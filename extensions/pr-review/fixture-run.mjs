@@ -25,15 +25,31 @@ export function watchRuntime(client, controller) {
 export async function executeFixtureRun(parent, client, settings, {
   controller, experiment, onStopped = () => {},
 }) {
+  return executeOwnedRun(parent, client, {
+    controller, onStopped, subject: "Fixture review",
+    evidencePrefix: experiment === "fixture" ? "F2" : "F3",
+    details: () => ({ experiment }),
+    execute: async (startRuntime) => {
+      await startRuntime();
+      return reviewFixture(parent, client, settings, { signal: controller.signal, experiment });
+    },
+  });
+}
+
+export async function executeOwnedRun(parent, client, {
+  controller, onStopped = () => {}, subject, evidencePrefix, execute, details = () => ({}),
+}) {
   let report;
   let error;
   let stopWatching;
   const cleanupErrors = [];
   try {
-    await client.start();
-    controller.signal.throwIfAborted();
-    stopWatching = watchRuntime(client, controller);
-    report = await reviewFixture(parent, client, settings, { signal: controller.signal, experiment });
+    report = await execute(async () => {
+      controller.signal.throwIfAborted();
+      await client.start();
+      controller.signal.throwIfAborted();
+      stopWatching = watchRuntime(client, controller);
+    });
   } catch (failure) {
     error = String(failure);
   } finally {
@@ -52,18 +68,19 @@ export async function executeFixtureRun(parent, client, settings, {
     }
   }
   const outcome = {
-    experiment,
+    ...details(),
     ...report,
     cancelled: controller.signal.aborted && controller.signal.reason?.name === "AbortError",
-    complete: report?.complete === true && !error && cleanupErrors.length === 0,
+    complete: report?.complete === true && !controller.signal.aborted && !error && cleanupErrors.length === 0,
     error,
     cleanupErrors,
   };
   onStopped();
-  if (!outcome.complete) {
-    await parent.log(`Fixture review has incomplete coverage. This is not a clean-review result. ${error ?? ""} ${cleanupErrors.join("; ")}`,
+  if (!outcome.complete && !(outcome.coverage === "not-started" && !error && !controller.signal.aborted && !cleanupErrors.length)) {
+    outcome.coverage = "incomplete";
+    await parent.log(`${subject} has incomplete coverage. This is not a clean-review result. ${error ?? ""} ${cleanupErrors.join("; ")}`,
       { level: "error" });
   }
-  await parent.log(`${experiment === "fixture" ? "F2" : "F3"} evidence: ${JSON.stringify(outcome)}`);
+  await parent.log(`${evidencePrefix} evidence: ${JSON.stringify(outcome)}`);
   return outcome;
 }

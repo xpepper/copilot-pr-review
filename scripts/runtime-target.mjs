@@ -32,6 +32,14 @@ export async function prepareLiveTargetSmoke() {
   const before = state();
   return {
     sessionOptions: { workingDirectory: directory },
+    quickTarget: {
+      args: "2543 --include-closed", workingDirectory: directory, repository: "github/copilot-sdk",
+      head: "7525814ae7de890acf63b0eb665531292adaf96d",
+      async check() {
+        assert.equal(state(), before);
+        assert.equal(await readFile(sentinel, "utf8"), "Different local checkout; do not use as PR evidence.\n");
+      },
+    },
     async exercise(session) {
       const pending = await dispatchTarget(session, "2543");
       assert.equal(pending.disposition, "confirmation-required", "No elicitation UI: require an explicit override");
@@ -98,6 +106,16 @@ export async function prepareTargetSmoke() {
   const questions = [];
   const calls = async () => (await readFile(trace, "utf8")).split("\n").filter(Boolean).map(JSON.parse);
   return {
+    quickTarget: {
+      args: "1", workingDirectory: directory, repository: "fixture/repository", head: "b".repeat(40),
+      async check() {
+        assert.equal(localState(), localBefore);
+        assert.equal(await readFile(reviewed, "utf8"), dirty);
+        assert.equal(await readFile(sentinel, "utf8"), "Unrelated local source remains unchanged.\n");
+        assert((await calls()).every(({ args }) => args[0] === "repo" ||
+          (args[0] === "api" && args[3] === "--method" && args[4] === "GET")));
+      },
+    },
     sessionOptions: {
       onElicitationRequest: async (request) => {
         questions.push(request.message);

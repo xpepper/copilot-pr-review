@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { exerciseF3, startFixture } from "./runtime-fixture.mjs";
 import { prepareLiveTargetSmoke, prepareTargetSmoke } from "./runtime-target.mjs";
+import { exerciseQuick } from "./runtime-quick.mjs";
 
 function fixtureSettings() {
   const settings = {
@@ -32,6 +33,16 @@ const { CopilotClient, RuntimeConnection } = await import(
 if (process.argv.includes("--targets") && process.argv.includes("--target-live")) {
   throw new Error("Use --targets and --target-live separately (stub versus real gh).");
 }
+const quickSettings = process.argv.includes("--quick") ? {
+  model: process.env.PR_REVIEW_HEAVY_MODEL,
+  reasoningEffort: process.env.PR_REVIEW_HEAVY_EFFORT,
+} : undefined;
+if (quickSettings) {
+  assert(Object.values(quickSettings).every((value) => value && !/\s/.test(value)),
+    "Set PR_REVIEW_HEAVY_MODEL and PR_REVIEW_HEAVY_EFFORT explicitly for inference-spending Q3 probes");
+  assert(process.argv.includes("--targets") || process.argv.includes("--target-live"),
+    "Q3 runtime probe requires --targets or --target-live");
+}
 const targetSmoke = process.argv.includes("--targets") ? await prepareTargetSmoke()
   : process.argv.includes("--target-live") ? await prepareLiveTargetSmoke() : undefined;
 const client = new CopilotClient({
@@ -47,6 +58,7 @@ try {
     availableTools: [],
     onPermissionRequest: async () => ({ kind: "denied-no-approval-rule" }),
     ...targetSmoke?.sessionOptions,
+    ...quickSettings,
   });
 
   await session.rpc.extensions.reload();
@@ -67,7 +79,7 @@ try {
     ["  status  ", "Copilot PR Review: entry point ready."],
     ["help", "Usage: /pr-review [status|help|models|fixture"],
     ["--help", "Usage: /pr-review [status|help|models|fixture"],
-    ["cancel", "No fixture review is running."],
+    ["cancel", "No review is running."],
   ]) {
     const before = (await session.getEvents()).length;
     const result = await session.rpc.commands.execute({ commandName: "pr-review", args });
@@ -79,7 +91,7 @@ try {
     console.log(`PASS /pr-review ${args}`);
   }
 
-  for (const args of ["123 --quick --no-comment", "status extra", "cancel extra", "--comment"]) {
+  for (const args of ["123 --balanced --no-comment", "status extra", "cancel extra", "--comment"]) {
     const result = await session.rpc.commands.execute({ commandName: "pr-review", args });
     assert.match(result.error, /Unsupported arguments\. No review was started\./);
     console.log(`PASS rejected /pr-review ${args}`);
@@ -101,6 +113,11 @@ try {
     ["fixture model1=a effort1=low model2=b effort2=high extra=x", /Invalid/],
     ["fixture model1=missing-f2-model effort1=low model2=b effort2=high", /Unavailable/],
     [`fixture model1=${available.id} effort1=invalid-effort model2=b effort2=high`, /Unsupported reasoning/],
+    ["123 --quick", /requires/],
+    ["123 --quick --major-only --no-comment", /requires/],
+    ["123 --quick --no-comment --comment", /Unsupported arguments/],
+    ["123 --quick --no-comment heavyModel=missing-q3-model", /Unavailable/],
+    [`123 --quick --no-comment heavyModel=${available.id} heavyEffort=invalid-effort`, /Unsupported reasoning/],
   ]) {
     const before = (await session.getEvents()).length;
     const result = await session.rpc.commands.execute({ commandName: "pr-review", args });
@@ -121,6 +138,8 @@ try {
     event.type === "tool.execution_start",
   ), "The entry point must not start model turns, agents, or tools");
   console.log("PASS no model turns, subagents, or tool executions");
+
+  if (quickSettings) await exerciseQuick(session, targetSmoke.quickTarget, quickSettings);
 
   if (process.argv.includes("--fixture") || process.argv.includes("--f3")) {
     const settings = fixtureSettings();

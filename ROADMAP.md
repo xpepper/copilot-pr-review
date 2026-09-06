@@ -20,7 +20,7 @@ in [AGENTS.md](AGENTS.md); the replaceable next-session prompt lives in
 | F3 | Completed | Native forbidden-tool denials plus an adversarial fixture; retained incomplete coverage; startup/active/unresponsive cancellation and owned-runtime/extension/parent loss exercised with process-exit evidence. Stdio integration selected; limits below. | F2; [Models/execution](SCOPE.md#models-configuration-and-execution) |
 | Q1 | Completed | Read-only code-owned PR capture with repository/head-bound snapshot, skip/override/confirmation gates, consistency guards, and installed-plugin controlled/live evidence below. | F3; [Targets](SCOPE.md#targets-and-local-behavior) |
 | Q2 | Completed | Source context bound to the captured head/base revisions with blob-verified provenance; local-checkout, moved-head, and inconsistent source refused. Evidence below. | Q1; [Targets](SCOPE.md#targets-and-local-behavior) |
-| Q3 | Pending | Run the three quick specialists, with `--major-only` alias and explicit incomplete coverage, in no-comment mode. | Q2; [Modes](SCOPE.md#review-modes-and-findings) |
+| Q3 | Completed | Three concurrent quick specialists consume bound PR input; explicit/ambient assignments, alias, incomplete coverage, and cancellation demonstrated below. Candidates remain unvalidated. | Q2; [Modes](SCOPE.md#review-modes-and-findings) |
 | Q4 | Pending | Validate evidence, severity/location/confidence, and deduplicate candidates; demonstrate real `--quick --no-comment` findings. | Q3; [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | P1 | Pending | Select validated findings with a minimal UI and `--all`; no writes yet. | Q4; [Selection/publication](SCOPE.md#selection-publication-and-cached-results) |
 | P2 | Pending | Retain results with session/repository/PR/head binding and reload/resume where supported; inspect without rerunning reviewers. | P1; [Cached results](SCOPE.md#selection-publication-and-cached-results) |
@@ -628,34 +628,200 @@ invocations, and not yet consumed by any reviewer. Q1's limits on remote
 sessions, GitHub Enterprise, other operating systems, `gh` authentication, and
 the 32 MiB subprocess buffer are unchanged. L1 remains pending.
 
+## Completed increment: Q3
+
+Implementation: `extensions/pr-review/quick.mjs`, command dispatch in
+`extension.mjs`, shared `reviewAssignments` / `validateModelAssignment` in
+`fixture.mjs`, and shared `executeOwnedRun` in `fixture-run.mjs`. The fixture
+experiments use those same helpers. `target.mjs` accepts cancellation for `gh`
+execution and pending closed-PR confirmation when invoked by quick review.
+Exercises: `scripts/smoke-quick.mjs`, `scripts/runtime-quick.mjs`, and the
+existing runtime/target/fixture harnesses. No upstream source was reused.
+
+### Implemented boundary
+
+- `NUMBER --quick --no-comment` and `NUMBER --major-only --no-comment` capture
+  and bind the target, then dispatch exactly correctness, contracts, and
+  combined security/performance/resources specialists concurrently. Exactly one
+  quick-mode spelling is required. The bare number remains capture-only.
+- Optional invocation-local `heavyModel=ID` and `heavyEffort=LEVEL` assign the
+  same heavy tier to all three reviewers. Unset fields independently inherit
+  the parent session's current model/effort. No saved configuration is loaded
+  or written; C1/C2 remain pending. Missing/unavailable subscription models,
+  incompatible inherited effort, and invalid explicit effort stop without
+  substitution. When ambient effort is unset, the owned runtime's resolved
+  default is displayed and checked before prompts. That last default-resolution
+  branch is pure-test evidence only, not a live non-reasoning-model claim.
+- Both runtime catalogs, initialized empty tools, and effective model/effort
+  are checked before any prompt. Assignments are displayed before reviewer
+  starts; actual usage must match model, effort, and `isByok: false`.
+  Independent sessions retain the F3 denying hooks/permissions, disabled
+  configuration discovery, no-timeout waiting, connection-failure supervision,
+  cancellation, and owned-runtime shutdown.
+- Each prompt carries captured metadata, diff, and numbered source context as
+  JSON data. An appended system instruction marks all PR-controlled content as
+  untrusted, forbids tools/local evidence, and requests substantiated P0-P2
+  candidates with severity, confidence, location, and concrete evidence.
+  JSON encoding and instructions aid interpretation; capability restrictions
+  are the enforcement boundary, not a promise of prompt-injection immunity.
+- Code-owned `Q3 binding:` and result envelopes identify repository/PR,
+  head/base SHAs, diff/context hashes, paths, and per-source blob provenance.
+  Model-written citations are **not validated by that envelope**. Outputs are
+  explicitly untrusted, unvalidated candidates; no selection, publication,
+  safeguards, source changes, or result cache was added.
+- `Q3 evidence:` follows cleanup. `complete` means successful specialist
+  execution and cleanup, not a validated or clean review. Partial/failed
+  reviewers retain their output and do not discard successful peers. Capture
+  skips/declines/pending confirmation report `coverage: "not-started"` with no
+  reviewer runtime. Capture/setup failures, mismatched usage, cleanup errors,
+  and cancellation report incomplete coverage.
+- Quick dispatch returns after acceptance. Cancellation also aborts an active
+  `gh` subprocess and the local confirmation waiter; a late confirmation
+  cannot resume capture. A host-owned confirmation dialog may remain visible.
+  Confirmation cancellation is demonstrated with a controlled pure probe, not
+  a native UI exercise.
+
+### Demonstrated outcome
+
+On 2026-09-07 (local time), using CLI 1.0.83 / bundled SDK / Node.js 26.1.0 /
+macOS arm64:
+
+- All four pure probes passed. Q3 covers parsing/aliases/conflicts, exact
+  specialist topology, ambient and explicit assignment resolution, three
+  simultaneous in-flight prompts, input/envelope binding, untrusted metadata
+  encoding, read-only session configuration, partial-result retention, tool
+  attempts, missing/wrong usage, capture gates/failures, startup/setup errors,
+  cancellation before/during capture and execution, late confirmation, and
+  visible cleanup failures with force-stop.
+- The installed-plugin controlled exercise ran against the Q2 fixture on a
+  different dirty local branch. Both explicit quick and bare alias commands
+  completed with three independent sessions using `claude-sonnet-5` / `high`.
+  Final-run three-way overlap was **2006 ms** and **2445 ms**, respectively.
+  The dirty reviewed-path decoy and checkout state remained unchanged; traced
+  `gh` operations were read-only and source refs stayed captured. Owned runtime
+  PIDs **60328**, **60861**, and **61387** exited after explicit completion,
+  alias completion, and active cancellation, respectively.
+- The live exercise reviewed public merged **github/copilot-sdk#2543** via
+  `--include-closed`, using the same immutable head/base/diff/context identities
+  recorded for Q2. The only captured path was
+  `.github/workflows/java-publish-maven.yml`. All three specialists' actual
+  usage was `claude-sonnet-5`, reasoning `high`, `isByok: false`.
+  Explicit quick execution had **87406 ms** three-way overlap; the bare alias
+  inheriting the configured parent had **74162 ms** overlap. The parent model
+  and the unrelated empty checkout remained unchanged.
+
+| Live explicit specialist | Independent session | Turn start (epoch ms) | Session idle (epoch ms) |
+| --- | --- | --- | --- |
+| correctness | `51b1e4b4-eb4b-443b-b9bb-6f8eab07b752` | 1788734231889 | 1788734392717 |
+| contracts | `5a730b2d-2d04-4444-855f-c443acc189d2` | 1788734231879 | 1788734319310 |
+| security-performance-resources | `97d638c9-67c4-4cd1-9d55-22d43b488623` | 1788734231904 | 1788734351778 |
+
+Live alias session IDs: `fe0c136e-cf43-4526-9082-d77a275ccd69`,
+`c75139e2-39d4-4a59-8b60-b5c247c8df06`, and
+`ae84f2a5-b788-4660-947c-09806f302d38`, in specialist order.
+
+- Live explicit and alias owned-runtime PIDs **52866** and **55651** exited
+  after normal cleanup. Cancellation after all three live reviewers were active
+  rejected a duplicate invocation, returned `complete: false`,
+  `cancelled: true`, and three cancelled reviewer entries, and stopped PID
+  **58412**. No harness kill was needed; cleanup errors were empty. Individual
+  abort RPCs reported a disposed connection after force-stop, retained as
+  reviewer error detail rather than hidden or mistaken for completed coverage.
+- Live output included low-confidence candidates (for example, confidence
+  **0.4**) and potential duplicate/pre-existing claims. These are evidence
+  that the inference plumbing works, **not accepted findings or proof of a
+  defect in that PR**. Q4 must independently reject unsupported/pre-existing
+  claims and validate/deduplicate the rest.
+- The refactored F2 real-inference probe also passed: `claude-sonnet-5` / `low`
+  and `gpt-5.6-terra` / `high`, with **1970 ms** execution overlap. Existing
+  pure F3 error/denial/cancellation checks passed. The complete native F3
+  adversarial/loss/SIGSTOP suite was not rerun for Q3; its earlier evidence
+  remains recorded above. New Q3 partial-failure scenarios are pure probes,
+  while live Q3 cancellation and normal cleanup have process-exit evidence.
+
+### Reproduction and consulted APIs
+
+```sh
+copilot plugin install "$(pwd)"
+node scripts/smoke-fixture.mjs
+node scripts/smoke-target.mjs
+node scripts/smoke-context.mjs
+node scripts/smoke-quick.mjs
+COPILOT_CLI_PATH="$(command -v copilot)" \
+COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
+PR_REVIEW_HEAVY_MODEL=claude-sonnet-5 PR_REVIEW_HEAVY_EFFORT=high \
+node scripts/smoke-runtime.mjs --targets --quick
+COPILOT_CLI_PATH="$(command -v copilot)" \
+COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
+PR_REVIEW_HEAVY_MODEL=claude-sonnet-5 PR_REVIEW_HEAVY_EFFORT=high \
+node scripts/smoke-runtime.mjs --target-live --quick
+COPILOT_CLI_PATH="$(command -v copilot)" \
+COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
+PR_REVIEW_MODEL_1=claude-sonnet-5 PR_REVIEW_EFFORT_1=low \
+PR_REVIEW_MODEL_2=gpt-5.6-terra PR_REVIEW_EFFORT_2=high \
+node scripts/smoke-runtime.mjs --fixture
+```
+
+The pure scripts use existing Node.js/assert only. Runtime `--quick` and
+`--fixture` spend subscription credits; the `--targets` and `--target-live`
+variants without `--quick` remain no-inference. Use stub/live separately,
+with a fresh runtime and reinstalled plugin. The live Q3 probe took several
+minutes without imposing any review deadline.
+
+Consulted current official
+[plugin creation documentation](https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/plugins-creating),
+the extension authoring guide, installed SDK `docs/extensions.md`,
+`docs/agent-author.md`, `types.d.ts` (`systemMessage` append mode), and
+`generated/rpc.d.ts` (`model.getCurrent`, `CurrentModel.reasoningEffort`).
+The existing stdio/session integration was reused, not replaced by factories
+or a new runtime abstraction.
+
+### Remaining limitations
+
+No evidence-validation or deduplication implementation exists yet. The
+reviewer's human-readable structure, claimed severity/confidence, and cited
+paths/lines are requests in the prompt, not a trusted findings schema. The
+code-owned envelope cannot make a hallucinated location valid or prove a
+candidate was introduced by the diff. Q4 is the next increment.
+
+Only all-heavy quick mode is wired. Saved tier configuration, trust, inheritance
+across saved tiers, fallback, other modes, selection, retained results, and
+publication remain their later increments. The large-input/context limitations
+from Q2 remain: no prompt-size budget or truncation strategy; oversized input
+can fail explicitly at the runtime/provider boundary. No timing-based fallback
+or timeout was added. Remote/Enterprise/other-OS support and robust handling of
+all provider behaviors have not been demonstrated. SDK transcripts may persist;
+the plugin still has no cross-command or cross-session cache. L1 remains pending.
+
 ## Exact next increment
 
-**Q3 only:** Run the three quick specialists over the Q2-bound target, in
-no-comment mode, with the `--major-only` alias for `--quick` and explicit
-incomplete-coverage reporting.
-
-Reuse the F2/F3 reviewer machinery: plugin-owned stdio runtime, independent
-reviewer sessions, empty tool sets, denying pre-tool hooks and permissions,
-displayed effective assignments, per-reviewer progress, cancellation, and
-owned-runtime cleanup. Feed each reviewer the captured diff and the Q2 context
-with its provenance, and require reviewers to treat that content as untrusted
-input rather than instructions. A failed or incomplete reviewer must remain
-visible as incomplete coverage and must never become a clean-review claim.
+**Q4 only:** Validate evidence, severity/location/confidence, and deduplicate
+quick specialist candidates; demonstrate a real `--quick --no-comment` result
+with validated findings.
 
 Acceptance criteria:
 
-- `/pr-review NUMBER --quick --no-comment` and its `--major-only` alias capture,
-  bind context, and dispatch exactly the three quick specialists concurrently
-  with their configured models and reasoning efforts.
-- Reviewer output stays bound to the captured repository, head, and paths.
-  No publication, no writes, no local source, and no safeguard execution.
-- Partial and failed reviewers report incomplete coverage explicitly, and
-  cancellation still stops owned work.
-- Cover the new paths with the existing pure Node.js/assert exercises, and
-  record inference-spending runtime evidence separately from assumptions.
+- Define a strict candidate/result boundary for the Q3 output. Malformed,
+  incomplete, unsupported, or out-of-binding claims must not silently become
+  accepted findings or clean coverage. Do not add the dropped experimental
+  malformed-output extraction behavior.
+- Validate each accepted candidate against the captured diff and Q2 source
+  evidence, including repository/head/path/side/line provenance, concrete
+  impact, confidence and severity, and whether the change introduced the
+  defect. Quick results contain substantiated P0-P2 only.
+- Deduplicate overlapping specialist reports of the same defect without
+  merging distinct issues merely because they share a file or line. Preserve
+  human-readable severity, location, confidence, and review structure.
+- Preserve useful validated findings from degraded runs, with failed or partial
+  coverage explicitly visible. Never turn execution completion or zero accepted
+  candidates into an unjustified clean-review claim.
+- Add deterministic Node.js/assert exercises for accepted/rejected candidates,
+  provenance, false positives/pre-existing claims, deduplication, malformed
+  output, and incomplete coverage. Separately record installed-plugin real-PR
+  inference evidence; do not label model assertions as validated by default.
 
-Do not implement Q4 validation/deduplication, selection, publication, saved
-configuration, retained-result caching, or safeguards. Do not switch branches,
-modify reviewed source, fetch/reset the checkout, or reopen settled scope
-decisions. Keep L1 pending unless separately authorized; no upstream source
-reuse.
+Keep the Q3 model assignment, isolation, progress, cancellation, no-timeout,
+and cleanup guarantees. Do not add selection, caching, publication, saved
+configuration, other modes, fallback, or safeguards. Do not modify reviewed
+source, switch branches, or fetch/reset the checkout. Respect `SCOPE.md`,
+keep L1 pending unless separately authorized, and copy no upstream source.

@@ -45,15 +45,19 @@ export function validateAssignments(settings, list) {
   return ["rounding", "shipping"].map((label, index) => {
     const model = settings[`model${index + 1}`];
     const reasoningEffort = settings[`effort${index + 1}`];
-    const available = subscriptionModels(list).find((entry) => entry.id === model);
-    if (!available) {
-      throw new Error(`Unavailable or disabled Copilot-subscription model: ${model}. No substitution.`);
-    }
-    if (!reasoningEfforts(available).includes(reasoningEffort)) {
-      throw new Error(`Unsupported reasoning effort ${reasoningEffort} for ${model}. No substitution.`);
-    }
+    validateModelAssignment({ model, reasoningEffort }, list);
     return { label, model, reasoningEffort };
   });
+}
+
+export function validateModelAssignment({ model, reasoningEffort }, list) {
+  const available = subscriptionModels(list).find((entry) => entry.id === model);
+  if (!available) {
+    throw new Error(`Unavailable or disabled Copilot-subscription model: ${model}. No substitution.`);
+  }
+  if (reasoningEffort !== undefined && !reasoningEfforts(available).includes(reasoningEffort)) {
+    throw new Error(`Unsupported reasoning effort ${reasoningEffort} for ${model}. No substitution.`);
+  }
 }
 
 export async function reviewFixture(parent, client, settings, {
@@ -71,6 +75,32 @@ export async function reviewFixture(parent, client, settings, {
   const adversarial = experiment === "adversarial"
     ? await readFile(new URL("./fixtures/adversarial.txt", import.meta.url), "utf8")
     : "";
+  const report = await reviewAssignments(parent, client, assignments, {
+    signal, probeTools: experiment === "adversarial",
+    injectFailure: experiment === "failure",
+    intro: "F2 fixture only. Outputs are unvalidated, not publishable findings.",
+    outputLabel: "Unvalidated fixture output",
+    prompt: (assignment) => [
+      "Review ONLY the original fixture below against its comment contract.",
+      `Your focus is ${assignment.label === "rounding" ? "whole-cent rounding" : "the free-shipping threshold"}.`,
+      "Do not use tools, read any other files, run commands, delegate, or modify anything.",
+      "Reply in at most 150 words with a defect, source line, and concrete input/expected/actual example,",
+      "or explicitly state that you found no defect in your assigned focus.",
+      "This is a feasibility exercise, not a real PR or a validated review.",
+      "<fixture>", source, adversarial, "</fixture>",
+    ].join("\n"),
+  });
+  await parent.log(report.complete
+    ? "F2 fixture execution completed. Output has not been evidence-validated or deduplicated."
+    : "F2 fixture execution has incomplete coverage. This is not a clean-review result.",
+  { level: report.complete ? "info" : "error" });
+  return { ...report, experiment };
+}
+
+export async function reviewAssignments(parent, client, assignments, {
+  signal, prompt, intro, outputLabel, systemMessage,
+  probeTools = false, injectFailure = false,
+}) {
   const log = (message, level = "info") => parent.log(message, { level });
   const sessions = [];
   const policies = [];
@@ -81,55 +111,50 @@ export async function reviewFixture(parent, client, settings, {
     const session = await client.createSession({
       model: assignment.model,
       reasoningEffort: assignment.reasoningEffort,
+      ...(systemMessage ? { systemMessage } : {}),
       ...reviewerPolicy(policy),
     });
     sessions.push(session);
     policies.push(policy);
     signal.throwIfAborted();
     // The owned runtime uses local CLI authentication; validate its own catalog too.
-    validateAssignments(settings, (await session.rpc.model.list()).list);
+    const catalog = (await session.rpc.model.list()).list;
+    validateModelAssignment(assignment, catalog);
     const current = await session.rpc.model.getCurrent();
-    if (current.modelId !== assignment.model || current.reasoningEffort !== assignment.reasoningEffort) {
+    if (current.modelId !== assignment.model ||
+        (assignment.reasoningEffort !== undefined && current.reasoningEffort !== assignment.reasoningEffort)) {
       throw new Error(`Runtime did not retain the explicit assignment for ${assignment.label}. No review started.`);
     }
+    // An unset effort uses the runtime's resolved default, which must also be displayed and checked.
+    assignment.reasoningEffort = current.reasoningEffort;
+    validateModelAssignment(assignment, catalog);
     await assertNoReviewerTools(session);
-    if (experiment === "adversarial") {
+    if (probeTools) {
       enforcement.push({ label: assignment.label, probes: await probeForbiddenTools(session) });
     }
   }
   signal.throwIfAborted();
-  await log("F2 fixture only. Outputs are unvalidated, not publishable findings.");
+  await log(intro);
   for (const assignment of assignments) {
-    await log(`Assignment ${assignment.label}: model=${assignment.model} reasoning=${assignment.reasoningEffort}`);
+    await log(`Assignment ${assignment.label}: model=${assignment.model} reasoning=${assignment.reasoningEffort ?? "(not configurable)"}`);
   }
   const outcomes = await Promise.allSettled(assignments.map(async (assignment, index) => {
     await log(`Reviewer ${assignment.label}: starting`);
-    const evidence = await runReviewer(sessions[index], [
-      "Review ONLY the original fixture below against its comment contract.",
-      `Your focus is ${assignment.label === "rounding" ? "whole-cent rounding" : "the free-shipping threshold"}.`,
-      "Do not use tools, read any other files, run commands, delegate, or modify anything.",
-      "Reply in at most 150 words with a defect, source line, and concrete input/expected/actual example,",
-      "or explicitly state that you found no defect in your assigned focus.",
-      "This is a feasibility exercise, not a real PR or a validated review.",
-      "<fixture>",
-      source,
-      adversarial,
-      "</fixture>",
-    ].join("\n"), {
+    const evidence = await runReviewer(sessions[index], prompt(assignment), {
       signal,
-      injectFailure: experiment === "failure" && index === 0,
+      injectFailure: injectFailure && index === 0,
       onActive: () => log(`Reviewer ${assignment.label}: active`),
     });
     if (evidence.status === "completed" && (!evidence.usage.length || evidence.usage.some((usage) =>
       usage.model !== assignment.model ||
-      usage.reasoningEffort !== assignment.reasoningEffort ||
+      (usage.reasoningEffort ?? undefined) !== assignment.reasoningEffort ||
       usage.isByok !== false,
     ))) {
       evidence.status = "incomplete";
       evidence.error = "Actual model/reasoning/subscription usage did not match the assignment.";
     }
     await log(evidence.status === "completed"
-      ? `Reviewer ${assignment.label}: completed\nUnvalidated fixture output:\n${evidence.result}`
+      ? `Reviewer ${assignment.label}: completed\n${outputLabel}:\n${evidence.result}`
       : `Reviewer ${assignment.label}: ${evidence.status}; incomplete coverage. ${evidence.error}`,
     evidence.status === "completed" ? "info" : "error");
     return { ...assignment, ...evidence, policy: policies[index] };
@@ -145,13 +170,9 @@ export async function reviewFixture(parent, client, settings, {
     }
   }
   const complete = !signal.aborted && reviewers.every((reviewer) => reviewer.status === "completed");
-  await log(complete
-    ? "F2 fixture execution completed. Output has not been evidence-validated or deduplicated."
-    : "F2 fixture execution has incomplete coverage. This is not a clean-review result.",
-  complete ? "info" : "error");
   return {
     complete, cancelled: signal.aborted && signal.reason?.name === "AbortError",
-    experiment, enforcement, reviewers,
+    enforcement, reviewers,
   };
 }
 
@@ -186,7 +207,7 @@ export async function runReviewer(session, prompt, {
         evidence.result = event.data.content;
         break;
       case "tool.execution_start":
-        reject(new Error("Fixture reviewer attempted a tool call; no read-only claim can be made."));
+        reject(new Error("Reviewer attempted a tool call; no read-only claim can be made."));
         break;
       case "session.error":
         reject(new Error(event.data.message));

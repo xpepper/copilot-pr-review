@@ -14,7 +14,7 @@ function isAlive(pid) {
   }
 }
 
-async function assertExited(rows) {
+export async function assertExited(rows) {
   // Harness-only exit observation bound, not a reviewer execution deadline.
   for (let attempt = 0; attempt < 100 && rows.some((row) => isAlive(row.pid)); attempt++) {
     await delay(50);
@@ -24,7 +24,7 @@ async function assertExited(rows) {
   }
 }
 
-async function descendants() {
+export async function descendants() {
   const { stdout } = await exec("ps", ["-axo", "pid=,ppid=,command="]);
   const rows = stdout.trim().split("\n").map((line) => {
     const [, pid, ppid, command] = line.match(/^\s*(\d+)\s+(\d+)\s+(.*)$/);

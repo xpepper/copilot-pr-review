@@ -23,7 +23,8 @@ export function parseTargetArgs(args) {
   };
 }
 
-export async function runGh(args, cwd) {
+export async function runGh(args, cwd, { signal } = {}) {
+  signal?.throwIfAborted();
   if (typeof cwd !== "string" || !isAbsolute(cwd)) {
     throw new Error("Target capture requires the session's absolute working directory.");
   }
@@ -32,7 +33,7 @@ export async function runGh(args, cwd) {
   for (const key of ["GH_REPO", "GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR"]) delete env[key];
   try {
     const { stdout } = await execute("gh", args, {
-      cwd, env, encoding: "utf8", maxBuffer: 32 * 1024 * 1024,
+      cwd, env, signal, encoding: "utf8", maxBuffer: 32 * 1024 * 1024,
     });
     return stdout;
   } catch (error) {
@@ -183,16 +184,32 @@ export function contextSummary(context, limit = 20) {
   };
 }
 
-export async function executeTargetCapture(session, args, { gh = runGh } = {}) {
+async function confirmTarget(session, message, signal) {
+  if (!signal) return session.ui.confirm(message);
+  signal.throwIfAborted();
+  const cancellation = Promise.withResolvers();
+  const cancel = () => cancellation.reject(signal.reason);
+  signal.addEventListener("abort", cancel, { once: true });
+  try {
+    return await Promise.race([session.ui.confirm(message), cancellation.promise]);
+  } finally {
+    signal.removeEventListener("abort", cancel);
+  }
+}
+
+export async function executeTargetCapture(session, args, { gh = runGh, signal } = {}) {
   const options = parseTargetArgs(args);
+  signal?.throwIfAborted();
   const metadata = await session.rpc.metadata.snapshot();
+  signal?.throwIfAborted();
   if (metadata.isRemote) throw new Error("PR capture requires a local Copilot session.");
   const cwd = metadata.workingDirectory;
   const outcome = await captureTarget(options, {
     cwd, gh,
     confirm: session.capabilities.ui?.elicitation
-      ? (message) => session.ui.confirm(message) : undefined,
+      ? (message) => confirmTarget(session, message, signal) : undefined,
   });
+  signal?.throwIfAborted();
   // Keep PR-controlled text and the complete diff out of the parent timeline.
   await session.log(`Q1 target: ${JSON.stringify({
     disposition: outcome.disposition, reason: outcome.reason,
@@ -207,6 +224,7 @@ export async function executeTargetCapture(session, args, { gh = runGh } = {}) {
   if (!outcome.snapshot) return outcome;
   // Context is bound to the captured revisions; unavailable or inconsistent source stops here.
   const context = await assembleContext(outcome.snapshot, { gh, cwd });
+  signal?.throwIfAborted();
   const bound = "Source context comes only from the captured GitHub revisions. " +
     "The local checkout, its branch, and its uncommitted changes are not review evidence.";
   await session.log(`Q2 context: ${JSON.stringify(contextSummary(context))}\n${bound}`);

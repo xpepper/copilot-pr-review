@@ -5,12 +5,14 @@ import {
 } from "./fixture.mjs";
 import { executeFixtureRun } from "./fixture-run.mjs";
 import { executeTargetCapture } from "./target.mjs";
+import { executeQuickRun, parseQuickArgs, quickAssignments } from "./quick.mjs";
 
 const help = [
   "Copilot PR Review - runtime feasibility prototype",
   "",
   "Usage: /pr-review [status|help|models|fixture model1=ID effort1=LEVEL model2=ID effort2=LEVEL]",
   "       /pr-review NUMBER [--include-drafts] [--include-closed|--review-closed]",
+  "       /pr-review NUMBER --quick|--major-only --no-comment [heavyModel=ID] [heavyEffort=LEVEL]",
   "",
   "status  Show the implemented capability boundary (default).",
   "help    Show this usage information.",
@@ -18,12 +20,15 @@ const help = [
   "fixture Run two reviewers of the bundled original fixture (uses Copilot credits).",
   "adversarial  Same settings; exercise forbidden tools and untrusted fixture text.",
   "failure      Same settings; inject a failure in the first active reviewer.",
-  "cancel       Cancel active fixture reviewers and stop their owned runtime.",
+  "cancel       Cancel active review work and stop its owned runtime.",
   "",
   "NUMBER  Capture PR metadata and diff, then bind source context to the captured",
   "        head/base revisions. No reviewers, no publication, no local source.",
   "Drafts and obvious bots are skipped, as are provably empty changes.",
   "Closed/merged PRs require confirmation or an explicit closed-PR override.",
+  "--quick / --major-only  Run three heavy specialists on captured PR content.",
+  "Requires --no-comment. Unset heavy settings inherit the ambient model/effort.",
+  "Candidates are unvalidated; no selection, publication, caching, or safeguards.",
   "Other review flags are not supported yet.",
 ].join("\n");
 
@@ -32,15 +37,15 @@ const status = [
   "The plugin extension joined this Copilot CLI session and handled /pr-review.",
   "",
   "Implemented: PR target capture with revision-bound source context, model capability",
-  "listing, and a two-reviewer fixture prototype.",
+  "listing, three quick PR specialists, and a two-reviewer fixture prototype.",
   "The fixture requires explicit distinct models and reasoning efforts.",
   "F3 experiments: adversarial read-only probes, failure injection, and manual cancellation.",
-  "This is a runtime feasibility prototype, not a real PR review.",
+  "Quick execution is available with --quick --no-comment; candidate validation is pending.",
   "",
   "Status/help start no models or background work. PR capture and source context use",
   "read-only gh requests against the captured revisions, never the local checkout.",
   "The prototype publishes nothing and runs no project safeguards.",
-  "No PR review has been performed; this is not a clean-review result.",
+  "Status is not a review result or a clean-review claim.",
 ].join("\n");
 
 let activeRun;
@@ -49,14 +54,14 @@ const session = await joinSession({
   commands: [
     {
       name: "pr-review",
-      description: "PR target capture, prototype status, model listing, or fixture experiment",
+      description: "Read-only quick PR specialists, target capture, status, or fixture experiment",
       handler: async ({ args }) => {
         if (shuttingDown) throw new Error("Extension is shutting down.");
         switch (args.trim()) {
           case "cancel": {
             const run = activeRun;
             if (!run) {
-              await session.log("No fixture review is running.");
+              await session.log("No review is running.");
               return;
             }
             run.controller.abort(new DOMException("Manually cancelled; incomplete coverage.", "AbortError"));
@@ -66,7 +71,7 @@ const session = await joinSession({
             if (outcome.cleanupErrors.length) {
               throw new Error(`Cancellation cleanup was not clean: ${outcome.cleanupErrors.join("; ")}`);
             }
-            await session.log("Fixture cancellation finished; owned runtime stopped. No publication is possible.");
+            await session.log("Review cancellation finished; owned runtime stopped. No publication is possible.");
             return;
           }
           case "":
@@ -88,30 +93,23 @@ const session = await joinSession({
           }
           default: {
             if (/^\d/.test(args.trim())) {
+              if (args.trim().split(/\s+/).some((token) => ["--quick", "--major-only"].includes(token))) {
+                const options = parseQuickArgs(args);
+                assertIdle();
+                const assignments = await quickAssignments(session, options.settings);
+                startRun((client, lifecycle) => executeQuickRun(session, client, options, assignments, lifecycle));
+                return;
+              }
               await executeTargetCapture(session, args);
               return;
             }
             const experiment = args.trim().split(/\s+/)[0];
             if (["fixture", "adversarial", "failure"].includes(experiment)) {
               const settings = parseFixtureArgs(args);
-              if (activeRun) throw new Error("A fixture review is already running in this session.");
+              assertIdle();
               validateAssignments(settings, (await session.rpc.model.list()).list);
-              if (activeRun) throw new Error("A fixture review is already running in this session.");
-              if (shuttingDown) throw new Error("Extension is shutting down.");
-              const client = new CopilotClient({ connection: RuntimeConnection.forStdio() });
-              const controller = new AbortController();
-              const run = { client, controller };
-              activeRun = run;
-              const clearRun = () => {
-                if (activeRun === run) activeRun = undefined;
-              };
-              run.done = executeFixtureRun(session, client, settings, {
-                controller, experiment, onStopped: clearRun,
-              })
-                .finally(clearRun);
-              // Command dispatch must return so the interactive user can issue cancel.
-              // A broken parent transport may prevent timeline delivery; stderr is the extension log.
-              void run.done.catch((error) => console.error(`Fixture run failed: ${String(error)}`));
+              startRun((client, lifecycle) =>
+                executeFixtureRun(session, client, settings, { ...lifecycle, experiment }));
               return;
             }
             const message = `Unsupported arguments. No review was started.\n\n${help}`;
@@ -123,6 +121,25 @@ const session = await joinSession({
     },
   ],
 });
+
+function assertIdle() {
+  if (activeRun) throw new Error("A review is already running in this session.");
+  if (shuttingDown) throw new Error("Extension is shutting down.");
+}
+
+function startRun(execute) {
+  assertIdle();
+  const client = new CopilotClient({ connection: RuntimeConnection.forStdio() });
+  const controller = new AbortController();
+  const run = { client, controller };
+  activeRun = run;
+  const clearRun = () => {
+    if (activeRun === run) activeRun = undefined;
+  };
+  run.done = execute(client, { controller, onStopped: clearRun }).finally(clearRun);
+  // Return dispatch so cancel remains available. Parent transport loss can prevent timeline delivery.
+  void run.done.catch((error) => console.error(`Review run failed: ${String(error)}`));
+}
 
 async function shutdown(reason) {
   if (shuttingDown) return;

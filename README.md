@@ -1,6 +1,7 @@
 # Copilot PR Review
 
-An original Copilot CLI plugin prototype. **It does not review PRs yet.**
+An original Copilot CLI plugin prototype. **Quick PR specialists run, but their
+candidates are not yet validated or publishable.**
 [SCOPE.md](SCOPE.md) is the authoritative product specification;
 [ROADMAP.md](ROADMAP.md) records delivery status and runtime evidence.
 
@@ -38,8 +39,9 @@ available subscription models and reasoning capabilities without inference.
 A PR number captures the GitHub repository owning the **current session
 directory**, PR metadata, base/head SHAs, and diff through `gh`. It does not
 start reviewers, change branches, read local source as PR evidence, or post
-anything. Other review flags (including `--quick` and `--no-comment`) remain
-unsupported until their increments; this command is capture-only.
+anything. Without `--quick` / `--major-only`, this command remains capture-only.
+The quick execution path is described below; other review modes are not yet
+implemented.
 
 Drafts are skipped unless `--include-drafts` is supplied. Obvious bot accounts
 (GitHub `Bot` type or a `[bot]` login) are skipped. The conservative trivial
@@ -97,9 +99,62 @@ The reported summary carries provenance only: repository, head/base SHAs, per
 file path, status, side, blob SHA, byte and line counts, window ranges, and a
 SHA-256 of the assembled context. Source text stays out of the parent
 conversation. Inside the assembled context, every line is prefixed with its
-line number under a provenance header, so PR-controlled text cannot pass itself
-off as a header. Context lives only inside the invocation; it is not cached,
-and no reviewer consumes it yet.
+line number under a provenance header. This aids legibility, not prompt-injection
+isolation. Context lives only inside the invocation; it is not cached. Quick
+reviewers consume it when explicitly requested.
+
+### Three quick PR specialists (Q3)
+
+```text
+/pr-review 123 --quick --no-comment
+/pr-review 123 --major-only --no-comment
+/pr-review 123 --quick --no-comment heavyModel=claude-sonnet-5 heavyEffort=high
+/pr-review cancel
+```
+
+These commands spend Copilot subscription credits. Quick mode runs exactly three
+heavy specialists concurrently: correctness, contracts, and combined
+security/performance/resources. The example model is not a default. All three
+use the same heavy-tier assignment. Until saved configuration is implemented,
+unset `heavyModel` and `heavyEffort` inherit the current parent session's model
+and reasoning effort independently. Explicit settings and inherited assignments
+must be available and compatible; an unsupported effort is an error, never
+silently lowered when changing models. An unset ambient effort uses the owned
+runtime's resolved default. Effective settings are displayed before prompts
+and checked against actual usage. The parent model is unchanged.
+
+Use exactly one of `--quick` and `--major-only`, together with `--no-comment`.
+The existing draft/closed overrides still apply. `--comment`, other review modes,
+`--all`, and `--verify` remain unsupported. No personal/project configuration or
+fallback is saved or applied by Q3.
+
+Dispatch returns after acceptance so cancellation remains available during capture
+or reviewer execution. Capture/skip/error messages, assignments, progress, and
+candidate outputs follow in the timeline. The `Q3 binding:` line identifies the
+captured repository, PR, head/base SHAs, diff/context fingerprints, and allowed
+paths with source provenance. Each independent reviewer receives the captured
+diff and numbered context as untrusted JSON data, with code-owned system
+instructions to ignore embedded requests and use no other evidence. Reviewers
+have no tools, configuration discovery, or allowed permissions. No checkout
+source, branch switching, source writes, GitHub mutations, or safeguards are used.
+
+Reviewers are asked for substantiated P0-P2 candidates with severity, confidence,
+path/side/lines, and concrete evidence. **Their prose is still untrusted and
+unvalidated:** code binds the output envelope, not the factual correctness of
+its citations. Evidence/location validation, severity filtering, deduplication,
+and a final findings presentation belong to Q4. Candidate output may quote PR
+source; full captured input is not dumped into the parent timeline.
+
+`Q3 evidence:` is emitted after owned-runtime cleanup. `complete: true` means
+only that every specialist finished with matching usage and clean cleanup, not
+that the PR is correct or its candidates are validated. Failed reviewers retain
+partial output alongside successful reviewers and report incomplete coverage.
+Skipped/declined/unconfirmed targets report `coverage: "not-started"` and start
+no reviewer runtime. Setup/capture failures and cancellation never become a
+clean-review result. Results are invocation-local, not a publish-later cache.
+Manual cancellation stops owned work without a review timeout; a pending host
+confirmation UI may remain visible, but a late answer cannot resume cancelled
+capture.
 
 ### Two-reviewer fixture experiment (F2)
 
@@ -201,8 +256,8 @@ Signal/parent-EOF handlers force-stop owned work without waiting for parent
 logging. An abruptly lost parent cannot receive a final report; there is no
 clean-review claim or publication. Normal SDK transcripts may persist, and
 forced termination does not guarantee a final transcript flush. The prototype
-can capture PRs and bind their source context, but does not review them,
-publish to GitHub, or execute project safeguards. It does not restrict or change the model of the surrounding Copilot session. The SDK may
+can capture PRs, bind source context, and run quick specialists, but cannot
+validate candidates, publish to GitHub, or execute project safeguards. It does not restrict or change the model of the surrounding Copilot session. The SDK may
 retain its own session transcripts; no plugin review archive is implemented.
 
 No upstream source has been copied. Source reuse/licensing assessment remains
@@ -217,13 +272,14 @@ Node.js 22+ and the SDK bundled with the installed CLI (adjust its path):
 node scripts/smoke-fixture.mjs
 node scripts/smoke-target.mjs
 node scripts/smoke-context.mjs
+node scripts/smoke-quick.mjs
 COPILOT_CLI_PATH="$(command -v copilot)" \
 COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
 node scripts/smoke-runtime.mjs
 ```
 
 The pure probes exercise fixture guards/lifecycle, PR capture/gates, and
-revision-bound context assembly without a runtime. The context probe covers
+revision-bound context assembly, and quick orchestration without a runtime. The context probe covers
 diff parsing, blob and hunk verification, window binding, an advancing PR, and
 a decoy working-tree file at the reviewed path. The runtime probe discovers the **installed** extension, dispatches status/help,
 model listing, and invalid settings, and asserts explicit errors without model
@@ -258,6 +314,24 @@ configuration/model-list access described above. The live exercise additionally
 requires `gh` authentication and those public PRs to remain accessible.
 
 To exercise actual concurrent inference as well:
+
+```sh
+COPILOT_CLI_PATH="$(command -v copilot)" \
+COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
+PR_REVIEW_HEAVY_MODEL=claude-sonnet-5 PR_REVIEW_HEAVY_EFFORT=high \
+node scripts/smoke-runtime.mjs --targets --quick
+```
+
+This Q3 probe runs explicit quick settings, the bare alias inheriting a configured
+parent model/effort, and cancellation after all three reviewers become active.
+It asserts actual three-way execution overlap, subscription usage, assignments
+before dispatch, target binding, duplicate-run rejection, incomplete cancellation,
+owned-process exit, and an unchanged checkout. Replace `--targets` with
+`--target-live` to use the pinned public PR through real GitHub GETs. Do not
+combine the stub and live variants. Adding `--quick` is inference-spending;
+the capture-only variants without it still start no reviewers.
+
+The original F2 inference probe remains available separately:
 
 ```sh
 COPILOT_CLI_PATH="$(command -v copilot)" \
