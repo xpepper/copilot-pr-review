@@ -1,0 +1,6 @@
+{
+  "name": "copilot-pr-review",
+  "description": "Copilot CLI PR review runtime feasibility prototype. No reviews yet.",
+  "version": "0.0.1",
+  "extensions": ["extensions"]
+}
