@@ -4,7 +4,9 @@
 
 - Read [SCOPE.md](SCOPE.md) as the authoritative product specification, then
   [ROADMAP.md](ROADMAP.md) for evidence, runtime caveats, and the exact next
-  increment. Inspect the working tree and implementation before editing.
+  increment. Read [HANDOFF.md](HANDOFF.md) for the latest next-session prompt.
+  Inspect the working tree and implementation before editing; if the handoff
+  is stale, reconcile it against git state and the authoritative scope/roadmap.
 - Do not depend on previous conversations or reopen settled product decisions.
   Implement only the next small increment identified by the roadmap unless the
   user explicitly changes the task.
@@ -31,11 +33,21 @@
   reproduction commands, remaining uncertainties or blockers, and the exact
   next small increment. Keep product requirements in `SCOPE.md`, not duplicated
   in handoff notes.
-- End the final response with a copyable **Handoff prompt** for the next agent.
-  Include instructions to read `AGENTS.md`, `SCOPE.md`, and `ROADMAP.md`; inspect
+- Write the next agent's ready-to-use prompt into `HANDOFF.md` as the final
+  repository file edit before the session-ending commit. Complete implementation,
+  validation, and other documentation updates first; if further edits become
+  necessary, refresh `HANDOFF.md` again last. Include it in that commit before
+  declaring the session ended.
+- `HANDOFF.md` is a replaceable handoff, not an append-only history. Each agent
+  may completely overwrite it for the next fresh session; git preserves history.
+- Include instructions to read `AGENTS.md`, `SCOPE.md`, and `ROADMAP.md`; inspect
   git state; implement only the next increment; respect the scope constraints;
-  and distinguish demonstrated behavior from assumptions.
-- Include the current checkpoint/commit, any uncommitted work, the next
-  increment's concrete acceptance criteria, and important runtime caveats.
-  Tell the next agent to follow these commit and handoff rules in turn.
-  Never rely on the next agent having access to this conversation.
+  and distinguish demonstrated behavior from assumptions. Include the existing
+  checkpoint reference, any remaining uncommitted work, concrete next-increment
+  acceptance criteria, and important runtime caveats. Do not try to embed the
+  hash of the commit that will contain the handoff itself.
+- Tell the next agent to follow these commit and file-based handoff rules in
+  turn. Never rely on access to this conversation. The final response should
+  report the commit outcome and point to `HANDOFF.md`, not duplicate the prompt.
+- If committing is blocked or explicitly prohibited, still write `HANDOFF.md`
+  last and report that it remains uncommitted; do not claim a committed handoff.

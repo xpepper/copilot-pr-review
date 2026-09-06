@@ -6,7 +6,8 @@ historical. Items below target roughly 1-3 hours each, not review runtime limits
 An item is complete only with repository evidence. Later items may be split
 further when their implementation context is known, without changing scope.
 The standing checkpoint-commit and fresh-session handoff workflow is recorded
-in [AGENTS.md](AGENTS.md).
+in [AGENTS.md](AGENTS.md); the replaceable next-session prompt lives in
+[HANDOFF.md](HANDOFF.md).
 
 ## Increments
 
