@@ -19,7 +19,7 @@ in [AGENTS.md](AGENTS.md); the replaceable next-session prompt lives in
 | F2 | Completed | Two concurrent reviewers over a tiny original local fixture; distinct explicitly configured subscription models and reasoning levels; display assignments, per-reviewer progress, and results. | F1; [Models/execution](SCOPE.md#models-configuration-and-execution) |
 | F3 | Completed | Native forbidden-tool denials plus an adversarial fixture; retained incomplete coverage; startup/active/unresponsive cancellation and owned-runtime/extension/parent loss exercised with process-exit evidence. Stdio integration selected; limits below. | F2; [Models/execution](SCOPE.md#models-configuration-and-execution) |
 | Q1 | Completed | Read-only code-owned PR capture with repository/head-bound snapshot, skip/override/confirmation gates, consistency guards, and installed-plugin controlled/live evidence below. | F3; [Targets](SCOPE.md#targets-and-local-behavior) |
-| Q2 | Pending | Bind reviewer evidence to the captured head, including surrounding code; reject mismatched local evidence. | Q1; [Targets](SCOPE.md#targets-and-local-behavior) |
+| Q2 | Completed | Source context bound to the captured head/base revisions with blob-verified provenance; local-checkout, moved-head, and inconsistent source refused. Evidence below. | Q1; [Targets](SCOPE.md#targets-and-local-behavior) |
 | Q3 | Pending | Run the three quick specialists, with `--major-only` alias and explicit incomplete coverage, in no-comment mode. | Q2; [Modes](SCOPE.md#review-modes-and-findings) |
 | Q4 | Pending | Validate evidence, severity/location/confidence, and deduplicate candidates; demonstrate real `--quick --no-comment` findings. | Q3; [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | P1 | Pending | Select validated findings with a minimal UI and `--all`; no writes yet. | Q4; [Selection/publication](SCOPE.md#selection-publication-and-cached-results) |
@@ -508,23 +508,154 @@ and other operating systems were not demonstrated. There is no review timeout,
 automatic retry, reviewer/context assembly, publication, saved configuration,
 retained cache, or safeguard execution in Q1. L1 remains pending.
 
+## Completed increment: Q2
+
+Continues Q1 checkpoint `4280b15`. Original implementation:
+`extensions/pr-review/context.mjs`, wired into `executeTargetCapture` in
+`extensions/pr-review/target.mjs`. Exercises use the existing Node.js/assert
+approach: new `scripts/smoke-context.mjs`, extended `scripts/smoke-target.mjs`,
+`scripts/target-fixture.mjs`, `scripts/fixtures/gh`, and
+`scripts/runtime-target.mjs`. No upstream source was reused.
+
+### Implemented and demonstrated outcome
+
+On 2026-09-07 (local time), CLI 1.0.83 / bundled SDK / Node.js 26.1.0 /
+macOS arm64:
+
+- After a successful capture, the command assembles source context and reports
+  a `Q2 context:` line. Every request is
+  `gh api --hostname HOST --method GET repos/OWNER/NAME/contents/PATH?ref=SHA`,
+  where `SHA` is always the captured head or base SHA from the Q1 snapshot.
+  Nothing is read from the session's checkout, its branch, its `HEAD`, or its
+  uncommitted edits, including files with the reviewed paths.
+- Each response must be a base64 `file` at the requested path whose `size`
+  equals the delivered bytes and whose `sha` equals the Git blob hash
+  recomputed locally from those bytes. Where the captured diff's `index` line
+  records blob identities, the fetched blob must match the recorded abbreviation.
+  Every hunk's reviewed lines must then appear verbatim at the diff's line
+  numbers in the fetched revision. Failures stop the command explicitly and
+  name repository, revision, and path.
+- The head side is fetched for every surviving changed file; the base side is
+  added wherever the change removed lines, so deleted and rewritten code keeps
+  its own repository/SHA/path provenance. Files without textual hunks (binary
+  and mode-only changes) are reported with a reason and no source fetch.
+  Windows are hunk ranges widened by 40 lines, clamped to the fetched
+  revision's real line count and merged where they overlap.
+- The timeline summary carries provenance only: head/base SHAs, per-file path,
+  status, side, blob SHA, byte/line counts, window ranges, a context SHA-256,
+  and an undisplayed-file count beyond 20 entries. Source text and PR prose
+  stay out of the parent conversation. Inside the assembled context each line
+  is numbered under its provenance header, so PR-controlled text cannot imitate
+  a header. Context is invocation-local; nothing is cached and no reviewer
+  consumes it yet.
+- The controlled installed-plugin exercise ran with its session directory on a
+  Git branch `not-the-pr-branch`, holding a committed **and** dirty `example.js`
+  that differs from the reviewed revision. Every captured dispatch reported the
+  served head/base blob identities, never the local file, and the local branch,
+  `HEAD`, working tree, and unrelated sentinel were unchanged afterwards.
+  All traced context requests were read-only GETs at the captured revisions.
+- The same exercise captured fixture PR 11, whose head then advanced. The
+  assembled context stayed on the captured revisions, and the next capture of
+  the moved head stopped explicitly with the blob mismatch rather than
+  reviewing new source against the captured diff.
+- The live installed-plugin exercise bound context for public merged PR
+  **github/copilot-sdk#2543** from an empty temporary checkout: head
+  `7525814ae7de890acf63b0eb665531292adaf96d`, base
+  `e90856093760d95793d8211219b883dfce08862c`, file
+  `.github/workflows/java-publish-maven.yml`, head blob
+  `d1ef78f66b7831e43d2833ce6e7cd73fb03d8395` (37420 bytes, 800 lines, window
+  50-224), base blob `fd07aae155d07658f8a1654a601b5c80fff3b26a` (36577 bytes,
+  781 lines, window 50-205), **14903** context bytes, context SHA-256
+  `2be6f0cf8e28d8e6383439dd3c24900e8cc7730ad0cb47e1414a1e20b19876d4`.
+  Both blob identities are the ones recorded in that PR's diff `index` line.
+  The skipped bot PR #2545 assembled no context.
+- Existing Q1 gates, status/help/models, invalid-setting rejections, and the
+  pure F2/F3 permission/error/cancellation/cleanup exercises still pass. The
+  parent session started no model turns, subagents, or tool executions. The
+  inference-spending F2/F3 scenarios were not rerun for Q2.
+
+Demonstrated versus assumed: the checks above ran against real GitHub responses
+for one modified UTF-8 file with both sides, and against fixture responses for
+the failure paths. Added, deleted, renamed, binary, mode-only, CRLF, and quoted
+non-ASCII-path sections are covered only by the pure exercise's synthetic diff,
+not by a live PR. Files above the contents API's inline limit, symlinks, and
+submodules are handled as explicit stops that were exercised by mutating
+fixture responses, not by real repository objects.
+
+### Reproduction and consulted APIs
+
+```sh
+copilot plugin install "$(pwd)"
+node scripts/smoke-fixture.mjs
+node scripts/smoke-target.mjs
+node scripts/smoke-context.mjs
+COPILOT_CLI_PATH="$(command -v copilot)" \
+COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
+node scripts/smoke-runtime.mjs --targets
+COPILOT_CLI_PATH="$(command -v copilot)" \
+COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
+node scripts/smoke-runtime.mjs --target-live
+```
+
+The two runtime variants still run separately, and neither starts inference.
+The live probe pins immutable public evidence and fails if that evidence
+changes or becomes unavailable.
+
+Consulted the current official
+[repository contents REST documentation](https://docs.github.com/en/rest/repos/contents#get-repository-content)
+and [Git blob documentation](https://docs.github.com/en/rest/git/blobs), plus
+`gh api --help`. Verified the response shape, the base64 encoding, and the
+returned `sha` against a real revision before implementing the check.
+No upstream implementation source was read or copied.
+
+### Remaining limitations
+
+The contents response is trusted for the path-to-blob mapping; the delivered
+bytes are then verified against the blob identity it returns, which is Git's
+SHA-1 object id, used here as an identity match rather than a collision-
+resistance claim. Blob-prefix verification applies only where the captured diff
+carries an `index` line. Hunk verification proves the fetched revision contains
+the reviewed lines; it does not prove the rest of the file is unchanged from
+what a reviewer would see in a checkout.
+
+Sources are fetched sequentially with no rate-limit handling, retry, or
+concurrency. There is no prompt-size budget: a large PR assembles a large
+context, bounded only by the fixed 40-line radius and the per-file failure
+boundaries. Assembled source is untrusted PR-controlled text; line numbering
+is a legibility measure, not a security boundary, and reviewer-side handling
+of untrusted content stays with Q3. Context is not cached, not retained across
+invocations, and not yet consumed by any reviewer. Q1's limits on remote
+sessions, GitHub Enterprise, other operating systems, `gh` authentication, and
+the 32 MiB subprocess buffer are unchanged. L1 remains pending.
+
 ## Exact next increment
 
-**Q2 only:** Bind surrounding-source context to the Q1 snapshot's captured
-repository and head, without relying on the current checkout. Supply
-coordinator-owned source context from immutable GitHub revisions through `gh`,
-with explicit repository/SHA/path provenance (and base-side provenance where
-needed for deleted/changed code). Fail explicitly on unavailable, inconsistent,
-or incomplete required context; never substitute another local branch's code.
+**Q3 only:** Run the three quick specialists over the Q2-bound target, in
+no-comment mode, with the `--major-only` alias for `--quick` and explicit
+incomplete-coverage reporting.
 
-Demonstrate that a different local branch/HEAD or dirty source cannot become
-review evidence, and that source context remains bound to the captured revision
-when the PR advances. Preserve Q1 lifecycle gates and fixture commands. Cover
-the context paths with targeted existing-runner exercises and record what is
-demonstrated versus assumed.
+Reuse the F2/F3 reviewer machinery: plugin-owned stdio runtime, independent
+reviewer sessions, empty tool sets, denying pre-tool hooks and permissions,
+displayed effective assignments, per-reviewer progress, cancellation, and
+owned-runtime cleanup. Feed each reviewer the captured diff and the Q2 context
+with its provenance, and require reviewers to treat that content as untrusted
+input rather than instructions. A failed or incomplete reviewer must remain
+visible as incomplete coverage and must never become a clean-review claim.
 
-Do not start real PR reviewers yet (Q3-Q4), publish anything, implement saved
-configuration or retained-result caching, or execute safeguards. Do not switch
-branches, modify reviewed source, fetch/reset the checkout, or reopen settled
-scope decisions. Keep L1 pending unless separately authorized; no upstream
-source reuse.
+Acceptance criteria:
+
+- `/pr-review NUMBER --quick --no-comment` and its `--major-only` alias capture,
+  bind context, and dispatch exactly the three quick specialists concurrently
+  with their configured models and reasoning efforts.
+- Reviewer output stays bound to the captured repository, head, and paths.
+  No publication, no writes, no local source, and no safeguard execution.
+- Partial and failed reviewers report incomplete coverage explicitly, and
+  cancellation still stops owned work.
+- Cover the new paths with the existing pure Node.js/assert exercises, and
+  record inference-spending runtime evidence separately from assumptions.
+
+Do not implement Q4 validation/deduplication, selection, publication, saved
+configuration, retained-result caching, or safeguards. Do not switch branches,
+modify reviewed source, fetch/reset the checkout, or reopen settled scope
+decisions. Keep L1 pending unless separately authorized; no upstream source
+reuse.

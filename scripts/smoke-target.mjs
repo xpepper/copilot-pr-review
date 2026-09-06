@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import {
-  captureTarget, executeTargetCapture, parseTargetArgs, skipReason, validateDiff,
+  captureTarget, contextSummary, executeTargetCapture, parseTargetArgs, skipReason, validateDiff,
 } from "../extensions/pr-review/target.mjs";
-import { diff, pull, repository, respond } from "./target-fixture.mjs";
+import { blobSha, diff, headSource, pull, repository, respond } from "./target-fixture.mjs";
 
 const cwd = process.cwd();
 const options = parseTargetArgs("1");
@@ -140,10 +140,18 @@ const session = {
   rpc: { metadata: { snapshot: async () => ({ workingDirectory: cwd, isRemote: false }) } },
   capabilities: {}, log: async (message) => logs.push(message),
 };
-await executeTargetCapture(session, "1", { gh: fake.gh });
+const executed = await executeTargetCapture(session, "1", { gh: fake.gh });
 assert.match(logs[0], /"disposition":"captured"/);
 assert(!logs[0].includes(diff), "Do not put the diff in the parent conversation");
+assert.match(logs[1], /^Q2 context: /);
+assert(logs[1].includes(`"blob":"${blobSha(headSource)}"`), "Report the bound source provenance");
+assert(!logs[1].includes("export const value"), "Do not put source context in the parent conversation");
+assert.match(logs[1], /local checkout, its branch, and its uncommitted changes are not review evidence/);
+assert.equal(executed.context.head, "b".repeat(40));
+assert.deepEqual(contextSummary(executed.context, 0),
+  { ...contextSummary(executed.context), entries: [], undisplayedFiles: 1 },
+  "Large PRs report an undisplayed-file count instead of an unbounded summary");
 session.rpc.metadata.snapshot = async () => ({ workingDirectory: cwd, isRemote: true });
 await assert.rejects(executeTargetCapture(session, "1", { gh: fake.gh }), /local Copilot session/);
-assert.equal(fake.calls.length, 4);
+assert.equal(fake.calls.length, 6, "Capture plus both bound source sides");
 console.log("PASS Q1 capture, gates, strict confirmation, races, malformed metadata/diffs, command summary");

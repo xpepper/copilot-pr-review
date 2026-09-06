@@ -2,6 +2,7 @@ import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import { isAbsolute } from "node:path";
 import { promisify } from "node:util";
+import { assembleContext } from "./context.mjs";
 
 const execute = promisify(execFile);
 const shaPattern = /^[0-9a-f]{40}$/;
@@ -164,12 +165,31 @@ export async function captureTarget(options, { cwd, gh = runGh, confirm } = {}) 
   };
 }
 
+export function contextSummary(context, limit = 20) {
+  return {
+    head: context.head, base: context.base, radius: context.radius,
+    files: context.files.length,
+    sources: context.files.reduce((total, file) => total + file.sources.length, 0),
+    contextBytes: context.bytes, contextSha256: context.sha256,
+    entries: context.files.slice(0, limit).map((file) => ({
+      path: file.path, status: file.status,
+      ...(file.reason ? { reason: file.reason } : {}),
+      sources: file.sources.map((source) => ({
+        side: source.side, blob: source.blobSha, bytes: source.bytes, lines: source.lines.length,
+        windows: source.windows.map((window) => `${window.start}-${window.end}`),
+      })),
+    })),
+    ...(context.files.length > limit ? { undisplayedFiles: context.files.length - limit } : {}),
+  };
+}
+
 export async function executeTargetCapture(session, args, { gh = runGh } = {}) {
   const options = parseTargetArgs(args);
   const metadata = await session.rpc.metadata.snapshot();
   if (metadata.isRemote) throw new Error("PR capture requires a local Copilot session.");
+  const cwd = metadata.workingDirectory;
   const outcome = await captureTarget(options, {
-    cwd: metadata.workingDirectory, gh,
+    cwd, gh,
     confirm: session.capabilities.ui?.elicitation
       ? (message) => session.ui.confirm(message) : undefined,
   });
@@ -184,5 +204,11 @@ export async function executeTargetCapture(session, args, { gh = runGh } = {}) {
       capturedAt: outcome.snapshot.capturedAt,
     } : {}),
   })}\nNo PR review performed; no clean-review claim. Nothing published.`);
-  return outcome;
+  if (!outcome.snapshot) return outcome;
+  // Context is bound to the captured revisions; unavailable or inconsistent source stops here.
+  const context = await assembleContext(outcome.snapshot, { gh, cwd });
+  const bound = "Source context comes only from the captured GitHub revisions. " +
+    "The local checkout, its branch, and its uncommitted changes are not review evidence.";
+  await session.log(`Q2 context: ${JSON.stringify(contextSummary(context))}\n${bound}`);
+  return { ...outcome, context };
 }

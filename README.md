@@ -65,10 +65,41 @@ the diff and verifies file counts, hunk completeness, and added/deleted line
 counts. Authentication, unavailable PRs, changing metadata, inconsistent diff
 responses, and responses exceeding the 32 MiB subprocess buffer fail explicitly.
 There is no silent truncation or automatic capture retry. These checks are not
-a GitHub transactional snapshot guarantee; immutable surrounding-source
-evidence is the next increment. `gh` must already be authenticated. The CLI
+a GitHub transactional snapshot guarantee. `gh` must already be authenticated. The CLI
 filters sensitive extension environment variables; local stored `gh`
 authentication was demonstrated, not token-only environment forwarding.
+
+### Revision-bound source context (Q2)
+
+A successful capture immediately binds surrounding source to the captured
+revisions and reports a `Q2 context:` line. Context is fetched only through
+`gh` GET requests for `repos/OWNER/NAME/contents/PATH?ref=SHA`, where the ref
+is always the captured head or base SHA. The local checkout supplies nothing:
+its branch, its `HEAD`, and its uncommitted edits at the same paths are never
+review evidence, even when they contain the same file names.
+
+Each fetched file must arrive as a base64 `file` at the requested path, with a
+size matching the delivered bytes and a `sha` equal to the Git blob hash
+recomputed locally from those bytes. When the captured diff records blob
+identities in its `index` line, the fetched blob must match them. The reviewed
+lines of every hunk must then appear verbatim at the diff's line numbers in the
+fetched revision. Any unavailable, oversized, non-UTF-8, mismatched, or shifted
+source stops the command explicitly. Nothing falls back to another revision.
+
+The head side is fetched for every surviving changed file; the base side is
+added wherever the change removed lines, so deleted and rewritten code keeps
+its own provenance. Files without textual hunks, including binary changes and
+mode-only changes, are reported with a reason and no source. Context windows
+are the hunk ranges widened by 40 lines, clamped to the fetched revision and
+merged where they overlap.
+
+The reported summary carries provenance only: repository, head/base SHAs, per
+file path, status, side, blob SHA, byte and line counts, window ranges, and a
+SHA-256 of the assembled context. Source text stays out of the parent
+conversation. Inside the assembled context, every line is prefixed with its
+line number under a provenance header, so PR-controlled text cannot pass itself
+off as a header. Context lives only inside the invocation; it is not cached,
+and no reviewer consumes it yet.
 
 ### Two-reviewer fixture experiment (F2)
 
@@ -170,8 +201,8 @@ Signal/parent-EOF handlers force-stop owned work without waiting for parent
 logging. An abruptly lost parent cannot receive a final report; there is no
 clean-review claim or publication. Normal SDK transcripts may persist, and
 forced termination does not guarantee a final transcript flush. The prototype
-can capture PRs but does not review them, publish to GitHub, or execute project
-safeguards. It does not restrict or change the model of the surrounding Copilot session. The SDK may
+can capture PRs and bind their source context, but does not review them,
+publish to GitHub, or execute project safeguards. It does not restrict or change the model of the surrounding Copilot session. The SDK may
 retain its own session transcripts; no plugin review archive is implemented.
 
 No upstream source has been copied. Source reuse/licensing assessment remains
@@ -185,13 +216,16 @@ Node.js 22+ and the SDK bundled with the installed CLI (adjust its path):
 ```sh
 node scripts/smoke-fixture.mjs
 node scripts/smoke-target.mjs
+node scripts/smoke-context.mjs
 COPILOT_CLI_PATH="$(command -v copilot)" \
 COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
 node scripts/smoke-runtime.mjs
 ```
 
-The pure probes exercise fixture guards/lifecycle and PR capture/gates without
-a runtime. The runtime probe discovers the **installed** extension, dispatches status/help,
+The pure probes exercise fixture guards/lifecycle, PR capture/gates, and
+revision-bound context assembly without a runtime. The context probe covers
+diff parsing, blob and hunk verification, window binding, an advancing PR, and
+a decoy working-tree file at the reviewed path. The runtime probe discovers the **installed** extension, dispatches status/help,
 model listing, and invalid settings, and asserts explicit errors without model
 turns. It requires authenticated model-list access. It uses configuration
 discovery to find plugins, so run it only with trusted installed configuration.
@@ -201,6 +235,11 @@ To exercise Q1 through the installed plugin, use the same CLI/SDK settings with
 `node scripts/smoke-runtime.mjs --targets`. This runs controlled `gh` responses
 in a child-only PATH, native confirmation acceptance/decline, lifecycle/skip
 gates, explicit failures, and a session-directory change after extension startup.
+Its session directory is a Git checkout on another branch whose committed and
+uncommitted `example.js` differs from the reviewed revision; the harness asserts
+that the bound context carries the served blob identities instead. It also
+captures a fixture PR that then advances, and asserts the next capture stops
+explicitly rather than reviewing the moved head against the captured diff.
 The harness asserts read-only requests, no model turns, and no source changes.
 The `scripts/fixtures/gh` executable is a test double, not a shipped runtime
 dependency; do not add its directory to your normal PATH.
@@ -208,7 +247,8 @@ dependency; do not add its directory to your normal PATH.
 Use `node scripts/smoke-runtime.mjs --target-live` separately for real `gh`
 requests through the installed plugin. It creates an empty temporary Git
 repository pointing to `github/copilot-sdk`, captures public merged PR #2543
-with a pinned expected head/diff fingerprint, checks the bot skip on #2545,
+with a pinned expected head/diff fingerprint and pinned head/base blob
+identities, window ranges, and context SHA-256, checks the bot skip on #2545,
 and verifies the unrelated local checkout stays unchanged. It also exercises
 the closed gate without an elicitation UI. No PR is created and no source is
 checked out; the temporary repository is removed afterwards. This fixture is
