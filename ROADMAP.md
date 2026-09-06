@@ -16,7 +16,7 @@ in [AGENTS.md](AGENTS.md); the replaceable next-session prompt lives in
 | S0 | Completed | Confirmed product specification recorded in `SCOPE.md`, commit `6407a59`. | [Goal](SCOPE.md#goal) |
 | L1 | Pending | Resolve applicable upstream licensing and attribution; record what can be reused. No upstream source reuse until resolved. Original prototypes need not wait. | [Upstream baseline](SCOPE.md#upstream-baseline) |
 | F1 | Completed | Locally installable plugin with a code-owned, usable status/help entry point; runtime evidence and reproduction below. | [Technical feasibility](SCOPE.md#technical-uncertainties-and-proposed-sequence) |
-| F2 | Pending | Two concurrent reviewers over a tiny original local fixture; distinct explicitly configured subscription models and reasoning levels; display assignments, per-reviewer progress, and results. | F1; [Models/execution](SCOPE.md#models-configuration-and-execution) |
+| F2 | Completed | Two concurrent reviewers over a tiny original local fixture; distinct explicitly configured subscription models and reasoning levels; display assignments, per-reviewer progress, and results. | F1; [Models/execution](SCOPE.md#models-configuration-and-execution) |
 | F3 | Pending | Adversarial fixture demonstrates read-only enforcement; explicit reviewer failures remain incomplete coverage; manual cancellation stops owned work with no abandoned agents. Record runtime limitations before selecting the integration. | F2; [Models/execution](SCOPE.md#models-configuration-and-execution) |
 | Q1 | Pending | Capture a PR number's repository, lifecycle, head, and diff without altering the checkout; demonstrate skip and override gates. | F3; [Targets](SCOPE.md#targets-and-local-behavior) |
 | Q2 | Pending | Bind reviewer evidence to the captured head, including surrounding code; reject mismatched local evidence. | Q1; [Targets](SCOPE.md#targets-and-local-behavior) |
@@ -131,7 +131,7 @@ The installed SDK is under
 `~/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk/` on the development host.
 No SDK copy or machine-specific import is shipped in the plugin.
 
-### Remaining uncertainties
+### Uncertainties at the F1 checkpoint
 
 Distinct per-reviewer subscription models/reasoning, simultaneous execution,
 per-reviewer progress/results, read-only enforcement, reviewer failure
@@ -139,18 +139,136 @@ propagation, and cancellation remain unproven and are reserved for F2/F3.
 The surrounding interactive Copilot session is not made read-only by this
 extension. No cross-client or other-OS compatibility is claimed.
 Future CLI/API compatibility, marketplace migration, and source licensing remain
-open. L1 blocks upstream source copying, not this original code. No current
-runtime blocker prevents starting F2; documented factory APIs alone remain
-insufficient evidence for completing it.
+open. L1 blocks upstream source copying, not this original code. No runtime
+blocker was known before starting F2; its outcome is recorded below.
 
-### Exact next increment
+## Completed increment: F2
 
-**F2 only:** Add a tiny original local fixture and run two reviewers concurrently
-from the plugin. Require distinct explicitly configured Copilot-subscription
-models and reasoning levels, validate them against actual available capabilities
-without substitution, show effective assignments before execution, and display
-per-reviewer progress plus results. Record evidence of overlap and actual model/
-reasoning selection, or a concrete runtime limitation. Do not impose review
-timeouts. Do not add PR fetching, publication, or project safeguard execution.
-Full adversarial permissions, failure, and cancellation demonstrations follow
-in F3; do not claim them from F2's happy path.
+Implementation: the extension's `models` and `fixture` commands,
+`extensions/pr-review/fixture.mjs`, and a tiny original
+`extensions/pr-review/fixtures/checkout.js`. `scripts/smoke-fixture.mjs`
+exercises pure guards, and `scripts/smoke-runtime.mjs --fixture` exercises the
+installed plugin with real inference. No upstream source was reused.
+
+### Runtime candidate and demonstrated outcome
+
+On 2026-09-06, on the same CLI 1.0.83 / bundled SDK / Node.js 26.1.0 /
+macOS arm64 environment as F1:
+
+- Agent factory registration did not establish usability. Calling
+  `session.factory.run` from the installed extension failed with
+  **"Agent factories are not available for this session"**, before model
+  execution. Runtime inspection located an availability check in the session
+  quota projection. No entitlement/feature gate was overridden.
+- Instead, the plugin successfully constructed `CopilotClient` using the
+  injected SDK and its default bundled runtime resolution. It created two
+  separate sessions with explicit model and reasoning settings, local CLI
+  authentication, configuration discovery disabled, an empty tool allowlist,
+  and permission denial. No provider credentials were requested or supplied.
+- The parent and owned sessions' available-model catalogs were validated before
+  prompts. Each owned session's `model.getCurrent()` matched its assignment.
+  Actual `assistant.usage` events then confirmed these settings:
+
+| Reviewer | Actual model | Actual reasoning | BYOK | Turn start (epoch ms) | Session idle (epoch ms) |
+| --- | --- | --- | --- | --- | --- |
+| rounding | `claude-sonnet-5` | `low` | false | 1788730143771 | 1788730147939 |
+| shipping | `gpt-5.6-terra` | `high` | false | 1788730143771 | 1788730145935 |
+
+The two independent reviewer session IDs were
+`58141075-2af4-4c0e-a342-935bb72d4c78` and
+`f1bddcde-b37b-45df-9888-6cc0603632e9`. The observed execution intervals
+overlapped by **2164 ms**. These are runtime turn/idle timestamps, not estimates
+from the coordinator's promise scheduling and not a provider-side timing claim.
+
+- The CLI timeline displayed both assignments before execution, per-reviewer
+  starting/completed messages, and both outputs. Shipping identified the
+  incorrect free-shipping basis with `[5000], 10` yielding 5000 instead of
+  4500 cents. Rounding reported fractional cents, and also duplicated the
+  shipping issue. Outputs remain explicitly **unvalidated**; this demonstrates
+  review execution, not Q4 evidence validation or deduplication.
+- No reviewer tool execution was observed. The runner treats a tool start as
+  an error, not permission-enforcement evidence. Normal `client.stop()` cleanup
+  returned no errors for the plugin-owned and smoke runtimes.
+- Pure guards cover malformed/missing/duplicate keys, non-distinct assignments,
+  unavailable/disabled/unconfigured/BYOK/auto models, and unsupported reasoning.
+  Runtime command probes reject malformed settings, an unavailable model, and
+  an unsupported effort without starting reviewers. The parent model/reasoning
+  remains unchanged.
+- A final run after expanding the progress-order and parent-setting assertions
+  also completed successfully, with **1912 ms** overlap and the same actual
+  model/reasoning assignments. Its reviewer sessions were
+  `0cdf64d2-3136-4d09-ba90-536cd697db69` and
+  `26fc5a2d-e047-4dec-b702-590946d7133c`.
+
+### Reproduction
+
+```sh
+copilot plugin install "$(pwd)"
+node scripts/smoke-fixture.mjs
+COPILOT_CLI_PATH="$(command -v copilot)" \
+COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
+node scripts/smoke-runtime.mjs
+
+COPILOT_CLI_PATH="$(command -v copilot)" \
+COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
+PR_REVIEW_MODEL_1=claude-sonnet-5 PR_REVIEW_EFFORT_1=low \
+PR_REVIEW_MODEL_2=gpt-5.6-terra PR_REVIEW_EFFORT_2=high \
+node scripts/smoke-runtime.mjs --fixture
+```
+
+The final command uses subscription credits. The model names are reproduction
+inputs, not hardcoded defaults; use `/pr-review models` in a fresh CLI to inspect
+current availability. The equivalent invocation is:
+
+```text
+/pr-review fixture model1=claude-sonnet-5 effort1=low model2=gpt-5.6-terra effort2=high
+```
+
+### API sources and concrete caveats
+
+Consulted current official [plugin creation](https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/plugins-creating),
+[plugin reference](https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-plugin-reference),
+and [SDK getting started](https://github.com/github/copilot-sdk/blob/main/docs/getting-started.md)
+documentation, plus the installed SDK's extension/factory guides,
+`extension.d.ts`, `factory.d.ts`, `types.d.ts`, `session.d.ts`, and generated
+RPC/event definitions before choosing APIs.
+
+- Factories remain unavailable on the observed account/session. Their RPC types
+  also describe `reasoningEffort` and `agent` as accepted but not honored;
+  factory reasoning/permission behavior was **not** reached or demonstrated.
+  The unsuccessful factory implementation was replaced, not shipped as a
+  fallback or silently selected alternative.
+- Session-scoped `model.list()` exposes raw CAPI
+  `capabilities.supports.reasoning_effort` arrays, not the normalized
+  `supportedReasoningEfforts` field from `client.listModels()`. The code uses
+  the demonstrated session shape, excludes provider-qualified IDs, and refuses
+  unsupported values rather than guessing.
+- `sendAndWait` defaults to a 60-second wait timeout, so reviewers instead
+  subscribe to events before `send` and wait for idle/error without a timer.
+  There is no plugin review deadline, fallback, or elapsed-time retry.
+- The plugin owns a separate runtime, not factory subagents in the parent.
+  Parent log output bridges progress/results. SDK session transcripts may
+  persist normally; this is not the P2 session-bound review cache or a plugin
+  cross-session archive.
+- Explicit error paths preserve incomplete coverage and normal cleanup exists,
+  but failure injection, transport loss, manual cancellation, and extension
+  shutdown have **not** been demonstrated. There is no cancel command yet.
+  In particular, an extension stopping is not proof its owned runtime and
+  reviewers stop; F3 must establish this before selecting the integration.
+- Empty tools/configuration isolation plus a benign no-tool result do not prove
+  adversarial read-only enforcement. The parent assistant remains unrestricted.
+  No PR fetching, publication, safeguard execution, or other-client support
+  was added. L1 still blocks upstream source reuse only.
+
+## Exact next increment
+
+**F3 only:** Exercise the plugin-owned SDK-session candidate with an original
+adversarial fixture and demonstrate enforceable read-only reviewers. Inject
+explicit reviewer failures and retain visible incomplete coverage without a
+clean-review claim. Add and demonstrate manual cancellation of active work,
+including owned-runtime/session cleanup and prevention of abandoned reviewers
+on cancellation or extension shutdown. Cover relevant disconnect/error paths
+without introducing review timeouts. Record concrete runtime limitations before
+selecting the integration. Do not add PR fetching, publication, configuration
+persistence, or project safeguard execution. Keep L1 pending unless separately
+authorized; no upstream source reuse.

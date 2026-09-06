@@ -36,13 +36,14 @@ try {
 
   const { commands } = await session.rpc.commands.list();
   assert(commands.some((command) => command.name === "pr-review"));
+  const parentModel = await session.rpc.model.getCurrent();
 
   for (const [args, expected] of [
     ["", "Copilot PR Review: entry point ready."],
     ["status", "Copilot PR Review: entry point ready."],
     ["  status  ", "Copilot PR Review: entry point ready."],
-    ["help", "Usage: /pr-review [status|help]"],
-    ["--help", "Usage: /pr-review [status|help]"],
+    ["help", "Usage: /pr-review [status|help|models|fixture"],
+    ["--help", "Usage: /pr-review [status|help|models|fixture"],
   ]) {
     const before = (await session.getEvents()).length;
     const result = await session.rpc.commands.execute({ commandName: "pr-review", args });
@@ -60,6 +61,32 @@ try {
     console.log(`PASS rejected /pr-review ${args}`);
   }
 
+  const listing = await session.rpc.model.list();
+  const modelsResult = await session.rpc.commands.execute({ commandName: "pr-review", args: "models" });
+  assert.equal(modelsResult.error, undefined);
+  const available = listing.list.find((model) =>
+    typeof model.id === "string" && !model.id.includes("/") &&
+    (!model.policy || model.policy.state === "enabled") &&
+    model.capabilities?.supports?.reasoning_effort?.length > 0,
+  );
+  assert(available, "Need an available reasoning-capable subscription model for rejection probes");
+  for (const [args, error] of [
+    ["fixture", /requires explicit/],
+    ["fixture model1=a effort1=low model2=a effort2=high", /distinct models/],
+    ["fixture model1=a effort1=low model2=b effort2=low", /distinct reasoning/],
+    ["fixture model1=a effort1=low model2=b effort2=high extra=x", /Invalid/],
+    ["fixture model1=missing-f2-model effort1=low model2=b effort2=high", /Unavailable/],
+    [`fixture model1=${available.id} effort1=invalid-effort model2=b effort2=high`, /Unsupported reasoning/],
+  ]) {
+    const before = (await session.getEvents()).length;
+    const result = await session.rpc.commands.execute({ commandName: "pr-review", args });
+    assert.match(result.error, error);
+    assert(!(await session.getEvents()).slice(before).some((event) =>
+      event.type === "session.info" && event.data.message.startsWith("Reviewer "),
+    ), "Rejected settings must not start reviewers");
+    console.log(`PASS rejected /pr-review ${args}`);
+  }
+
   const events = await session.getEvents();
   assert(!events.some((event) =>
     event.type === "user.message" ||
@@ -68,6 +95,71 @@ try {
     event.type === "tool.execution_start",
   ), "The entry point must not start model turns, agents, or tools");
   console.log("PASS no model turns, subagents, or tool executions");
+
+  if (process.argv.includes("--fixture")) {
+    const settings = {
+      model1: process.env.PR_REVIEW_MODEL_1,
+      effort1: process.env.PR_REVIEW_EFFORT_1,
+      model2: process.env.PR_REVIEW_MODEL_2,
+      effort2: process.env.PR_REVIEW_EFFORT_2,
+    };
+    assert(Object.values(settings).every((value) => value && !/\s/.test(value)),
+      "Set PR_REVIEW_MODEL_1, PR_REVIEW_EFFORT_1, PR_REVIEW_MODEL_2, PR_REVIEW_EFFORT_2 explicitly");
+    const observed = [];
+    const unsubscribe = session.on((event) => {
+      observed.push(event);
+      if (event.type === "session.info") console.log(event.data.message);
+    });
+    try {
+      const result = await session.rpc.commands.execute({
+        commandName: "pr-review",
+        args: `fixture ${Object.entries(settings).map(([key, value]) => `${key}=${value}`).join(" ")}`,
+      });
+      assert.equal(result.error, undefined);
+      const reportEvent = observed.find((event) =>
+        event.type === "session.info" && event.data.message.startsWith("F2 evidence: "),
+      );
+      assert(reportEvent, "Fixture evidence must be observable");
+      const report = JSON.parse(reportEvent.data.message.slice("F2 evidence: ".length));
+      assert.equal(report.complete, true);
+      assert.equal(report.reviewers.length, 2, "Exactly two independent reviewers");
+      assert.equal(new Set(report.reviewers.map((reviewer) => reviewer.sessionId)).size, 2);
+      const messages = observed.filter((event) => event.type === "session.info")
+        .map((event) => event.data.message);
+      const firstStart = messages.findIndex((message) => /^Reviewer \w+: starting$/.test(message));
+      assert(firstStart >= 0);
+      for (const label of ["rounding", "shipping"]) {
+        const assignmentIndex = messages.findIndex((message) => message.startsWith(`Assignment ${label}:`));
+        assert(assignmentIndex >= 0 && assignmentIndex < firstStart,
+          "Effective assignments must be displayed before either reviewer starts");
+        assert(messages.includes(`Reviewer ${label}: starting`));
+        assert(messages.some((message) => message.startsWith(`Reviewer ${label}: completed\n`)));
+      }
+      for (const [index, label] of ["rounding", "shipping"].entries()) {
+        const reviewer = report.reviewers.find((entry) => entry.label === label);
+        assert.equal(reviewer?.status, "completed");
+        assert(reviewer.result.trim(), `Missing output for ${label}`);
+        assert(reviewer.usage.length > 0, `Missing actual usage evidence for ${label}`);
+        for (const usage of reviewer.usage) {
+          assert.equal(usage.model, settings[`model${index + 1}`]);
+          assert.equal(usage.reasoningEffort, settings[`effort${index + 1}`]);
+          assert.equal(usage.isByok, false, "Must use Copilot, not BYOK");
+        }
+        assert(Number.isFinite(reviewer.startedAt));
+        assert(Number.isFinite(reviewer.completedAt));
+      }
+      const overlap = Math.min(...report.reviewers.map((reviewer) => reviewer.completedAt)) -
+        Math.max(...report.reviewers.map((reviewer) => reviewer.startedAt));
+      assert(overlap > 0, "Reviewer execution intervals must overlap");
+      assert(!observed.some((event) => event.type === "tool.execution_start"),
+        "The fixture must not execute tools");
+      console.log(`PASS two subscription models, explicit reasoning, and ${overlap}ms overlap`);
+    } finally {
+      unsubscribe();
+    }
+  }
+  assert.deepEqual(await session.rpc.model.getCurrent(), parentModel,
+    "Prototype must not alter the parent session's model or reasoning");
 } finally {
   const errors = await client.stop();
   if (errors.length) {
