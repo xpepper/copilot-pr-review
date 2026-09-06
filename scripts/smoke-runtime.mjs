@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { exerciseF3, startFixture } from "./runtime-fixture.mjs";
+import { prepareLiveTargetSmoke, prepareTargetSmoke } from "./runtime-target.mjs";
 
 function fixtureSettings() {
   const settings = {
@@ -28,6 +29,11 @@ if (!sdkPath || !cliPath) {
 const { CopilotClient, RuntimeConnection } = await import(
   pathToFileURL(resolve(sdkPath, "index.js")).href
 );
+if (process.argv.includes("--targets") && process.argv.includes("--target-live")) {
+  throw new Error("Use --targets and --target-live separately (stub versus real gh).");
+}
+const targetSmoke = process.argv.includes("--targets") ? await prepareTargetSmoke()
+  : process.argv.includes("--target-live") ? await prepareLiveTargetSmoke() : undefined;
 const client = new CopilotClient({
   connection: RuntimeConnection.forStdio({ path: resolve(cliPath) }),
 });
@@ -40,6 +46,7 @@ try {
     requestExtensions: true,
     availableTools: [],
     onPermissionRequest: async () => ({ kind: "denied-no-approval-rule" }),
+    ...targetSmoke?.sessionOptions,
   });
 
   await session.rpc.extensions.reload();
@@ -103,6 +110,8 @@ try {
     ), "Rejected settings must not start reviewers");
     console.log(`PASS rejected /pr-review ${args}`);
   }
+
+  if (targetSmoke) await targetSmoke.exercise(session);
 
   const events = await session.getEvents();
   assert(!events.some((event) =>
@@ -171,7 +180,9 @@ try {
     await exerciseF3(session, settingsArgs(fixtureSettings()), parentModel, () => { parentKilled = true; });
   }
 } finally {
-  const errors = await client.stop();
+  let errors;
+  try { errors = await client.stop(); }
+  finally { await targetSmoke?.cleanup(); }
   if (errors.length) {
     if (!parentKilled || errors.some((error) => !String(error).includes("Connection is closed."))) {
       throw new AggregateError(errors, "Could not stop smoke runtime cleanly");

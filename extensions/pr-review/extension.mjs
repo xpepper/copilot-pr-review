@@ -4,11 +4,13 @@ import {
   parseFixtureArgs, reasoningEfforts, subscriptionModels, validateAssignments,
 } from "./fixture.mjs";
 import { executeFixtureRun } from "./fixture-run.mjs";
+import { executeTargetCapture } from "./target.mjs";
 
 const help = [
   "Copilot PR Review - runtime feasibility prototype",
   "",
   "Usage: /pr-review [status|help|models|fixture model1=ID effort1=LEVEL model2=ID effort2=LEVEL]",
+  "       /pr-review NUMBER [--include-drafts] [--include-closed|--review-closed]",
   "",
   "status  Show the implemented capability boundary (default).",
   "help    Show this usage information.",
@@ -18,20 +20,23 @@ const help = [
   "failure      Same settings; inject a failure in the first active reviewer.",
   "cancel       Cancel active fixture reviewers and stop their owned runtime.",
   "",
-  "PR numbers and review flags are not supported yet.",
+  "NUMBER  Capture PR metadata and diff only; no reviewers or publication.",
+  "Drafts and obvious bots are skipped, as are provably empty changes.",
+  "Closed/merged PRs require confirmation or an explicit closed-PR override.",
+  "Other review flags are not supported yet.",
 ].join("\n");
 
 const status = [
   "Copilot PR Review: entry point ready.",
   "The plugin extension joined this Copilot CLI session and handled /pr-review.",
   "",
-  "Implemented: entry point, model capability listing, and a two-reviewer fixture prototype.",
+  "Implemented: PR target capture, model capability listing, and a two-reviewer fixture prototype.",
   "The fixture requires explicit distinct models and reasoning efforts.",
   "F3 experiments: adversarial read-only probes, failure injection, and manual cancellation.",
   "This is a runtime feasibility prototype, not a real PR review.",
   "",
-  "Status/help start no models or background work. The prototype",
-  "fetches no PRs, publishes nothing, and runs no project safeguards.",
+  "Status/help start no models or background work. PR capture uses read-only gh requests.",
+  "The prototype publishes nothing and runs no project safeguards.",
   "No PR review has been performed; this is not a clean-review result.",
 ].join("\n");
 
@@ -41,7 +46,7 @@ const session = await joinSession({
   commands: [
     {
       name: "pr-review",
-      description: "PR review prototype status, model listing, or fixture experiment",
+      description: "PR target capture, prototype status, model listing, or fixture experiment",
       handler: async ({ args }) => {
         if (shuttingDown) throw new Error("Extension is shutting down.");
         switch (args.trim()) {
@@ -79,6 +84,10 @@ const session = await joinSession({
             return;
           }
           default: {
+            if (/^\d/.test(args.trim())) {
+              await executeTargetCapture(session, args);
+              return;
+            }
             const experiment = args.trim().split(/\s+/)[0];
             if (["fixture", "adversarial", "failure"].includes(experiment)) {
               const settings = parseFixtureArgs(args);

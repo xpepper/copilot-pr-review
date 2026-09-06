@@ -26,7 +26,49 @@ Wait for plugin/extension loading to finish, then enter:
 These commands are implemented in JavaScript by a plugin-shipped extension, not
 a model prompt. Status/help make no model calls. `models` queries the session's
 available subscription models and reasoning capabilities without inference.
-PR numbers and review flags produce an explicit error.
+
+### Read-only PR target capture (Q1)
+
+```text
+/pr-review 123
+/pr-review 123 --include-drafts
+/pr-review 123 --include-closed
+```
+
+A PR number captures the GitHub repository owning the **current session
+directory**, PR metadata, base/head SHAs, and diff through `gh`. It does not
+start reviewers, change branches, read local source as PR evidence, or post
+anything. Other review flags (including `--quick` and `--no-comment`) remain
+unsupported until their increments; this command is capture-only.
+
+Drafts are skipped unless `--include-drafts` is supplied. Obvious bot accounts
+(GitHub `Bot` type or a `[bot]` login) are skipped. The conservative trivial
+gate accepts only metadata proving an empty change; small diffs, documentation
+filenames, and titles claiming a typo are not proof of correctness.
+Closed/merged PRs require confirmation, or `--include-closed` /
+`--review-closed`. If the host has no confirmation UI, the command reports
+`confirmation-required` and requires an explicit override on a new invocation.
+No diff is fetched while confirmation is pending; a changed target invalidates
+approval instead of silently applying it to the new target.
+
+Successful capture creates an invocation-local snapshot. The `Q1 target:` line
+reports repository/PR identity, lifecycle, base/head SHAs, diff byte count, and
+SHA-256. The complete diff and PR-controlled prose are not dumped into the
+parent conversation. The snapshot is not retained across commands and is not
+the future publish-later cache. `captured`, `skipped`, and `declined` are
+**not review results**, and none claims a clean review.
+
+Repository identity is resolved with `gh repo view` from the session directory,
+ignoring `GH_REPO` and Git directory/worktree overrides; subsequent API GETs
+pin the resolved host/repository/PR. Capture checks metadata before and after
+the diff and verifies file counts, hunk completeness, and added/deleted line
+counts. Authentication, unavailable PRs, changing metadata, inconsistent diff
+responses, and responses exceeding the 32 MiB subprocess buffer fail explicitly.
+There is no silent truncation or automatic capture retry. These checks are not
+a GitHub transactional snapshot guarantee; immutable surrounding-source
+evidence is the next increment. `gh` must already be authenticated. The CLI
+filters sensitive extension environment variables; local stored `gh`
+authentication was demonstrated, not token-only environment forwarding.
 
 ### Two-reviewer fixture experiment (F2)
 
@@ -128,8 +170,8 @@ Signal/parent-EOF handlers force-stop owned work without waiting for parent
 logging. An abruptly lost parent cannot receive a final report; there is no
 clean-review claim or publication. Normal SDK transcripts may persist, and
 forced termination does not guarantee a final transcript flush. The prototype
-does not fetch PRs, publish to GitHub, or execute project safeguards. It does not
-restrict or change the model of the surrounding Copilot session. The SDK may
+can capture PRs but does not review them, publish to GitHub, or execute project
+safeguards. It does not restrict or change the model of the surrounding Copilot session. The SDK may
 retain its own session transcripts; no plugin review archive is implemented.
 
 No upstream source has been copied. Source reuse/licensing assessment remains
@@ -142,17 +184,38 @@ Node.js 22+ and the SDK bundled with the installed CLI (adjust its path):
 
 ```sh
 node scripts/smoke-fixture.mjs
+node scripts/smoke-target.mjs
 COPILOT_CLI_PATH="$(command -v copilot)" \
 COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
 node scripts/smoke-runtime.mjs
 ```
 
-The first probe exercises argument/capability guards without a runtime. The
-runtime probe discovers the **installed** extension, dispatches status/help,
+The pure probes exercise fixture guards/lifecycle and PR capture/gates without
+a runtime. The runtime probe discovers the **installed** extension, dispatches status/help,
 model listing, and invalid settings, and asserts explicit errors without model
 turns. It requires authenticated model-list access. It uses configuration
 discovery to find plugins, so run it only with trusted installed configuration.
 It stops its runtime in `finally`, including on failure.
+
+To exercise Q1 through the installed plugin, use the same CLI/SDK settings with
+`node scripts/smoke-runtime.mjs --targets`. This runs controlled `gh` responses
+in a child-only PATH, native confirmation acceptance/decline, lifecycle/skip
+gates, explicit failures, and a session-directory change after extension startup.
+The harness asserts read-only requests, no model turns, and no source changes.
+The `scripts/fixtures/gh` executable is a test double, not a shipped runtime
+dependency; do not add its directory to your normal PATH.
+
+Use `node scripts/smoke-runtime.mjs --target-live` separately for real `gh`
+requests through the installed plugin. It creates an empty temporary Git
+repository pointing to `github/copilot-sdk`, captures public merged PR #2543
+with a pinned expected head/diff fingerprint, checks the bot skip on #2545,
+and verifies the unrelated local checkout stays unchanged. It also exercises
+the closed gate without an elicitation UI. No PR is created and no source is
+checked out; the temporary repository is removed afterwards. This fixture is
+used because this project's repository had no PRs at the Q1 checkpoint.
+Both Q1 runtime exercises are no-inference and require the trusted installed
+configuration/model-list access described above. The live exercise additionally
+requires `gh` authentication and those public PRs to remain accessible.
 
 To exercise actual concurrent inference as well:
 

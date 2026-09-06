@@ -18,7 +18,7 @@ in [AGENTS.md](AGENTS.md); the replaceable next-session prompt lives in
 | F1 | Completed | Locally installable plugin with a code-owned, usable status/help entry point; runtime evidence and reproduction below. | [Technical feasibility](SCOPE.md#technical-uncertainties-and-proposed-sequence) |
 | F2 | Completed | Two concurrent reviewers over a tiny original local fixture; distinct explicitly configured subscription models and reasoning levels; display assignments, per-reviewer progress, and results. | F1; [Models/execution](SCOPE.md#models-configuration-and-execution) |
 | F3 | Completed | Native forbidden-tool denials plus an adversarial fixture; retained incomplete coverage; startup/active/unresponsive cancellation and owned-runtime/extension/parent loss exercised with process-exit evidence. Stdio integration selected; limits below. | F2; [Models/execution](SCOPE.md#models-configuration-and-execution) |
-| Q1 | Pending | Capture a PR number's repository, lifecycle, head, and diff without altering the checkout; demonstrate skip and override gates. | F3; [Targets](SCOPE.md#targets-and-local-behavior) |
+| Q1 | Completed | Read-only code-owned PR capture with repository/head-bound snapshot, skip/override/confirmation gates, consistency guards, and installed-plugin controlled/live evidence below. | F3; [Targets](SCOPE.md#targets-and-local-behavior) |
 | Q2 | Pending | Bind reviewer evidence to the captured head, including surrounding code; reject mismatched local evidence. | Q1; [Targets](SCOPE.md#targets-and-local-behavior) |
 | Q3 | Pending | Run the three quick specialists, with `--major-only` alias and explicit incomplete coverage, in no-comment mode. | Q2; [Modes](SCOPE.md#review-modes-and-findings) |
 | Q4 | Pending | Validate evidence, severity/location/confidence, and deduplicate candidates; demonstrate real `--quick --no-comment` findings. | Q3; [Modes/findings](SCOPE.md#review-modes-and-findings) |
@@ -392,17 +392,139 @@ demonstrated, not an exhaustive proof of every OS/process-startup interleaving.
 No PR fetching, publication, saved configuration, or safeguard execution was
 added. L1 still blocks upstream source reuse only.
 
+## Completed increment: Q1
+
+Continues F3 checkpoint `27816f2`. Original implementation:
+`extensions/pr-review/target.mjs`, wired into the existing extension command.
+Exercises use the existing Node.js/assert approach in `scripts/smoke-target.mjs`
+and the extended `scripts/smoke-runtime.mjs`, with
+`scripts/runtime-target.mjs`, `scripts/target-fixture.mjs`, and a child-only
+`scripts/fixtures/gh` test double. No upstream source was reused.
+
+### Implemented and demonstrated outcome
+
+On 2026-09-07 (local time), CLI 1.0.83 / bundled SDK / Node.js 26.1.0 /
+macOS arm64:
+
+- `/pr-review NUMBER` resolves the session's current directory using the native
+  `session.rpc.metadata.snapshot()` API, rather than the extension process cwd.
+  `gh repo view` resolves repository ID, host, and name from that directory;
+  API requests explicitly bind host, repository, PR number, and GET method.
+  Ambient `GH_REPO` and Git directory/worktree overrides cannot redirect it.
+  PR metadata must match the resolved repository/number/URL and include valid
+  lifecycle, author, base/head SHAs, and change counts.
+- Capture returns an invocation-local snapshot containing metadata, the entire
+  diff, byte count, timestamp, and SHA-256. The command displays only its bound
+  summary, never PR prose or the full diff in the parent timeline. It does not
+  retain a result/cache or claim that a review occurred.
+- Metadata is read before and after the diff; observable changes in identity,
+  base/head, lifecycle, prose, update timestamp, or counts reject the attempt.
+  File counts, hunk completeness, and added/deleted line counts are checked.
+  Missing/malformed/unavailable data and the 32 MiB subprocess buffer limit
+  fail explicitly, rather than producing a partial successful snapshot.
+- Drafts skip by default; `--include-drafts` bypasses only that gate.
+  GitHub Bot accounts and `[bot]` logins skip. The deliberately conservative
+  trivial gate skips only a provably empty change: zero files/additions/deletions.
+  Titles, documentation suffixes, small diffs, and zero textual changes with
+  changed files do not prove correctness. This follows the upstream prompt's
+  direction to review rather than skip when metadata cannot prove triviality.
+- Closed/merged PRs first use `session.ui.confirm()` when the host supports
+  elicitation. The installed plugin demonstrated both decline and acceptance,
+  and both closed/merged override aliases without a prompt. A host without UI
+  returns `confirmation-required`, with the override as the explicit next action.
+  No diff is held during a pending question. Accepted confirmation re-reads
+  metadata, rejecting changes instead of transferring approval to another head.
+  Draft/bot/trivial gates still apply after non-open authorization.
+- The controlled installed-plugin smoke changed the session cwd after extension
+  startup and deliberately supplied a wrong `GH_REPO`. All traced capture
+  calls used the new cwd, had no repository override, and were either repository
+  inspection or API GETs. It demonstrated eligible capture, draft skip/override,
+  bot/empty skips, closed/merged decline/override, accepted confirmation, HTTP
+  failure, head drift, and truncated diff errors. The parent events showed no
+  model turns, subagents, or tool execution; the parent model stayed unchanged.
+- The live installed-plugin smoke used a temporary, empty Git repository with
+  a remote to public `github/copilot-sdk`, because this project's repository had
+  no PRs. It captured merged PR **#2543**, head
+  `7525814ae7de890acf63b0eb665531292adaf96d`, **3168 diff bytes**, SHA-256
+  `7a343fbb2f05089c786d0e8bfeea6a3471a86e8b4d94c6744bb7d2f8af40c883`.
+  It also demonstrated the real bot skip on merged PR **#2545** and the
+  no-UI closed gate. Local Git branch/status and the unrelated source sentinel
+  were unchanged. No PR was created, branches switched, source checked out,
+  GitHub mutations sent, or reviewers started. Temporary fixtures were removed.
+- Existing status/help/models, invalid fixture setting probes, and pure F2/F3
+  permission/error/cancellation/cleanup exercises passed. Reviewer implementation
+  was not changed; the inference-spending F2/F3 scenarios were not rerun for Q1.
+
+An initial controlled-runtime assertion compared macOS `/var` and
+`/private/var` spellings of the same temporary directory and failed. The harness
+now canonicalizes its directory with `realpath`; the repeated runtime exercise
+passed. This was a harness path comparison, not a capture-directory fallback.
+
+### Reproduction and consulted APIs
+
+```sh
+copilot plugin install "$(pwd)"
+node scripts/smoke-fixture.mjs
+node scripts/smoke-target.mjs
+COPILOT_CLI_PATH="$(command -v copilot)" \
+COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
+node scripts/smoke-runtime.mjs --targets
+COPILOT_CLI_PATH="$(command -v copilot)" \
+COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
+node scripts/smoke-runtime.mjs --target-live
+```
+
+The two runtime variants intentionally run separately: controlled child-only
+`gh` versus real authenticated `gh`. Neither starts inference. Both include the
+existing entry-point/model-list rejection exercise, so require authenticated
+Copilot model access and trusted installed configuration. The live probe pins
+known public PR evidence and fails if that evidence becomes unavailable/changes.
+Its Git setup is only in a disposable harness directory, never capture behavior.
+
+Consulted the installed SDK's `docs/extensions.md`, `types.d.ts`,
+`generated/rpc.d.ts`, and `extension.js` confirmation implementation, along with
+the current official
+[SDK getting-started documentation](https://github.com/github/copilot-sdk/blob/main/docs/getting-started.md)
+and [GitHub pull-request REST documentation](https://docs.github.com/en/rest/pulls/pulls#get-a-pull-request).
+Inspected `gh repo view --help`, `gh api --help`, and `gh help environment`.
+Read only the upstream prompt's target/skip behavior at the scope's pinned
+revision; no upstream implementation source was copied.
+
+### Remaining limitations
+
+The metadata/diff/metadata capture is an observed-consistency check, not an
+atomic GitHub transaction or a proof against every change-and-revert/cache race.
+The SHA-256 identifies fetched bytes; it is not a Git object identity. Q2 must
+bind surrounding source to immutable revisions, not the current local branch.
+Binary-only changes are capturable when GitHub supplies consistent counts,
+but their payload is not textual review evidence. Oversized/unavailable GitHub
+diff responses stop explicitly; no silent subset is reviewed.
+
+Only local sessions are supported. `gh` authentication must already work;
+stored local authentication worked inside the installed extension. The SDK
+filters sensitive environment variables, so token-only forwarding was not
+demonstrated or enabled implicitly. Remote-session execution, GitHub Enterprise,
+and other operating systems were not demonstrated. There is no review timeout,
+automatic retry, reviewer/context assembly, publication, saved configuration,
+retained cache, or safeguard execution in Q1. L1 remains pending.
+
 ## Exact next increment
 
-**Q1 only:** Capture a PR number's owning GitHub repository, lifecycle metadata,
-head identity, and diff without changing the checkout. Add and demonstrate the
-scope's skip/override gates: drafts skipped unless explicitly overridden,
-obvious bots and clearly trivial changes skipped, and closed/merged PRs requiring
-confirmation or the `--include-closed` / `--review-closed` override. Bind the
-snapshot to the captured head and report unavailable/inconsistent capture
-explicitly. Preserve the demonstrated fixture commands.
+**Q2 only:** Bind surrounding-source context to the Q1 snapshot's captured
+repository and head, without relying on the current checkout. Supply
+coordinator-owned source context from immutable GitHub revisions through `gh`,
+with explicit repository/SHA/path provenance (and base-side provenance where
+needed for deleted/changed code). Fail explicitly on unavailable, inconsistent,
+or incomplete required context; never substitute another local branch's code.
 
-Do not start real PR reviewers yet (Q2-Q4), publish anything, implement saved
-configuration, or execute safeguards. Do not switch branches, modify reviewed
-source, fetch/reset the checkout, or reopen settled scope decisions. Keep L1
-pending unless separately authorized; no upstream source reuse.
+Demonstrate that a different local branch/HEAD or dirty source cannot become
+review evidence, and that source context remains bound to the captured revision
+when the PR advances. Preserve Q1 lifecycle gates and fixture commands. Cover
+the context paths with targeted existing-runner exercises and record what is
+demonstrated versus assumed.
+
+Do not start real PR reviewers yet (Q3-Q4), publish anything, implement saved
+configuration or retained-result caching, or execute safeguards. Do not switch
+branches, modify reviewed source, fetch/reset the checkout, or reopen settled
+scope decisions. Keep L1 pending unless separately authorized; no upstream
+source reuse.
