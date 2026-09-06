@@ -17,7 +17,7 @@ in [AGENTS.md](AGENTS.md); the replaceable next-session prompt lives in
 | L1 | Pending | Resolve applicable upstream licensing and attribution; record what can be reused. No upstream source reuse until resolved. Original prototypes need not wait. | [Upstream baseline](SCOPE.md#upstream-baseline) |
 | F1 | Completed | Locally installable plugin with a code-owned, usable status/help entry point; runtime evidence and reproduction below. | [Technical feasibility](SCOPE.md#technical-uncertainties-and-proposed-sequence) |
 | F2 | Completed | Two concurrent reviewers over a tiny original local fixture; distinct explicitly configured subscription models and reasoning levels; display assignments, per-reviewer progress, and results. | F1; [Models/execution](SCOPE.md#models-configuration-and-execution) |
-| F3 | Pending | Adversarial fixture demonstrates read-only enforcement; explicit reviewer failures remain incomplete coverage; manual cancellation stops owned work with no abandoned agents. Record runtime limitations before selecting the integration. | F2; [Models/execution](SCOPE.md#models-configuration-and-execution) |
+| F3 | Completed | Native forbidden-tool denials plus an adversarial fixture; retained incomplete coverage; startup/active/unresponsive cancellation and owned-runtime/extension/parent loss exercised with process-exit evidence. Stdio integration selected; limits below. | F2; [Models/execution](SCOPE.md#models-configuration-and-execution) |
 | Q1 | Pending | Capture a PR number's repository, lifecycle, head, and diff without altering the checkout; demonstrate skip and override gates. | F3; [Targets](SCOPE.md#targets-and-local-behavior) |
 | Q2 | Pending | Bind reviewer evidence to the captured head, including surrounding code; reject mismatched local evidence. | Q1; [Targets](SCOPE.md#targets-and-local-behavior) |
 | Q3 | Pending | Run the three quick specialists, with `--major-only` alias and explicit incomplete coverage, in no-comment mode. | Q2; [Modes](SCOPE.md#review-modes-and-findings) |
@@ -260,15 +260,149 @@ RPC/event definitions before choosing APIs.
   No PR fetching, publication, safeguard execution, or other-client support
   was added. L1 still blocks upstream source reuse only.
 
+## Completed increment: F3
+
+Continues F2 checkpoint `430afd2`. Original implementation:
+`extensions/pr-review/read-only.mjs`, `fixture-run.mjs`,
+`fixtures/adversarial.txt`, and updates to the entry point/reviewer runner.
+The existing smoke scripts now cover lifecycle behavior with
+`scripts/runtime-fixture.mjs` as the runtime scenario helper.
+No upstream source was reused.
+
+### Demonstrated outcome and integration selection
+
+On 2026-09-06, using CLI 1.0.83, its bundled SDK, Node.js 26.1.0, and
+macOS arm64, the recorded installed-plugin `--f3` run passed all nine F3 scenarios
+and the preceding F1/F2 regression exercise. The F2 reviewers again used
+`claude-sonnet-5` / `low` and `gpt-5.6-terra` / `high`, both `isByok=false`,
+with 2338 ms observed turn/idle overlap. These remain reproduction inputs, not
+defaults.
+
+**Select the plugin-owned SDK stdio runtime for subsequent increments.**
+The extension explicitly uses `RuntimeConnection.forStdio()` with bundled
+runtime resolution; ambient transport overrides cannot silently select an
+unproven in-process integration. Factories remain unavailable as recorded in F2.
+
+| Scenario | Observed evidence |
+| --- | --- |
+| Adversarial | Both initialized reviewer tool catalogs were empty. Each native `tools.execute` call for `create_file`, `apply_patch`, `bash`, `task`, `skill`, and `tool_search` returned `resultType: denied` with `Denied by preToolUse hook: PR reviewers cannot execute tools.` Both reviewers then processed the original hostile fixture without model tool execution. |
+| Injected reviewer failure | Rounding failed after its turn began and acknowledged abort; shipping completed with its unvalidated finding retained. Final `complete` was false, with visible incomplete coverage. |
+| Startup cancellation | Immediate `/pr-review cancel` after accepted dispatch produced `cancelled: true`, incomplete coverage, and no active reviewer. |
+| Active cancellation | Both turn-start events were observed before cancellation. Both reviewers became cancelled; owned runtime PID `94893` exited, with no cleanup errors. |
+| Unresponsive cancellation | After both turn-start events, the harness suspended only owned runtime PID `95257` using `SIGSTOP`. `/pr-review cancel` still returned and that PID exited. No abort-RPC acknowledgement is required for manual cancellation. |
+| Owned-runtime loss | Killing owned PID `95606` produced an actual failed connection probe. Both reviewers became incomplete; abort and graceful-cleanup RPC errors remained in the evidence, rather than a successful cleanup claim. |
+| Extension reload | Reload while both reviewers were active stopped owned PID `96031`. The reloaded extension answered status, with no completed-review claim for interrupted work. |
+| Abrupt extension loss | Killing extension PID `96359` while reviewers were active also ended its owned runtime PID `96396`; reloading restored the command. This was not a graceful signal-handler test. |
+| Abrupt parent loss | Killing the smoke parent runtime while both reviewers were active ended extension PID `96723` and owned reviewer runtime PID `96745`. No terminal report can be delivered to a dead parent. |
+
+The harness checks PID existence, not just absence from the current process
+tree, to distinguish exit from orphaning. No `HARNESS CLEANUP` intervention was
+needed in either of the final two complete runs. Signals were restricted to
+processes identified in the smoke process's descendant tree, not other CLI
+sessions. The SDK's own smoke-parent cleanup errors after the final deliberate
+parent kill are printed and expected; unexpected smoke-runtime cleanup errors
+fail the probe. Expected owned-runtime-loss errors are asserted in its report.
+
+Representative adversarial reviewer sessions:
+`bac0a05e-ca7c-42e3-8c65-ef12a7c4a03f` and
+`722dacb7-3a94-41a9-bdeb-b55b524c55a7`.
+The failed-reviewer session was `b9ee1ebd-5444-4aa7-a664-47fcdb51f514`;
+the retained successful shipping session was
+`7d5e65a5-fd0b-4954-881a-1a281044e31c`.
+Its example was `[5000], 10`: expected 4500 cents, actual 5000.
+These remain prototype transcripts/evidence, not the P2 review cache.
+A subsequent final run with the startup-exit and idle-cancel assertions also
+passed all scenarios, with 2661 ms F2 overlap and no harness cleanup intervention.
+
+### Runtime findings that changed the implementation
+
+- Keeping the command handler awaiting the full review left the smoke's command
+  RPC unresolved after extension reload, even though the extension and its
+  reviewer runtime had exited. The final implementation instead returns after
+  validated command acceptance and performs supervised work asynchronously.
+  Results and cleanup status are delivered through the timeline. Consumers must
+  not interpret dispatch success as review completion.
+- The SDK does not surface transport closure as a reviewer `session.error`,
+  and exposes no public client disconnect subscription. Waiting only for
+  idle/error can therefore hang after runtime loss. A single-in-flight
+  `client.ping()` probe at one-second intervals now detects actual RPC failures.
+  There is no response deadline, review timer, retry, or model fallback.
+- Waiting for `session.abort()` is insufficient if the runtime is unresponsive.
+  Manual cancellation and extension shutdown directly use `client.forceStop()`;
+  ordinary reviewer failures still attempt a per-session abort so the other
+  reviewer can finish. Failed aborts are retained in evidence. Normal completion
+  uses `client.stop()`. Explicit cleanup errors remain errors even if force-stop
+  is subsequently attempted.
+- Native tool invocation returns a canonical `denied` result, not necessarily
+  an exception. `apply_patch` also requires a string argument before reaching
+  the hook; its probe uses an inert empty patch. Other probe arguments are empty
+  objects. Schema/transport failures are not counted as permission enforcement.
+  The actual pre-tool hook ran for all six probes in both sessions. The
+  permission handler was not reached, so runtime enforcement of that separate
+  defense-in-depth layer is not claimed from these probes.
+- Cancellation and early errors now settle reviewer waiters, retain available
+  output/usage, remove listeners, and surface incomplete coverage. Pure probes
+  cover send/error/shutdown/tool-start/empty-result failures, cancellation before
+  send, partial output, startup failure, and cleanup failure. Runtime reports
+  are emitted after cleanup, and cleanup errors prevent `complete: true`.
+
+### Reproduction and sources
+
+```sh
+copilot plugin install "$(pwd)"
+node scripts/smoke-fixture.mjs
+COPILOT_CLI_PATH="$(command -v copilot)" \
+COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
+PR_REVIEW_MODEL_1=claude-sonnet-5 PR_REVIEW_EFFORT_1=low \
+PR_REVIEW_MODEL_2=gpt-5.6-terra PR_REVIEW_EFFORT_2=high \
+node scripts/smoke-runtime.mjs --f3
+```
+
+Use current available explicit assignments, reinstall after code edits, and run
+only with trusted discovered configuration. The last command spends subscription
+credits. Without `--f3` or `--fixture`, the runtime smoke remains no-inference.
+The process-exit assertion allows five seconds **after intervention**; this is
+a harness assertion about cleanup, never a reviewer deadline.
+
+Consulted the current official
+[SDK getting-started documentation](https://github.com/github/copilot-sdk/blob/main/docs/getting-started.md)
+and the installed SDK's `docs/extensions.md`, `docs/agent-author.md`,
+`extension.d.ts`, `client.d.ts`, `session.d.ts`, `types.d.ts`, and generated
+tool RPC definitions. Inspected bundled SDK implementation behavior for
+`stop`, `forceStop`, connection closure, and extension joining; API declarations
+alone were not treated as runtime evidence.
+
+### Remaining limits
+
+This selects an experimental CLI/macOS stdio integration, not general
+cross-platform support or an OS sandbox. Reviewers have no tools at all;
+surrounding-source context will be supplied by the coordinator in later work.
+The surrounding assistant is unchanged. SDK transcript persistence remains
+normal; forced termination may skip a final transcript flush. No claims are
+made about stopping a provider's already-accepted remote computation/billing,
+only the owned local runtime and sessions.
+
+A hung but connected reviewer can wait indefinitely. The connection probe
+does not treat silence as failure; manual cancellation ends even a suspended
+runtime. Future SDK versions must re-demonstrate their cleanup behavior.
+Abrupt parent loss cannot deliver final logs, and cross-reload retained review
+state belongs to P2, not this fixture prototype. Startup cancellation is
+demonstrated, not an exhaustive proof of every OS/process-startup interleaving.
+
+No PR fetching, publication, saved configuration, or safeguard execution was
+added. L1 still blocks upstream source reuse only.
+
 ## Exact next increment
 
-**F3 only:** Exercise the plugin-owned SDK-session candidate with an original
-adversarial fixture and demonstrate enforceable read-only reviewers. Inject
-explicit reviewer failures and retain visible incomplete coverage without a
-clean-review claim. Add and demonstrate manual cancellation of active work,
-including owned-runtime/session cleanup and prevention of abandoned reviewers
-on cancellation or extension shutdown. Cover relevant disconnect/error paths
-without introducing review timeouts. Record concrete runtime limitations before
-selecting the integration. Do not add PR fetching, publication, configuration
-persistence, or project safeguard execution. Keep L1 pending unless separately
-authorized; no upstream source reuse.
+**Q1 only:** Capture a PR number's owning GitHub repository, lifecycle metadata,
+head identity, and diff without changing the checkout. Add and demonstrate the
+scope's skip/override gates: drafts skipped unless explicitly overridden,
+obvious bots and clearly trivial changes skipped, and closed/merged PRs requiring
+confirmation or the `--include-closed` / `--review-closed` override. Bind the
+snapshot to the captured head and report unavailable/inconsistent capture
+explicitly. Preserve the demonstrated fixture commands.
+
+Do not start real PR reviewers yet (Q2-Q4), publish anything, implement saved
+configuration, or execute safeguards. Do not switch branches, modify reviewed
+source, fetch/reset the checkout, or reopen settled scope decisions. Keep L1
+pending unless separately authorized; no upstream source reuse.

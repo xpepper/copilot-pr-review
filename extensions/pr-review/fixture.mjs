@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import { assertNoReviewerTools, probeForbiddenTools, reviewerPolicy } from "./read-only.mjs";
 
 const keys = ["model1", "effort1", "model2", "effort2"];
 
@@ -55,29 +56,48 @@ export function validateAssignments(settings, list) {
   });
 }
 
-export async function reviewFixture(parent, client, settings) {
+export async function reviewFixture(parent, client, settings, {
+  signal = new AbortController().signal,
+  experiment = "fixture",
+} = {}) {
+  if (!["fixture", "adversarial", "failure"].includes(experiment)) {
+    throw new Error(`Unknown fixture experiment: ${experiment}`);
+  }
+  signal.throwIfAborted();
   const { list } = await parent.rpc.model.list();
   const assignments = validateAssignments(settings, list);
   const fixture = await readFile(new URL("./fixtures/checkout.js", import.meta.url), "utf8");
   const source = fixture.split("\n").map((line, index) => `${index + 1}: ${line}`).join("\n");
+  const adversarial = experiment === "adversarial"
+    ? await readFile(new URL("./fixtures/adversarial.txt", import.meta.url), "utf8")
+    : "";
   const log = (message, level = "info") => parent.log(message, { level });
   const sessions = [];
+  const policies = [];
+  const enforcement = [];
   for (const assignment of assignments) {
+    signal.throwIfAborted();
+    const policy = { permissionDenials: [], toolDenials: [] };
     const session = await client.createSession({
       model: assignment.model,
       reasoningEffort: assignment.reasoningEffort,
-      enableConfigDiscovery: false,
-      availableTools: [],
-      onPermissionRequest: async () => ({ kind: "denied-no-approval-rule" }),
+      ...reviewerPolicy(policy),
     });
     sessions.push(session);
+    policies.push(policy);
+    signal.throwIfAborted();
     // The owned runtime uses local CLI authentication; validate its own catalog too.
     validateAssignments(settings, (await session.rpc.model.list()).list);
     const current = await session.rpc.model.getCurrent();
     if (current.modelId !== assignment.model || current.reasoningEffort !== assignment.reasoningEffort) {
       throw new Error(`Runtime did not retain the explicit assignment for ${assignment.label}. No review started.`);
     }
+    await assertNoReviewerTools(session);
+    if (experiment === "adversarial") {
+      enforcement.push({ label: assignment.label, probes: await probeForbiddenTools(session) });
+    }
   }
+  signal.throwIfAborted();
   await log("F2 fixture only. Outputs are unvalidated, not publishable findings.");
   for (const assignment of assignments) {
     await log(`Assignment ${assignment.label}: model=${assignment.model} reasoning=${assignment.reasoningEffort}`);
@@ -93,17 +113,26 @@ export async function reviewFixture(parent, client, settings) {
       "This is a feasibility exercise, not a real PR or a validated review.",
       "<fixture>",
       source,
+      adversarial,
       "</fixture>",
-    ].join("\n"));
-    if (!evidence.usage.length || evidence.usage.some((usage) =>
+    ].join("\n"), {
+      signal,
+      injectFailure: experiment === "failure" && index === 0,
+      onActive: () => log(`Reviewer ${assignment.label}: active`),
+    });
+    if (evidence.status === "completed" && (!evidence.usage.length || evidence.usage.some((usage) =>
       usage.model !== assignment.model ||
       usage.reasoningEffort !== assignment.reasoningEffort ||
       usage.isByok !== false,
-    )) {
-      throw new Error(`${assignment.label}: actual model/reasoning/subscription usage did not match the assignment.`);
+    ))) {
+      evidence.status = "incomplete";
+      evidence.error = "Actual model/reasoning/subscription usage did not match the assignment.";
     }
-    await log(`Reviewer ${assignment.label}: completed\nUnvalidated fixture output:\n${evidence.result}`);
-    return { ...assignment, status: "completed", ...evidence };
+    await log(evidence.status === "completed"
+      ? `Reviewer ${assignment.label}: completed\nUnvalidated fixture output:\n${evidence.result}`
+      : `Reviewer ${assignment.label}: ${evidence.status}; incomplete coverage. ${evidence.error}`,
+    evidence.status === "completed" ? "info" : "error");
+    return { ...assignment, ...evidence, policy: policies[index] };
   }));
   const reviewers = [];
   for (const [index, outcome] of outcomes.entries()) {
@@ -115,21 +144,36 @@ export async function reviewFixture(parent, client, settings) {
       reviewers.push({ ...assignments[index], status: "incomplete", error });
     }
   }
-  const complete = reviewers.every((reviewer) => reviewer.status === "completed");
+  const complete = !signal.aborted && reviewers.every((reviewer) => reviewer.status === "completed");
   await log(complete
     ? "F2 fixture execution completed. Output has not been evidence-validated or deduplicated."
     : "F2 fixture execution has incomplete coverage. This is not a clean-review result.",
   complete ? "info" : "error");
-  return { complete, reviewers };
+  return {
+    complete, cancelled: signal.aborted && signal.reason?.name === "AbortError",
+    experiment, enforcement, reviewers,
+  };
 }
 
-async function runReviewer(session, prompt) {
+export async function runReviewer(session, prompt, {
+  signal = new AbortController().signal,
+  injectFailure = false,
+  onActive = async () => {},
+} = {}) {
   const evidence = { sessionId: session.sessionId, usage: [], result: "", startedAt: null, completedAt: null };
   const { promise, resolve, reject } = Promise.withResolvers();
+  // Cancellation can reject before send, while cleanup is still awaiting an RPC.
+  promise.catch(() => {});
+  const cancel = () => reject(signal.reason);
+  signal.addEventListener("abort", cancel, { once: true });
+  if (signal.aborted) cancel();
   const unsubscribe = session.on((event) => {
     switch (event.type) {
       case "assistant.turn_start":
         evidence.startedAt ??= Date.parse(event.timestamp);
+        // Log delivery failures must settle the reviewer too, rather than leave a rejected callback.
+        onActive().catch(reject);
+        if (injectFailure) reject(new Error("Injected reviewer failure after turn start."));
         break;
       case "assistant.usage":
         evidence.usage.push({
@@ -147,6 +191,9 @@ async function runReviewer(session, prompt) {
       case "session.error":
         reject(new Error(event.data.message));
         break;
+      case "session.shutdown":
+        reject(new Error("Reviewer session shut down before completion."));
+        break;
       case "session.idle":
         evidence.completedAt = Date.parse(event.timestamp);
         if (!evidence.result?.trim()) reject(new Error("Reviewer produced no usable output."));
@@ -155,10 +202,24 @@ async function runReviewer(session, prompt) {
     }
   });
   try {
+    signal.throwIfAborted();
     // sendAndWait has a default deadline. Subscribe first and wait without a timer.
     await Promise.all([session.send({ prompt }), promise]);
+    return { ...evidence, status: "completed" };
+  } catch (error) {
+    evidence.status = signal.aborted && signal.reason?.name === "AbortError" ? "cancelled" : "incomplete";
+    evidence.error = String(error);
+    // A failed local waiter does not stop inference. Abort before reporting it settled.
+    try {
+      await session.abort();
+      evidence.abortAcknowledged = true;
+    } catch (abortError) {
+      evidence.abortAcknowledged = false;
+      evidence.error += `; reviewer abort failed: ${String(abortError)}`;
+    }
     return evidence;
   } finally {
+    signal.removeEventListener("abort", cancel);
     unsubscribe();
   }
 }

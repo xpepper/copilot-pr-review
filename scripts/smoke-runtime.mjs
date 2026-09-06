@@ -1,6 +1,21 @@
 import assert from "node:assert/strict";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import { exerciseF3, startFixture } from "./runtime-fixture.mjs";
+
+function fixtureSettings() {
+  const settings = {
+    model1: process.env.PR_REVIEW_MODEL_1,
+    effort1: process.env.PR_REVIEW_EFFORT_1,
+    model2: process.env.PR_REVIEW_MODEL_2,
+    effort2: process.env.PR_REVIEW_EFFORT_2,
+  };
+  assert(Object.values(settings).every((value) => value && !/\s/.test(value)),
+    "Set PR_REVIEW_MODEL_1, PR_REVIEW_EFFORT_1, PR_REVIEW_MODEL_2, PR_REVIEW_EFFORT_2 explicitly");
+  return settings;
+}
+const settingsArgs = (settings) =>
+  Object.entries(settings).map(([key, value]) => `${key}=${value}`).join(" ");
 
 const sdkPath = process.env.COPILOT_SDK_PATH;
 const cliPath = process.env.COPILOT_CLI_PATH;
@@ -16,6 +31,7 @@ const { CopilotClient, RuntimeConnection } = await import(
 const client = new CopilotClient({
   connection: RuntimeConnection.forStdio({ path: resolve(cliPath) }),
 });
+let parentKilled = false;
 
 try {
   const session = await client.createSession({
@@ -44,6 +60,7 @@ try {
     ["  status  ", "Copilot PR Review: entry point ready."],
     ["help", "Usage: /pr-review [status|help|models|fixture"],
     ["--help", "Usage: /pr-review [status|help|models|fixture"],
+    ["cancel", "No fixture review is running."],
   ]) {
     const before = (await session.getEvents()).length;
     const result = await session.rpc.commands.execute({ commandName: "pr-review", args });
@@ -55,7 +72,7 @@ try {
     console.log(`PASS /pr-review ${args}`);
   }
 
-  for (const args of ["123 --quick --no-comment", "status extra", "--comment"]) {
+  for (const args of ["123 --quick --no-comment", "status extra", "cancel extra", "--comment"]) {
     const result = await session.rpc.commands.execute({ commandName: "pr-review", args });
     assert.match(result.error, /Unsupported arguments\. No review was started\./);
     console.log(`PASS rejected /pr-review ${args}`);
@@ -96,26 +113,16 @@ try {
   ), "The entry point must not start model turns, agents, or tools");
   console.log("PASS no model turns, subagents, or tool executions");
 
-  if (process.argv.includes("--fixture")) {
-    const settings = {
-      model1: process.env.PR_REVIEW_MODEL_1,
-      effort1: process.env.PR_REVIEW_EFFORT_1,
-      model2: process.env.PR_REVIEW_MODEL_2,
-      effort2: process.env.PR_REVIEW_EFFORT_2,
-    };
-    assert(Object.values(settings).every((value) => value && !/\s/.test(value)),
-      "Set PR_REVIEW_MODEL_1, PR_REVIEW_EFFORT_1, PR_REVIEW_MODEL_2, PR_REVIEW_EFFORT_2 explicitly");
+  if (process.argv.includes("--fixture") || process.argv.includes("--f3")) {
+    const settings = fixtureSettings();
     const observed = [];
     const unsubscribe = session.on((event) => {
       observed.push(event);
       if (event.type === "session.info") console.log(event.data.message);
     });
     try {
-      const result = await session.rpc.commands.execute({
-        commandName: "pr-review",
-        args: `fixture ${Object.entries(settings).map(([key, value]) => `${key}=${value}`).join(" ")}`,
-      });
-      assert.equal(result.error, undefined);
+      const run = await startFixture(session, `fixture ${settingsArgs(settings)}`);
+      try { await run.done; } finally { run.unsubscribe(); }
       const reportEvent = observed.find((event) =>
         event.type === "session.info" && event.data.message.startsWith("F2 evidence: "),
       );
@@ -160,9 +167,15 @@ try {
   }
   assert.deepEqual(await session.rpc.model.getCurrent(), parentModel,
     "Prototype must not alter the parent session's model or reasoning");
+  if (process.argv.includes("--f3")) {
+    await exerciseF3(session, settingsArgs(fixtureSettings()), parentModel, () => { parentKilled = true; });
+  }
 } finally {
   const errors = await client.stop();
   if (errors.length) {
-    throw new AggregateError(errors, "Could not stop smoke runtime cleanly");
+    if (!parentKilled || errors.some((error) => !String(error).includes("Connection is closed."))) {
+      throw new AggregateError(errors, "Could not stop smoke runtime cleanly");
+    }
+    console.log(`Expected smoke cleanup errors after injected parent loss: ${errors.map(String).join("; ")}`);
   }
 }
