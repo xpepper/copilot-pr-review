@@ -5,9 +5,19 @@ first implementation increment; the scope's earlier authorization statement is
 historical. Items below target roughly 1-3 hours each, not review runtime limits.
 An item is complete only with repository evidence. Later items may be split
 further when their implementation context is known, without changing scope.
-The standing checkpoint-commit and fresh-session handoff workflow is recorded
-in [AGENTS.md](AGENTS.md); the replaceable next-session prompt lives in
-[HANDOFF.md](HANDOFF.md).
+The standing checkpoint-commit, pull-request and fresh-session handoff workflow
+is recorded in [AGENTS.md](AGENTS.md); the replaceable next-session prompt lives
+in [HANDOFF.md](HANDOFF.md).
+
+**Since 2026-09-07, every increment lands on a branch and a pull request that is
+reviewed with this plugin.** `main` carries a repository ruleset requiring a pull
+request with zero approving reviews and no bypass actors, so nobody pushes to it
+directly. Each increment's entry below must record its pull request and the
+outcome of reviewing it with the tool: mode, model and effort actually used,
+coverage, findings and withheld findings, reported credit cost, and what changed
+in response. The tool emits only `COMMENT` reviews, so its review never satisfies
+an approval requirement, and findings stay local unless the user authorizes
+posting them.
 
 ## Increments
 
@@ -31,7 +41,7 @@ in [AGENTS.md](AGENTS.md); the replaceable next-session prompt lives in
 | C1 | Completed | Personal light/medium/heavy tier configuration and `autoPostReviews` inspected and updated by `/pr-review-config`; validated capabilities, nearest-tier/ambient inheritance, flag precedence and effective-assignment display demonstrated below. | F3; [Configuration](SCOPE.md#models-configuration-and-execution) |
 | C2 | Completed | Explicit per-directory trust gates `.copilot/pr-review/config.json` overrides; untrusted files ignored unparsed, self-trust impossible, precedence and revocation demonstrated below. | C1; [Configuration trust](SCOPE.md#models-configuration-and-execution) |
 | R1 | Completed | Verified-checkout reads and matching-head harnesses demonstrated. One authorized live quick review used unchanged source without denials; prior coverage gaps disappeared, but no additional finding was produced. GPT's `rg` alias is supported without widening the grant. | F4, Q3; [Modes/findings](SCOPE.md#review-modes-and-findings) |
-| M1 | Pending | Balanced becomes default with required topology and P3 cap; full adds conventions reviewer and its findings policy. | Q4, C1; [Modes](SCOPE.md#review-modes-and-findings) |
+| M1 | Balanced half completed | Balanced is the default with its four heavy specialists, light overview reviewer and three-finding P3/nit cap. Demonstrated by controlled probes, no-inference installed dispatch and one live review of this repository's own pull request #3. Pending until full adds the conventions reviewer and its findings policy. | Q4, C1; [Modes](SCOPE.md#review-modes-and-findings) |
 | M2 | Pending | Deep uses one holistic reviewer; reject conflicting mode flags. | M1; [Modes](SCOPE.md#review-modes-and-findings) |
 | C3 | Pending | Explicit optional fallback with at most one eligible retry per failed reviewer; no timers or silent substitutions. | C1, Q3; [Fallbacks/execution](SCOPE.md#models-configuration-and-execution) |
 | V1 | Pending | `--verify` enforces matching branch/SHA/cleanliness before reviewers and presents discovered existing commands for approval. | Q1; [Safeguards](SCOPE.md#optional-project-safeguards) |
@@ -3144,39 +3154,295 @@ GitHub response double, not a real GitHub PR. No fixture-driven
 inference/publication suite was rerun. Cold retained-session resume is still
 unsupported. Presentation consolidation was left untouched.
 
+## Completed increment: M1, balanced half
+
+Implementation: `extensions/pr-review/modes.mjs` (new), `review.mjs` (renamed
+from `quick.mjs`), `findings.mjs`, `retention.mjs`, `preview.mjs`,
+`checkout.mjs`, `retained-run.mjs`, `extension.mjs`, `config.mjs` and
+`target.mjs` wording. Probes: `scripts/smoke-review.mjs` (renamed from
+`smoke-quick.mjs`), `smoke-findings.mjs`, `smoke-retention.mjs`,
+`smoke-checkout.mjs`, `smoke-config.mjs`, `retention-fixture.mjs`,
+`runtime-target.mjs`, `smoke-runtime.mjs` and `smoke-config-runtime.mjs`.
+No upstream source was copied. The full and deep modes, fallbacks, timeouts,
+safeguards, reviewer shell tools, gate overrides and an interactive menu were
+not added, and no configuration key was added. L1 remains pending.
+
+### Mode boundary
+
+`modes.mjs` declares each mode as data: reviewer topology with the tier each
+reviewer resolves, findings policy, label, flag and evidence prefix. Quick keeps
+its three heavy specialists and its P0-P2 policy. Balanced runs four heavy
+specialists (correctness, contracts, security, performance/resources) and one
+light overview reviewer, and presents P0-P2 plus at most three P3/nit findings.
+Mode flags are mutually exclusive, `--major-only` remains the quick alias, and
+**balanced is the default when no mode flag is given**.
+
+Because a bare PR number now runs a review, the capture-only path that Q1/Q2
+probes depend on moved to an explicit `--capture-only` flag. It refuses to
+combine with a mode, posting, selection or model argument, starts no reviewer
+and spends no inference. This flag is not in `SCOPE.md`; it is a prototype
+diagnostic path that keeps the no-inference capture probes reachable, and it can
+be removed at D1 if the documented surface should match upstream exactly.
+
+The findings policy travels with the mode into the reviewer instructions, the
+candidate schema, the evidence boundary, the adjudicator instructions,
+presentation, retention and publication. Accepted minor findings beyond the cap
+are withheld rather than dropped: they are recorded in `validation.capped` with
+their id, severity, title and reason, are reported in the findings output, and
+can never be selected or published. A duplicate alias of a withheld finding is
+withheld with it. Withholding is a presentation policy, not a coverage failure,
+so it does not make a run incomplete. Severity order is declared by the policy
+rather than inferred from string comparison.
+
+`retention.mjs` now validates the record against its own mode: the reviewer
+count for a complete run, the admitted severities, the minor cap, and the
+`capped` entries' identity. A quick record still rejects a P3, and a balanced
+record with four presented minor findings or a missing reviewer is rejected. The
+retained schema version is unchanged; `capped` is optional, so older records
+stay readable. `preview.mjs` builds the same code-controlled COMMENT payload,
+titled by the mode's label and admitting only the mode's severities. Selection,
+retention and publication gates are otherwise untouched.
+
+Each reviewer resolves its own tier through the existing layering, so a personal
+or trusted-project light assignment is what the overview reviewer actually runs.
+Before any reviewer starts, an `Effective reviewer assignments:` block names
+every reviewer, its tier, model, reasoning effort and the origin of each value,
+after the existing effective-configuration report. Only `heavyModel=` and
+`heavyEffort=` remain invocation flags; no light-tier flag was added, so a
+per-invocation light override is only possible through `/pr-review-config`.
+A heavy invocation flag does not propagate to the light tier: only saved
+settings inherit across tiers, which is unchanged C1 behavior. The adjudicator
+still runs on the heavy tier and still holds zero tools.
+
+### Controlled evidence
+
+All twelve controlled suites passed in this session, and `git diff --check` is
+clean. `smoke-quick.mjs` was renamed to `smoke-review.mjs`; the suite list is now
+`findings`, `review`, `selection`, `retention`, `preview`, `publication`,
+`publish-later`, `checkout`, `config`, `context`, `fixture`, `target`.
+
+New demonstrations, all without inference or network access:
+
+- Mode parsing: `--balanced`, the bare default, the `--major-only` alias,
+  mutually exclusive mode flags, `--full`/`--deep` rejected as unsupported
+  arguments, and `--capture-only` rejected with any mode, posting, selection or
+  model argument.
+- Topology and tiers: balanced resolves five reviewers, four heavy and one
+  light; an unconfigured light tier falls back to the ambient assignment; a
+  layered personal/trusted-project light assignment reaches the overview
+  reviewer with `project:light` origins; an unusable light model refuses the
+  review with no substitution.
+- A settled balanced run through `executeReviewRun`: five concurrent specialist
+  sessions plus one adjudicator, the overview session created with the light
+  model while the adjudicator stays heavy, `M1 binding:`/`M1 evidence:`
+  markers, four accepted P3 candidates reduced to three presented findings and
+  one withheld record, selection of exactly the three presented findings, and a
+  proposed body reading `Balanced review: 3 selected validated finding(s)`.
+- Findings policy at unit level: quick admits no minor candidate at all;
+  balanced admits P3/nit, orders P1 before P3 before nit, caps at three, records
+  the withheld representative and its duplicate alias, and stays complete.
+- Retention: a balanced record with five reviewers validates; the same record
+  relabelled `quick` is rejected for incomplete reviewer coverage and for a
+  severity outside the mode's policy; a fourth presented minor finding is
+  rejected as exceeding the findings policy.
+- The checkout gate refuses with its own mode's label and fixing command
+  (`rerun /pr-review 12 --balanced`), on the same evidence as quick.
+
+### Installed-plugin evidence
+
+The extension was reinstalled with `copilot plugin install "$(pwd)"` (the
+deprecation warning is expected) before every runtime probe. No probe below sent
+a model prompt; each asserts the absence of model turns, subagents and tool
+executions, or of any `Reviewer ` timeline message.
+
+- `smoke-runtime.mjs --targets --startup` and
+  `smoke-runtime.mjs --targets --matching-checkout --startup` passed. Both now
+  dispatch the skipped draft in **both** modes and assert a settled
+  `coverage: "not-started"` result under `Q3 evidence:` and `M1 evidence:`
+  respectively, one assignment line per reviewer (three and five), the
+  `overview [light]` line, the balanced findings-policy text, and that no
+  reviewer started. Capture dispatches now pass `--capture-only`, including the
+  advanced-head, HTTP 404, truncated-diff and invalid-number cases.
+- New installed rejections without inference: `--quick --balanced`,
+  `--capture-only --balanced`, `--balanced --no-comment --comment`,
+  `--balanced ... heavyModel=missing-m1-model` and `--balanced ...
+  heavyEffort=invalid-effort`. Each returns an explicit command error and starts
+  no reviewer.
+- `smoke-retention-runtime.mjs` passed; the retained record now carries
+  `"capped":[]`. Command-only cold `session.resume` remains unsupported.
+- `smoke-reviewer-tools.mjs` passed with `PR_REVIEW_HEAVY_MODEL=gpt-5.6-terra`
+  (catalog `glob, rg, view`) and with `claude-sonnet-5` (`glob, grep, view`).
+  Confinement, native write/exec denial and non-leakage are unchanged.
+- `smoke-config-runtime.mjs` passed, including a new balanced case: with a saved
+  personal `lightModel`/`lightEffort`, a skipped-draft balanced dispatch reported
+  `overview [light]: model=<saved> [configured:light] reasoning=<saved>
+  [configured:light]` and `correctness [heavy]: ... [inherited:light] ...`
+  before settling, with no inference and no GitHub request. This probe requires
+  an empty personal configuration store; the existing personal `config.json` was
+  copied aside for the run and restored byte-identically afterwards.
+
+### Live inference: the dogfood review of pull request #3
+
+One live balanced review was explicitly authorized and run, against this
+project's own pull request #3 at head `5c05b7c63d44f7f08a1775d4f2d601dd912c9aa1`
+(base `d88774cb3fc3c5631ba1045c3623af3c780b8336`, 27 files, 1381 additions and
+446 deletions). It was dispatched with
+`node scripts/dogfood-review.mjs 3 --all --no-comment`, which sends the command
+through the SDK command RPC from a session rooted at this checkout. Parent
+session `e5845e77-1237-4a88-b0fd-2e438d251778`, invocation
+`453c696d-89b3-43b2-a556-84be490fe3b6`.
+
+Every reviewer ran `gpt-5.6-terra` at `high`, from the saved personal heavy
+tier. The overview reviewer is on the light tier, but no light tier is saved, so
+it inherited the heavy assignment: this run therefore exercised the balanced
+topology, **not** a genuinely lighter model.
+
+| Reviewer | Tier | Status | Requests | Reported credits | Duration | Tool calls |
+| --- | --- | --- | --- | --- | --- | --- |
+| correctness | heavy | completed | 6 | 88.04068 | 85596 ms | 23 |
+| contracts | heavy | completed | 5 | 90.05597 | 87188 ms | 24 |
+| security | heavy | completed | 4 | 82.11749 | 62526 ms | 16 |
+| performance-resources | heavy | completed | 1 | 63.66150 | 17397 ms | 0 |
+| overview | light | completed | 6 | 90.27063 | 76994 ms | 26 |
+
+Five reviewers overlapped for 17397 ms inside an 87234 ms wall time. The runtime
+reported **414.14627 AI credits** in total. That is the runtime's own figure for
+this review, not a billing reconciliation, and it is roughly fifteen times the
+27.89 credits R1 spent with three reviewers on a small diff. A doc-heavy pull
+request is expensive to review this way.
+
+The reviewers made 89 confined read-only calls (69 `view`, 18 `rg`, 2 `glob`)
+with **zero permission or tool denials**, so the read grant worked on a real
+repository checkout. No adjudicator ran, because no reviewer produced a
+candidate. Selection was `empty`, the proposal was `empty`, publication was
+`not-attempted`, and nothing was written to GitHub.
+
+The result was **0 findings with incomplete coverage**: four coverage gaps and
+two informational caveats. Coverage was incomplete for the right reason, and
+zero findings is not a clean-review claim.
+
+**The review found a real defect in its own pull request.** The `contracts` and
+`overview` reviewers independently reported that the rename of
+`scripts/smoke-quick.mjs` left a `README.md` reproduction command pointing at the
+removed script, and that they could not present it as a candidate because the
+stale line is unchanged context rather than a changed line. Verbatim, from
+`contracts`:
+
+```text
+The patch renames the documented smoke suite, but the README reproduction command that still invokes the old filename is unchanged diff context rather than an added or removed source line. The required changed-line-only location schema cannot anchor that user-visible regression.
+```
+
+That gap was verified by hand and was correct: `README.md` had two references to
+the old filename and the increment's edit fixed only the first. The second was
+fixed on the same branch after this review, and the docs now name only scripts
+that exist.
+
+The `security` reviewer recorded that the captured source cannot demonstrate
+runtime enforcement of the light reviewer's read-only boundary, and
+`performance-resources` recorded that no live evidence existed for the
+five-reviewer topology's operational cost. This run partly answers the second
+gap with its own numbers above, and the confinement evidence for the first
+remains the separate no-inference `smoke-reviewer-tools.mjs` probe.
+
+Limitations of this single run: one pull request, one model, one effort level,
+and a change set dominated by documentation. It demonstrates that balanced
+executes end to end on a real pull request with real reads and a real charge. It
+demonstrates nothing about balanced review quality, about minor findings, or
+about the light tier, since no light model ran and no candidate was ever
+adjudicated.
+
+**Recorded tool defect: the changed-line anchoring rule hid a real regression.**
+Two reviewers found a genuine, user-visible consequence of this diff and had no
+compliant way to report it, because the affected line is unchanged context even
+though the rename that broke it is a changed line. The rule exists to stop
+reviewers auditing the repository at large, and it should not simply be relaxed.
+A later increment should decide how a candidate can be anchored on the changed
+line that causes the breakage while citing the unchanged line that it breaks.
+Until then, expect stale-reference regressions to surface as coverage gaps
+rather than findings.
+
+### Reproduction
+
+```sh
+for suite in findings review selection retention preview publication \
+  publish-later checkout config context fixture target; do
+  node "scripts/smoke-$suite.mjs" || break
+done
+git diff --check
+
+copilot plugin install "$(pwd)"
+COPILOT_CLI_PATH="$(command -v copilot)" \
+COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
+node scripts/smoke-runtime.mjs --targets --startup
+COPILOT_CLI_PATH="$(command -v copilot)" \
+COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
+node scripts/smoke-runtime.mjs --targets --matching-checkout --startup
+COPILOT_CLI_PATH="$(command -v copilot)" \
+COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
+node scripts/smoke-retention-runtime.mjs
+COPILOT_CLI_PATH="$(command -v copilot)" \
+COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
+PR_REVIEW_HEAVY_MODEL=claude-sonnet-5 PR_REVIEW_HEAVY_EFFORT=high \
+node scripts/smoke-config-runtime.mjs
+```
+
+`smoke-config-runtime.mjs` refuses to run while a personal
+`<copilot-config-home>/pr-review/config.json` exists; move it aside and restore
+it afterwards.
+
+### Remaining limitations
+
+- One live balanced review exists, on this project's own doc-heavy pull request.
+  It produced no findings and no adjudication, so balanced review quality and
+  minor-finding behavior are still undemonstrated. No light model has ever run,
+  because the light tier inherited the heavy assignment.
+- No light-tier invocation flag, so a per-invocation light override requires
+  `/pr-review-config`. Deliberate: no configuration surface was added.
+- `--capture-only` is prototype surface outside `SCOPE.md`, introduced only
+  because balanced became the default. Revisit at D1.
+- The minor-finding cap keeps the strongest three by declared severity then
+  confidence. It does not spread minor findings across reviewers or files, and
+  a light reviewer's minor finding can be displaced by a heavy one's.
+- Fixture inference and publication suites were not rerun; the balanced payload
+  body was demonstrated in controlled probes only, never posted to GitHub.
+- Everything R1 recorded still holds: cold command-only resume is unsupported,
+  the adjudicator receives zero tools, confinement limits for untracked and
+  ignored files are unchanged, and the matching fixture's base is synthetic.
+
 ## Exact next increment
 
-**The balanced half of M1 only, after R1.** Add the balanced review mode with its
-upstream reviewer assignment, so a mode other than quick runs and the light tier
-is actually consumed. M1 stays Pending until the full mode's conventions reviewer
-and findings policy also land, which is the increment after this one. Do not add
-full or deep now, nor fallbacks, safeguards or an interactive menu, and do not
-change publication gates or the configuration surface.
+**The full half of M1.** Add `--full`: the balanced reviewer set plus one medium
+conventions/maintainability reviewer, with the full findings policy (all
+qualifying severities). M1 completes when that lands; deep stays with M2.
 
 Acceptance criteria:
 
-- `--balanced` runs four heavy specialists (correctness, contracts, security,
-  performance/resources) plus one light overview reviewer, per `SCOPE.md`.
-  Balanced is the default when no mode flag is given; mode flags stay mutually
-  exclusive and `--major-only` remains the alias for `--quick`.
-- The light reviewer resolves the light tier through the existing layered
-  configuration, so a personal or trusted-project light assignment is what
-  actually runs, and the pre-execution report keeps showing every origin.
-- Findings policy follows `SCOPE.md`: P0-P2 plus at most three direct-diff
-  P3/nit findings. Evidence validation and deduplication apply unchanged, and a
-  failed or incomplete reviewer stays visible as incomplete coverage.
-- Reviewer count and concurrency follow the selected mode. No timeouts are
-  imposed, and cancellation still stops all owned work.
-- Selection, retention and publication gates are untouched.
-- Demonstrate with controlled probes first, and reuse the existing no-inference
-  installed-plugin probes for plumbing. Spend inference only for the one live
-  balanced review needed to prove real reviewer output, and record whether it
-  was run.
+- `--full` runs the four heavy specialists, the light overview reviewer and one
+  medium conventions/maintainability reviewer, resolving the medium tier through
+  the existing layering, with every origin shown before execution.
+- The full findings policy presents all qualifying severities, with no minor cap,
+  while evidence validation, deduplication, incomplete-coverage reporting and
+  cancellation stay unchanged.
+- Mode flags stay mutually exclusive; balanced stays the default; quick and its
+  alias are unchanged. Do not add deep, fallbacks, timeouts, safeguards,
+  reviewer shell tools, gate overrides, configuration keys or an interactive
+  menu, and do not alter user checkouts to satisfy the revision gate.
+- Update the M1 row to Completed only when the full mode is demonstrated.
+- Demonstrate with controlled probes and the no-inference installed dispatch
+  first, extending `smoke-review.mjs`, `smoke-findings.mjs`,
+  `smoke-retention.mjs` and the installed draft-skip loop the way balanced did.
+  Any live review, balanced or full, needs new explicit authorization in that
+  session; none is carried over.
 - Consult the installed SDK and current official documentation before adopting
   new runtime APIs, then record evidence, remaining limits and the next small
-  increment. Follow `AGENTS.md` checkpoint and final-file handoff rules in turn.
+  increment. Follow the `AGENTS.md` checkpoint and final-file handoff rules.
+- Land the increment on its own branch and pull request, and review that pull
+  request with this plugin before asking for a merge, as `AGENTS.md` now
+  requires. Record the review outcome here. That single review is authorized by
+  the workflow; nothing else that spends credits is.
 
-Keep L1 pending, copy no upstream source and implement no fallbacks, safeguards
-or additional modes beyond balanced. Do not switch branches or modify reviewed
-source as part of review or publication. No push authorization exists in this
-session; do not assume one.
+A live balanced review remains an open, separately authorizable step. It is the
+only way to learn whether the light overview reviewer and the minor-finding
+policy produce useful output; the plumbing itself is already demonstrated.
+Keep L1 pending and copy no upstream source. Push the increment branch and open
+its pull request; `main` refuses direct pushes and merging stays the user's call.

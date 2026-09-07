@@ -1,5 +1,6 @@
 import { isDeepStrictEqual } from "node:util";
 import { minimumConfidence, reviewKey } from "./findings.mjs";
+import { reviewMode } from "./modes.mjs";
 import { waitForInteraction } from "./interaction.mjs";
 import { selectionBinding } from "./selection.mjs";
 import { formatCoverage } from "./coverage.mjs";
@@ -40,10 +41,10 @@ function selectedFindings(outcome) {
   return selected;
 }
 
-function inlineComment(finding, binding) {
+function inlineComment(finding, binding, policy) {
   const location = finding.location;
   requirePreview(finding.validation?.kind === "source-grounded-model-adjudication" &&
-    finding.validation.allClaimsSupported === true && ["P0", "P1", "P2"].includes(finding.severity) &&
+    finding.validation.allClaimsSupported === true && policy.severities.includes(finding.severity) &&
     Number.isFinite(finding.confidence) && finding.confidence >= minimumConfidence && finding.confidence <= 1,
   "finding is not validated");
   requirePreview(location && ["head", "base"].includes(location.side) &&
@@ -77,17 +78,18 @@ function inlineComment(finding, binding) {
 
 // Reconstruction on reload checks shape/binding, NOT the current GitHub head or diff.
 export function reviewRequest(outcome) {
+  const mode = reviewMode(outcome.mode);
   const findings = selectedFindings(outcome);
   return {
     binding: selectionBinding(outcome),
     payload: {
       commit_id: outcome.binding.head, event: "COMMENT",
-      body: `Quick review: ${findings.length} selected validated finding(s). ` +
+      body: `${mode.label}: ${findings.length} selected validated finding(s). ` +
         (outcome.validation.diagnostics === undefined
           ? `Review coverage: ${outcome.complete ? "completed" : "INCOMPLETE"}. `
           : `${formatCoverage(outcome)}\n`) +
         "This is not a clean-review claim.",
-      comments: findings.map((finding) => inlineComment(finding, outcome.binding)),
+      comments: findings.map((finding) => inlineComment(finding, outcome.binding, mode.policy)),
     },
   };
 }

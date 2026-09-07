@@ -122,7 +122,7 @@ try {
     console.log(`PASS /pr-review ${args}`);
   }
 
-  for (const args of ["123 --balanced --no-comment", "status extra", "cancel extra", "--comment"]) {
+  for (const args of ["123 --full --no-comment", "123 --deep --no-comment", "status extra", "cancel extra", "--comment"]) {
     const result = await session.rpc.commands.execute({ commandName: "pr-review", args });
     assert.match(result.error, /Unsupported arguments\. No review was started\./);
     console.log(`PASS rejected /pr-review ${args}`);
@@ -144,10 +144,15 @@ try {
     ["fixture model1=a effort1=low model2=b effort2=high extra=x", /Invalid/],
     ["fixture model1=missing-f2-model effort1=low model2=b effort2=high", /Unavailable/],
     [`fixture model1=${available.id} effort1=invalid-effort model2=b effort2=high`, /Unsupported reasoning/],
-    ["123 --quick --major-only --no-comment", /requires/],
+    ["123 --quick --major-only --no-comment", /mutually exclusive/],
+    ["123 --quick --balanced --no-comment", /mutually exclusive/],
+    ["123 --capture-only --balanced", /cannot be combined/],
     ["123 --quick --no-comment --comment", /Conflicting posting flags/],
+    ["123 --balanced --no-comment --comment", /Conflicting posting flags/],
     ["123 --quick --no-comment heavyModel=missing-q3-model", /Unavailable/],
+    ["123 --balanced --no-comment heavyModel=missing-m1-model", /Unavailable/],
     [`123 --quick --no-comment heavyModel=${available.id} heavyEffort=invalid-effort`, /Unsupported reasoning/],
+    [`123 --balanced --no-comment heavyModel=${available.id} heavyEffort=invalid-effort`, /Unsupported reasoning/],
   ]) {
     const before = (await session.getEvents()).length;
     const result = await session.rpc.commands.execute({ commandName: "pr-review", args });
@@ -162,7 +167,7 @@ try {
 
   if (startup) {
     const original = (await session.rpc.metadata.snapshot()).workingDirectory;
-    const settled = Promise.withResolvers();
+    let settled = Promise.withResolvers();
     const unsubscribe = session.on((event) => {
       if (!["session.info", "session.error"].includes(event.type)) return;
       if (event.data.message.startsWith("P2 evidence: ")) settled.resolve();
@@ -170,21 +175,39 @@ try {
         settled.reject(new Error(event.data.message));
       }
     });
-    const before = (await session.getEvents()).length;
     try {
       await session.rpc.metadata.setWorkingDirectory({ workingDirectory: targetSmoke.quickTarget.workingDirectory });
-      const result = await session.rpc.commands.execute({
-        commandName: "pr-review",
-        args: `2 --quick --no-comment --all heavyModel=${available.id} ` +
-          `heavyEffort=${available.capabilities.supports.reasoning_effort[0]}`,
-      });
-      assert.equal(result.error, undefined, `CLI discovery without COPILOT_CLI_PATH: ${result.error}`);
-      await settled.promise;
-      const messages = (await session.getEvents()).slice(before)
-        .filter((event) => event.type === "session.info").map((event) => event.data.message);
-      assert(messages.some((message) => message.startsWith("Q3 evidence: ") &&
-        JSON.parse(message.slice("Q3 evidence: ".length)).coverage === "not-started"),
-      "Draft skip must settle without inference");
+      // A draft target settles both modes before any reviewer starts, so this
+      // exercises installed dispatch, tier resolution and settlement without
+      // spending inference.
+      for (const [mode, prefix, reviewers] of [["--quick", "Q3", 3], ["--balanced", "M1", 5]]) {
+        const before = (await session.getEvents()).length;
+        settled = Promise.withResolvers();
+        const result = await session.rpc.commands.execute({
+          commandName: "pr-review",
+          args: `2 ${mode} --no-comment --all heavyModel=${available.id} ` +
+            `heavyEffort=${available.capabilities.supports.reasoning_effort[0]}`,
+        });
+        assert.equal(result.error, undefined, `CLI discovery without COPILOT_CLI_PATH: ${result.error}`);
+        await settled.promise;
+        const messages = (await session.getEvents()).slice(before)
+          .filter((event) => event.type === "session.info").map((event) => event.data.message);
+        assert(messages.some((message) => message.startsWith(`${prefix} evidence: `) &&
+          JSON.parse(message.slice(`${prefix} evidence: `.length)).coverage === "not-started"),
+        `Draft skip must settle ${mode} without inference`);
+        const assignments = messages.find((message) => message.startsWith("Effective reviewer assignments:"));
+        assert(assignments, `${mode} must display its effective reviewer assignments before execution`);
+        assert.equal(assignments.split("\n").filter((line) => line.startsWith("  ")).length, reviewers,
+          `${mode} must show one assignment line per reviewer`);
+        assert(assignments.includes("[flag]"), "An invocation flag is reported as the origin it is");
+        if (mode === "--balanced") {
+          assert.match(assignments, /overview \[light\]: model=\S+ \[[^\]]+\]/,
+            "The light overview reviewer resolves and reports its own tier");
+          assert.match(assignments, /findings policy: P0-P2 findings, plus at most 3 P3\/nit finding\(s\)/);
+        }
+        assert(!messages.some((message) => /^Reviewer /.test(message)), "A skipped draft starts no reviewer");
+        console.log(`PASS installed ${mode} dispatch settled a skipped draft without inference`);
+      }
     } finally {
       unsubscribe();
       await session.rpc.metadata.setWorkingDirectory({ workingDirectory: original });

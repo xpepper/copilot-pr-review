@@ -11,8 +11,9 @@ import {
   locateProjectConfig, projectConfigSegments, projectSchemaVersion, readProjectConfig, trustFilename,
   trustSchemaVersion, validateTrustedProjects,
 } from "../extensions/pr-review/project.mjs";
-import { parseQuickArgs, quickAssignments } from "../extensions/pr-review/quick.mjs";
-import { executeRetainedQuick } from "../extensions/pr-review/retained-run.mjs";
+import { parseReviewArgs, reviewerAssignments } from "../extensions/pr-review/review.mjs";
+import { reviewModes } from "../extensions/pr-review/modes.mjs";
+import { executeRetainedReview } from "../extensions/pr-review/retained-run.mjs";
 import { sessionStore } from "../extensions/pr-review/retention.mjs";
 import { respond } from "./target-fixture.mjs";
 
@@ -217,26 +218,26 @@ console.log("PASS configuration argument parsing, unknown keys, malformed assign
 {
   const h = harness();
   const configuration = await loadConfiguration(h.parent);
-  const ambientAssignments = await quickAssignments(h.parent, {}, configuration);
+  const ambientAssignments = await reviewerAssignments(h.parent, reviewModes.quick, {}, configuration);
   assert.deepEqual(ambientAssignments.map(({ label }) => label),
     ["correctness", "contracts", "security-performance-resources"]);
   assert(ambientAssignments.every((a) => a.model === "heavy" && a.reasoningEffort === "high"));
 
   configuration.store.write({ lightModel: "other", lightEffort: "low" });
   const saved = await loadConfiguration(h.parent);
-  assert((await quickAssignments(h.parent, {}, saved)).every((a) => a.model === "other" && a.reasoningEffort === "low"),
+  assert((await reviewerAssignments(h.parent, reviewModes.quick, {}, saved)).every((a) => a.model === "other" && a.reasoningEffort === "low"),
     "An unset heavy tier inherits the configured light tier, not the ambient model");
-  assert((await quickAssignments(h.parent, { heavyModel: "heavy", heavyEffort: "high" }, saved))
+  assert((await reviewerAssignments(h.parent, reviewModes.quick, { heavyModel: "heavy", heavyEffort: "high" }, saved))
     .every((a) => a.model === "heavy" && a.reasoningEffort === "high"), "Invocation flags override saved settings");
   assert.deepEqual((await loadConfiguration(h.parent)).settings, { lightModel: "other", lightEffort: "low" },
     "A flag override never rewrites the saved configuration");
 
   configuration.store.write({ heavyModel: "plain", heavyEffort: "low" });
-  await assert.rejects(quickAssignments(h.parent, {}, await loadConfiguration(h.parent)), /No substitution/);
+  await assert.rejects(reviewerAssignments(h.parent, reviewModes.quick, {}, await loadConfiguration(h.parent)), /No substitution/);
   configuration.store.write({ heavyModel: "other" });
-  await assert.rejects(quickAssignments(h.parent, {}, await loadConfiguration(h.parent)), /No substitution/,
+  await assert.rejects(reviewerAssignments(h.parent, reviewModes.quick, {}, await loadConfiguration(h.parent)), /No substitution/,
     "An inherited ambient effort the configured model cannot support is refused, never lowered");
-  assert((await quickAssignments(h.parent, { heavyEffort: "low" }, await loadConfiguration(h.parent)))
+  assert((await reviewerAssignments(h.parent, reviewModes.quick, { heavyEffort: "low" }, await loadConfiguration(h.parent)))
     .every((a) => a.model === "other" && a.reasoningEffort === "low"));
 
   configuration.store.write({ autoPostReviews: true });
@@ -253,10 +254,10 @@ for (const autoPostReviews of [true, false]) {
   const history = [];
   const assignments = ["correctness", "contracts", "security-performance-resources"]
     .map((label) => ({ label, model: "heavy", reasoningEffort: "high" }));
-  const result = await executeRetainedQuick(h.parent, {
+  const result = await executeRetainedReview(h.parent, {
     async start() { assert.fail("A skipped target must not start inference"); },
     async stop() { return []; },
-  }, parseQuickArgs("2 --quick --all"), assignments, {
+  }, parseReviewArgs("2 --quick --all"), assignments, {
     controller: new AbortController(),
     gh: async (args, cwd) => {
       const response = respond(args, cwd, history);
@@ -350,7 +351,7 @@ console.log("PASS effective autoPostReviews reaches the retained posting policy 
     const configuration = await loadConfiguration(h.parent);
     assert.equal(configuration.trustRecord, undefined);
     assert.equal(configuration.project.settings, undefined, "An untrusted file is located, never parsed");
-    assert((await quickAssignments(h.parent, {}, configuration))
+    assert((await reviewerAssignments(h.parent, reviewModes.quick, {}, configuration))
       .every((a) => a.model === "heavy" && a.reasoningEffort === "high"),
     "An untrusted project file cannot change a review's assignment");
   }
@@ -386,9 +387,9 @@ console.log("PASS effective autoPostReviews reaches the retained posting policy 
     { lightModel: "heavy", lightEffort: "high", heavyModel: "other", heavyEffort: "low", autoPostReviews: false });
   assert.deepEqual(configuration.effective.origins,
     { lightModel: "personal", lightEffort: "personal", heavyModel: "project", heavyEffort: "project", autoPostReviews: "personal" });
-  assert((await quickAssignments(h.parent, {}, configuration))
+  assert((await reviewerAssignments(h.parent, reviewModes.quick, {}, configuration))
     .every((a) => a.model === "other" && a.reasoningEffort === "low"), "A trusted project drives the review assignment");
-  assert((await quickAssignments(h.parent, { heavyModel: "heavy", heavyEffort: "high" }, configuration))
+  assert((await reviewerAssignments(h.parent, reviewModes.quick, { heavyModel: "heavy", heavyEffort: "high" }, configuration))
     .every((a) => a.model === "heavy" && a.reasoningEffort === "high"), "Invocation flags still win over a trusted project");
   assert.deepEqual((await loadConfiguration(h.parent)).settings, JSON.parse(personal).settings,
     "Resolving a review never rewrites the personal file");
@@ -444,7 +445,7 @@ console.log("PASS effective autoPostReviews reaches the retained posting policy 
     const report = describeConfiguration(configuration);
     assert.match(report, /Project configuration: ERROR/);
     assert.match(report, /Reviews and configuration updates are refused/);
-    await assert.rejects(quickAssignments(h.parent, {}, configuration), expected);
+    await assert.rejects(reviewerAssignments(h.parent, reviewModes.quick, {}, configuration), expected);
     await assert.rejects(executeConfiguration(h.parent, "autoPostReviews=true"), expected);
     assert.equal(readFileSync(h.filename, "utf8"), personal, "A refused update leaves the personal file byte-identical");
     assert.equal(readFileSync(h.trustFile, "utf8"), trust, "A broken project file never changes the trust record");
@@ -469,7 +470,7 @@ console.log("PASS effective autoPostReviews reaches the retained posting policy 
   h.writeProject({ schemaVersion: projectSchemaVersion, settings: { heavyModel: "other", heavyEffort: "high" } });
   const unusable = await loadConfiguration(h.parent);
   assert.match(describeConfiguration(unusable), /UNUSABLE: Unsupported reasoning effort high for other/);
-  await assert.rejects(quickAssignments(h.parent, {}, unusable), /No substitution/);
+  await assert.rejects(reviewerAssignments(h.parent, reviewModes.quick, {}, unusable), /No substitution/);
   assert.equal(readFileSync(h.filename, "utf8"), personal);
   console.log("PASS a trusted project's malformed, unknown-key and unusable settings refuse and change nothing");
 }
@@ -488,11 +489,11 @@ for (const projectPosting of [true, false]) {
 
   const store = await sessionStore(h.parent);
   const history = [];
-  const assignments = await quickAssignments(h.parent, {}, configuration);
-  const result = await executeRetainedQuick(h.parent, {
+  const assignments = await reviewerAssignments(h.parent, reviewModes.quick, {}, configuration);
+  const result = await executeRetainedReview(h.parent, {
     async start() { assert.fail("A skipped target must not start inference"); },
     async stop() { return []; },
-  }, parseQuickArgs("2 --quick --all"), assignments, {
+  }, parseReviewArgs("2 --quick --all"), assignments, {
     controller: new AbortController(),
     gh: async (args, cwd) => {
       const response = respond(args, cwd, history);

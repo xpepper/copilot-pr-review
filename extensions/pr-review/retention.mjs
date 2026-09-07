@@ -10,6 +10,7 @@ import { validatePreview } from "./preview.mjs";
 import { selectionBinding } from "./selection.mjs";
 import { publicationSummary, validatePublication } from "./publication.mjs";
 import { blockingIssues, diagnosticKinds } from "./coverage.mjs";
+import { isMinor, modeIds, reviewModes } from "./modes.mjs";
 
 export const retainedFilename = "pr-review-result.json";
 const hash = /^[a-f0-9]{64}$/;
@@ -73,8 +74,8 @@ function citation(value, target) {
     source.path === value.path && source.side === value.side &&
     source.ref === value.ref && source.blobSha === value.blobSha)), "citation outside reviewed binding");
 }
-function validation(value, target) {
-  object(value, ["complete", "findings", "rejected", "duplicates", "issues"], ["diagnostics"]);
+function validation(value, target, policy) {
+  object(value, ["complete", "findings", "rejected", "duplicates", "issues"], ["diagnostics", "capped"]);
   strings(value.issues);
   if (value.diagnostics !== undefined) {
     requireValue(Array.isArray(value.diagnostics), "expected coverage diagnostics");
@@ -96,9 +97,9 @@ function validation(value, target) {
     for (const key of ["id", "reviewer", "title", "trigger", "expected", "actual", "introduction"]) text(finding[key]);
     requireValue(!ids.has(finding.id), "duplicate canonical finding ID");
     ids.add(finding.id);
-    requireValue(["P0", "P1", "P2"].includes(finding.severity) &&
+    requireValue(policy.severities.includes(finding.severity) &&
       Number.isFinite(finding.confidence) && finding.confidence >= minimumConfidence &&
-      finding.confidence <= 1, "invalid quick severity/confidence");
+      finding.confidence <= 1, "severity or confidence outside this mode's findings policy");
     strings(finding.reportedBy); strings(finding.candidateIds);
     requireValue(finding.reportedBy.includes(finding.reviewer) && finding.candidateIds.includes(finding.id) &&
       finding.candidateIds.every((id) => !candidates.has(id)) &&
@@ -137,6 +138,18 @@ function validation(value, target) {
         finding.candidateIds.includes(entry.id)), "invalid duplicate alias");
     excluded.add(entry.id);
   }
+  // A withheld minor finding was adjudicated but is outside the mode's presented
+  // findings policy, so it can never be selected or published.
+  requireValue(value.capped === undefined || Array.isArray(value.capped), "expected withheld minor findings");
+  for (const entry of value.capped ?? []) {
+    object(entry, ["id", "severity", "title", "reason"]);
+    text(entry.id); text(entry.title); text(entry.reason);
+    requireValue(isMinor(policy, entry.severity) && !ids.has(entry.id) && !excluded.has(entry.id),
+      "invalid withheld minor finding");
+    excluded.add(entry.id);
+  }
+  requireValue(value.findings.filter((finding) => isMinor(policy, finding.severity)).length <= policy.minorCap,
+    "presented minor findings exceed this mode's findings policy");
   requireValue([...candidates].every((id) => ids.has(id) || excluded.has(id)), "unaccounted duplicate alias");
 }
 
@@ -156,7 +169,7 @@ export function retainedRecord(outcome) {
   if (outcome.adjudicator) result.adjudicator = pick(outcome.adjudicator, reviewerKeys);
   if (outcome.validation) {
     result.validation = {
-      ...pick(outcome.validation, ["complete", "findings", "rejected", "issues", "diagnostics"]),
+      ...pick(outcome.validation, ["complete", "findings", "rejected", "issues", "diagnostics", "capped"]),
       duplicates: outcome.validation.duplicates.map((entry) => pick(entry, ["id", "duplicateOf", "reason"])),
     };
   }
@@ -184,7 +197,8 @@ export function validateRecord(record, sessionId) {
     ...(record.schemaVersion >= 2 ? ["preview"] : []), ...(record.schemaVersion >= 3 ? ["publication"] : [])]);
   requireValue(record.digest === reviewKey(value) && isDeepStrictEqual(value.invocation, record.invocation),
     "record digest or invocation mismatch");
-  requireValue(value.mode === "quick" && typeof value.noComment === "boolean" &&
+  const mode = modeIds.includes(value.mode) ? reviewModes[value.mode] : undefined;
+  requireValue(mode !== undefined && typeof value.noComment === "boolean" &&
     (record.schemaVersion >= 2 || value.noComment === true), "unsupported mode/publication state");
   for (const key of ["complete", "reviewComplete", "executionComplete", "cancelled"]) {
     requireValue(typeof value[key] === "boolean", "invalid coverage flag");
@@ -196,7 +210,7 @@ export function validateRecord(record, sessionId) {
   if (value.binding) binding(value.binding);
   if (value.validation) {
     requireValue(value.binding, "validated result without review binding");
-    validation(value.validation, value.binding);
+    validation(value.validation, value.binding, mode.policy);
   }
   requireValue(!value.complete || (value.reviewComplete && value.executionComplete && value.validation?.complete &&
     !value.cancelled && !value.error && !value.cleanupErrors.length), "false completed-coverage claim");
@@ -219,7 +233,7 @@ export function validateRecord(record, sessionId) {
       }
     }
   }
-  if (value.complete) requireValue(value.reviewers.length === 3 &&
+  if (value.complete) requireValue(value.reviewers.length === mode.specialists.length &&
     value.reviewers.every((reviewer) => reviewer.status === "completed") &&
     (!value.adjudicator || value.adjudicator.status === "completed"), "incomplete reviewer coverage");
   const selection = value.selection;

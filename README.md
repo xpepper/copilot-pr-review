@@ -1,13 +1,18 @@
 # Copilot PR Review
 
-An original Copilot CLI plugin prototype. **Quick reviews now include grounded
-candidate validation, deduplication, finding selection, posting-authority controls,
-code-controlled COMMENT publication, and session-bound retention with
-uncertain-write protection. A retained selection can also be published later by
+An original Copilot CLI plugin prototype. **Balanced (the default) and quick
+reviews include grounded candidate validation, deduplication, finding selection,
+posting-authority controls, code-controlled COMMENT publication, and session-bound
+retention with uncertain-write protection. A retained selection can also be published later by
 an explicit command, without rerunning reviewers. Personal model tiers and
 `autoPostReviews` are inspected and updated with `/pr-review-config`.**
 [SCOPE.md](SCOPE.md) is the authoritative product specification;
 [ROADMAP.md](ROADMAP.md) records delivery status and runtime evidence.
+
+Development happens on branches: every increment lands through a pull request
+that is reviewed with this plugin before it merges, and `main` is protected by a
+repository ruleset that requires it. [AGENTS.md](AGENTS.md) records that
+workflow for humans and agents alike.
 
 ## Install and invoke
 
@@ -62,17 +67,19 @@ using the plugin's resolver, without sending a model prompt.
 ### Read-only PR target capture (Q1)
 
 ```text
-/pr-review 123
-/pr-review 123 --include-drafts
-/pr-review 123 --include-closed
+/pr-review 123 --capture-only
+/pr-review 123 --capture-only --include-drafts
+/pr-review 123 --capture-only --include-closed
 ```
 
 A PR number captures the GitHub repository owning the **current session
-directory**, PR metadata, base/head SHAs, and diff through `gh`. It does not
-start reviewers, change branches, read local source as PR evidence, or post
-anything. Without `--quick` / `--major-only`, this command remains capture-only.
-The quick execution path is described below; other review modes are not yet
-implemented.
+directory**, PR metadata, base/head SHAs, and diff through `gh`. Capture never
+changes branches, reads local source as PR evidence, or posts anything.
+
+`--capture-only` stops there: it starts no reviewer, spends no inference, and
+takes no mode, posting, selection or model argument. **Without it, a PR number
+runs a review**, balanced by default, and spends Copilot credits. Capture-only
+is a diagnostic path of this prototype, not an upstream mode.
 
 Drafts are skipped unless `--include-drafts` is supplied. Obvious bot accounts
 (GitHub `Bot` type or a `[bot]` login) are skipped. The conservative trivial
@@ -131,8 +138,8 @@ file path, status, side, blob SHA, byte and line counts, window ranges, and a
 SHA-256 of the assembled context. Source text stays out of the parent
 conversation. Inside the assembled context, every line is prefixed with its
 line number under a provenance header. This aids legibility, not prompt-injection
-isolation. Context lives only inside the invocation; it is not cached. Quick
-reviewers consume it when explicitly requested.
+isolation. Context lives only inside the invocation; it is not cached.
+Reviewers consume it when a review is explicitly requested.
 
 ### Three quick PR specialists (Q3)
 
@@ -156,12 +163,12 @@ silently lowered when changing models. An unset ambient effort uses the owned
 runtime's resolved default. Effective settings are displayed before prompts
 and checked against actual usage. The parent model is unchanged.
 
-Use exactly one of `--quick` and `--major-only`. The existing draft/closed
-overrides still apply to reviewing, not inline publication. Quick accepts
-`--comment`, `--no-comment`, or neither; the posting flags conflict.
-Authorized selections can publish, as described below.
-Other review modes and `--verify` remain unsupported. Personal configuration is
-applied; project-provided configuration and fallback models are not.
+`--quick` and `--major-only` are the same mode; mode flags are mutually
+exclusive. The existing draft/closed overrides still apply to reviewing, not
+inline publication. Every mode accepts `--comment`, `--no-comment`, or neither;
+the posting flags conflict. Authorized selections can publish, as described
+below. `--full`, `--deep` and `--verify` remain unsupported. Personal and
+explicitly trusted project configuration are applied; fallback models are not.
 
 Dispatch returns after acceptance so cancellation remains available during capture
 or reviewer execution. Capture/skip/error messages, assignments, progress, and
@@ -171,7 +178,7 @@ paths with source provenance. Each independent reviewer receives the captured
 diff and numbered context as untrusted JSON data, with code-owned system
 instructions to ignore embedded requests.
 
-Quick reviewers additionally get `view`, `grep` (exposed as `rg` by GPT-family
+Reviewers additionally get `view`, `grep` (exposed as `rg` by GPT-family
 sessions), and `glob`, confined to the
 local checkout, so they can read unchanged callers, callees, and tests that the
 captured diff and context windows do not include. That access requires the
@@ -212,7 +219,7 @@ only findings surviving the Q4 boundary below appear in the final findings view.
 Candidate output may quote PR source; full captured input is not dumped into the
 parent timeline.
 
-`Q3 evidence:` is emitted after owned-runtime cleanup and now includes Q4
+`Q3 evidence:` (`M1 evidence:` for balanced) is emitted after owned-runtime cleanup and now includes Q4
 `validation` and optional `adjudicator` records. `executionComplete` reports
 specialist execution separately. `complete: true` additionally requires finished
 validation without unresolved evidence or cleanup errors; it never means the PR
@@ -230,13 +237,60 @@ Manual cancellation stops owned work without a review timeout; a pending host
 confirmation UI may remain visible, but a late answer cannot resume cancelled
 capture.
 
+### Balanced review mode (M1)
+
+```text
+/pr-review 123 --no-comment
+/pr-review 123 --balanced --no-comment
+/pr-review 123 --balanced --no-comment --all
+```
+
+Balanced is the default when no mode flag is given, so a bare PR number runs a
+review and spends credits; add `--capture-only` for the capture-only path. It
+runs five reviewers concurrently: four heavy specialists (correctness,
+contracts, security, performance/resources) and one light overview reviewer for
+whole-change coherence, missed call sites, misleading names, and small defects
+on the changed lines.
+
+Each reviewer resolves the tier its mode assigns, through the same layering as
+quick: invocation flags, then a trusted project's settings, then personal
+settings, then the ambient session assignment, with unset tiers inheriting the
+nearest configured tier. Before any reviewer starts, an `Effective reviewer
+assignments:` line names every reviewer, its tier, its model and reasoning
+effort, and the origin of each value. Only `heavyModel=` and `heavyEffort=` are
+invocation flags; set the light tier with `/pr-review-config lightModel=...
+lightEffort=...`.
+
+The balanced findings policy presents P0-P2 findings plus at most three P3/nit
+findings; quick presents P0-P2 only. Minor findings must still anchor on a line
+this diff changed and pass the same validation and deduplication. Accepted minor
+findings beyond the limit are **withheld** from presentation, selection and
+publication, and are listed in the result and the retained record rather than
+dropped. The retained schema enforces the mode's reviewer count and findings
+policy, so a record cannot claim complete coverage with a missing reviewer or an
+over-limit minor finding.
+
+Everything else is unchanged: the same revision gate, confined read-only
+reviewer tools, evidence boundary, isolated adjudication, selection, retention
+and publication gates. Cancellation still stops all owned work, no timeout is
+imposed, and incomplete coverage is still reported as incomplete.
+
+Balanced execution is demonstrated by controlled probes, no-inference installed
+dispatch, and one live review of this project's own pull request #3: five
+reviewers, 89 confined reads with no denials, zero findings with incomplete
+coverage, and 414.14627 reported AI credits. That run says nothing about review
+quality, and its light reviewer inherited the heavy assignment because no light
+tier was saved. See [ROADMAP.md](ROADMAP.md).
+
 ### Grounded findings and deduplication (Q4)
 
-No extra flag is required. After the three quick specialists finish, code rejects
-malformed output rather than extracting fragments or removing markdown fences.
-Candidates must echo a digest of the code-owned review binding and use exactly the
-defined schema. Only P0-P2 candidates with numeric confidence **0.8 through 1**
-are eligible. This is a conservative admission threshold, not calibrated certainty.
+No extra flag is required. After the selected mode's specialists finish, code
+rejects malformed output rather than extracting fragments or removing markdown
+fences. Candidates must echo a digest of the code-owned review binding and use
+exactly the defined schema. Candidates must carry numeric confidence **0.8
+through 1** and a severity the mode's findings policy admits: P0-P2 for quick,
+P0-P2 plus P3/nit for balanced. This is a conservative admission threshold, not
+calibrated certainty.
 
 Code checks every cited path, side, line range and verbatim quotation against Q2's
 captured context windows and blob/revision provenance. The primary location must
@@ -251,7 +305,7 @@ visible coverage issues, not silent filtering into a clean result.
 When eligible candidates exist, one **separate, isolated validation session**
 uses the effective heavy model/effort in the same owned runtime. Its assignment
 is displayed before its prompt. This uses additional subscription credits; it
-does not change the three-specialist quick topology or start a fourth specialist.
+does not change the selected mode's reviewer topology or add a specialist.
 The validator attempts to disprove each claim against the original diff and
 source, checking guards, reachability, contract changes, pre-existing behavior,
 severity/confidence, and causal impact. Acceptance requires a reason and
@@ -372,7 +426,7 @@ the plugin's fail-closed behavior. See the roadmap for recorded evidence.
 /pr-review inspect
 ```
 
-Quick runs now retain **one latest result per originating local session**. This
+Reviews retain **one latest result per originating local session**. This
 command displays the retained findings, canonical selection IDs/disposition,
 reviewer coverage and errors, and repository/PR/reviewed-head identity. It performs
 no inference, GitHub requests, current-head refresh, local source reads, or
@@ -550,7 +604,7 @@ Reproduce controlled and native probes:
 ```sh
 node scripts/smoke-preview.mjs
 node scripts/smoke-publication.mjs
-node scripts/smoke-quick.mjs
+node scripts/smoke-review.mjs
 copilot plugin install "$(pwd)"
 COPILOT_CLI_PATH="$(command -v copilot)" \
 COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
@@ -693,12 +747,14 @@ tier when two are equidistant, and otherwise the ambient session model or
 reasoning effort. Model and effort resolve independently. `show` prints the file
 location, the stored settings, the ambient assignment, the effective light,
 medium, and heavy assignments with the origin of each value, and the effective
-`autoPostReviews`. Quick review prints the same report, with invocation flags
-applied, before any reviewer starts.
+`autoPostReviews`. Every review prints the same report, with invocation flags
+applied, followed by its per-reviewer assignments, before any reviewer starts.
 
 Invocation flags win over saved settings for that invocation only and never
-rewrite the file: `heavyModel=`/`heavyEffort=` on `/pr-review NUMBER --quick`,
-and `--comment`/`--no-comment` over `autoPostReviews`.
+rewrite the file: `heavyModel=`/`heavyEffort=` on `/pr-review NUMBER`, and
+`--comment`/`--no-comment` over `autoPostReviews`. There is no light-tier
+invocation flag; balanced takes its light assignment from saved configuration
+or the ambient session.
 
 Configuration is personal and lives at `<copilot-config-home>/pr-review/config.json`,
 beside the CLI's own `session-state` directory, so it is never inside a reviewed
@@ -891,8 +947,8 @@ the observed session, so the candidate uses plugin-owned SDK sessions instead.
 The SDK resolves its bundled runtime; no machine-specific SDK path is shipped.
 
 Reviewer sessions disable configuration discovery and deny pre-tool hooks.
-The Q4 adjudicator and every non-quick reviewer session assert an empty
-initialized tool set and deny all permission requests. Quick reviewers offer
+The Q4 adjudicator and every fixture reviewer session assert an empty
+initialized tool set and deny all permission requests. PR reviewers offer
 only `builtin:view`, `builtin:grep`, and `builtin:glob`; their hook denies every
 other tool, and their permission handler rejects reads whose real path escapes
 the verified checkout root, so the handler — not a model promise — is the
@@ -910,8 +966,8 @@ logging. An abruptly lost parent cannot receive a final report; there is no
 clean-review claim or publication. Normal SDK transcripts may persist, and
 forced termination does not guarantee a final transcript flush. The prototype
 can capture PRs, bind source context, resolve personal and explicitly trusted
-project configuration, run quick specialists, and validate/deduplicate findings,
-but cannot execute project safeguards. It does not restrict or change the model of the surrounding Copilot session. The SDK may
+project configuration, run the quick and balanced specialists, and
+validate/deduplicate findings, but cannot execute project safeguards. It does not restrict or change the model of the surrounding Copilot session. The SDK may
 retain its own session transcripts; no plugin review archive is implemented.
 
 No upstream source has been copied. Source reuse/licensing assessment remains
@@ -926,7 +982,7 @@ Node.js 22+ and the SDK bundled with the installed CLI (adjust its path):
 node scripts/smoke-fixture.mjs
 node scripts/smoke-target.mjs
 node scripts/smoke-context.mjs
-node scripts/smoke-quick.mjs
+node scripts/smoke-review.mjs
 node scripts/smoke-findings.mjs
 node scripts/smoke-config.mjs
 COPILOT_CLI_PATH="$(command -v copilot)" \
@@ -934,8 +990,10 @@ COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
 node scripts/smoke-runtime.mjs
 ```
 
-The pure probes exercise fixture guards/lifecycle, PR capture/gates, and
-revision-bound context assembly, and quick orchestration without a runtime. The findings probe exercises strict
+The pure probes exercise fixture guards/lifecycle, PR capture/gates,
+revision-bound context assembly, and quick/balanced orchestration without a
+runtime, including mode parsing, both reviewer topologies, tier resolution and
+the balanced minor-finding cap. The findings probe exercises strict
 schema/provenance gates, changed-line anchors, renamed/added/deleted files,
 pure insertion/deletion context, cross-file deduplication, and degraded coverage. Its semantic
 accept/reject decisions are explicit test doubles, not live-model evidence.
@@ -956,6 +1014,10 @@ uncommitted `example.js` differs from the reviewed revision; the harness asserts
 that the bound context carries the served blob identities instead. It also
 captures a fixture PR that then advances, and asserts the next capture stops
 explicitly rather than reviewing the moved head against the captured diff.
+Its capture dispatches all use `--capture-only`. With `--startup` it also
+dispatches a skipped draft in both quick and balanced modes, asserting the
+displayed per-reviewer assignments, that no reviewer starts, and a settled
+`coverage: "not-started"` result without inference.
 The harness asserts read-only requests, no model turns, and no source changes.
 The `scripts/fixtures/gh` executable is a test double, not a shipped runtime
 dependency; do not add its directory to your normal PATH.
@@ -989,7 +1051,10 @@ before dispatch, target binding, duplicate-run rejection, incomplete cancellatio
 owned-process exit, and an unchanged checkout. Replace `--targets` with
 `--target-live` to use the pinned public PR through real GitHub GETs. Do not
 combine the stub and live variants. Adding `--quick` is inference-spending;
-the capture-only variants without it still start no reviewers.
+the probe variants without it still start no reviewers. There is no balanced
+harness probe: balanced execution is demonstrated by the controlled suites and
+the no-inference installed dispatch above, and a live balanced review needs its
+own explicit authorization.
 
 The controlled quick target is now synthetic PR 12, an original four-line
 `total.js` multiplication-to-addition regression with an unchanged contract.

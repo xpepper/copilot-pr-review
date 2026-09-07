@@ -1,13 +1,15 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { assembleContext } from "../extensions/pr-review/context.mjs";
-import { quickBinding } from "../extensions/pr-review/quick.mjs";
+import { reviewBinding } from "../extensions/pr-review/review.mjs";
 import {
   adjudicateCandidates, collectCandidates, evidenceBoundary, formatFindings, reviewKey,
 } from "../extensions/pr-review/findings.mjs";
 import { formatCoverage, presentationDiagnostics } from "../extensions/pr-review/coverage.mjs";
+import { reviewModes } from "../extensions/pr-review/modes.mjs";
 import { blobSha, validationBaseSource, validationHeadSource, validationDiff } from "./target-fixture.mjs";
 
+const policy = reviewModes.quick.policy;
 const baseText = validationBaseSource;
 const headText = validationHeadSource;
 const diff = validationDiff;
@@ -25,7 +27,7 @@ const context = await assembleContext(snapshot, {
     });
   },
 });
-const binding = quickBinding(snapshot, context);
+const binding = reviewBinding(snapshot, context);
 const boundary = evidenceBoundary(snapshot, context, binding);
 const key = reviewKey(binding);
 const citation = (side, line = 3) => ({
@@ -53,9 +55,9 @@ const validator = (decisions = [decision()], changes = {}) => ({
   status: "completed", result: JSON.stringify({ schemaVersion: 2, reviewKey: key, decisions, limitations: [] }),
   ...changes,
 });
-const collected = collectCandidates([reviewer()], boundary);
+const collected = collectCandidates([reviewer()], boundary, policy);
 assert.equal(collected.issues.length, 0);
-const result = adjudicateCandidates(collected, validator(), boundary);
+const result = adjudicateCandidates(collected, validator(), boundary, policy);
 assert.equal(result.complete, true);
 assert.equal(result.findings.length, 1);
 assert.equal(result.findings[0].validation.allClaimsSupported, true);
@@ -79,7 +81,7 @@ for (const mutate of [
 ]) {
   const bad = structuredClone(candidate);
   mutate(bad);
-  const rejected = collectCandidates([reviewer([bad, candidate])], boundary);
+  const rejected = collectCandidates([reviewer([bad, candidate])], boundary, policy);
   assert.equal(rejected.candidates.length, 1, "Reject only the invalid candidate, retaining its valid sibling");
   assert.equal(rejected.issues.length, 1);
 }
@@ -87,27 +89,27 @@ for (const raw of ["not JSON", "```json\n{}\n```", '{"schemaVersion":1', "null",
   JSON.stringify({ schemaVersion: 1, reviewKey: "wrong", candidates: [candidate], limitations: [] }),
   JSON.stringify({ schemaVersion: 1, reviewKey: key, candidates: [], limitations: [], clean: true }),
 ]) {
-  const malformed = collectCandidates([reviewer([], { result: raw })], boundary);
+  const malformed = collectCandidates([reviewer([], { result: raw })], boundary, policy);
   assert.equal(malformed.candidates.length, 0);
-  assert.equal(adjudicateCandidates(malformed, undefined, boundary).complete, false);
+  assert.equal(adjudicateCandidates(malformed, undefined, boundary, policy).complete, false);
 }
 const preExisting = structuredClone(candidate);
 preExisting.location = citation("head", 2);
-assert.match(collectCandidates([reviewer([preExisting])], boundary).issues[0], /changed lines/);
+assert.match(collectCandidates([reviewer([preExisting])], boundary, policy).issues[0], /changed lines/);
 for (const reason of [
   "False positive: the proposed expected behavior contradicts the unchanged contract.",
   "Pre-existing: the cited edge case already fails on the captured base; the changed operator is irrelevant.",
 ]) {
   const rejected = adjudicateCandidates(collected, validator([decision(undefined, {
     verdict: "reject", reason, evidence: [], allClaimsSupported: false,
-  })]), boundary);
+  })]), boundary, policy);
   assert.equal(rejected.findings.length, 0);
   assert.equal(rejected.rejected[0].reason, reason);
   assert.equal(rejected.complete, true, "A resolved false positive is not a validation failure");
 }
 const uncertain = adjudicateCandidates(collected, validator([decision(undefined, {
   verdict: "uncertain", reason: "The claimed caller is absent from supplied context.", evidence: [], allClaimsSupported: false,
-})]), boundary);
+})]), boundary, policy);
 assert.equal(uncertain.complete, false);
 assert.equal(uncertain.findings.length, 0);
 
@@ -115,11 +117,11 @@ const peers = collectCandidates([
   reviewer(), reviewer([{ ...candidate, title: "Addition undercharges customers" }], { label: "contracts" }),
   reviewer([{ ...candidate, title: "Separate issue on same line", trigger: "a different condition", actual: "a distinct effect" }],
     { label: "security-performance-resources" }),
-], boundary);
+], boundary, policy);
 const deduplicated = adjudicateCandidates(peers, validator([
   decision(), decision("contracts:1", { duplicateOf: "correctness:1", reason: "Same changed operator, numeric trigger and undercharge." }),
   decision("security-performance-resources:1"),
-]), boundary);
+]), boundary, policy);
 assert.equal(deduplicated.findings.length, 2, "Only an explicit same-defect decision merges reports");
 assert.equal(deduplicated.duplicates.length, 1);
 assert.deepEqual(deduplicated.findings[0].reportedBy, ["correctness", "contracts"]);
@@ -128,10 +130,10 @@ const wider = structuredClone(candidate);
 wider.before = { ...citation("base"), startLine: 2, quote: baseText.split("\n").slice(1, 3).join("\n") };
 wider.after = { ...citation("head"), startLine: 2, quote: headText.split("\n").slice(1, 3).join("\n") };
 wider.severity = "P1";
-const widerPeers = collectCandidates([reviewer(), reviewer([wider], { label: "contracts" })], boundary);
+const widerPeers = collectCandidates([reviewer(), reviewer([wider], { label: "contracts" })], boundary, policy);
 const widerResult = adjudicateCandidates(widerPeers, validator([
   decision(), decision("contracts:1", { duplicateOf: "correctness:1" }),
-]), boundary);
+]), boundary, policy);
 assert.equal(widerResult.findings.length, 1, "Different quote ranges can describe the same defect");
 assert.equal(widerResult.findings[0].severity, "P1", "Do not suppress an accepted higher-severity report");
 assert.equal(widerResult.duplicates[0].previousRepresentative.severity, "P2");
@@ -143,29 +145,29 @@ for (const changes of [
   { allClaimsSupported: "true" },
   { allClaimsSupported: undefined },
 ]) {
-  const invalid = adjudicateCandidates(collected, validator([decision(undefined, changes)]), boundary);
+  const invalid = adjudicateCandidates(collected, validator([decision(undefined, changes)]), boundary, policy);
   assert.equal(invalid.findings.length, 0);
   assert.equal(invalid.complete, false);
 }
 const partlyTrue = adjudicateCandidates(peers, validator([
   decision(undefined, { allClaimsSupported: false, reason: "Only the core claim is true, not all its stated effects." }),
   decision("contracts:1"), decision("security-performance-resources:1", { verdict: "reject", allClaimsSupported: false }),
-]), boundary);
+]), boundary, policy);
 assert.equal(partlyTrue.findings.length, 1, "Keep the fully supported peer, not the partially true report");
 assert.equal(partlyTrue.findings[0].id, "contracts:1");
 assert.equal(partlyTrue.complete, false, "Contradictory acceptance is not completed validation");
 for (const decisions of [[], [decision(), decision()], [decision("wrong-id")]]) {
-  assert.equal(adjudicateCandidates(collected, validator(decisions), boundary).complete, false);
+  assert.equal(adjudicateCandidates(collected, validator(decisions), boundary, policy).complete, false);
 }
 for (const changes of [{ status: "incomplete" }, { result: "```json\n{}\n```" }, { result: "null" }]) {
-  assert.equal(adjudicateCandidates(collected, validator(undefined, changes), boundary).findings.length, 0);
+  assert.equal(adjudicateCandidates(collected, validator(undefined, changes), boundary, policy).findings.length, 0);
 }
-const degraded = collectCandidates([reviewer(), reviewer([], { label: "contracts", status: "incomplete" })], boundary);
-const retained = adjudicateCandidates(degraded, validator(), boundary);
+const degraded = collectCandidates([reviewer(), reviewer([], { label: "contracts", status: "incomplete" })], boundary, policy);
+const retained = adjudicateCandidates(degraded, validator(), boundary, policy);
 assert.equal(retained.complete, false);
 assert.equal(retained.findings.length, 1);
 assert.match(formatFindings({ validation: retained, complete: false }), /incomplete coverage/);
-const empty = adjudicateCandidates(collectCandidates([reviewer([])], boundary), undefined, boundary);
+const empty = adjudicateCandidates(collectCandidates([reviewer([])], boundary, policy), undefined, boundary, policy);
 assert.equal(empty.complete, true);
 assert.match(formatFindings({ validation: empty, complete: true }), /not proof of a clean PR/);
 
@@ -182,8 +184,8 @@ for (const [limitations, complete, kinds] of [
   [[gap], false, ["coverage-gap"]],
   [[caveat, gap], false, ["caveat", "coverage-gap"]],
 ]) {
-  const reports = collectCandidates([withLimitations(reviewer([]), limitations)], boundary);
-  const assessment = adjudicateCandidates(reports, undefined, boundary);
+  const reports = collectCandidates([withLimitations(reviewer([]), limitations)], boundary, policy);
+  const assessment = adjudicateCandidates(reports, undefined, boundary, policy);
   assert.equal(assessment.complete, complete);
   assert.deepEqual(assessment.diagnostics.map((entry) => entry.kind), kinds);
   assert.equal(assessment.issues.length, complete ? 0 : 1);
@@ -194,7 +196,7 @@ for (const [limitations, complete, kinds] of [
     assert.match(display, /Informational caveat: correctness: External library/);
     assert.doesNotMatch(display, /incomplete|INCOMPLETE/);
   } else assert.match(display, /Blocked assessment: Cannot assess/);
-  const adjudicated = adjudicateCandidates(collected, withLimitations(validator(), limitations), boundary);
+  const adjudicated = adjudicateCandidates(collected, withLimitations(validator(), limitations), boundary, policy);
   assert.equal(adjudicated.complete, complete, "Adjudicator uses the same limitation policy");
   assert.equal(adjudicated.findings.length, 1, "Useful findings survive gaps and caveats");
   assert.deepEqual(adjudicated.diagnostics.map((entry) => entry.kind), kinds);
@@ -202,7 +204,7 @@ for (const [limitations, complete, kinds] of [
 const mixedCoverage = adjudicateCandidates(collectCandidates([
   withLimitations(reviewer(), [caveat, gap]),
   reviewer([], { label: "contracts", status: "incomplete", error: "Synthetic crash" }),
-], boundary), withLimitations(validator(), [caveat]), boundary);
+], boundary, policy), withLimitations(validator(), [caveat]), boundary, policy);
 assert.equal(mixedCoverage.complete, false);
 assert.equal(mixedCoverage.findings.length, 1);
 assert.deepEqual(mixedCoverage.diagnostics.map((entry) => entry.kind),
@@ -210,7 +212,7 @@ assert.deepEqual(mixedCoverage.diagnostics.map((entry) => entry.kind),
 assert.match(formatFindings({ validation: mixedCoverage, complete: false }), /Execution failure: contracts:.*Synthetic crash/);
 const caveatedUncertainty = adjudicateCandidates(collected, withLimitations(validator([decision(undefined, {
   verdict: "uncertain", allClaimsSupported: false, evidence: [], reason: gap.impact,
-})]), [caveat]), boundary);
+})]), [caveat]), boundary, policy);
 assert.equal(caveatedUncertainty.complete, false);
 assert.deepEqual(caveatedUncertainty.diagnostics.map((entry) => entry.kind), ["caveat", "coverage-gap"]);
 for (const limitations of [
@@ -219,17 +221,17 @@ for (const limitations of [
   [{ ...caveat, extra: true }], [{ ...caveat, reason: " " }],
 ]) {
   const malformed = adjudicateCandidates(
-    collectCandidates([withLimitations(reviewer([]), limitations)], boundary), undefined, boundary);
+    collectCandidates([withLimitations(reviewer([]), limitations)], boundary, policy), undefined, boundary, policy);
   assert.equal(malformed.complete, false);
   assert.equal(malformed.diagnostics[0].kind, "execution-failure");
-  const malformedAdjudication = adjudicateCandidates(collected, withLimitations(validator(), limitations), boundary);
+  const malformedAdjudication = adjudicateCandidates(collected, withLimitations(validator(), limitations), boundary, policy);
   assert.equal(malformedAdjudication.complete, false);
   assert.equal(malformedAdjudication.findings.length, 0);
   assert.equal(malformedAdjudication.diagnostics[0].kind, "execution-failure");
 }
 for (const assessment of [
-  adjudicateCandidates(collectCandidates([withLimitations(reviewer([]), [caveat.reason], 1)], boundary), undefined, boundary),
-  adjudicateCandidates(collected, withLimitations(validator(), [caveat.reason], 1), boundary),
+  adjudicateCandidates(collectCandidates([withLimitations(reviewer([]), [caveat.reason], 1)], boundary, policy), undefined, boundary, policy),
+  adjudicateCandidates(collected, withLimitations(validator(), [caveat.reason], 1), boundary, policy),
 ]) {
   assert.equal(assessment.complete, false, "Legacy uncertainty is never reclassified by prose keywords");
   assert.equal(assessment.diagnostics[0].kind, "coverage-gap");
@@ -333,7 +335,7 @@ for (const kind of ["added", "deleted", "renamed", "inserted", "removed", "inser
       });
     },
   });
-  const bound = quickBinding(snap, ctx);
+  const bound = reviewBinding(snap, ctx);
   const gate = evidenceBoundary(snap, ctx, bound);
   const before = added || insertion ? null :
     { path: oldPath, side: "base", startLine: withContext ? 2 : 1, endLine: withContext ? 2 : 1, quote: "old" };
@@ -342,7 +344,7 @@ for (const kind of ["added", "deleted", "renamed", "inserted", "removed", "inser
   const entry = { ...candidate, before, after, location: after ?? before, evidence: [after ?? before] };
   const eligible = collectCandidates([{
     ...reviewer(), result: JSON.stringify({ schemaVersion: 1, reviewKey: reviewKey(bound), candidates: [entry], limitations: [] }),
-  }], gate);
+  }], gate, policy);
   assert.equal(eligible.issues.length, 0, `${kind}: ${eligible.issues.join("; ")}`);
   assert.equal(eligible.candidates.length, 1);
 }
@@ -361,7 +363,7 @@ const crossContext = await assembleContext(crossSnapshot, {
     });
   },
 });
-const crossBinding = quickBinding(crossSnapshot, crossContext);
+const crossBinding = reviewBinding(crossSnapshot, crossContext);
 const crossBoundary = evidenceBoundary(crossSnapshot, crossContext, crossBinding);
 const other = structuredClone(candidate);
 for (const field of ["location", "before", "after"]) other[field].path = "other.js";
@@ -378,10 +380,50 @@ for (const sharedCause of [true, false]) {
   const adjudication = validator([], {
     result: JSON.stringify({ schemaVersion: 1, reviewKey: reviewKey(crossBinding), decisions, limitations: [] }),
   });
-  const crossResult = adjudicateCandidates(collectCandidates(reports, crossBoundary), adjudication, crossBoundary);
+  const crossResult = adjudicateCandidates(collectCandidates(reports, crossBoundary, policy), adjudication, crossBoundary, policy);
   assert.equal(crossResult.duplicates.length, sharedCause ? 1 : 0);
   assert.equal(crossResult.complete, sharedCause);
 }
+// The balanced mode's findings policy admits minor severities, caps how many are
+// presented, and records the rest instead of dropping or hiding them.
+const balancedPolicy = reviewModes.balanced.policy;
+const minorCandidate = (title, severity) => ({ ...structuredClone(candidate), title, severity });
+const minorReports = [
+  ["correctness", "P3"], ["contracts", "P3"], ["security", "P3"], ["overview", "nit"], ["performance-resources", "nit"],
+].map(([label, severity]) => reviewer([minorCandidate(`Minor ${label} issue`, severity)], { label }));
+assert.equal(collectCandidates(minorReports, boundary, policy).candidates.length, 0,
+  "Quick mode admits no minor candidate at all");
+assert.match(collectCandidates(minorReports, boundary, policy).issues[0], /P0\/P1\/P2/);
+const minorCollected = collectCandidates(minorReports, boundary, balancedPolicy);
+assert.equal(minorCollected.candidates.length, 5);
+assert.equal(minorCollected.issues.length, 0);
+const minorDecisions = minorCollected.candidates.map((entry, index) => decision(entry.id,
+  index === 4 ? { duplicateOf: "overview:1" } : {}));
+const cappedResult = adjudicateCandidates(minorCollected, validator(minorDecisions), boundary, balancedPolicy);
+assert.deepEqual(cappedResult.findings.map((finding) => finding.id),
+  ["correctness:1", "contracts:1", "security:1"]);
+assert(cappedResult.findings.every((finding) => finding.severity === "P3"));
+assert.deepEqual(cappedResult.capped.map((entry) => entry.id), ["overview:1", "performance-resources:1"]);
+assert.equal(cappedResult.capped[0].severity, "nit");
+assert.match(cappedResult.capped[0].reason, /limit of 3 P3\/nit finding\(s\)/);
+assert.match(cappedResult.capped[1].reason, /Duplicate of withheld overview:1/);
+assert.deepEqual(cappedResult.duplicates, [], "A duplicate of a withheld finding is withheld with it");
+assert.equal(cappedResult.complete, true, "The presentation limit is policy, not incomplete coverage");
+const balancedReport = { mode: "balanced", validation: cappedResult, complete: true };
+assert.match(formatFindings(balancedReport), /^Balanced review: 3 validated finding\(s\)/);
+assert.match(formatFindings(balancedReport), /2 minor finding\(s\) withheld by the balanced review findings policy/);
+assert.match(formatFindings(balancedReport), /overview:1: \[nit\] Minor overview issue/);
+assert.match(formatFindings({ mode: "quick", validation: result, complete: true }), /^Quick review: 1 validated/);
+// A major finding always outranks a minor one, and three minors still fit.
+const mixedReports = [
+  ["correctness", "P1"], ["contracts", "P3"], ["security", "nit"], ["overview", "P3"],
+].map(([label, severity]) => reviewer([minorCandidate(`Mixed ${label} issue`, severity)], { label }));
+const mixedCollected = collectCandidates(mixedReports, boundary, balancedPolicy);
+const mixed = adjudicateCandidates(mixedCollected,
+  validator(mixedCollected.candidates.map((entry) => decision(entry.id))), boundary, balancedPolicy);
+assert.deepEqual(mixed.findings.map((finding) => finding.severity), ["P1", "P3", "P3", "nit"]);
+assert.deepEqual(mixed.capped, []);
+console.log("PASS balanced minor severities, declared severity order, the three-finding cap and its withheld record");
 console.log("PASS strict candidates, exact provenance/changed lines, confidence/severity, and fail-closed malformed output");
 console.log("PASS mocked semantic rejection/uncertainty, explicit same-defect deduplication, distinct same-line issues and degraded retention");
 console.log("PASS renamed/added/deleted files, insertion/deletion context, and shared-cause cross-file deduplication");

@@ -221,7 +221,7 @@ export async function executeTargetCapture(session, args, { gh = runGh, signal }
   signal?.throwIfAborted();
   const bound = "Source context comes only from the captured GitHub revisions. " +
     "The local checkout, its branch, and its uncommitted changes are never context evidence; " +
-    "a quick review additionally requires the checkout to be exactly this head before reviewers may read it.";
+    "a review additionally requires the checkout to be exactly this head before reviewers may read it.";
   await session.log(`Q2 context: ${JSON.stringify(contextSummary(context))}\n${bound}`);
   return { ...outcome, context, workingDirectory: cwd };
 }
