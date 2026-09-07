@@ -300,9 +300,10 @@ review costs more than a balanced one on the same diff.
 The medium tier resolves through exactly the same layering as the others, and
 the `Effective reviewer assignments:` block names its model, effort and origin
 before any reviewer starts. There is no medium invocation flag; set it with
-`/pr-review-config mediumModel=... mediumEffort=...`. An unset medium tier sits
-equidistant between light and heavy, so it inherits the heavy tier rather than
-downgrading to the light one.
+`/pr-review-config mediumModel=... mediumEffort=...`. An unset medium tier takes
+the nearest configured tier, and light and heavy are equidistant from it, so a
+configured heavy tier wins that tie. With only a light tier configured, the
+conventions reviewer inherits the light one.
 
 The full findings policy presents **every qualifying severity with no minor
 cap**: accepted P3 and nit findings are all presented, so nothing is withheld
@@ -312,6 +313,18 @@ Everything else is unchanged from balanced: the same revision gate, confined
 read-only reviewer tools, incomplete-coverage reporting, selection, retention,
 publication gates and cancellation. Mode flags remain mutually exclusive, and
 balanced remains the default.
+
+**Known defect: pick your medium model carefully.** Full mode was demonstrated by
+the live review of this project's own pull request #5, which ran all three tiers
+on distinct models for the first time: four heavy specialists on `gpt-5.6-terra`,
+the light overview reviewer on `gpt-5.6-luna`, and the conventions reviewer on
+`claude-sonnet-5`. That run made 95 confined reads with no denials and cost
+276.266849 reported AI credits. It also found that `claude-sonnet-5` wraps its
+candidate JSON in a ```` ```json ```` fence, and the parser performs no fence
+stripping by design, so the conventions reviewer's whole output was discarded as
+an execution failure. Until that is resolved, a Claude-family medium model spends
+a sixth reviewer's credits and contributes nothing. Prefer a GPT-family medium
+model. See [ROADMAP.md](ROADMAP.md).
 
 ### Grounded findings and deduplication (Q4)
 
@@ -798,8 +811,8 @@ heavy tier only. Balanced adds the light tier for its overview reviewer, and
 full adds the medium tier for its conventions reviewer. **If you leave the
 light tier unset, it inherits the nearest configured tier**, so a balanced
 review runs its "light" reviewer on your heavy model at heavy effort, which is
-what makes a balanced review expensive. An unset medium tier inherits the heavy
-tier for the same reason.
+what makes a balanced review expensive. An unset medium tier inherits heavy over
+light when both are configured, because a tie prefers the heavier tier.
 
 One trap worth knowing: a model that supports no configurable reasoning effort,
 such as `claude-haiku-4.5`, cannot be used in a tier while any effort reaches

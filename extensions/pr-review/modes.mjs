@@ -14,6 +14,15 @@ const overview = { label: "overview", tier: "light",
   focus: "Whole-change coherence: oversights, missed call sites, misleading names, and small " +
     "defects on the changed lines that a narrow specialist may pass over." };
 
+// Every mode ranks the same severities in the same order. Balanced and full
+// admit the minor ones too and differ only in how many they present, so the
+// vocabulary is declared once and cannot drift between them.
+const majorSeverities = ["P0", "P1", "P2"];
+const minorSeverities = ["P3", "nit"];
+const minorPolicy = (label, minorCap) => ({
+  label, severities: [...majorSeverities, ...minorSeverities], minorSeverities, minorCap,
+});
+
 export const reviewModes = {
   quick: {
     id: "quick",
@@ -29,7 +38,7 @@ export const reviewModes = {
     ],
     policy: {
       label: "Quick review",
-      severities: ["P0", "P1", "P2"],
+      severities: majorSeverities,
       minorSeverities: [],
       minorCap: 0,
     },
@@ -41,12 +50,7 @@ export const reviewModes = {
     label: "Balanced review",
     evidencePrefix: "M1",
     specialists: [correctness, contracts, security, performanceResources, overview],
-    policy: {
-      label: "Balanced review",
-      severities: ["P0", "P1", "P2", "P3", "nit"],
-      minorSeverities: ["P3", "nit"],
-      minorCap: 3,
-    },
+    policy: minorPolicy("Balanced review", 3),
   },
   full: {
     id: "full",
@@ -60,14 +64,9 @@ export const reviewModes = {
         focus: "Project conventions, naming, structure, error handling, tests and documentation; " +
           "maintainability of the changed code, judged against the surrounding codebase." },
     ],
-    policy: {
-      label: "Full review",
-      severities: ["P0", "P1", "P2", "P3", "nit"],
-      minorSeverities: ["P3", "nit"],
-      // Full presents every qualifying severity, so its minor allowance is
-      // unbounded rather than absent: the cap arithmetic stays one number.
-      minorCap: Infinity,
-    },
+    // Full presents every qualifying severity, so its minor allowance is
+    // unbounded rather than absent: the cap arithmetic stays one number.
+    policy: minorPolicy("Full review", Infinity),
   },
 };
 

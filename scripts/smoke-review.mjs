@@ -131,6 +131,20 @@ assert.deepEqual(layeredFull.at(-1), {
   origin: { model: "inherited:heavy", reasoningEffort: "inherited:heavy",
     tier: "medium: model=heavy [inherited:heavy] reasoning=high [inherited:heavy]" },
 });
+// With no heavy tier configured, the tie disappears and the medium tier
+// inherits the only configured neighbour instead.
+const lightOnly = {
+  ...layered,
+  effective: {
+    settings: { lightModel: "other", lightEffort: "low" },
+    origins: { lightModel: "personal", lightEffort: "personal" },
+  },
+};
+const lightOnlyFull = await reviewerAssignments(parentModels, fullMode, {}, lightOnly);
+assert.deepEqual(lightOnlyFull.at(-1).origin, {
+  model: "inherited:light", reasoningEffort: "inherited:light",
+  tier: "medium: model=other [inherited:light] reasoning=low [inherited:light]",
+}, "An unset medium tier inherits heavy only when a heavy tier is configured");
 const configuredMedium = {
   ...layered,
   effective: {

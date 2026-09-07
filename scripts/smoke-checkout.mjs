@@ -148,16 +148,14 @@ try {
   }
   // The balanced and full gates refuse on exactly the same evidence, each
   // naming its own mode; no mode gets an override or a degraded fallback.
-  for (const [mode, label, flag] of [
-    [reviewModes.balanced, "Balanced review", "--balanced"], [reviewModes.full, "Full review", "--full"],
-  ]) {
+  for (const mode of [reviewModes.balanced, reviewModes.full]) {
     await assert.rejects(
       assertReviewableCheckout(snapshotFor("c".repeat(40)),
         { cwd: matching.directory, gh: fakeGh("c".repeat(40)), mode }),
       (error) => {
-        assert.match(error.message, new RegExp(`^${label} refused before any reviewer started`));
+        assert.match(error.message, new RegExp(`^${mode.label} refused before any reviewer started`));
         assert.match(error.message, /Failed condition: local-head/);
-        assert.match(error.message, new RegExp(`rerun /pr-review 12 ${flag}`));
+        assert.match(error.message, new RegExp(`rerun /pr-review 12 ${mode.flag}`));
         return true;
       });
   }
