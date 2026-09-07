@@ -1,14 +1,16 @@
 import { randomUUID } from "node:crypto";
 import { captureTarget, parseTargetArgs } from "../extensions/pr-review/target.mjs";
 import { assembleContext } from "../extensions/pr-review/context.mjs";
-import { quickBinding } from "../extensions/pr-review/quick.mjs";
+import { reviewBinding } from "../extensions/pr-review/review.mjs";
 import { adjudicateCandidates, collectCandidates, evidenceBoundary, reviewKey } from "../extensions/pr-review/findings.mjs";
 import { selectFindings } from "../extensions/pr-review/selection.mjs";
+import { reviewModes } from "../extensions/pr-review/modes.mjs";
 import { respond, validationBaseSource, validationHeadSource } from "./target-fixture.mjs";
 
 export async function retentionFixture(sessionId, {
-  includeBoundary = false, reviewerLimitations = [], adjudicatorLimitations = [],
+  includeBoundary = false, reviewerLimitations = [], adjudicatorLimitations = [], mode = "quick",
 } = {}) {
+  const reviewMode = reviewModes[mode];
   const history = [];
   const gh = async (args, cwd) => {
     const response = respond(args, cwd, history);
@@ -17,7 +19,7 @@ export async function retentionFixture(sessionId, {
   };
   const { snapshot } = await captureTarget(parseTargetArgs("12"), { cwd: "/controlled", gh });
   const context = await assembleContext(snapshot, { cwd: "/controlled", gh });
-  const binding = quickBinding(snapshot, context);
+  const binding = reviewBinding(snapshot, context);
   const boundary = evidenceBoundary(snapshot, context, binding);
   const cite = (side, line = 3) => ({
     path: "total.js", side, startLine: line, endLine: line,
@@ -29,7 +31,7 @@ export async function retentionFixture(sessionId, {
     introduction: "The changed operator adds quantity instead of multiplying.",
     location: cite("head"), before: cite("base"), after: cite("head"), evidence: [cite("head", 1)],
   };
-  const reviewers = ["correctness", "contracts", "security-performance-resources"].map((label) => ({
+  const reviewers = reviewMode.specialists.map(({ label }) => ({
     label, model: "controlled-model", reasoningEffort: "high", status: "completed", sessionId: randomUUID(),
     usage: [{ model: "controlled-model", reasoningEffort: "high", isByok: false }],
     result: JSON.stringify({
@@ -37,7 +39,7 @@ export async function retentionFixture(sessionId, {
       limitations: label === "correctness" ? reviewerLimitations : [],
     }),
   }));
-  const collected = collectCandidates(reviewers, boundary);
+  const collected = collectCandidates(reviewers, boundary, reviewMode.policy);
   const adjudicator = {
     label: "evidence-validator", model: "controlled-model", status: "completed",
     result: JSON.stringify({
@@ -51,8 +53,8 @@ export async function retentionFixture(sessionId, {
     }),
   };
   const outcome = {
-    invocation: { invocationId: randomUUID(), sessionId }, binding, mode: "quick", noComment: true,
-    validation: adjudicateCandidates(collected, adjudicator, boundary), reviewers, adjudicator,
+    invocation: { invocationId: randomUUID(), sessionId }, binding, mode, noComment: true,
+    validation: adjudicateCandidates(collected, adjudicator, boundary, reviewMode.policy), reviewers, adjudicator,
     complete: true, reviewComplete: true, executionComplete: true, coverage: "completed",
     cancelled: false, cleanupErrors: [],
   };

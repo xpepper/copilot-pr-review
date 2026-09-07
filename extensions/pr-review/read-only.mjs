@@ -1,7 +1,7 @@
 import { realpathSync } from "node:fs";
 import { isAbsolute, relative, sep } from "node:path";
 
-// Quick reviewers may read surrounding source, so the granted set is exactly
+// Reviewers may read surrounding source, so the granted set is exactly
 // these three built-ins; every other built-in stays natively unavailable.
 export const readOnlyTools = ["view", "grep", "glob"];
 export const readOnlyToolFilters = readOnlyTools.map((name) => `builtin:${name}`);

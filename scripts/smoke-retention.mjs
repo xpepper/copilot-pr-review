@@ -4,8 +4,8 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, rmdirSync, symlinkSync, w
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { inspectRetained, retainedFilename, retainedRecord, sessionStore, validateRecord } from "../extensions/pr-review/retention.mjs";
-import { executeRetainedQuick } from "../extensions/pr-review/retained-run.mjs";
-import { parseQuickArgs } from "../extensions/pr-review/quick.mjs";
+import { executeRetainedReview } from "../extensions/pr-review/retained-run.mjs";
+import { parseReviewArgs } from "../extensions/pr-review/review.mjs";
 import { reviewKey } from "../extensions/pr-review/findings.mjs";
 import { respond } from "./target-fixture.mjs";
 import { retentionFixture } from "./retention-fixture.mjs";
@@ -42,6 +42,19 @@ try {
   assert(messages.some((message) => message.includes("Selection: selected; IDs: correctness:1")));
   assert.equal(readFileSync(join(workspace, retainedFilename), "utf8"), JSON.stringify(record));
   assert.throws(() => validateRecord(record, "other-session"), /wrong originating session/);
+
+  // The same schema retains a balanced record, whose reviewer topology differs.
+  const balanced = retainedRecord(await retentionFixture(sessionId, { mode: "balanced" }));
+  validateRecord(balanced, sessionId);
+  assert.equal(balanced.outcome.mode, "balanced");
+  assert.equal(balanced.outcome.reviewers.length, 5);
+  assert.deepEqual(balanced.outcome.reviewers.map((reviewer) => reviewer.label),
+    ["correctness", "contracts", "security", "performance-resources", "overview"]);
+  assert.deepEqual(balanced.outcome.validation.capped, []);
+  const wrongTopology = structuredClone(balanced);
+  wrongTopology.outcome.mode = "quick";
+  wrongTopology.digest = reviewKey(wrongTopology.outcome);
+  assert.throws(() => validateRecord(wrongTopology, sessionId), /incomplete reviewer coverage/);
 
   for (const mutate of [
     (r) => { r.schemaVersion = 2; }, (r) => { r.extra = true; },
@@ -185,10 +198,10 @@ try {
     } };
     const history = [];
     let stops = 0;
-    const result = await executeRetainedQuick(h, {
+    const result = await executeRetainedReview(h, {
       async start() { assert.fail("Skipped target must not start inference"); },
       async stop() { stops++; return []; },
-    }, parseQuickArgs("2 --quick --no-comment --all"), assignments, {
+    }, parseReviewArgs("2 --quick --no-comment --all"), assignments, {
       controller, gh: async (args, cwd) => {
         const result = respond(args, cwd, history);
         history.push({ args, cwd });

@@ -6,8 +6,9 @@ import {
 } from "./fixture.mjs";
 import { executeFixtureRun } from "./fixture-run.mjs";
 import { executeTargetCapture } from "./target.mjs";
-import { parseQuickArgs, quickAssignments } from "./quick.mjs";
-import { executeRetainedQuick } from "./retained-run.mjs";
+import { describeAssignments, parseReviewArgs, reviewerAssignments } from "./review.mjs";
+import { reviewMode } from "./modes.mjs";
+import { executeRetainedReview } from "./retained-run.mjs";
 import { inspectRetained } from "./retention.mjs";
 import { executePublishLater } from "./publish-later.mjs";
 import { publicationSummary } from "./publication.mjs";
@@ -17,8 +18,9 @@ const help = [
   "Copilot PR Review - runtime feasibility prototype",
   "",
   "Usage: /pr-review [status|help|models|fixture model1=ID effort1=LEVEL model2=ID effort2=LEVEL]",
-  "       /pr-review NUMBER [--include-drafts] [--include-closed|--review-closed]",
-  "       /pr-review NUMBER --quick|--major-only [--comment|--no-comment] [--all] [heavyModel=ID] [heavyEffort=LEVEL]",
+  "       /pr-review NUMBER [--balanced|--quick|--major-only] [--comment|--no-comment] [--all]",
+  "                         [--include-drafts] [--include-closed|--review-closed] [heavyModel=ID] [heavyEffort=LEVEL]",
+  "       /pr-review NUMBER --capture-only [--include-drafts] [--include-closed|--review-closed]",
   "",
   "status  Show the implemented capability boundary (default).",
   "help    Show this usage information.",
@@ -34,23 +36,31 @@ const help = [
   "Saved tiers supply unset assignments; a trusted project's file overrides them; invocation flags win.",
   "An untrusted repository's .copilot/pr-review/config.json is ignored; a repository cannot trust itself.",
   "",
-  "NUMBER  Capture PR metadata and diff, then bind source context to the captured",
-  "        head/base revisions. No reviewers, no publication, no local source.",
+  "NUMBER  Capture PR metadata and diff, bind source context to the captured head/base",
+  "        revisions, then run the selected review mode. Reviews use Copilot credits.",
   "Drafts and obvious bots are skipped, as are provably empty changes.",
   "Closed/merged PRs require confirmation or an explicit closed-PR override.",
-  "--quick / --major-only  Run three heavy specialists on captured PR content.",
-  "Quick reviewers additionally read this checkout, so it must be the reviewed revision:",
+  "--balanced  Four heavy specialists (correctness, contracts, security, performance/resources)",
+  "            plus one light overview reviewer. This is the default when no mode flag is given.",
+  "--quick / --major-only  Three heavy specialists on captured PR content.",
+  "Mode flags are mutually exclusive. Full and deep modes are not implemented yet.",
+  "Balanced presents P0-P2 findings plus at most three P3/nit findings anchored on changed lines;",
+  "quick presents P0-P2 only. Withheld minor findings are reported, never silently dropped.",
+  "--capture-only  Capture and bind the target, then stop: no reviewers, no inference, no publication.",
+  "Reviewers additionally read this checkout, so it must be the reviewed revision:",
   "local HEAD must equal the captured PR head, the PR head must not have moved, and no tracked",
   "file may be modified or staged. Otherwise the review is refused; run `gh pr checkout NUMBER` first.",
   "Reviewers get view/grep/glob confined to the checkout; every other tool stays unavailable.",
-  "Unset heavy settings inherit the nearest configured tier, then the ambient model/effort.",
+  "Each reviewer resolves its mode's tier: heavy specialists, light overview. Unset tiers inherit",
+  "the nearest configured tier, then the ambient model/effort. Only heavyModel=/heavyEffort= are",
+  "invocation flags; set lightModel/lightEffort with /pr-review-config.",
   "Strict evidence checks and an isolated adjudication pass validate/deduplicate candidates.",
   "Select validated findings in the host UI, or use --all. Selection never authorizes posting.",
   "--comment authorizes the proposal; --no-comment suppresses posting. The flags conflict.",
   "Without either flag, the effective saved autoPostReviews applies; it defaults to false and then requires final confirmation.",
   "Authorized selections submit a code-built COMMENT review after fresh head/lifecycle/anchor checks.",
   "Draft/closed/merged PRs cannot receive the current inline payload. Uncertain writes are never retried.",
-  "Results are retained only in the originating local session; a new quick run replaces the previous result.",
+  "Results are retained only in the originating local session; a new review replaces the previous result.",
   "publish is a new explicit authorization; retained flags, configuration and confirmations authorize nothing.",
   "It refetches the reviewed evidence and reruns every gate, and refuses repeats of published or unresolved writes.",
   "No safeguards yet. Validation also uses Copilot credits; publish uses none.",
@@ -62,10 +72,13 @@ const status = [
   "The plugin extension joined this Copilot CLI session and handled /pr-review.",
   "",
   "Implemented: PR target capture with revision-bound source context, model capability",
-  "listing, three quick PR specialists, and a two-reviewer fixture prototype.",
+  "listing, the quick and balanced review modes, and a two-reviewer fixture prototype.",
   "The fixture requires explicit distinct models and reasoning efforts.",
   "F3 experiments: adversarial read-only probes, failure injection, and manual cancellation.",
-  "Quick execution is available with --quick, grounded validation and deduplication.",
+  "Balanced is the default mode: four heavy specialists plus one light overview reviewer,",
+  "presenting P0-P2 plus at most three P3/nit findings. --quick runs three heavy specialists",
+  "and presents P0-P2 only. Full and deep are not implemented; --capture-only starts no reviewer.",
+  "Both modes apply the same grounded validation and deduplication.",
   "Validated findings can be selected via the host UI or --all, then retained in this local session.",
   "Use /pr-review inspect after extension reload or a CLI-supported same-session resume.",
   "Current-run COMMENT publication is implemented with fresh gates and a durable write-ahead journal.",
@@ -76,8 +89,8 @@ const status = [
   "",
   "Status/help start no models or background work. PR capture and source context use",
   "read-only gh requests against the captured revisions, never the local checkout.",
-  "Quick reviewers may read the local checkout read-only, but only after it is proven to be",
-  "exactly the reviewed head revision; otherwise the quick review refuses to start.",
+  "Reviewers may read the local checkout read-only, but only after it is proven to be",
+  "exactly the reviewed head revision; otherwise the review refuses to start.",
   "Only authorized selected findings can publish; no project safeguards are run.",
   "Status is not a review result or a clean-review claim.",
 ].join("\n");
@@ -88,7 +101,7 @@ const session = await joinSession({
   commands: [
     {
       name: "pr-review",
-      description: "Read-only quick PR specialists, target capture, status, or fixture experiment",
+      description: "Read-only balanced/quick PR specialists, target capture, status, or fixture experiment",
       handler: async ({ args }) => {
         if (shuttingDown) throw new Error("Extension is shutting down.");
         switch (args.trim()) {
@@ -137,23 +150,28 @@ const session = await joinSession({
             return;
           default: {
             if (/^\d/.test(args.trim())) {
-              if (args.trim().split(/\s+/).some((token) => ["--quick", "--major-only"].includes(token))) {
-                const options = parseQuickArgs(args);
-                assertIdle();
-                // Saved and trusted-project settings are displayed before any reviewer
-                // starts, and before the assignment is resolved, so a refusal explains
-                // itself. An unusable effective assignment refuses the review instead
-                // of substituting.
-                const configuration = await loadConfiguration(session);
-                await session.log(describeConfiguration(configuration, {
-                  flags: options.settings, heading: "Effective PR review configuration for this invocation.",
-                }));
-                const assignments = await quickAssignments(session, options.settings, configuration);
-                startRun((client, lifecycle) => executeRetainedQuick(session, client, options, assignments, lifecycle,
-                  { autoPostReviews: configuration.autoPostReviews }));
+              const options = parseReviewArgs(args);
+              // Capture-only stops at the bound snapshot: no mode, no reviewer,
+              // no inference. Every other invocation runs its mode, which is
+              // balanced unless a mode flag selects another one.
+              if (options.captureOnly) {
+                await executeTargetCapture(session, options.captureArgs);
                 return;
               }
-              await executeTargetCapture(session, args);
+              assertIdle();
+              // Saved and trusted-project settings are displayed before any reviewer
+              // starts, and before the assignment is resolved, so a refusal explains
+              // itself. An unusable effective assignment refuses the review instead
+              // of substituting.
+              const mode = reviewMode(options.mode);
+              const configuration = await loadConfiguration(session);
+              await session.log(describeConfiguration(configuration, {
+                flags: options.settings, heading: "Effective PR review configuration for this invocation.",
+              }));
+              const assignments = await reviewerAssignments(session, mode, options.settings, configuration);
+              await session.log(describeAssignments(mode, assignments));
+              startRun((client, lifecycle) => executeRetainedReview(session, client, options, assignments, lifecycle,
+                { autoPostReviews: configuration.autoPostReviews }));
               return;
             }
             const experiment = args.trim().split(/\s+/)[0];

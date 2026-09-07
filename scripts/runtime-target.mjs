@@ -10,9 +10,11 @@ import { assertReviewableCheckout, runGit } from "../extensions/pr-review/checko
 import { captureTarget, parseTargetArgs, runGh } from "../extensions/pr-review/target.mjs";
 import { assembleContext } from "../extensions/pr-review/context.mjs";
 
+// Capture-only is the dispatch that stops at the bound snapshot: it starts no
+// reviewer and spends no inference, so these probes never run a review.
 async function dispatchTarget(session, args) {
   const before = (await session.getEvents()).length;
-  const result = await session.rpc.commands.execute({ commandName: "pr-review", args });
+  const result = await session.rpc.commands.execute({ commandName: "pr-review", args: `${args} --capture-only` });
   assert.equal(result.error, undefined);
   const messages = (await session.getEvents()).slice(before)
     .filter((event) => event.type === "session.info").map((event) => event.data.message);
@@ -349,14 +351,16 @@ export async function prepareTargetSmoke({ allowPublish = false, coordinatePost 
         assert.equal(bound.context.entries[0].sources[0].blob, blobSha(headSource));
         await runGh(["api", "--hostname", "github.com", "--method", "GET",
           "repos/fixture/repository/pulls/11", "-H", "Accept: application/vnd.github+json"], directory);
-        const advanced = await session.rpc.commands.execute({ commandName: "pr-review", args: "11" });
+        const advanced = await session.rpc.commands.execute({ commandName: "pr-review", args: "11 --capture-only" });
         assert.match(advanced.error, /not the blob recorded in the captured diff/);
         assert.match(advanced.error, /cccccccc/, "The advanced head is refused, not silently reviewed");
         console.log("PASS context stays bound to the captured revision after the PR advances");
 
         for (const [args, expected] of [
-          ["8", /HTTP 404/], ["9", /changed during capture/], ["10", /truncated/i],
-          ["0", /positive safe integer/], ["1 --verify", /Unsupported arguments/],
+          ["8 --capture-only", /HTTP 404/], ["9 --capture-only", /changed during capture/],
+          ["10 --capture-only", /truncated/i], ["0 --capture-only", /positive safe integer/],
+          ["1 --verify --capture-only", /Unsupported arguments/],
+          ["1 --capture-only --quick", /cannot be combined/],
         ]) {
           const result = await session.rpc.commands.execute({ commandName: "pr-review", args });
           assert.match(result.error, expected);

@@ -352,7 +352,7 @@ export function describeConfiguration(configuration, { flags = {}, heading } = {
     `autoPostReviews: ${autoPostReviews} [${autoPostSource}].`,
     "Precedence: invocation flags, then a trusted project's settings, then personal settings, then the ambient " +
       "session assignment. Unset tiers inherit the nearest configured tier, preferring the heavier tier when " +
-      "equidistant. Quick review uses the heavy tier only.",
+      "equidistant. Quick review uses the heavy tier only; balanced also runs its overview reviewer on the light tier.",
     "Invocation flags such as heavyModel=/heavyEffort= and --comment/--no-comment override these settings for " +
       "that invocation only and never rewrite the personal or project file.",
     "Explicit values are never silently substituted or lowered: an unusable assignment refuses the review.",

@@ -8,7 +8,7 @@ import {
   cancelPublication, interpretWrite, publicationSummary, publishCurrent,
 } from "../extensions/pr-review/publication.mjs";
 import { retainedRecord, sessionStore, validateRecord, inspectRetained } from "../extensions/pr-review/retention.mjs";
-import { executeRetainedQuick } from "../extensions/pr-review/retained-run.mjs";
+import { executeRetainedReview } from "../extensions/pr-review/retained-run.mjs";
 import { reviewKey } from "../extensions/pr-review/findings.mjs";
 import { retentionFixture } from "./retention-fixture.mjs";
 import { pull, validationDiff } from "./target-fixture.mjs";
@@ -180,7 +180,7 @@ try {
     if (name.startsWith("cancel")) assert.equal(h.outcome.publication.cancelRequested, true);
     validateRecord(retainedRecord(h.outcome), h.parent.sessionId);
     if (status === "uncertain") {
-      await assert.rejects(executeRetainedQuick(h.parent, {}, {}, [], { controller: h.controller }), /Previous publication is uncertain/);
+      await assert.rejects(executeRetainedReview(h.parent, {}, {}, [], { controller: h.controller }), /Previous publication is uncertain/);
       assert.equal(h.store.read().digest, retainedRecord(h.outcome).digest, "Do not replace an unresolved journal");
       assert.match(publicationSummary(h.outcome.publication), /UNCERTAIN.*may have received/);
     }
@@ -195,7 +195,7 @@ try {
     assert.equal(h.calls.filter((call) => call.args[4] === "POST").length, failAt === "in-flight" ? 0 : 1);
     if (failAt === "succeeded") {
       assert.equal(h.store.read().outcome.publication.status, "in-flight");
-      await assert.rejects(executeRetainedQuick(h.parent, {}, {}, [], { controller: h.controller }), /Previous publication is uncertain/);
+      await assert.rejects(executeRetainedReview(h.parent, {}, {}, [], { controller: h.controller }), /Previous publication is uncertain/);
       await inspectRetained(h.parent);
       assert(h.messages.some((message) => message.includes("UNCERTAIN")));
     }

@@ -214,6 +214,20 @@ try {
     "An invocation flag never rewrites the saved configuration");
   console.log("PASS saved tiers drive a real quick invocation and invocation flags override them without rewriting the file");
 
+  // Balanced consumes the light tier, so the saved light assignment must be the
+  // one the overview reviewer would run, with its origin visible beforehand.
+  const balanced = (await quickRun(session, "2 --balanced --no-comment")).find((message) =>
+    message.startsWith("Effective reviewer assignments:"));
+  assert(balanced, "A balanced review displays its per-reviewer assignments before execution");
+  assert.match(balanced, /balanced mode, 5 reviewer\(s\)/);
+  assert(balanced.includes(
+    `overview [light]: model=${current.modelId} [configured:light] reasoning=${other} [configured:light]`),
+  `The saved light tier drives the balanced overview reviewer: ${balanced}`);
+  assert(balanced.includes(
+    `correctness [heavy]: model=${current.modelId} [inherited:light] reasoning=${other} [inherited:light]`),
+  `The heavy specialists still inherit the nearest configured tier: ${balanced}`);
+  console.log("PASS the saved light tier drives the balanced overview reviewer without inference");
+
   writeFileSync(filename, JSON.stringify({ schemaVersion: configSchemaVersion,
     settings: { heavyModel: "definitely-not-a-model" } }), { mode: 0o600 });
   const refused = await run(session, "2 --quick --no-comment", "pr-review");

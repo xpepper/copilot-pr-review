@@ -2,6 +2,7 @@ import { execFile } from "node:child_process";
 import { realpath } from "node:fs/promises";
 import { isAbsolute } from "node:path";
 import { promisify } from "node:util";
+import { reviewModes } from "./modes.mjs";
 
 const execute = promisify(execFile);
 const shaPattern = /^[0-9a-f]{40}$/;
@@ -26,15 +27,15 @@ export async function runGit(args, cwd, { signal } = {}) {
 // evidence about code that is not the reviewed revision. There is deliberately
 // no override flag and no degraded context-only fallback, and this never
 // switches branches, stashes, pulls or cleans to satisfy itself.
-export function refuseCheckout(condition, detail, number) {
+export function refuseCheckout(condition, detail, number, mode = reviewModes.quick) {
   return [
-    `Quick review refused before any reviewer started: ${detail}`,
+    `${mode.label} refused before any reviewer started: ${detail}`,
     `Failed condition: ${condition}.`,
-    "Quick reviewers read the local checkout, so it must be exactly the reviewed revision.",
+    "Reviewers read the local checkout, so it must be exactly the reviewed revision.",
     "There is no override flag; nothing was reviewed, and no local file was touched.",
     condition === "remote-head"
-      ? `Fix: rerun /pr-review ${number} --quick after \`gh pr checkout ${number}\` to capture the new head.`
-      : `Fix: run \`gh pr checkout ${number}\` in this checkout, commit or discard your own changes, then rerun /pr-review ${number} --quick.`,
+      ? `Fix: rerun /pr-review ${number} ${mode.flag} after \`gh pr checkout ${number}\` to capture the new head.`
+      : `Fix: run \`gh pr checkout ${number}\` in this checkout, commit or discard your own changes, then rerun /pr-review ${number} ${mode.flag}.`,
   ].join("\n");
 }
 
@@ -47,12 +48,12 @@ function statusEntries(status) {
   };
 }
 
-export async function assertReviewableCheckout(snapshot, { cwd, gh, git = runGit, signal } = {}) {
+export async function assertReviewableCheckout(snapshot, { cwd, gh, git = runGit, signal, mode = reviewModes.quick } = {}) {
   signal?.throwIfAborted();
   const number = snapshot.pull.number;
   const captured = snapshot.pull.head.sha;
   const refuse = (condition, detail) => {
-    throw new Error(refuseCheckout(condition, detail, number));
+    throw new Error(refuseCheckout(condition, detail, number, mode));
   };
   let top;
   try {

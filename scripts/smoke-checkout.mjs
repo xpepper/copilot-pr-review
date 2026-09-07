@@ -6,6 +6,7 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { assertReviewableCheckout, refuseCheckout, runGit } from "../extensions/pr-review/checkout.mjs";
+import { reviewModes } from "../extensions/pr-review/modes.mjs";
 
 const temporary = [];
 function repositoryFixture({ commit = true } = {}) {
@@ -134,14 +135,28 @@ try {
   await assert.rejects(runGit(["status"], "relative/path"), /absolute working directory/);
   console.log("PASS cancellation and non-absolute working directories are refused");
 
-  // 9. The refusal text always names the failed condition and the fix.
-  for (const condition of ["local-head", "working-tree", "remote-head", "not-a-git-checkout"]) {
-    const message = refuseCheckout(condition, "detail", 7);
-    assert.match(message, new RegExp(`Failed condition: ${condition}`));
-    assert.match(message, condition === "remote-head" ? /rerun \/pr-review 7 --quick/ : /gh pr checkout 7/);
-    assert.match(message, /no local file was touched/);
+  // 9. The refusal text always names the failed condition, the mode and the fix.
+  for (const mode of [reviewModes.quick, reviewModes.balanced]) {
+    for (const condition of ["local-head", "working-tree", "remote-head", "not-a-git-checkout"]) {
+      const message = refuseCheckout(condition, "detail", 7, mode);
+      assert.match(message, new RegExp(`Failed condition: ${condition}`));
+      assert.match(message, new RegExp(`^${mode.label} refused before any reviewer started`));
+      assert.match(message, condition === "remote-head"
+        ? new RegExp(`rerun /pr-review 7 ${mode.flag}`) : /gh pr checkout 7/);
+      assert.match(message, /no local file was touched/);
+    }
   }
-  console.log("PASS every refusal names its failed condition and the exact fixing command");
+  // The balanced gate refuses on exactly the same evidence, naming its own mode.
+  await assert.rejects(
+    assertReviewableCheckout(snapshotFor("c".repeat(40)),
+      { cwd: matching.directory, gh: fakeGh("c".repeat(40)), mode: reviewModes.balanced }),
+    (error) => {
+      assert.match(error.message, /^Balanced review refused before any reviewer started/);
+      assert.match(error.message, /Failed condition: local-head/);
+      assert.match(error.message, /rerun \/pr-review 12 --balanced/);
+      return true;
+    });
+  console.log("PASS every refusal names its mode, its failed condition and the exact fixing command");
 } finally {
   for (const directory of temporary) rmSync(directory, { recursive: true, force: true });
 }
