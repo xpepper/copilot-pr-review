@@ -2433,17 +2433,75 @@ node scripts/smoke-runtime.mjs --targets --startup
 Remaining limits: native evidence is macOS arm64 / CLI 1.0.83, not Windows or
 other installation layouts. PATH selects the installed executable; matching
 its version to the hosting SDK remains the installer's responsibility. The
-user's full private-PR review still needs a fresh interactive session; this
+user's full private-PR review had not yet been retried at this checkpoint; this
 startup regression does not claim successful end-to-end inference on that PR.
 Earlier publication, retention, configuration and runtime caveats remain.
 
+## Manual feedback: coverage classification and presentation
+
+After startup checkpoint `ff78dcb`, the user reran the quick review and supplied
+the session ID for read-only inspection. The saved events and retained result
+showed all three reviewers completed with no execution errors, cancellation or
+cleanup errors. There were no candidates or validated findings, and no
+publication was attempted. The result settled with `executionComplete: true`
+but `reviewComplete: false` and `coverage: incomplete`.
+
+The coverage label came from the reviewers' general caveats about external
+component implementations and behavior not present in their supplied evidence.
+In `findings.mjs`, every output `limitations` entry becomes an issue, and any
+issue makes the validation result incomplete. This conflates informational
+caveats with substantive coverage gaps and failed execution.
+
+This did not demonstrate a missing executable or a failed attempt to run one.
+`read-only.mjs` gives reviewers no tools and denies execution; `quick.mjs`
+supplies captured revision-bound context and prohibits independent local reads
+or commands. `--verify` is not implemented and does not explain this boundary.
+The user reports that `gh-aw` should be accessible, at least via mise; neither
+its availability nor useful/safe invocation was established during inspection.
+
+The user agreed to prioritize the classification/presentation fix, followed by
+more manual testing to surface feedback before returning to M1.
+Read-only investigation tools are a separate deferred discussion. The user is
+interested in allowing them, but exact tools, revision binding, permission
+boundaries and acceptance criteria remain undecided. Do not interpret this as
+approval for shell access, automatic mise/gh-aw execution, or implementation
+of investigation tools in the classification fix. Read-only investigation and
+approved safeguard execution are distinct capabilities.
+
 ## Exact next increment
 
-**First finish the user's manual testing before continuing the feature plan.**
-The CLI-discovery fix is installed; retry the same quick invocation in a fresh
-interactive session. Investigate any further blocker before starting M1.
-Do not change the user's project trust or personal model assignments to make a
-review pass.
+**Fix coverage classification and presentation only, then resume manual tests.**
+Do not start M1 or add investigation tools as part of this increment.
+
+Acceptance criteria:
+
+- Distinguish execution failure, substantive review-coverage gaps and
+  informational caveats. A generic statement that an external dependency was
+  not independently audited must not automatically make the review incomplete.
+- Crashes, cancellation, unusable output, unavailable relevant changed content
+  and missing evidence needed for a specific consequential assessment remain
+  visible as incomplete. Do not downgrade every limitation to achieve a green
+  result, or imply that zero findings proves the PR clean.
+- Preserve useful caveats and show why a real coverage gap matters. Carry the
+  distinction consistently through the final summary, retained inspection and
+  publication-facing coverage descriptions; preserve authorization and
+  publication gates.
+- Establish explicit structured categories rather than guessing from keywords
+  in prose. Choose the smallest compatible schema change after inspecting
+  reviewer/adjudicator outputs and retained-result validation; handle older
+  retained results conservatively, without silently reclassifying uncertainty.
+- Use synthetic controlled cases for caveat-only results, genuine gaps,
+  execution failure and mixed results. Do not copy private review payloads into
+  repository fixtures. Demonstrate the distinction before requesting another
+  manual run; no inference rerun is required merely to reproduce classification.
+- Keep personal settings and trust unchanged. Do not enable tools, implement
+  `--verify`, add timeouts or alter models to make the result appear complete.
+
+After this fix, prioritize further manual-test feedback. Discuss read-only
+investigation tools separately when the user returns to that topic; do not
+assume an implementation priority relative to M1 has been settled.
+
+## Feature-plan increment after manual feedback
 
 **The balanced half of M1 only.** Add the balanced review mode with its upstream
 reviewer assignment, so a mode other than quick runs and the light tier is

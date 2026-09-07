@@ -8,16 +8,19 @@ them. Respect scope constraints and distinguish demonstrated behavior from
 assumptions. Follow these same checkpoint-commit and final-file handoff rules
 in turn.
 
-## Current priority: finish manual testing before M1
+## Current priority: classification/presentation fix, then manual testing
 
 The user paused the feature plan to try the plugin in an ordinary interactive
 session. Running `copilot --experimental --yolo` and then
 `/pr-review 727 --quick --no-comment --all` failed at SDK construction because
 the bundled SDK could not resolve `@github/copilot-darwin-arm64`.
 
-This session fixed only that startup blocker. The starting checkpoint was
-`0a32e77` on local `main`, following C2's `56ace3f`. The changes accompanying
-this prompt belong to one fix checkpoint. No unrelated or unfinished work is
+Startup checkpoint **`ff78dcb`** fixed that blocker, following `0a32e77` and
+C2's `56ace3f`. The user then retried the review and we inspected its saved
+events/result read-only. The changes accompanying this prompt record the
+subsequent agreed priorities only; the classification fix is not implemented.
+At handoff creation only `ROADMAP.md` and `HANDOFF.md` are uncommitted, both
+belonging to this documentation checkpoint. No unrelated or unfinished code is
 carried forward, no background work is pending, and nothing was pushed.
 Do not infer current remote/ahead status from earlier handoffs.
 
@@ -39,12 +42,37 @@ Do not infer current remote/ahead status from earlier handoffs.
   consulted official/installed APIs and reproduction are in the roadmap's
   "Manual-test blocker" section.
 
-The corrected extension is installed locally; the user needs a **fresh
-interactive Copilot session** to retry the original invocation. The private PR
-was not fetched or reviewed in this session; no inference or publication was
-performed. Successful startup plumbing is not evidence of a complete review on
-the user's target. Investigate further manual-test failures before continuing
-M1. Do not alter personal model assignments or project trust to make a run pass.
+The corrected extension is installed locally. The user's subsequent manual run
+completed all three reviewers with no execution/cleanup errors or cancellation.
+No candidates were returned and nothing was published. However, general caveats
+about unavailable external component implementations caused the result to be
+classified as incomplete. `findings.mjs` currently turns every reviewer
+`limitations` entry into an issue and every issue into incomplete validation.
+This is not another startup failure or evidence of an unavailable executable.
+No additional inference or publication was initiated by the diagnostic session.
+
+**Implement only the classification/presentation fix described under "Exact
+next increment" in `ROADMAP.md`.** Distinguish execution failures and substantive
+coverage gaps from informational caveats. Preserve true uncertainty and do not
+claim that zero findings proves a PR clean. Choose explicit structured
+categories, handle existing retained results conservatively, and keep final
+output, retained inspection and publication-facing descriptions consistent.
+Cover caveat-only, genuine-gap, failure and mixed cases with synthetic fixtures,
+not private review payloads. Preserve all authority/publication gates.
+
+After the fix, resume manual testing to surface feedback before M1. Do not
+alter personal model assignments or project trust to make a run pass.
+
+**Read-only investigation tools are deferred for a separate discussion.**
+The user is interested in allowing them, but no concrete tool set or permission
+design is agreed. Current reviewers have no tools at all (`read-only.mjs`);
+they cannot independently investigate beyond supplied revision-bound context.
+This is an implementation boundary, not a necessary property of read-only
+review and not caused by omitting `--verify`, which is still unimplemented.
+The user reports `gh-aw` should be available via mise; this was not tested.
+Do not add tool access, automatically execute mise/gh-aw, or implement
+safeguards as part of the classification fix. The relative priority of future
+investigation-tool implementation and M1 remains open.
 
 Native evidence is macOS arm64 / CLI 1.0.83 / Node 26.1.0, not other platforms.
 PATH selects the installed CLI; compatibility with the hosting SDK remains the
@@ -79,7 +107,8 @@ Project-file probes belong in disposable fixture checkouts, not this repo.
 
 ## Feature plan after manual testing
 
-Implement only the balanced half of M1, following the exact acceptance criteria
+Once manual-feedback work is complete and the feature plan resumes, implement
+only the balanced half of M1, following its recorded acceptance criteria
 at the end of `ROADMAP.md`. Balanced uses four heavy specialists (correctness,
 contracts, security, performance/resources) plus one light overview reviewer,
 becomes the default, and permits at most three direct-diff P3/nit findings in
