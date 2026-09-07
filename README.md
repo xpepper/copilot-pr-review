@@ -750,6 +750,32 @@ medium, and heavy assignments with the origin of each value, and the effective
 `autoPostReviews`. Every review prints the same report, with invocation flags
 applied, followed by its per-reviewer assignments, before any reviewer starts.
 
+A worked example. List what your subscription actually offers with
+`/pr-review models`, then set the three tiers together:
+
+```text
+/pr-review models
+/pr-review-config lightModel=gemini-3.8-flash lightEffort=low
+/pr-review-config mediumModel=claude-sonnet-5 mediumEffort=medium
+/pr-review-config heavyModel=gpt-5.6-terra heavyEffort=high
+/pr-review-config show
+```
+
+`show` prints the effective assignment for every tier with the origin of each
+value, so you can see which tier a review will actually use. Quick uses the
+heavy tier only. Balanced adds the light tier for its overview reviewer, and the
+medium tier is reserved for full mode's conventions reviewer. **If you leave the
+light tier unset, it inherits the nearest configured tier**, so a balanced
+review runs its "light" reviewer on your heavy model at heavy effort, which is
+what makes a balanced review expensive.
+
+One trap worth knowing: a model that supports no configurable reasoning effort,
+such as `claude-haiku-4.5`, cannot be used in a tier while any effort reaches
+it. An unset `lightEffort` inherits `heavyEffort`, and the resolved pair is
+validated, so the review is refused rather than silently lowered. Pick a light
+model that supports an effort, such as `gemini-3.8-flash`, `gpt-5-mini` or
+`mai-code-1.1-flash`.
+
 Invocation flags win over saved settings for that invocation only and never
 rewrite the file: `heavyModel=`/`heavyEffort=` on `/pr-review NUMBER`, and
 `--comment`/`--no-comment` over `autoPostReviews`. There is no light-tier
@@ -1074,6 +1100,35 @@ is not supplied to the plugin reviewers. Only captured PR source is used as
 review input; no third-party code is copied into the bundled fixtures. Run this
 variant separately from the other target variants. `gpt-5.6-terra` with `high`
 effort is the Q4 demonstration assignment, not a product default or fallback.
+
+### Real integration test: review a real pull request
+
+Everything above runs the code against test doubles. This runs the **installed
+plugin** against a real pull request of the repository you are standing in:
+
+```sh
+copilot plugin install "$(pwd)"
+gh pr checkout NUMBER
+COPILOT_CLI_PATH="$(command -v copilot)" \
+COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
+node scripts/dogfood-review.mjs NUMBER --all --no-comment
+```
+
+It dispatches `/pr-review NUMBER --all --no-comment` through the SDK's command
+RPC, so the real extension, runtime, models, `gh` requests, revision gate and
+confined read tools all take part. `copilot -p "/pr-review NUMBER"` is **not** a
+substitute: prompt mode starts an ambient model turn instead of dispatching the
+command.
+
+The runner refuses to start unless local `HEAD` is the pull request head and no
+tracked file is modified, and it refuses `--comment`, so it can never publish.
+It prints the whole plugin timeline, then the settled outcome and the credit
+cost the runtime reported.
+
+**It spends real credits, and doc-heavy pull requests are expensive.** Reviewing
+this project's own 27-file pull request #3 with five balanced reviewers on
+`gpt-5.6-terra` at `high` cost 414.14627 reported AI credits. Choose the mode
+and the tier assignments deliberately before dispatching.
 
 The original F2 inference probe remains available separately:
 

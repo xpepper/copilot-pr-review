@@ -10,7 +10,11 @@ is recorded in [AGENTS.md](AGENTS.md); the replaceable next-session prompt lives
 in [HANDOFF.md](HANDOFF.md).
 
 **Since 2026-09-07, every increment lands on a branch and a pull request that is
-reviewed with this plugin.** `main` carries a repository ruleset requiring a pull
+reviewed with this plugin, and that review is the increment's real integration
+test.** Controlled suites use test doubles and prove logic only; the pull-request
+review exercises the installed plugin, the real runtime, real models, real `gh`
+requests, the real revision gate and real confined reads. An increment is not
+demonstrated until that has run once and its evidence is recorded here. `main` carries a repository ruleset requiring a pull
 request with zero approving reviews and no bypass actors, so nobody pushes to it
 directly. Each increment's entry below must record its pull request and the
 outcome of reviewing it with the tool: mode, model and effort actually used,
@@ -3400,6 +3404,15 @@ it afterwards.
   `/pr-review-config`. Deliberate: no configuration surface was added.
 - `--capture-only` is prototype surface outside `SCOPE.md`, introduced only
   because balanced became the default. Revisit at D1.
+- Tier inheritance can produce an assignment the user never asked for and then
+  refuse it. A model with no configurable reasoning effort, such as
+  `claude-haiku-4.5`, cannot serve a tier while any other tier has an effort
+  set: an unset `lightEffort` inherits `heavyEffort`, the resolved pair is
+  validated against the light model, and the review is refused. Verified against
+  the live model catalogue on 2026-09-07. Refusing beats silently lowering the
+  effort, but there is no way to express "this tier takes no effort" today.
+  A later increment should decide whether an unset effort should stay unset when
+  the resolved model supports none.
 - The minor-finding cap keeps the strongest three by declared severity then
   confidence. It does not spread minor findings across reviewers or files, and
   a light reviewer's minor finding can be displaced by a heavy one's.
@@ -3438,8 +3451,10 @@ Acceptance criteria:
   increment. Follow the `AGENTS.md` checkpoint and final-file handoff rules.
 - Land the increment on its own branch and pull request, and review that pull
   request with this plugin before asking for a merge, as `AGENTS.md` now
-  requires. Record the review outcome here. That single review is authorized by
-  the workflow; nothing else that spends credits is.
+  requires. That review is the increment's real integration test: dispatch it
+  with `node scripts/dogfood-review.mjs NUMBER --all --no-comment` if you cannot
+  type a slash command, and record its outcome here. That single review is
+  authorized by the workflow; nothing else that spends credits is.
 
 A live balanced review remains an open, separately authorizable step. It is the
 only way to learn whether the light overview reviewer and the minor-finding
