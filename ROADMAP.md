@@ -3832,6 +3832,105 @@ it afterwards.
   verified by the twelve controlled suites only. They were not reviewed by the
   plugin, because the increment's single authorized review is spent.
 
+## F5 checkpoint: the structured-output surface, without inference
+
+`F5` is a feasibility spike. It changes no shipped behaviour: `envelope` is
+untouched, no reviewer moved, no mode, configuration key, fallback, timeout,
+safeguard, reviewer shell tool or gate override was added, `L1` stays pending
+and no upstream source was copied.
+
+Probe: `scripts/smoke-factory.mjs`, which writes `scripts/f5-factory-extension.mjs`
+into throwaway workspaces the CLI discovers for one session each. Nothing is
+installed, and the shipped plugin is not modified or reinstalled to run it.
+Without `--spend` the probe starts no subagent and spends no inference. This
+section records that half; the inference half is below it.
+
+```sh
+COPILOT_CLI_PATH="$(command -v copilot)" \
+COPILOT_SDK_PATH="$(ls -d "$HOME"/.copilot/pkg/*/"$(copilot --version | sed -n 's/.*CLI \([0-9][0-9.]*[0-9]\).*/\1/p')"/copilot-sdk)" \
+node scripts/smoke-factory.mjs
+```
+
+### The surface is not reachable from this plugin on CLI 1.0.83
+
+Two demonstrated facts sit in front of `F5`'s four questions, and both were
+found by running the surface rather than by reading its declarations.
+
+**Agent Factories are behind a feature flag that is off for this account.** An
+ordinary session, including one created with `enableExperimentalMode: true`,
+answers every `session.factory.*` call with `Agent factories are not available
+for this session`. The runtime reads the flag from the CLI process's own
+environment: starting the CLI with `COPILOT_CLI_ENABLED_FEATURE_FLAGS=agent_factories`
+makes the same call succeed, and `enableExperimentalMode` turns out to be
+irrelevant either way. Passing `expAssignments` with the feature named does
+**not** open it and in fact closes it again when combined with the flag. The
+probe forces the flag on for its own child runtime so the remaining questions
+can be answered at all; that is a local configuration, not one a user of this
+plugin could reach.
+
+**A plugin cannot register a factory on a runtime it owns.** The shipped
+reviewers run on a runtime this plugin starts as an SDK client, whose
+environment the plugin does control, so the flag would not be a blocker there.
+It cannot be used: `client.resumeSessionForExtension(...)` with a factory handle
+is refused with `Only an extension connection can register factories`. Factories
+register only through `joinSession`, which attaches to the **user's foreground
+session**, whose CLI environment the plugin does not set.
+
+Together those mean the structured-output surface cannot be reached in
+production today by any path this plugin controls, whatever the four questions
+below answer.
+
+### Q1: tool confinement
+
+Half demonstrated, and the demonstrated half is negative.
+
+**An extension cannot register a session permission handler at all.** A
+`joinSession` option bisection ran four one-option extensions in one session:
+a control, one passing `factories`, one passing `customAgents`, and one passing
+`onPermissionRequest`. The first three reached their `joined` marker and the CLI
+reported them `running`. The fourth logged `start` and never logged `joined`:
+`joinSession` never settles, and the CLI reports the extension `failed`. The
+shipped reviewers confine reads with exactly such a handler
+(`readingReviewerPolicy` in `read-only.mjs`), so on this surface the confinement
+point would have to move to the session host, which for a plugin is the user's
+interactive CLI and its own approval flow, not code this project owns.
+
+**A custom agent does register with exactly the declared grant.** An extension
+passing `customAgents: [{ name: "f5-confined-reviewer", tools: ["view", "grep",
+"glob"], ... }]` loads, and `session.agent.list({ includeBuiltInAgents: true })`
+reports that agent with `tools` exactly `["view", "grep", "glob"]`. That is the
+declaration; whether the runtime enforces it on a factory-owned subagent, and
+whether an out-of-checkout read is actually refused, needs a real subagent and
+is recorded in the inference half.
+
+### Q4: code structure
+
+Fully demonstrated, and the premise in the earlier plan was wrong.
+
+The "emitted verbatim into a generated module, closes over nothing, cannot use
+static imports" constraint belongs to the `factories_manage` authoring path,
+where a model writes a factory into a session-scoped extension at runtime. An
+**extension-authored** factory is an ordinary closure: the SDK calls
+`definition.run(context)` directly in the extension process.
+
+The probe's factory body demonstrated all of it in a run that spawned no
+subagent and spent nothing, `consumed: { subagents: 0, nanoAiu: 0 }`:
+
+- It read a module-scope constant defined in the extension outside the body, and
+  saw a statically imported binding, so the body does close over its module.
+- It dynamically imported `modes.mjs`, `findings.mjs`, `read-only.mjs`,
+  `review.mjs` and `fixture.mjs` from the shipped extension, with no failures,
+  and called into them: `reviewMode("balanced")`, `describePolicy`,
+  `candidateFormat` (2861 characters), `reviewInstructions` (4674 characters)
+  and `readOnlyTools`.
+- It replayed the defect `F5` exists to settle, through the shipped parser and
+  with no inference: the plain envelope produced no diagnostic, and the same
+  envelope wrapped in a ```` ```json ```` fence produced
+  `probe: invalid candidate output: SyntaxError: Unexpected token '`'`.
+
+So orchestration code being reachable is not an obstacle. `F5`'s fourth question
+is answered yes.
+
 ## Exact next increment
 
 **`F5`: settle how reviewer output stops depending on a model family's
