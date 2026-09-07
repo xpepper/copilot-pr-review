@@ -26,23 +26,22 @@ before you start.
 
 ## Recorded state
 
-- `main` is at `db8bd69`, the squash merge of pull request #3, which delivered
-  the balanced half of M1 and this working agreement. Its branch is deleted; the
-  individual commits from that branch are not ancestors of `main`, so read
-  `git log` and the pull request rather than looking for those hashes.
+- `main` is the squash merge of pull request #4, which is documentation only. It
+  recorded that an increment's pull-request review is its real integration test,
+  documented how to run that review, added increment `C4`, and fixed the three
+  findings its own review returned. Pull request #3, squash-merged as `db8bd69`,
+  delivered the balanced half of M1 before it.
+- Both branches are deleted, and their individual commits are not ancestors of
+  `main`, so read `git log` and the pull requests rather than looking for hashes
+  from those branches. Nothing is uncommitted and no pull request is open.
 - Pull requests #1 and #2 are synthetic publication playgrounds from P4 and P5.
   **Never merge them**, and never republish to them.
-- Check whether an open pull request already carries unmerged documentation from
-  the previous session before starting new work. Pull request #4 is that
-  documentation, still open and unmerged. Its review comments were addressed on
-  the same branch: the integration-test commands now derive the SDK path from
-  `copilot --version` instead of pinning a version, and the effort-less tier
-  model question is tracked as increment `C4` rather than sitting in prose.
-- Pull request #4 was itself reviewed with the plugin at head `ae2c55c`, on the
-  user's explicit authorization. Read "Documentation checkpoint: pull request #4
-  and its review" in `ROADMAP.md` before running your own. Three validated
-  findings, all fixed; 79.82605 credits; coverage incomplete. That review is
-  spent. **Yours needs its own authorization, and this one does not carry over.**
+- Pull request #4 was reviewed with the plugin at head `ae2c55c`, on the user's
+  explicit authorization. Read "Documentation checkpoint: pull request #4 and
+  its review" in `ROADMAP.md` before running your own. Balanced mode, five
+  reviewers, incomplete coverage, three validated findings all since fixed, and
+  79.82605 credits. That review is spent. **Yours needs its own authorization,
+  and this one does not carry over.**
 - Two things it taught us. The light tier ran a light model for the first time
   and found something no heavy reviewer did, so a distinct light model earns its
   place. And the evidence gate discards true findings whose citations are
@@ -154,8 +153,8 @@ tool; never weaken a gate to make the run pass.
 - Controlled suites (no inference/network): `node scripts/smoke-<name>.mjs` for
   `findings`, `review`, `selection`, `retention`, `preview`, `publication`,
   `publish-later`, `checkout`, `config`, `context`, `fixture`, `target`. All
-  twelve passed on this branch at `55be5af`, as did `git diff --check`. Only
-  documentation has changed on this branch throughout.
+  twelve passed on pull request #4 before it merged, as did `git diff --check`.
+  Re-run them before you start: they need no network and no inference.
 - Installed probes require both `COPILOT_CLI_PATH` and `COPILOT_SDK_PATH`, set
   the same derived way as the integration test above rather than pinned to a
   version.
