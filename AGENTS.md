@@ -63,9 +63,13 @@ the real revision gate against a real checkout, real confined read tools, and a
 real charge. Nothing else in this repository demonstrates that the thing we ship
 actually works.
 
-- Treat it as the increment's verification of record. An increment is not
+- Treat it as the increment's verification of record. An increment that changes
+  behaviour, meaning anything under `extensions/` or `scripts/`, is not
   demonstrated until the installed plugin has reviewed its own pull request at
   least once, and the roadmap entry says so with evidence.
+- A documentation-only pull request still needs the pull request, but its review
+  is the user's call rather than a requirement, because reviewing costs real
+  credits. Ask; do not spend by default.
 - Record what only a real run can tell you: which model and effort each reviewer
   actually used, reviewer coverage, tool calls and denials, findings, withheld
   findings, coverage gaps, and the credit cost the runtime reported.
