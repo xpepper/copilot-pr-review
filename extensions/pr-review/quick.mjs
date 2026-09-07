@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { reviewAssignments, validateModelAssignment } from "./fixture.mjs";
 import { finishSelection } from "./selection.mjs";
+import { finishPreview, postingAuthority } from "./preview.mjs";
 import { executeOwnedRun } from "./fixture-run.mjs";
 import { executeTargetCapture, parseTargetArgs, runGh } from "./target.mjs";
 import {
@@ -22,7 +23,7 @@ export function parseQuickArgs(args) {
   for (const token of tokens) {
     if (seen.has(token)) throw new Error(`Duplicate quick argument: ${token}`);
     seen.add(token);
-    if (["--quick", "--major-only", "--no-comment", "--all"].includes(token)) continue;
+    if (["--quick", "--major-only", "--comment", "--no-comment", "--all"].includes(token)) continue;
     if (token.includes("=")) {
       const [key, value, extra] = token.split("=");
       if (!["heavyModel", "heavyEffort"].includes(key) || !value || extra !== undefined || key in settings) {
@@ -33,12 +34,13 @@ export function parseQuickArgs(args) {
       targetFlags.push(token);
     }
   }
-  if (Number(seen.has("--quick")) + Number(seen.has("--major-only")) !== 1 || !seen.has("--no-comment")) {
-    throw new Error("Quick review requires exactly one of --quick or --major-only, together with --no-comment.");
+  if (Number(seen.has("--quick")) + Number(seen.has("--major-only")) !== 1) {
+    throw new Error("Quick review requires exactly one of --quick or --major-only.");
   }
+  const { policy } = postingAuthority({ comment: seen.has("--comment"), noComment: seen.has("--no-comment") });
   const captureArgs = [number, ...targetFlags].join(" ");
   parseTargetArgs(captureArgs);
-  return { captureArgs, settings, all: seen.has("--all") };
+  return { captureArgs, settings, all: seen.has("--all"), comment: policy.comment, noComment: policy.noComment };
 }
 
 export async function quickAssignments(parent, settings) {
@@ -110,10 +112,11 @@ export async function executeQuickRun(parent, client, options, assignments, {
   let execution;
   let validation;
   let adjudicator;
+  let boundary;
   const outcome = await executeOwnedRun(parent, client, {
     controller, onStopped, subject: "Quick review", evidencePrefix: "Q3",
     details: () => ({
-      mode: "quick", noComment: true, invocation, binding, validation, adjudicator,
+      mode: "quick", noComment: options.noComment, invocation, binding, validation, adjudicator,
       executionComplete: execution?.complete ?? false,
       reviewers: assignments.map((assignment) => ({
         ...assignment, status: "incomplete", error: "Review did not reach specialist execution.",
@@ -146,7 +149,7 @@ export async function executeQuickRun(parent, client, options, assignments, {
       execution = {
         ...report, reviewers: report.reviewers.map((reviewer) => ({ ...reviewer, binding })),
       };
-      const boundary = evidenceBoundary(target.snapshot, target.context, binding);
+      boundary = evidenceBoundary(target.snapshot, target.context, binding);
       const collected = collectCandidates(report.reviewers, boundary);
       for (const file of target.context.files) {
         if (file.reason) collected.issues.push(`${file.path ?? "(unknown path)"}: ${file.reason}; not reviewed.`);
@@ -181,5 +184,6 @@ export async function executeQuickRun(parent, client, options, assignments, {
     },
   });
   if (outcome.validation) await parent.log(formatFindings(outcome), { level: outcome.complete ? "info" : "error" });
-  return finishSelection(parent, outcome, options, controller);
+  const selected = await finishSelection(parent, outcome, options, controller);
+  return finishPreview(parent, selected, options, controller, boundary);
 }

@@ -24,7 +24,7 @@ in [AGENTS.md](AGENTS.md); the replaceable next-session prompt lives in
 | Q4 | Completed | Strict evidence/whole-claim gates, isolated adjudication, deduplication and degraded findings; positive controlled and real-PR installed-plugin inference demonstrated below. | Q3; [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | P1 | Completed | Invocation-bound validated finding selection via native elicitation or `--all`; subset/none/cancellation, invalid-answer rejection and no-UI behavior demonstrated below. No writes/cache. | Q4; [Selection/publication](SCOPE.md#selection-publication-and-cached-results) |
 | P2 | Completed | Retain the latest settled quick result in its originating local session; inspect without inference/GitHub access. Reload and conversation-backed cold resume demonstrated; command-only resume caveat below. | P1; [Cached results](SCOPE.md#selection-publication-and-cached-results) |
-| P3 | Pending | Resolve posting authority and conflicting flags; display a code-built inline review payload without submitting it. | P1; [Publication controls](SCOPE.md#selection-publication-and-cached-results) |
+| P3 | Completed | Independent posting authority, explicit confirmation and code-built COMMENT payload preview; native cancellation/reload/resume and no-submission evidence below. | P1; [Publication controls](SCOPE.md#selection-publication-and-cached-results) |
 | P4 | Pending | Submit only COMMENT reviews with valid anchors and lifecycle/head gates; surface uncertain write outcomes without blind retry. | P3; [Publication gates](SCOPE.md#selection-publication-and-cached-results) |
 | P5 | Pending | Publish retained selected findings without rerunning reviewers; reject changed heads and prevent publication after cancellation. | P2, P4; [Cached publication](SCOPE.md#selection-publication-and-cached-results) |
 | C1 | Pending | Inspect/update personal tier configuration via text commands; validate capabilities, inheritance, and flag precedence; show effective assignments. | F3; [Configuration](SCOPE.md#models-configuration-and-execution) |
@@ -1397,37 +1397,215 @@ mid-write crash test. Existing permission/cancellation/Q4 limitations remain.
 No posting authority, payload, publication, publish-later execution, saved
 configuration, other modes, fallbacks or safeguards were added. L1 remains pending.
 
+## Completed increment: P3
+
+Implemented after P2 checkpoint `083684a` and handoff `cf2db2f`. No upstream
+source was copied; L1 remains pending. No GitHub mutation, push or merge was
+performed. P3 authorizes proposals, not actual submission.
+
+### Implementation boundary
+
+`preview.mjs` owns independent posting policy, request construction, explicit
+confirmation and strict retained-preview validation. `quick.mjs` accepts exactly
+one quick-mode flag with optional `--comment` or `--no-comment`, rejecting their
+conflict before capture. It preserves the captured evidence boundary through
+selection, then calls preview only after inference cleanup. A bare number remains
+capture-only. `--all` selects, never authorizes. `--comment` authorizes without
+skipping selection; `--no-comment` suppresses authority without a final form.
+Without either flag the boolean effective `autoPostReviews` calculation defaults
+false; its injectable calculation is ready for C1/C2, but no configuration or new
+setting syntax was implemented.
+
+Selected proposals are displayed before final confirmation. The form defaults
+false and accepts only a literal boolean; missing UI, refusal, malformed answers,
+empty selection and cancellation are explicit non-authorized states. Incomplete
+coverage is independent of authority: useful validated findings can survive.
+The exact invocation/session/repository/PR/head/review binding and proposal input
+are guarded across payload display and confirmation waits. No timeout exists.
+
+The code-owned request envelope carries the selection binding and a REST-shaped
+payload: captured `commit_id`, literal `event: "COMMENT"`, concise coverage body
+and canonical-only inline comments. It rechecks quotations/source provenance,
+changed-line inclusion and a single captured hunk before creating RIGHT/LEFT
+anchors. Multiline comments use `start_line`/`start_side`; base citations for
+renamed files use the current diff path, deleted files retain the old path.
+Comments preserve severity, causal explanation, confidence and reviewer
+attribution. All current findings require inline anchors; there is no eligible
+non-inline finding category yet. Invalid anchors fail instead of becoming
+body-only fallback comments.
+
+`retention.mjs` now accepts strict version-2 records containing posting policy,
+status, authority and the exact unsubmitted request. It reconstructs the expected
+payload from canonical findings on inspection, detecting incompatible or altered
+payload/authority fields. That reconstruction is not a source/current-head check.
+Legacy version-1 P2 records remain inspectable only with their original
+`noComment: true` boundary and no invented authority/preview. Unknown versions
+and incompatible records fail explicitly. Inspect labels retained authority
+historical, never permission for a future invocation.
+
+Cancellation through final confirmation and the last retention log clears
+selected IDs, revokes authority and removes the actionable request. Findings and
+coverage evidence survive. The existing synchronous final cancellation
+check/write and same-microtask `activeRun` clearing remain intact. No publication
+API, hidden reviewer rerun, lifecycle refresh or safeguards were added.
+
+### Controlled evidence
+
+`scripts/smoke-preview.mjs` covers all posting-flag/effective-setting combinations,
+invalid booleans/conflicting flags, confirmation acceptance/refusal/false/invalid
+content/transport failure, missing UI, empty/skipped/unavailable selections and
+degraded coverage. Exact payload assertions cover single and multiline ranges,
+RIGHT/LEFT, and controlled rename/deletion path mapping. Corrupt citations,
+unbound/stale IDs, raw/rejected/duplicate aliases, changed target identities and
+invalid anchors fail closed; there is no body-only fallback.
+
+Pending confirmation cancellation, inert late acceptance/rejection, cancellation
+during payload/status logs and mutated proposal/session bindings are exercised.
+Version-2 schema probes reject altered COMMENT event, head, location, text,
+summary, selection and authority even when the record digest is recomputed.
+Legacy records acquire neither preview nor posting authority.
+
+`scripts/smoke-quick.mjs` now drives all/interactive selection with each posting
+choice through controlled specialist/adjudicator execution, checking exactly four
+sessions and owned-runtime cleanup before any UI. Its retained-run integration
+cancels an already authorized proposal during the final retention log and proves
+the atomically stored record has no selected IDs, authority or request while
+keeping the validated finding. Existing retention, selection, findings and
+fixture probes passed. Controlled positive adjudication is plumbing evidence,
+not a semantic inference claim.
+
+### Installed-plugin evidence
+
+CLI 1.0.83, bundled SDK, Node.js 26.1.0, macOS arm64; explicit
+`gpt-5.6-terra` / `high` was used, not a product default or fallback.
+`scripts/smoke-preview-runtime.mjs` exercised actual specialists and validation
+against child-only controlled `gh` target input, through the installed extension
+and native SDK-host forms. Each case is an explicit new review, not a preview
+action rerunning inference. All cases required positive validated findings.
+
+Session `0c15e99d-3e02-45b2-8aca-1b2a4ca65733`:
+
+- `--all --comment`: one canonical `total.js:3 RIGHT` P2 comment, completed
+  coverage, `flag-authorized`, `submitted: false`. Owned PID `92606` exited;
+  retained digest `edfd51e31f15e010ea46f4fd015f65f2d5d099a133542e247bafd2ba54787283`.
+- Pending final confirmation cancelled through `/pr-review cancel`: PID `93501`
+  had already exited before UI; retained selection empty, authority false,
+  request absent, coverage incomplete. Late acceptance was inert. Digest
+  `9d4fbba4c2d67988f58494296d4678fc11d805ea5c32c8dcff4337a6d6591f1f`.
+- Final confirmation accepted: one canonical P2 comment, completed coverage,
+  `confirmed`, still unsubmitted; PID `94303` exited. Digest
+  `1ba86e9186d97479b1ceeaa80e942bb0f58338c80c808c4a8451b55ddf7dcc94`.
+  Reload and cold resume in a fresh runtime preserved this exact version-2
+  record. One harness-only parent turn initialized resumable history.
+
+Session `5c48345a-be18-476f-99c0-cb4262198d87`:
+
+- `--comment` without `--all` still opened selection for target 13's two defects;
+  selecting one produced exactly one canonical comment. PID `96955` exited
+  before selection; `flag-authorized`, completed coverage, unsubmitted. Digest
+  `abeb9b95be26d5f989f1837aa397f1ef82e58fb04da4bde085525d56ea9aa5f9`.
+- A final boolean false retained the displayed proposal but no authority:
+  `declined`, `submitted: false`, PID `97872` exited, digest
+  `9b599cffe6c279c99b61b7ec28c82bcaac3aaed655955529b18c99fe1623d9a7`.
+
+UI-less session `20f02b81-c073-4c8f-96f2-d84b89157bbb` selected all but could not
+confirm: `unavailable`, authority false, unsubmitted. Its valid finding survived
+incomplete coverage because contracts reported missing caller/integration
+context; the payload explicitly said INCOMPLETE. PID `99103` exited; digest
+`f3995fd31966dead8f2aa9231330ea0a89f594ba1fc3ded5358c8624d683105e`.
+
+Every case checked one owned inference runtime, three specialists plus one
+validator with no hidden rerun, duplicate invocation/inspection refusal during
+forms where applicable, and exact retained payload after reload. Inspection
+made no model turns or `gh` requests. Controlled target assertions accepted only
+read-only `gh` requests and verified the deliberately unrelated dirty checkout
+was unchanged. Native command/target probes also passed after updating conflicting
+flag expectations. Legacy P2 reload/inspection/session-isolation probes passed;
+command-only cold resume remains unsupported, as previously recorded.
+
+### APIs, reproduction and remaining limits
+
+Consulted installed SDK `docs/extensions.md`, `docs/agent-author.md`,
+`types.d.ts` (`ElicitationSchema`, `ElicitationResult`, `ElicitationParams`,
+`ElicitationHandler`), current official
+[plugin creation documentation](https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/plugins-creating)
+and [REST review request documentation](https://docs.github.com/en/rest/pulls/reviews#create-a-review-for-a-pull-request).
+Native behavior, not declarations, establishes form and lifecycle support.
+
+```sh
+node scripts/smoke-preview.mjs
+node scripts/smoke-quick.mjs
+node scripts/smoke-retention.mjs
+node scripts/smoke-selection.mjs
+node scripts/smoke-findings.mjs
+node scripts/smoke-fixture.mjs
+copilot plugin install "$(pwd)"
+COPILOT_CLI_PATH="$(command -v copilot)" \
+COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
+PR_REVIEW_HEAVY_MODEL=gpt-5.6-terra PR_REVIEW_HEAVY_EFFORT=high \
+node scripts/smoke-preview-runtime.mjs --cases=comment,cancel-pending,confirmed --parent-turn
+```
+
+Using the same explicit environment, run the native probe with
+`--cases=subset-comment,declined`, or separately `--cases=unavailable` without
+`--parent-turn`. `scripts/smoke-runtime.mjs --targets` and
+`scripts/smoke-retention-runtime.mjs` use only the CLI/SDK environment and no
+inference settings. Native inference spends credits; no positive result is
+silently retried. The controlled `gh` executable must not enter ordinary PATH.
+Reinstall after extension edits and use a fresh runtime. Direct local plugin
+installation works but this CLI now warns that direct installs are deprecated
+in favor of future marketplace-only installs; packaging migration was not P3.
+
+No GitHub review endpoint was invoked. Remote acceptance of inline paths/ranges,
+current lifecycle/head checks, handling of a write in flight and uncertain
+outcomes are **not demonstrated by a preview**. P4 must supply those gates.
+The current non-inline category is empty; do not invent findings or downgrade
+bad anchors to manufacture body comments. Retained authority remains historical.
+Native human terminal clicks, forked/remote/other-platform sessions, mid-write
+crashes and the full F3 process-loss/SIGSTOP suite were not rerun in P3. P2's
+storage/no-lock/no-power-loss and Q4's semantic/context-window limitations remain.
+No publish-later execution, configuration, additional mode, fallback or safeguard
+was added.
+
 ## Exact next increment
 
-**P3 only:** Resolve posting authority and conflicting flags, then display a
-code-built inline review payload without submitting it.
+**P4 only:** Submit the current run's authorized canonical selection as a
+code-controlled COMMENT review, with lifecycle/head/anchor gates and explicit
+uncertain-write handling. Do not implement retained publish-later (P5).
 
 Acceptance criteria:
 
-- Apply `SCOPE.md`'s independent selection and authority controls: `--all` selects
-  only validated findings; `--comment` bypasses final confirmation, not selection;
-  `--no-comment` suppresses posting; both posting flags conflict. With neither
-  flag, use effective `autoPostReviews` (default false). Do not add saved
-  configuration in P3; design the authority calculation to consume that effective
-  setting when C1/C2 eventually provide it.
-- Without automatic authority, require explicit final confirmation before
-  treating a proposed payload as authorized. Missing UI, decline, cancellation,
-  zero selected findings, and incomplete coverage must remain explicit. No flag
-  authorizes safeguard execution or a non-COMMENT review event.
-- Build and display a preview in code from canonical selected findings with the
-  originating repository/PR/head binding and validated diff anchors. Preserve
-  concise summary behavior for applicable non-inline findings; never turn raw,
-  rejected or duplicate candidates into comments. The preview must be visibly
-  non-submitting, even with `--all --comment`.
-- Keep cancellation and head/binding safeguards fail-closed; preserve P1/P2
-  selection, retention, reload and no-timeout behavior. Extend assertion probes
-  for authority combinations, unsupported UI, invalid selections/bindings, and
-  exact payload shape. Demonstrate the code-owned preview through the installed
-  plugin without any GitHub mutation or rerun hidden in a preview action.
-- Consult installed SDK/current official docs before choosing new runtime APIs.
-  Record new evidence/limits and the next small increment in this roadmap.
+- Preserve independent selection and posting authority. Only a nonempty,
+  explicitly selected, authorized, non-cancelled current invocation may reach
+  a write. `--no-comment`, refusal, unavailable UI and cancelled/failed proposal
+  states must not submit. Incomplete coverage must remain visible, not silently
+  become a clean review or an approval.
+- Bind the mutation to the originating repository identity/host, PR and reviewed
+  head, never a later cwd. Recheck head and lifecycle before writing; reject
+  changed heads and invalid anchors. Draft review overrides do not implicitly
+  bypass publication gates. Consult upstream behavior and `SCOPE.md` for exact
+  lifecycle controls; do not infer publishing permission from review capture.
+- Send only the code-built COMMENT payload, not model-created mutation commands
+  or arbitrary JSON. Preserve valid inline anchors and applicable concise-summary
+  behavior, never stale/body-only fallback, APPROVE or REQUEST_CHANGES.
+- Record publication state sufficiently to distinguish no attempt, confirmed
+  success, definite failure and uncertain write outcomes. Do not blindly retry
+  after transport loss or cancellation once a write may have reached GitHub.
+  Cancellation must stop owned work/prevent subsequent writes without falsely
+  claiming an in-flight remote mutation was undone.
+- Keep session-bound retention and schema compatibility explicit; old preview
+  authority is not a future-run capability. Preserve selection, coverage,
+  no-timeout execution and the final cancellation/storage boundary. Do not
+  introduce cached publish-later or a cross-session archive.
+- Demonstrate payload/mutation gates and failure handling through controlled
+  probes and the installed plugin. Use the permitted `xpepper/copilot-pr-review`
+  playground for a suitable live publication exercise if possible without
+  violating no-push/no-merge instructions; report any missing live evidence
+  honestly rather than claiming remote acceptance from request shape alone.
+- Consult installed SDK/current official documentation before new runtime APIs.
+  Update this roadmap with evidence, reproduction, limitations and the next
+  increment, then follow the local checkpoint/final-file handoff rules.
 
-Do not submit GitHub reviews (P4), implement retained publish-later execution
-(P5), or add configuration, modes, fallbacks or safeguards. Respect `SCOPE.md`;
-keep L1 pending and copy no upstream source. Follow the checkpoint-commit and
-final-file handoff workflow in `AGENTS.md`; do not push.
+Do not implement P5, configuration, other modes, fallbacks or safeguards. Keep
+L1 pending, copy no upstream source, do not mutate reviewed source/switch branches
+as part of review, and do not push or merge synthetic PRs into main.

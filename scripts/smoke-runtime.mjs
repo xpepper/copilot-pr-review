@@ -124,9 +124,8 @@ try {
     ["fixture model1=a effort1=low model2=b effort2=high extra=x", /Invalid/],
     ["fixture model1=missing-f2-model effort1=low model2=b effort2=high", /Unavailable/],
     [`fixture model1=${available.id} effort1=invalid-effort model2=b effort2=high`, /Unsupported reasoning/],
-    ["123 --quick", /requires/],
     ["123 --quick --major-only --no-comment", /requires/],
-    ["123 --quick --no-comment --comment", /Unsupported arguments/],
+    ["123 --quick --no-comment --comment", /Conflicting posting flags/],
     ["123 --quick --no-comment heavyModel=missing-q3-model", /Unavailable/],
     [`123 --quick --no-comment heavyModel=${available.id} heavyEffort=invalid-effort`, /Unsupported reasoning/],
   ]) {

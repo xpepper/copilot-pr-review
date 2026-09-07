@@ -1,8 +1,9 @@
 # Copilot PR Review
 
 An original Copilot CLI plugin prototype. **Quick reviews now include grounded
-candidate validation, deduplication, finding selection, and session-bound retention.
-Publication is not implemented.**
+candidate validation, deduplication, finding selection, posting-authority controls,
+COMMENT payload previews, and session-bound retention. Publication is not
+implemented.**
 [SCOPE.md](SCOPE.md) is the authoritative product specification;
 [ROADMAP.md](ROADMAP.md) records delivery status and runtime evidence.
 
@@ -126,10 +127,11 @@ silently lowered when changing models. An unset ambient effort uses the owned
 runtime's resolved default. Effective settings are displayed before prompts
 and checked against actual usage. The parent model is unchanged.
 
-Use exactly one of `--quick` and `--major-only`, together with `--no-comment`.
-The existing draft/closed overrides still apply. `--comment`, other review modes,
-and `--verify` remain unsupported. No personal/project configuration or
-fallback is saved or applied by Q3.
+Use exactly one of `--quick` and `--major-only`. The existing draft/closed
+overrides still apply. P3 accepts `--comment`, `--no-comment`, or neither;
+the posting flags conflict. All runs are still preview-only, as described below.
+Other review modes and `--verify` remain unsupported. No personal/project
+configuration or fallback is saved or applied.
 
 Dispatch returns after acceptance so cancellation remains available during capture
 or reviewer execution. Capture/skip/error messages, assignments, progress, and
@@ -232,8 +234,8 @@ An empty result skips the form and is never a clean-review claim.
 
 `--all` selects every final validated finding without a form. It never selects
 raw/rejected candidates or duplicate aliases and **does not authorize posting**.
-`--no-comment` remains required. An unsupported host reports selection
-`unavailable` explicitly and selects nothing; rerunning with `--all` is an
+An unsupported host reports selection `unavailable` explicitly and selects
+nothing, even with `--comment`; rerunning with `--all` is an
 explicit new review, not a hidden select-all fallback or cached-result action.
 
 Answers are bound to a unique invocation, the originating session, repository,
@@ -249,7 +251,7 @@ IDs with their binding; `Q3 evidence:` remains the post-inference/cleanup review
 record. `reviewComplete` preserves that earlier coverage state, while cancellation
 marks the final run incomplete and clears selected IDs. Selection failure and
 coverage are separate: `complete` describes review coverage, not selection or
-posting success. P2 retention follows selection, as described below.
+posting success. P3 preview/confirmation and P2 retention follow selection.
 
 The installed CLI's native elicitation transport is exercised with a scripted
 SDK host in `scripts/runtime-selection.mjs`, not a mock extension API. This is
@@ -299,8 +301,9 @@ The digest is a corruption check, **not authentication against someone who can
 rewrite the session files**; local session storage is not an OS sandbox.
 
 An accepted new quick run supersedes the previous result with a non-actionable
-pending marker before capture. Once inference cleanup and selection settle, a
-synchronous, flushed-file/atomic-rename write records the final state without an
+pending marker before capture. Once inference cleanup, selection and
+preview/confirmation settle, a synchronous, flushed-file/atomic-rename write
+records the final state without an
 intervening await. Cancellation clears selected IDs and marks the result
 incomplete. A process interrupted before settlement leaves an unfinished marker,
 not the previous review's selection. Empty, skipped, failed, unavailable-UI, and
@@ -352,6 +355,87 @@ review; inspection/reload/resume never rerun reviewers. It uses controlled targe
 retained results; use `--selection-cases=subset,none,cancel-pending` to cover
 subset selection, no selection, and cancellation with an inert late UI answer.
 No publication or publish-later execution exists yet.
+
+### Posting authority and payload preview (P3)
+
+**This version never submits a GitHub review**, including with `--all --comment`.
+After selection it displays a code-built, repository/PR/head-bound COMMENT
+payload and records the posting-authority decision separately from selection.
+
+```text
+/pr-review 123 --quick --all --comment
+/pr-review 123 --quick --comment
+/pr-review 123 --quick --all
+/pr-review 123 --quick --all --no-comment
+```
+
+The first example selects all validated findings and authorizes the proposal
+without either form. The second still requires finding selection. The third
+requires explicit final confirmation of the displayed proposal; the form
+defaults to false. The fourth displays the payload but suppresses authority and
+does not ask for final confirmation. `--comment --no-comment` is rejected before
+capture or inference.
+
+Without a posting flag, the authority calculation consumes effective
+`autoPostReviews`, default false. The calculation is ready for future
+configuration, but there is **no saved setting or invocation syntax for
+`autoPostReviews` yet**. No posting flag or authority decision approves project
+safeguards. Missing UI, refusal, malformed answers, cancellation and empty
+selection never authorize a proposal. Incomplete coverage remains explicit;
+surviving validated findings may still be selected and authorized.
+
+Code constructs `commit_id`, literal `event: "COMMENT"`, a concise coverage
+summary, and inline comments from canonical selected findings only. The comment
+preserves severity, trigger, expected/actual behavior, introduction, confidence
+and reviewer attribution. Source quotations, provenance and captured changed
+hunks are checked again before preview. Head/base anchors use RIGHT/LEFT;
+multi-line ranges include `start_line` and `start_side`. Renamed-file base
+citations map to the current diff path; deleted files keep the old path.
+Every current finding requires an inline location, so there are no qualifying
+non-inline findings to summarize separately. Invalid anchors are refused, never
+silently converted into body-only comments.
+
+No GitHub refresh or mutation occurs during preview/confirmation. This is
+**captured-head evidence, not a current-head or publication-lifecycle check**.
+Actual submission, remote anchor acceptance, draft/lifecycle gates and uncertain
+write outcomes belong to P4. There is no separate preview/publish-later command;
+`/pr-review inspect` displays the stored proposal without rerunning anything.
+
+New records use schema version 2 and retain the policy, authority status and
+exact unsubmitted proposal. Inspection reconstructs the expected request to
+reject changed payloads, anchors or authority combinations. It does not reload
+source or prove the head still matches. Valid P2 version-1 records remain
+inspectable without inventing a preview or posting authority; unknown schemas
+fail explicitly. **Retained authority is historical, not permission for a later
+run.**
+
+Cancellation remains available through final confirmation and storage, with no
+timeout. It clears selection IDs, revokes authority and removes the actionable
+payload while preserving validated findings and incomplete coverage. A late UI
+answer cannot resume the run. Another review or inspection is refused until the
+run settles. Owned inference has already stopped before either form is shown.
+
+Reproduce controlled and native probes:
+
+```sh
+node scripts/smoke-preview.mjs
+node scripts/smoke-quick.mjs
+copilot plugin install "$(pwd)"
+COPILOT_CLI_PATH="$(command -v copilot)" \
+COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
+PR_REVIEW_HEAVY_MODEL=gpt-5.6-terra PR_REVIEW_HEAVY_EFFORT=high \
+node scripts/smoke-preview-runtime.mjs --cases=comment,cancel-pending,confirmed --parent-turn
+```
+
+The native harness uses actual inference with child-only controlled `gh` input;
+it makes no GitHub mutation. Every case is an explicit new review and requires a
+positive validated result, without automatic retries. Optional cases
+`subset-comment,declined` exercise selection under posting authority and final
+refusal. Run `--cases=unavailable` alone without `--parent-turn` for a UI-less
+host. The optional parent turn only initializes resumable conversation history
+for the harness; it is not plugin behavior. Reload and conversation-backed cold
+resume preserve the exact version-2 record. These are native SDK-host
+interactions, not a claim about human terminal clicks or other clients.
 
 ### Two-reviewer fixture experiment (F2)
 

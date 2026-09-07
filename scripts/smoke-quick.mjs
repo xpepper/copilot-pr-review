@@ -1,4 +1,8 @@
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   executeQuickRun, parseQuickArgs, quickAssignments, quickBinding, quickInstructions, quickPrompt,
 } from "../extensions/pr-review/quick.mjs";
@@ -6,7 +10,8 @@ import { captureTarget, parseTargetArgs } from "../extensions/pr-review/target.m
 import { assembleContext } from "../extensions/pr-review/context.mjs";
 import { respond } from "./target-fixture.mjs";
 import { reviewKey, validationInstructions } from "../extensions/pr-review/findings.mjs";
-import { retainedRecord, validateRecord } from "../extensions/pr-review/retention.mjs";
+import { retainedRecord, sessionStore, validateRecord } from "../extensions/pr-review/retention.mjs";
+import { executeRetainedQuick } from "../extensions/pr-review/retained-run.mjs";
 
 const catalog = [
   { id: "heavy", capabilities: { supports: { reasoning_effort: ["low", "high"] } } },
@@ -22,17 +27,20 @@ const parentModels = { rpc: { model: {
 const options = parseQuickArgs("1 --quick --no-comment");
 assert.deepEqual(parseQuickArgs("  1 --major-only --no-comment  "), options);
 assert.deepEqual(parseQuickArgs("2 --quick --no-comment --include-drafts heavyModel=other heavyEffort=low"),
-  { captureArgs: "2 --include-drafts", settings: { heavyModel: "other", heavyEffort: "low" }, all: false });
+  { captureArgs: "2 --include-drafts", settings: { heavyModel: "other", heavyEffort: "low" },
+    all: false, comment: false, noComment: true });
 assert.deepEqual(parseQuickArgs("1 --major-only --all --no-comment"), { ...options, all: true });
+assert.deepEqual(parseQuickArgs("1 --quick"), { ...options, noComment: false });
+assert.deepEqual(parseQuickArgs("1 --quick --all --comment"), { ...options, all: true, comment: true, noComment: false });
 for (const args of [
-  "1 --quick", "1 --no-comment", "1 --quick --major-only --no-comment",
+  "1 --no-comment", "1 --quick --major-only --no-comment",
   "1 --quick --quick --no-comment", "1 --quick --no-comment --no-comment",
   "1 --quick --no-comment --comment", "1 --quick --no-comment --balanced",
   "1 --quick --no-comment --verify", "1 --quick --no-comment --all --all",
   "1 --quick --no-comment heavyModel=", "1 --quick --no-comment heavyEffort=low=high",
   "1 --quick --no-comment heavyModel=heavy heavyModel=other",
   "1 --quick --no-comment lightModel=other", "0 --quick --no-comment",
-]) assert.throws(() => parseQuickArgs(args), /requires|Duplicate|Invalid|Unsupported|integer/);
+]) assert.throws(() => parseQuickArgs(args), /requires|Duplicate|Invalid|Unsupported|integer|Conflicting/);
 const assignments = await quickAssignments(parentModels, {});
 assert.deepEqual(assignments.map(({ label }) => label), ["correctness", "contracts", "security-performance-resources"]);
 assert(assignments.every(({ model, reasoningEffort }) => model === "heavy" && reasoningEffort === "high"));
@@ -335,7 +343,7 @@ for (const failure of [undefined, "validator-setup", "validator-malformed", "val
 assert.equal(reviewKey(quickBinding(snapshot, context)), reviewKey(structuredClone(quickBinding(snapshot, context))));
 console.log("PASS isolated adjudication, unsupported-claim rejection, validation failure/cancellation, retained execution and cleanup");
 
-for (const all of [true, false]) {
+for (const [flags, all] of ["--no-comment", "--comment", ""].flatMap((flag) => [[flag, true], [flag, false]])) {
   const h = harness({ withCandidate: true, acceptCandidate: true });
   let runtimeStopped = false;
   h.parent.capabilities = { ui: { elicitation: true } };
@@ -344,10 +352,11 @@ for (const all of [true, false]) {
       assert.equal(runtimeStopped, true);
       assert.equal(h.client.stops, 1, "Stop inference before waiting for selection");
       assert(h.sessions.every((session) => session.listenerCount === 0));
+      if (request.requestedSchema.properties.authorize) return { action: "accept", content: { authorize: true } };
       return { action: "accept", content: { findingIds: [request.requestedSchema.properties.findingIds.items.anyOf[0].const] } };
     },
   };
-  const report = await executeQuickRun(h.parent, h.client, { ...options, all }, structuredClone(assignments), {
+  const report = await executeQuickRun(h.parent, h.client, { ...parseQuickArgs(`1 --quick ${flags}`), all }, structuredClone(assignments), {
     controller: h.controller, gh: fakeGh(), onStopped() { runtimeStopped = true; },
   });
   assert.equal(report.selection.status, "selected");
@@ -358,7 +367,40 @@ for (const all of [true, false]) {
   assert.equal(h.client.stops, 1);
   assert.equal(report.selection.binding.sessionId, h.parent.sessionId);
   assert.equal(report.selection.binding.reviewKey, reviewKey(report.binding));
+  assert.equal(report.preview.status, flags === "--no-comment" ? "suppressed" : flags === "--comment" ? "flag-authorized" : "confirmed");
+  assert.equal(report.preview.submitted, false);
+  assert.equal(report.preview.request.payload.event, "COMMENT");
+  validateRecord(retainedRecord(report), h.parent.sessionId);
   assert(h.messages.findIndex((m) => m.startsWith("P1 evidence:")) >
     h.messages.findIndex((m) => m.startsWith("Q3 evidence:")));
 }
-console.log("PASS quick selection consumes final findings after runtime cleanup, without rerunning inference");
+console.log("PASS quick selection/authority/preview consume final findings after cleanup, without rerunning inference");
+
+const directory = mkdtempSync(join(tmpdir(), "pr-review-preview-"));
+try {
+  const h = harness({ withCandidate: true, acceptCandidate: true });
+  h.parent.sessionId = randomUUID();
+  const workspacePath = join(directory, h.parent.sessionId);
+  mkdirSync(workspacePath);
+  h.parent.rpc.metadata.snapshot = async () => ({
+    sessionId: h.parent.sessionId, workspacePath, isRemote: false, workingDirectory: directory,
+  });
+  h.parent.log = async (message) => {
+    h.messages.push(message);
+    if (message.startsWith("Retaining")) h.controller.abort(new DOMException("final-log cancellation", "AbortError"));
+  };
+  const result = await executeRetainedQuick(h.parent, h.client, parseQuickArgs("1 --quick --all --comment"),
+    structuredClone(assignments), { controller: h.controller, gh: fakeGh() });
+  assert(h.messages.some((message) => message.startsWith("Review preview: flag-authorized")), "Proposal was authorized before cancellation");
+  assert.equal(result.preview.status, "cancelled");
+  assert.equal(result.preview.authorized, false);
+  assert.equal(result.preview.request, undefined);
+  const record = (await sessionStore(h.parent)).read();
+  assert.equal(record.outcome.preview.status, "cancelled");
+  assert.deepEqual(record.outcome.selection.findingIds, []);
+  assert.equal(record.outcome.validation.findings.length, 1);
+  assert.equal(h.sessions.length, 4);
+} finally {
+  rmSync(directory, { recursive: true });
+}
+console.log("PASS final retention-log cancellation revokes an authorized proposal before atomic storage");

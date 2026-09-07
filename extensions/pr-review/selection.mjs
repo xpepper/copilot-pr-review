@@ -1,14 +1,18 @@
 import { reviewKey } from "./findings.mjs";
 import { waitForInteraction } from "./interaction.mjs";
 
-export async function selectFindings(parent, outcome, { all = false, controller }) {
-  const signal = controller.signal;
-  const binding = outcome.binding ? {
+export function selectionBinding(outcome) {
+  return outcome.binding ? {
     ...outcome.invocation,
     repository: structuredClone(outcome.binding.repository),
     number: outcome.binding.number, pullId: outcome.binding.pullId,
     head: outcome.binding.head, reviewKey: reviewKey(outcome.binding),
   } : undefined;
+}
+
+export async function selectFindings(parent, outcome, { all = false, controller }) {
+  const signal = controller.signal;
+  const binding = selectionBinding(outcome);
   const result = (status, findingIds = [], error) => ({ status, binding, findingIds, error });
   if (signal.aborted) return result("cancelled", [], String(signal.reason));
   if (!outcome.validation) return result("not-started");
@@ -95,7 +99,7 @@ export async function finishSelection(parent, outcome, options, controller) {
   await parent.log(`P1 evidence: ${JSON.stringify({
     invocation: report.invocation, binding: report.binding, selection: report.selection,
     reviewComplete: report.reviewComplete, complete: report.complete, coverage: report.coverage,
-    cancelled: report.cancelled, noComment: true, cleanupErrors: report.cleanupErrors,
+    cancelled: report.cancelled, noComment: report.noComment, cleanupErrors: report.cleanupErrors,
   })}`);
   applyCancellation();
   return report;

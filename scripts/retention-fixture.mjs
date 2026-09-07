@@ -6,7 +6,7 @@ import { adjudicateCandidates, collectCandidates, evidenceBoundary, reviewKey } 
 import { selectFindings } from "../extensions/pr-review/selection.mjs";
 import { respond, validationBaseSource, validationHeadSource } from "./target-fixture.mjs";
 
-export async function retentionFixture(sessionId) {
+export async function retentionFixture(sessionId, { includeBoundary = false } = {}) {
   const history = [];
   const gh = async (args, cwd) => {
     const response = respond(args, cwd, history);
@@ -52,5 +52,5 @@ export async function retentionFixture(sessionId) {
     cancelled: false, cleanupErrors: [],
   };
   outcome.selection = await selectFindings({ sessionId }, outcome, { all: true, controller: new AbortController() });
-  return outcome;
+  return includeBoundary ? { outcome, boundary } : outcome;
 }
