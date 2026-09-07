@@ -48,6 +48,7 @@ posting them.
 | M1 | Balanced half completed | Balanced is the default with its four heavy specialists, light overview reviewer and three-finding P3/nit cap. Demonstrated by controlled probes, no-inference installed dispatch and one live review of this repository's own pull request #3. Pending until full adds the conventions reviewer and its findings policy. | Q4, C1; [Modes](SCOPE.md#review-modes-and-findings) |
 | M2 | Pending | Deep uses one holistic reviewer; reject conflicting mode flags. | M1; [Modes](SCOPE.md#review-modes-and-findings) |
 | C3 | Pending | Explicit optional fallback with at most one eligible retry per failed reviewer; no timers or silent substitutions. | C1, Q3; [Fallbacks/execution](SCOPE.md#models-configuration-and-execution) |
+| C4 | Pending | A tier whose resolved model supports no configurable reasoning effort resolves to no effort instead of inheriting one, so such a model can serve a tier. An explicit effort is still validated and never silently lowered. | C1; [Configuration](SCOPE.md#models-configuration-and-execution) |
 | V1 | Pending | `--verify` enforces matching branch/SHA/cleanliness before reviewers and presents discovered existing commands for approval. | Q1; [Safeguards](SCOPE.md#optional-project-safeguards) |
 | V2 | Pending | Execute only approved existing safeguards with installed dependencies; show evidence and artifacts without autofix or checkout manipulation. | V1; [Safeguards](SCOPE.md#optional-project-safeguards) |
 | D1 | Pending | Document configuration, modes, incomplete coverage, cancellation, publication, cache, and safeguards with reproducible end-to-end examples. | Remaining v1 items; [Release boundary](SCOPE.md#priority-and-release-boundary) |
@@ -3411,8 +3412,9 @@ it afterwards.
   validated against the light model, and the review is refused. Verified against
   the live model catalogue on 2026-09-07. Refusing beats silently lowering the
   effort, but there is no way to express "this tier takes no effort" today.
-  A later increment should decide whether an unset effort should stay unset when
-  the resolved model supports none.
+  Tracked as increment `C4`: an unset effort should stay unset when the resolved
+  model supports none, while an explicit effort is still validated and never
+  silently lowered.
 - The minor-finding cap keeps the strongest three by declared severity then
   confidence. It does not spread minor findings across reviewers or files, and
   a light reviewer's minor finding can be displaced by a heavy one's.

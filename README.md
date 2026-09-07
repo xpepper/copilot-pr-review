@@ -774,7 +774,8 @@ such as `claude-haiku-4.5`, cannot be used in a tier while any effort reaches
 it. An unset `lightEffort` inherits `heavyEffort`, and the resolved pair is
 validated, so the review is refused rather than silently lowered. Pick a light
 model that supports an effort, such as `gemini-3.8-flash`, `gpt-5-mini` or
-`mai-code-1.1-flash`.
+`mai-code-1.1-flash`. Letting such a model serve a tier is tracked as increment
+`C4` in [ROADMAP.md](ROADMAP.md).
 
 Invocation flags win over saved settings for that invocation only and never
 rewrite the file: `heavyModel=`/`heavyEffort=` on `/pr-review NUMBER`, and
