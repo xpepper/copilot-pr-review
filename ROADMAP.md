@@ -1076,7 +1076,8 @@ F3 checks and new native quick/validation cancellation are separate evidence.
 
 ## Completed increment: P1
 
-Continues Q4's `d794b71`. Implements selection only, not publication or retention.
+Implementation checkpoint `c0d3d16` continues Q4's `d794b71`. Implements selection
+only, not publication or retention.
 No upstream source, new dependency, review mode, fallback or safeguard was added.
 
 ### Implementation and boundaries
