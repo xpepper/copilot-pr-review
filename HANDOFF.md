@@ -17,7 +17,8 @@ consolidation did not fire on real reviewer wording" for the measurements.
 
 The current checkpoint adds `scripts/smoke-reviewer-tools.mjs`, the F4
 capability probe, plus the ROADMAP evidence. Inspect git history for its
-containing commit; do not infer or embed that future hash. At handoff creation
+containing commit; do not infer or embed that future hash. A follow-up checkpoint
+records the agreed hard revision-identity gate. At handoff creation
 all uncommitted files belong to this checkpoint, no background work remains,
 and nothing was pushed.
 
@@ -73,10 +74,16 @@ it to `reject` as part of R1.
 
 **The central risk to design against:** a checkout parked on a different branch
 would give reviewers evidence about code that is not the reviewed head. That is
-exactly the failure Q2 was built to prevent. Require local `HEAD` equal to the
-captured PR head SHA and a clean working tree before enabling reads; otherwise
-fall back to today's supplied-context-only behavior with an explicit coverage
-caveat. Never switch branches, stash, pull or clean.
+exactly the failure Q2 was built to prevent. The user's decision is a **hard
+stop before any reviewer starts**, not a degraded fallback: local `HEAD` must
+equal the captured PR head SHA, the remote PR head must still equal the captured
+head at review start, and no tracked file may be modified or staged. On any
+mismatch, refuse and name the failed condition plus the exact fixing command
+such as `gh pr checkout <number>`. There is no override flag and no context-only
+fallback. A moved remote head means the snapshot is stale: stop and let the user
+re-run. Non-ignored untracked files warn only. Never switch branches, stash,
+pull or clean to satisfy the gate. Accept the usability cost: `/pr-review` will
+refuse on an unrelated branch, and `README.md` must say so.
 
 ## Validation and reproduction
 

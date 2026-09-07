@@ -30,7 +30,7 @@ in [AGENTS.md](AGENTS.md); the replaceable next-session prompt lives in
 | P5 | Completed | Explicit publish-later of the retained selection without rerunning reviewers; refetched evidence, fresh gates, version-4 authority, seven native cases and a real playground publication demonstrated below. | P2, P4; [Cached publication](SCOPE.md#selection-publication-and-cached-results) |
 | C1 | Completed | Personal light/medium/heavy tier configuration and `autoPostReviews` inspected and updated by `/pr-review-config`; validated capabilities, nearest-tier/ambient inheritance, flag precedence and effective-assignment display demonstrated below. | F3; [Configuration](SCOPE.md#models-configuration-and-execution) |
 | C2 | Completed | Explicit per-directory trust gates `.copilot/pr-review/config.json` overrides; untrusted files ignored unparsed, self-trust impossible, precedence and revocation demonstrated below. | C1; [Configuration trust](SCOPE.md#models-configuration-and-execution) |
-| R1 | Pending | Quick reviewers read the surrounding repository read-only instead of only hunk windows, so findings that depend on unchanged callers become reachable. Requires a revision-identity gate and a corrected permission-denial kind. | F4, Q3; [Modes/findings](SCOPE.md#review-modes-and-findings) |
+| R1 | Pending | Quick reviewers read the surrounding repository read-only instead of only hunk windows, so findings that depend on unchanged callers become reachable. Gated by a hard revision-identity stop and a corrected permission-denial kind. | F4, Q3; [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | M1 | Pending | Balanced becomes default with required topology and P3 cap; full adds conventions reviewer and its findings policy. | Q4, C1; [Modes](SCOPE.md#review-modes-and-findings) |
 | M2 | Pending | Deep uses one holistic reviewer; reject conflicting mode flags. | M1; [Modes](SCOPE.md#review-modes-and-findings) |
 | C3 | Pending | Explicit optional fallback with at most one eligible retry per failed reviewer; no timers or silent substitutions. | C1, Q3; [Fallbacks/execution](SCOPE.md#models-configuration-and-execution) |
@@ -2763,11 +2763,17 @@ Acceptance criteria:
 - The permission handler approves only `kind: "read"` requests whose real path
   resolves inside the reviewed checkout root, and rejects everything else.
 - Reviewer sessions are pointed at the checkout with `metadata.setWorkingDirectory`.
-- Reads are refused unless the checkout demonstrably matches the reviewed
-  revision: local `HEAD` equals the captured PR head SHA and the working tree is
-  clean. Otherwise the run proceeds with today's supplied-context-only behavior
-  and records an explicit coverage caveat naming the reason. Never switch
-  branches, stash, pull or clean; never silently review the wrong revision.
+- **The review stops before any reviewer starts unless the checkout is provably
+  the reviewed code.** All of the following must hold: local `HEAD` equals the
+  captured PR head SHA; the PR head on GitHub still equals the captured head at
+  review start; and no tracked file is modified or staged. On any mismatch,
+  refuse with a clear message naming which condition failed and the exact
+  command that fixes it, such as `gh pr checkout <number>`. No reviewer runs, no
+  degraded context-only fallback, and no override flag. A moved remote head
+  means the captured snapshot is stale: stop and let the user re-run rather than
+  re-capturing mid-run. Non-ignored untracked files warn but do not block, since
+  they cannot be mistaken for modified reviewed code. Never switch branches,
+  stash, pull, clean or otherwise touch the checkout to satisfy the gate.
 - `quickInstructions` is updated to permit reading surrounding files, callers
   and tests to establish context and confirm impact, while keeping the upstream
   in-scope rule: report only defects introduced by this diff, never a
@@ -2777,6 +2783,14 @@ Acceptance criteria:
 - Demonstrate with a controlled probe first, then one authorized live quick
   review of a PR whose risk lives in unchanged callers, and record whether the
   reviewers actually consulted surrounding source.
+
+The hard stop is a deliberate product decision with a real usability cost: quick
+review will require the user to check out the PR head first, so `/pr-review`
+refuses on an unrelated branch instead of reviewing whatever happens to be in the
+working directory. That is the intended trade. Reviewers must see exactly the
+code published on the PR, and a silently mismatched checkout would let a finding
+cite source that is not the reviewed revision. Record the refusal messages and
+the required user step in `README.md` as part of this increment.
 
 Do not add `--verify`, test or lint execution, `bash`, revision-bound custom
 tools, balanced/full/deep, fallbacks or timeouts in this increment. Do not
