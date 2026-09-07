@@ -32,26 +32,27 @@ export async function exerciseQuick(session, target, settings, { once = false } 
           selectionFinished.resolve(JSON.parse(message.slice("P1 evidence: ".length)));
         }
         if (message.startsWith("P2 evidence: ")) settled.resolve();
+        if (message.startsWith("Review/publication failed:")) settled.resolve(new Error(message));
       });
       try {
         const args = `${target.args} ${mode === "ambient-alias" ? "--major-only" : "--quick"} --no-comment --all` +
           (mode === "ambient-alias" ? "" : ` heavyModel=${settings.model} heavyEffort=${settings.reasoningEffort}`);
         const result = await session.rpc.commands.execute({ commandName: "pr-review", args });
         assert.equal(result.error, undefined);
-        await Promise.race([
-          active.promise,
-          completion.promise.then(() => { throw new Error("Review ended before three active specialists were observed"); }),
+        const reachedActive = await Promise.race([
+          active.promise.then(() => true),
+          completion.promise.then(() => false),
         ]);
         owned = (await descendants()).filter((row) => !before.some((old) => old.pid === row.pid));
-        assert.equal(owned.length, 1, "Exactly one new owned reviewer runtime");
-        if (mode === "cancel-validation") {
+        if (reachedActive) assert.equal(owned.length, 1, "Exactly one new owned reviewer runtime");
+        if (reachedActive && mode === "cancel-validation") {
           await Promise.race([
             validationActive.promise,
             completion.promise.then(() => { throw new Error("Review ended before validation became active"); }),
           ]);
         }
         const cancelling = mode === "cancel" || mode === "cancel-validation";
-        if (cancelling) {
+        if (reachedActive && cancelling) {
           const duplicate = await session.rpc.commands.execute({ commandName: "pr-review", args });
           assert.match(duplicate.error, /already running/);
           const cancelled = await session.rpc.commands.execute({ commandName: "pr-review", args: "cancel" });
@@ -59,7 +60,8 @@ export async function exerciseQuick(session, target, settings, { once = false } 
         }
         const report = await completion.promise;
         const selected = await selectionFinished.promise;
-        await settled.promise;
+        const settlementError = await settled.promise;
+        if (settlementError) throw settlementError;
         assert.deepEqual(selected.selection.findingIds, selected.cancelled ? [] :
           (report.validation?.findings ?? []).map((finding) => finding.id));
         console.log(`Q3 ${mode} runtime evidence: ${JSON.stringify(report)}`);
@@ -71,6 +73,7 @@ export async function exerciseQuick(session, target, settings, { once = false } 
           ? `${charges.reduce((sum, charge) => sum + charge.totalNanoAiu, 0) / 1e9} AI credits (reported nano-AIU / 1e9)`
           : "unavailable: runtime did not report every request charge"}`);
         await assertExited(owned);
+        assert(reachedActive, "Review ended before three active specialists were observed; settled evidence was preserved");
         assert.equal(report.mode, "quick");
         assert.equal(report.noComment, true);
         assert.deepEqual(report.cleanupErrors, []);

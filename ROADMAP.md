@@ -30,7 +30,7 @@ in [AGENTS.md](AGENTS.md); the replaceable next-session prompt lives in
 | P5 | Completed | Explicit publish-later of the retained selection without rerunning reviewers; refetched evidence, fresh gates, version-4 authority, seven native cases and a real playground publication demonstrated below. | P2, P4; [Cached publication](SCOPE.md#selection-publication-and-cached-results) |
 | C1 | Completed | Personal light/medium/heavy tier configuration and `autoPostReviews` inspected and updated by `/pr-review-config`; validated capabilities, nearest-tier/ambient inheritance, flag precedence and effective-assignment display demonstrated below. | F3; [Configuration](SCOPE.md#models-configuration-and-execution) |
 | C2 | Completed | Explicit per-directory trust gates `.copilot/pr-review/config.json` overrides; untrusted files ignored unparsed, self-trust impossible, precedence and revocation demonstrated below. | C1; [Configuration trust](SCOPE.md#models-configuration-and-execution) |
-| R1 | Pending | Quick reviewers read the surrounding repository read-only instead of only hunk windows, so findings that depend on unchanged callers become reachable. Gated by a hard revision-identity stop and a corrected permission-denial kind. | F4, Q3; [Modes/findings](SCOPE.md#review-modes-and-findings) |
+| R1 | Completed | Verified-checkout reads and matching-head harnesses demonstrated. One authorized live quick review used unchanged source without denials; prior coverage gaps disappeared, but no additional finding was produced. GPT's `rg` alias is supported without widening the grant. | F4, Q3; [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | M1 | Pending | Balanced becomes default with required topology and P3 cap; full adds conventions reviewer and its findings policy. | Q4, C1; [Modes](SCOPE.md#review-modes-and-findings) |
 | M2 | Pending | Deep uses one holistic reviewer; reject conflicting mode flags. | M1; [Modes](SCOPE.md#review-modes-and-findings) |
 | C3 | Pending | Explicit optional fallback with at most one eligible retry per failed reviewer; no timers or silent substitutions. | C1, Q3; [Fallbacks/execution](SCOPE.md#models-configuration-and-execution) |
@@ -2949,50 +2949,202 @@ diff-only baseline. That earlier baseline has not been rerun in this session.
 No fixture inference/publication runs are authorized or demonstrated by these
 no-inference results. L1 remains pending; no upstream source was copied.
 
+## Completed increment: R1, second half
+
+Harness checkpoint: `4cc5562` ("fix: prepare revision-matched quick review
+probes"). The subsequent work in this session corrected the runtime tool-name
+mismatch below and completed exactly one inference-spending live quick review.
+No reviewer prompt, permission scope, revision gate, configuration, trust,
+selection, binding, lifecycle, retention schema or publication authority changed.
+No safeguards or reviewer shell tool were added; L1 remains pending, with no
+upstream source copied.
+
+### Blocked first attempt and demonstrated alias correction
+
+The first explicitly authorized attempt against `primait/starsky#8126` captured
+the pinned revision and passed the checkout gate, then stopped before sending
+any model prompt. Session `939850f4-721b-4939-a154-af67c2f377d4` reported,
+verbatim:
+
+```text
+Runtime did not enforce the reviewer tool set (glob, grep, view). It offered: glob, rg, view. No review started.
+```
+
+This was a tool-catalog spelling mismatch, not a revision refusal or a model
+failure. No read tool was called, no reviewer inference was spent, and no
+finding improvement was observed. The harness exited nonzero. Its early-exit
+path has since been changed to wait for settlement before rejecting an
+unsuccessful run, rather than interrupting post-review retention.
+
+`read-only.mjs` now canonicalizes `rg` to `grep` only for the exact-set assertion
+and the read-only pre-tool hook. The granted filters remain exactly
+`builtin:view`, `builtin:grep`, `builtin:glob`; raw tool-call evidence retains
+the runtime spelling. It does not grant another tool or broaden confinement.
+Duplicate `grep` plus `rg`, a missing tool, or an extra tool still fails the
+exact-set assertion.
+
+The no-inference `smoke-reviewer-tools.mjs` can now select a model explicitly
+with `PR_REVIEW_HEAVY_MODEL`. With `gpt-5.6-terra`, it demonstrated catalog
+`glob, rg, view` under the unchanged filters; with `claude-sonnet-5`, it
+demonstrated `glob, grep, view`. Both actual search tools executed inside the
+root, rejected a search outside it through the permission handler, and kept
+zero-tool sessions empty. The GPT probe also explicitly denied its native
+`apply_patch` using the string-shaped argument schema (an object-shaped probe
+first failed schema validation and was not counted as denial evidence).
+The extension was reinstalled after the correction, before any runtime probe.
+
+### Authorized live outcome and verbatim evidence
+
+After the pre-inference failure and no-inference correction, the user explicitly
+authorized one new attempt. The successful invocation was:
+
+```text
+/pr-review 8126 --quick --no-comment --all heavyModel=gpt-5.6-terra heavyEffort=high
+```
+
+Target: `primait/starsky#8126`, head
+`06155b5ea4ed2d97656d65fc4c24a2799c0a44cd`, base
+`0547cc5cf9136344e262f1f01ea3a3331606d516`. The unchanged-source risk was whether
+removing direct `lapin` dependencies left imports or feature consumers in the
+three affected crates. The PR need not contain a bug to exercise that risk.
+The diff-only baseline is the earlier recorded manual run in this roadmap:
+zero findings, three substantive missing-source gaps, incomplete coverage. It
+was not rerun in this session and is not a controlled same-session A/B result.
+
+Successful parent session: `a6543909-e88c-4160-b44f-b90c4a7cbc76`; invocation
+`c4fb3ef3-5889-4336-88e6-51402c1f0e36`. Each specialist received one prompt.
+There was no alias review, cancellation review, fallback, retry after
+inference, or evidence-validator call (there were no candidates).
+
+| Reviewer | Actual calls | Read scope | Reported AI credits |
+| --- | --- | --- | --- |
+| correctness | 6 `rg`, 1 `glob` | Rust sources and then all file types under `audit-log`, `instrumentation_datadog`, `web_downloads`; Rust file enumeration | 7.65281 |
+| contracts | 6 `rg`, 1 `glob`, 4 `view` | Those crates' Rust/all-file references, workspace manifests, and the four files listed below | 10.14754 |
+| security-performance-resources | 6 `rg`, 3 `glob` | Those crates' source/manifests/file lists, workspace manifest consumers, repository Rust references and source-inclusion macros | 10.09312 |
+
+All **27 calls** have `tool.execution_complete` events with `success: true`
+in the child event files inspected after the run. All three policy records
+contain exactly `"permissionDenials":[],"toolDenials":[]`. There were **no
+denied reads** and no write/exec tool calls. `grep` was actually named `rg`;
+no literal `grep` call occurred.
+
+The four `view` calls opened unchanged `Cargo.toml` (`view_range: [1,220]`),
+`audit-log/src/lib.rs`, `instrumentation_datadog/src/lib.rs`, and
+`web_downloads/src/lib.rs`. The contracts policy's approved `reads` field,
+verbatim (including repeated permission requests and their observed ordering):
+
+```json
+[".","instrumentation_datadog","audit-log",".","web_downloads","Cargo.toml","audit-log/src/lib.rs","audit-log","web_downloads/src/lib.rs",".","instrumentation_datadog/src/lib.rs","instrumentation_datadog","web_downloads"]
+```
+
+Representative search arguments, verbatim from the live evidence:
+
+```json
+{"pattern":"\\b(lapin|amq_protocol|AMQP|Channel|Consumer|BasicProperties)\\b","paths":"audit-log","output_mode":"content","glob":"**/*.rs","n":true}
+{"pattern":"\\b(lapin|amq_protocol)\\b","paths":["audit-log","instrumentation_datadog","web_downloads"],"glob":"**/*","output_mode":"content","n":true,"head_limit":300}
+{"pattern":"^lapin\\s*=|lapin\\s*=|lapin","paths":".","glob":"**/Cargo.toml","output_mode":"content","n":true,"head_limit":300}
+```
+
+The full unedited timeline, all 27 original tool argument objects (including
+absolute temporary paths), raw reviewer JSON, and all charge values are kept
+locally in this session's persistent artifacts, not copied into this repository:
+
+```text
+~/.copilot/session-state/6e124b73-aed5-4bd5-9d18-01d8712e8c2b/files/r1-live-8126.log
+~/.copilot/session-state/6e124b73-aed5-4bd5-9d18-01d8712e8c2b/files/r1-live-8126-authorized-retry.log
+```
+
+The first file records only the blocked attempt. Successful child sessions, whose
+`events.jsonl` files contain the actual tool completion evidence:
+`470e8625-9c83-465e-adc0-b048b5205678` (correctness),
+`973cbaf8-17f0-46eb-9672-4f1d89d535e6` (contracts), and
+`ec45a812-4803-4280-ad92-eefa6b88301a` (security/performance/resources).
+These are direct local event-file observations, not cold-resume evidence.
+
+Verbatim final harness output:
+
+```text
+Q3 explicit credit cost: 27.89347 AI credits (reported nano-AIU / 1e9)
+PASS Q3 explicit: three specialists overlapped 14354ms
+Q4 explicit: 0 findings, 0 rejected, 0 duplicates, 0 coverage issues
+PASS Q3 explicit: owned runtime exited (11548)
+```
+
+The eight per-request `totalNanoAiu` values were, in reviewer order:
+`6369650000`, `1283160000`; `6328900000`, `1487810000`, `2330830000`;
+`6670600000`, `1765740000`, `1656780000`. They sum to `27893470000`.
+This is the runtime-reported charge for this review, not a cost estimate or an
+independent billing-ledger reconciliation.
+
+All three reviewers returned `"candidates":[]`. Correctness and contracts
+respectively returned these informational caveat reasons, verbatim:
+
+```text
+Build resolution was not independently executed; the assessment is limited to tracing direct source references and the captured manifest/lockfile changes.
+The captured context contains manifest and lockfile changes but no build or test output; the review could not independently confirm compilation under every workspace feature combination.
+```
+
+The third reviewer returned `"limitations":[]`. The result was
+`executionComplete: true`, `complete: true`, `coverage: "completed"`, with zero
+substantive coverage gaps and two caveats. **Findings did not improve in count
+or demonstrated bug detection: they remained zero.** Access to missing context
+was used and the prior three missing-source gaps disappeared, which is evidence
+of improved coverage on this target, not proof that the PR compiles or is
+correct. No prompt tuning was needed or attempted.
+
+Selection was `empty`, publication was `not-attempted`, and the retained record
+settled with digest
+`0de659e0f9cbcf3ed1dc5d2413c952ca5072f54529489b0beee3c086040e244b`.
+The harness waited for settlement, observed the owned runtime exit, checked
+the disposable checkout's exact head/detached/clean state, and removed it.
+No user checkout was changed; no test, compilation or lint command ran in the
+reviewed project; no review was published.
+
+### Reproduction and remaining limits
+
+All twelve controlled suites named in the first-half reproduction passed in
+this session, along with `git diff --check`. After the alias correction, both
+installed fixture modes (`--targets --startup` and
+`--targets --matching-checkout --startup`) passed again without inference.
+Installed public capture and retained inspection evidence is recorded at the
+harness checkpoint above; those results must not be mistaken for fixture
+inference or a live positive-finding/publication exercise.
+
+No-inference model-specific tool probes:
+
+```sh
+COPILOT_CLI_PATH="$(command -v copilot)" \
+COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
+PR_REVIEW_HEAVY_MODEL=gpt-5.6-terra node scripts/smoke-reviewer-tools.mjs
+COPILOT_CLI_PATH="$(command -v copilot)" \
+COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
+PR_REVIEW_HEAVY_MODEL=claude-sonnet-5 node scripts/smoke-reviewer-tools.mjs
+```
+
+The following command already spent credits. **Do not repeat it without new
+explicit authorization.** The prior authorization is consumed.
+
+```sh
+COPILOT_CLI_PATH="$(command -v copilot)" \
+COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
+PR_REVIEW_HEAVY_MODEL=gpt-5.6-terra PR_REVIEW_HEAVY_EFFORT=high \
+PR_REVIEW_LIVE_REPOSITORY=primait/starsky PR_REVIEW_LIVE_NUMBER=8126 \
+PR_REVIEW_LIVE_HEAD=06155b5ea4ed2d97656d65fc4c24a2799c0a44cd \
+node scripts/smoke-runtime.mjs --read-live --quick --once
+```
+
+Remaining limitations: one target and one model are not general review-quality
+proof. No new positive finding depending on unchanged source was adjudicated;
+the adjudicator still receives zero tools and only captured diff/context
+evidence. Reads and billing are in raw timeline evidence, not the retained
+inspection schema. Untracked/ignored readable content and filesystem races
+remain subject to the previously documented confinement limits. The matching
+fixture's head is real, but its base is still synthetic; it is a controlled
+GitHub response double, not a real GitHub PR. No fixture-driven
+inference/publication suite was rerun. Cold retained-session resume is still
+unsupported. Presentation consolidation was left untouched.
+
 ## Exact next increment
-
-**R1, second half: make the fixture and live harnesses able to satisfy the gate,
-then run one authorized live quick review that needs unchanged source.**
-
-The harness portion is now implemented and demonstrated above. The remaining
-step in this session is the single authorized live experiment, followed by an
-honest record of tool calls, read denials, findings versus the recorded baseline,
-and observed credit cost. The acceptance criteria below remain the boundary;
-do not repeat completed harness work or broaden scope.
-
-Acceptance criteria:
-
-- `runtime-target.mjs` gains a fixture mode whose PR head is a real commit in
-  the temporary checkout instead of `"b" * 40`, so fixture-driven `--quick`
-  probes can pass the gate again. `target-fixture.mjs` serves that commit's
-  content for the head side, and the existing mismatched-checkout refusal
-  demonstration keeps its own fixture and stays passing. Both must be
-  demonstrated, not assumed.
-- The `reads >= 3` drift thresholds in `target-fixture.mjs` become `4` so that
-  fixture PRs 11, 54 and 55 still drift at the intended step now that the gate
-  adds a metadata read.
-- `preparePublicCheckout` fetches and detaches the reviewed head for live public
-  targets, without modifying any repository the user cares about.
-- Then, with explicit user authorization, run **one** live quick review on a PR
-  whose real risk lives in code the diff does not contain, and record verbatim:
-  whether the reviewers actually called `view`/`grep`/`glob`, what they read,
-  whether any read was denied, whether the findings improved over the diff-only
-  baseline, and the credit cost. Record an honest negative result if reads went
-  unused or produced noise.
-- If reviewers read badly, prefer changing `quickInstructions` over widening the
-  tool grant, and record what was tried.
-
-Do not add `--verify`, test or lint execution, `bash`, custom revision-bound
-tools, balanced/full/deep, fallbacks, timeouts or an override flag for the gate.
-Do not change personal configuration, project trust, selection, binding,
-lifecycle, publication or authorization gates. Keep L1 pending and copy no
-upstream source.
-
-Presentation consolidation stays as it is for now. It is cosmetic relative to
-this cause, and once reviewers can read surrounding code the repeated identical
-gap may simply stop occurring.
-
-## Deferred feature-plan increment: the balanced half of M1
 
 **The balanced half of M1 only, after R1.** Add the balanced review mode with its
 upstream reviewer assignment, so a mode other than quick runs and the light tier

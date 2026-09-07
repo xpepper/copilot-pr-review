@@ -1,97 +1,120 @@
 # Next session prompt
 
-Copy everything below into a fresh session.
-
----
-
-Read `AGENTS.md`, `SCOPE.md` and `ROADMAP.md` in this repository, then inspect
-the working tree and recent commits before editing anything. `SCOPE.md` is the
+Read `AGENTS.md`, `SCOPE.md` and `ROADMAP.md`, then inspect the working tree,
+recent commits and implementation before editing anything. `SCOPE.md` is the
 authoritative product specification; `ROADMAP.md` records demonstrated evidence,
-runtime caveats and the exact next increment. Do not rely on any previous
-conversation and do not reopen settled product decisions.
+runtime caveats and the exact next increment. Do not rely on previous
+conversations or reopen settled product decisions.
 
-## Where the work stands
+## Recorded state
 
-The last checkpoint is `340ab77` "feat: let quick reviewers read the verified
-checkout". The working tree was clean at that commit apart from this handoff.
+R1 is complete. The existing implementation checkpoint is `4cc5562`
+("fix: prepare revision-matched quick review probes"). The session-ending
+commit containing this handoff also includes the `rg` alias correction, its
+controlled/native probes and the live R1 outcome. Inspect git history for that
+commit rather than assuming this file contains its own hash. No unrelated
+uncommitted work was present when this handoff was written; all remaining
+session changes belong in the same session-ending commit.
 
-That checkpoint completed the **first half of R1**: quick reviewers now receive
-`view`, `grep` and `glob` confined to the local checkout, but only after a hard
-revision-identity gate (`extensions/pr-review/checkout.mjs`) proves the checkout
-is exactly the reviewed revision. Read the "Completed increment: R1, first half"
-section of `ROADMAP.md` for the full demonstrated evidence and limitations; do
-not re-derive them.
+Read "R1 second-half harness checkpoint" and "Completed increment: R1, second
+half" in `ROADMAP.md`. Do not repeat that work:
 
-No inference has been spent on reviewer reads yet. Nothing proves a reviewer
-*model* uses the read tools well.
+- Matching fixtures have a real committed head, explicit session cwd, matching
+  fixture metadata/content/POST binding and post-gate drift thresholds of 4.
+  The default dirty mismatched fixture still proves refusal without inference.
+- Live harnesses fetch and detach pinned heads only in disposable new
+  checkouts, never in user repositories.
+- With `gpt-5.6-terra`, `builtin:grep` is exposed as `rg`. The exact-tool
+  assertion and hook accept that alias without widening the three built-in
+  grants. Native `rg` and `grep` confinement were demonstrated separately.
+- The first authorized live attempt stopped before inference on that alias
+  mismatch. After correction and separate explicit retry authorization, exactly
+  one live quick review of `primait/starsky#8126` ran at head
+  `06155b5ea4ed2d97656d65fc4c24a2799c0a44cd`, using `gpt-5.6-terra` / `high`.
+  It made 18 `rg`, 5 `glob` and 4 `view` calls, all successful, with no denials.
+  Findings stayed zero; the earlier recorded three missing-source gaps
+  disappeared, leaving two informational caveats. This demonstrates context use,
+  not detection of a missed bug or successful compilation.
+- The runtime reported 27.89347 AI credits. No adjudicator ran because there
+  were no candidates. Selection was empty, publication was not attempted, the
+  retained result settled, and the disposable checkout was removed.
+- Verbatim evidence, charge values, session IDs and reproduction commands are
+  recorded in the roadmap. Read traces and billing are in raw timeline evidence,
+  not the retained inspection schema. No cold transcript recovery was added.
 
-## Your increment
+## Implement only the exact next increment
 
-Implement only the "Exact next increment" section of `ROADMAP.md`: **R1, second
-half.** In short:
+Implement **the balanced half of M1**, as specified at the end of `ROADMAP.md`.
+R1 needs no further inference. M1 remains pending until full mode lands in a
+later increment.
 
-1. Give `scripts/runtime-target.mjs` a fixture mode whose PR head is a real
-   commit in the temporary checkout, so fixture-driven `--quick` runtime probes
-   can satisfy the gate again. Today `prepareTargetSmoke` builds a deliberately
-   dirty checkout on `not-the-pr-branch` with the synthetic head `"b" * 40`,
-   which can never pass; keep that existing mismatched-checkout refusal
-   demonstration working under its own fixture.
-2. Bump the `reads >= 3` drift thresholds in `scripts/target-fixture.mjs` to `4`
-   (fixture PRs 11, 54 and 55), because the gate adds a third metadata read.
-3. Make `preparePublicCheckout` fetch and detach the reviewed head for live
-   public targets, without touching any repository the user cares about.
-4. Only with the user's explicit authorization, run **one** live quick review on
-   a PR whose real risk lives in code the diff does not contain, and record
-   verbatim what happened: which read tools were actually called, what was read,
-   whether any read was denied, whether findings improved over the diff-only
-   baseline, and the credit cost. An honest negative result is a valid outcome.
+Acceptance criteria:
 
-Respect the increment's exclusions: no `--verify`, no test or lint execution, no
-`bash`, no custom revision-bound tools, no balanced/full/deep, no fallbacks or
-timeouts, and **no override flag for the gate**. Do not change personal
-configuration, project trust, selection, binding, lifecycle, publication or
-authorization gates. Keep L1 pending and copy no upstream source. Never switch
-branches, stash, clean or pull to satisfy the gate.
+1. `--balanced` runs four heavy specialists (correctness, contracts, security,
+   performance/resources) and one light overview reviewer. Balanced becomes the
+   default when no mode is supplied; flags stay mutually exclusive and
+   `--major-only` remains the quick alias.
+2. Resolve the light tier through existing personal/trusted-project/ambient
+   layering, and show the effective assignment and origin before execution.
+3. Apply the existing evidence validation and deduplication with the balanced
+   findings policy from `SCOPE.md`: P0-P2 plus at most three direct-diff P3/nits.
+   Preserve incomplete coverage and cancellation semantics.
+4. Keep selection, retention and publication gates unchanged. Add no full/deep,
+   fallbacks, timeouts, safeguards, reviewer shell tools, gate override,
+   configuration surface or interactive menu. Keep L1 pending; copy no upstream
+   source. Do not alter user checkouts to satisfy the revision gate.
+5. Demonstrate with controlled probes and no-inference installed-runtime
+   plumbing first. Any live balanced review requires new explicit authorization
+   in that session. The R1 authorizations are consumed, not reusable.
 
-## Runtime caveats that will bite you
+## Runtime and validation caveats
 
-- Consult the installed SDK (`~/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk`)
-  and current official documentation before adopting any runtime API. Demonstrate
-  capabilities; never infer them from type declarations.
-- Reinstall the plugin with `copilot plugin install "$(pwd)"` after **every**
-  change under `extensions/`, before running any installed-runtime probe. The
-  deprecation warning is expected.
-- Controlled suites (no inference, no network):
+- Consult the installed SDK and current official documentation before adopting
+  runtime APIs. Installed SDK:
+  `~/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk`. Demonstrate capabilities;
+  declarations and plugin format support alone are not proof.
+- Reinstall with `copilot plugin install "$(pwd)"` after every extension change,
+  before running installed-runtime probes. The deprecation warning is expected.
+- Controlled suites (no inference/network):
   `node scripts/smoke-<name>.mjs` for `findings`, `quick`, `selection`,
   `retention`, `preview`, `publication`, `publish-later`, `checkout`, `config`,
-  `context`, `fixture`, `target`. All twelve pass today. Also run
-  `git diff --check`.
-- Installed-runtime probes need both variables:
-  `COPILOT_CLI_PATH="$(command -v copilot)"` and
+  `context`, `fixture`, `target`. All twelve passed in the R1 session. Also run
+  `git diff --check`; prefer targeted validation while implementing.
+- Installed probes require both `COPILOT_CLI_PATH="$(command -v copilot)"` and
   `COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk"`.
-  `scripts/smoke-reviewer-tools.mjs`,
-  `scripts/smoke-runtime.mjs --targets --startup` and
-  `scripts/smoke-retention-runtime.mjs` all pass today without spending
-  inference.
-- `--quick` runtime probes spend credits. Never run one without explicit
-  authorization in the current session, and never publish a review comment
-  without the authorization the code already requires.
-- Cold `session.resume` of a retained record is unsupported by the runtime; do
-  not invent transcript recovery.
+  No-inference probes include `smoke-runtime.mjs --targets --startup`,
+  `smoke-runtime.mjs --targets --matching-checkout --startup`,
+  `smoke-retention-runtime.mjs` and `smoke-reviewer-tools.mjs`.
+  Give the last probe `PR_REVIEW_HEAVY_MODEL=gpt-5.6-terra` or
+  `PR_REVIEW_HEAVY_MODEL=claude-sonnet-5` to exercise both search spellings.
+- A matching fixture's capture and production gate were demonstrated without
+  inference; fixture inference/publication suites were not rerun for R1.
+  Do not describe them as live-inference evidence.
+- Harness `--quick` spends credits. Most legacy harness paths run multiple
+  reviews; `smoke-runtime.mjs --quick --once` limits its path to one.
+  `--read-live` additionally requires explicit `PR_REVIEW_LIVE_REPOSITORY`,
+  `PR_REVIEW_LIVE_NUMBER`, and `PR_REVIEW_LIVE_HEAD` values. Never rerun the
+  recorded R1 command or publish without new applicable authorization.
+- Cold `session.resume` of retained command-only records remains unsupported.
+  Do not invent transcript recovery. The adjudicator remains zero-tool and
+  citations remain restricted to captured diff/context evidence.
 
-## Working rules
+## Commit and final-file handoff rules
 
-Distinguish demonstrated behavior from assumptions in everything you write. If a
-claim is not backed by a probe you ran in your session, say so.
+Commit locally at meaningful validated checkpoints with the trailer
+`Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>`.
+Stage only checkpoint files; preserve unrelated changes. Do not amend, rewrite
+history or push. Record evidence and remaining limitations in `ROADMAP.md`
+before committing; a checkpoint does not by itself complete an increment.
 
-Commit locally at each meaningful checkpoint with the trailer
-`Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>`. Stage
-only the files belonging to that checkpoint, do not amend or rewrite history,
-and **do not push**.
+Before ending, finish implementation and applicable validation, update
+`ROADMAP.md` with outcomes, reproduction commands, uncertainties and the exact
+next small increment, and update `README.md` for user-visible changes. Then
+rewrite `HANDOFF.md` as the **final repository file edit** before the
+session-ending commit and include it. If any later file edit is needed, refresh
+the handoff last again. Pass these same rules on to the next agent. If commits
+are blocked, still write the handoff last and report it as uncommitted.
 
-Before ending your session, update `ROADMAP.md` with the outcome, reproduction
-commands, remaining limitations and the exact next small increment, update
-`README.md` if user-visible behavior changed, and then rewrite this `HANDOFF.md`
-as the final repository file edit before your session-ending commit. This file
-is a replaceable handoff, not a history; overwrite it completely. Pass these same
-commit and handoff rules on to the next agent.
+Distinguish observations from assumptions. Do not present this handoff's
+historical results as probes run in your session. The final response should
+report the commit outcome and point to `HANDOFF.md`, not repeat this prompt.

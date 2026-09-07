@@ -5,6 +5,8 @@ import { isAbsolute, relative, sep } from "node:path";
 // these three built-ins; every other built-in stays natively unavailable.
 export const readOnlyTools = ["view", "grep", "glob"];
 export const readOnlyToolFilters = readOnlyTools.map((name) => `builtin:${name}`);
+// The same builtin:grep grant is exposed as rg by GPT-family sessions.
+const canonicalToolName = (name) => name === "rg" ? "grep" : name;
 
 const refusal = "PR reviewers cannot execute tools.";
 const readRefusal = "PR reviewers may only read inside the reviewed checkout.";
@@ -63,7 +65,7 @@ export function readingReviewerPolicy(evidence, root) {
       // Read tools fall through to the permission handler instead of being
       // hook-approved, so path confinement still applies to every read.
       onPreToolUse: async ({ toolName }) => {
-        if (readOnlyTools.includes(toolName)) return undefined;
+        if (readOnlyTools.includes(canonicalToolName(toolName))) return undefined;
         evidence.toolDenials.push(toolName);
         return {
           permissionDecision: "deny",
@@ -83,7 +85,7 @@ export function reviewerEvidence(access) {
 export async function assertReviewerTools(session, expected) {
   await session.rpc.tools.initializeAndValidate();
   const { tools } = await session.rpc.tools.getCurrentMetadata();
-  const offered = Array.isArray(tools) ? tools.map((tool) => tool.name).sort() : undefined;
+  const offered = Array.isArray(tools) ? tools.map((tool) => canonicalToolName(tool.name)).sort() : undefined;
   const wanted = [...expected].sort();
   if (!offered || offered.length !== wanted.length || offered.some((name, index) => name !== wanted[index])) {
     throw new Error(`Runtime did not enforce the reviewer tool set (${wanted.join(", ") || "none"}). ` +

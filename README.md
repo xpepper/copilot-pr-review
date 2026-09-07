@@ -171,7 +171,8 @@ paths with source provenance. Each independent reviewer receives the captured
 diff and numbered context as untrusted JSON data, with code-owned system
 instructions to ignore embedded requests.
 
-Quick reviewers additionally get `view`, `grep`, and `glob`, confined to the
+Quick reviewers additionally get `view`, `grep` (exposed as `rg` by GPT-family
+sessions), and `glob`, confined to the
 local checkout, so they can read unchanged callers, callees, and tests that the
 captured diff and context windows do not include. That access requires the
 checkout to be exactly the reviewed revision. Before any reviewer starts, the
@@ -198,6 +199,11 @@ The Q4 adjudicator keeps zero tools and decides only on captured evidence, so
 every published citation still resolves against the captured revision. Branch
 switching, source writes, GitHub mutations, and safeguards remain unavailable to
 reviewers. Publication is a separate code-controlled step.
+
+One authorized live quick review demonstrated all three read tools being used
+on unchanged source, with no read denials. It removed the earlier missing-source
+coverage gaps but produced no additional findings; this is not proof of better
+bug detection. See the R1 evidence in [ROADMAP.md](ROADMAP.md).
 
 Reviewers return strict JSON candidates with severity, confidence, location,
 exact source quotations, concrete triggering conditions, expected/actual behavior,

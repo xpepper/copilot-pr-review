@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import {
-  readOnlyToolFilters, readOnlyTools, readingReviewerPolicy, reviewerEvidence, reviewerPolicy,
+  assertReviewerTools, readOnlyToolFilters, readOnlyTools, readingReviewerPolicy, reviewerEvidence, reviewerPolicy,
 } from "../extensions/pr-review/read-only.mjs";
 
 const sdkPath = process.env.COPILOT_SDK_PATH;
@@ -19,7 +19,7 @@ const { CopilotClient, RuntimeConnection, ToolSet } = await import(
   pathToFileURL(resolve(sdkPath, "index.js")).href
 );
 
-const writeTools = ["bash", "create", "edit", "task", "sql", "web_fetch", "write_agent"];
+const writeTools = ["bash", "create", "edit", "apply_patch", "task", "sql", "web_fetch", "write_agent"];
 const checkout = mkdtempSync(join(tmpdir(), "pr-review-reviewer-tools-"));
 const root = realpathSync(checkout);
 mkdirSync(join(checkout, "src"));
@@ -31,6 +31,8 @@ writeFileSync(outside, "must never be readable by a reviewer\n");
 const client = new CopilotClient({
   connection: RuntimeConnection.forStdio({ path: resolve(cliPath), env: process.env }),
 });
+const sessionOptions = process.env.PR_REVIEW_HEAVY_MODEL ? { model: process.env.PR_REVIEW_HEAVY_MODEL } : {};
+const createSession = (options) => client.createSession({ ...sessionOptions, ...options });
 const offered = async (session) => {
   await session.rpc.tools.initializeAndValidate();
   const { tools } = await session.rpc.tools.getCurrentMetadata();
@@ -41,16 +43,16 @@ try {
   await client.start();
 
   // 1. Enumerate the runtime's real built-in catalog instead of guessing names.
-  const catalogSession = await client.createSession({ enableConfigDiscovery: false });
+  const catalogSession = await createSession({ enableConfigDiscovery: false });
   const catalog = await offered(catalogSession);
   console.log(`Built-in catalog (${catalog.length}): ${catalog.join(", ")}`);
-  const readTools = ["view", "grep", "glob"].filter((name) => catalog.includes(name));
-  assert.deepEqual(readTools, ["view", "grep", "glob"].filter((name) => catalog.includes(name)));
+  const searchTool = catalog.includes("rg") ? "rg" : "grep";
+  const readTools = ["view", searchTool, "glob"].filter((name) => catalog.includes(name));
   assert(readTools.length === 3,
     `Runtime does not offer the expected read tools; catalog was: ${catalog.join(", ")}`);
 
   // 2. Regression: today's reviewer policy must still offer nothing at all.
-  const denied = await client.createSession({
+  const denied = await createSession({
     enableConfigDiscovery: false, ...reviewerPolicy(reviewerEvidence()),
   });
   assert.deepEqual(await offered(denied), [], "Current reviewer policy must remain zero-tool");
@@ -60,12 +62,12 @@ try {
   // plain `builtin:` filter strings, which must behave like the ToolSet builder.
   assert.deepEqual(new ToolSet().addBuiltIn(readOnlyTools).toArray(), readOnlyToolFilters,
     "The shipped filter strings must equal what the SDK builder produces");
-  assert.deepEqual(readOnlyTools, readTools);
   const evidence = reviewerEvidence({ root });
-  const reader = await client.createSession(readingReviewerPolicy(evidence, root));
+  const reader = await createSession(readingReviewerPolicy(evidence, root));
   const readerTools = await offered(reader);
-  assert.deepEqual(readerTools, [...readOnlyTools].sort(),
+  assert.deepEqual(readerTools, [...readTools].sort(),
     `Runtime did not honor the read-only subset: ${readerTools.join(", ")}`);
+  await assertReviewerTools(reader, readOnlyTools);
   for (const name of writeTools) {
     assert(!readerTools.includes(name), `Write/exec tool ${name} leaked into the read-only reviewer set`);
   }
@@ -74,11 +76,11 @@ try {
   // 4. Forbidden tools must fail through the native pipeline, not just be absent.
   // The shipped policy also denies them in its pre-tool-use hook, so check both
   // the hook-guarded session and a hook-less session with the same filters.
-  const unguarded = await client.createSession({
+  const unguarded = await createSession({
     enableConfigDiscovery: false, availableTools: readOnlyToolFilters,
     onPermissionRequest: async () => ({ kind: "reject" }),
   });
-  assert.deepEqual(await offered(unguarded), [...readOnlyTools].sort(),
+  assert.deepEqual(await offered(unguarded), [...readTools].sort(),
     "Plain builtin: filter strings must grant exactly the read subset");
   for (const [session, label, pattern] of [
     [unguarded, "native exclusion", /not (available|found)|unknown tool|does not exist/i],
@@ -88,7 +90,9 @@ try {
       let rejection;
       let result;
       try {
-        result = await session.rpc.tools.execute({ name, arguments: {} });
+        result = await session.rpc.tools.execute({
+          name, arguments: name === "apply_patch" ? "*** Begin Patch\n*** End Patch\n" : {},
+        });
       } catch (error) {
         rejection = String(error);
       }
@@ -125,11 +129,23 @@ try {
   assert.deepEqual(evidence.reads, [join("src", "consumer.rs")], "A refused read is never recorded as read evidence");
   console.log("PASS reads outside the reviewed checkout are denied by the permission handler");
 
+  const searchArguments = (path) => ({ pattern: "lapin", ...(searchTool === "rg" ? { paths: path } : { path }) });
+  const search = await reader.rpc.tools.execute({ name: searchTool, arguments: searchArguments(root) });
+  assert(!["denied", "rejected", "failure"].includes(search.resultType), JSON.stringify(search));
+  assert(JSON.stringify(search).includes("consumer.rs"), JSON.stringify(search));
+  assert(evidence.reads.includes("."), "Search must pass through the in-root permission handler");
+  const searchOutside = await reader.rpc.tools.execute({
+    name: searchTool, arguments: searchArguments(outsideDirectory),
+  });
+  assert.equal(searchOutside.resultType, "rejected", JSON.stringify(searchOutside));
+  assert.equal(evidence.permissionDenials.at(-1), "read");
+  console.log(`PASS ${searchTool} uses the unchanged builtin:grep grant and stays confined`);
+
   // 5c. The runtime accepts only a fixed decision vocabulary. F4 demonstrated
   // that the previous `denied-no-approval-rule` value was refused as an unknown
   // variant, turning a denial into a transport failure. Show both halves now:
   // the malformed value still fails, and the shipped `reject` denies cleanly.
-  const malformed = await client.createSession({
+  const malformed = await createSession({
     enableConfigDiscovery: false,
     availableTools: new ToolSet().addBuiltIn(["view"]),
     onPermissionRequest: async () => ({ kind: "denied-no-approval-rule" }),
@@ -141,7 +157,7 @@ try {
   assert(/unknown variant `denied-no-approval-rule`/.test(rejected),
     `Expected the runtime to reject the malformed denial kind: ${rejected}`);
   assert(!rejected.includes("lapin"), "A malformed denial must not fall through to file content");
-  const clean = await client.createSession({
+  const clean = await createSession({
     enableConfigDiscovery: false,
     availableTools: ["builtin:view"],
     onPermissionRequest: async () => ({ kind: "reject" }),
@@ -155,7 +171,7 @@ try {
   console.log("PASS the corrected reject denial refuses cleanly where denied-no-approval-rule fails transport");
 
   // 6. The grant must not become ambient: a fresh policy session stays empty.
-  const stillDenied = await client.createSession({
+  const stillDenied = await createSession({
     enableConfigDiscovery: false, ...reviewerPolicy(reviewerEvidence()),
   });
   assert.deepEqual(await offered(stillDenied), [], "Reviewer tool grant leaked into a zero-tool session");

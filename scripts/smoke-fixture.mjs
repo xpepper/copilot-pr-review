@@ -99,7 +99,7 @@ assert.deepEqual(readEvidence.reads, [".", "src", join("src", "caller.js"), "src
 assert.deepEqual(readEvidence.permissionDenials, ["read", "read", "read", "read", "read", "write", "shell"]);
 // Granted read tools must reach the permission handler instead of being
 // hook-approved, so confinement still applies to every read.
-for (const toolName of readOnlyTools) {
+for (const toolName of [...readOnlyTools, "rg"]) {
   assert.equal(await reading.hooks.onPreToolUse({ toolName }), undefined);
 }
 for (const toolName of ["bash", "create", "edit", "task", "sql", "web_fetch", "write_agent"]) {
@@ -207,6 +207,11 @@ await assert.rejects(assertNoReviewerTools(toolsSession), /reviewer tool set \(n
 toolsSession.rpc.tools.getCurrentMetadata = async () => ({ tools: readOnlyTools.map((name) => ({ name })) });
 await assertReviewerTools(toolsSession, readOnlyTools);
 await assert.rejects(assertNoReviewerTools(toolsSession), /reviewer tool set \(none\)/);
+toolsSession.rpc.tools.getCurrentMetadata = async () => ({ tools: ["view", "rg", "glob"].map((name) => ({ name })) });
+await assertReviewerTools(toolsSession, readOnlyTools);
+await assert.rejects(assertNoReviewerTools(toolsSession), /reviewer tool set \(none\)/);
+toolsSession.rpc.tools.getCurrentMetadata = async () => ({ tools: ["view", "grep", "rg", "glob"].map((name) => ({ name })) });
+await assert.rejects(assertReviewerTools(toolsSession, readOnlyTools), /reviewer tool set/);
 toolsSession.rpc.tools.getCurrentMetadata = async () => ({ tools: [{ name: "view" }, { name: "grep" }, { name: "bash" }] });
 await assert.rejects(assertReviewerTools(toolsSession, readOnlyTools), /glob, grep, view.*offered: bash, grep, view/);
 console.log("PASS read-only guards, reviewer errors, partial evidence, cancellation, and listener cleanup");
