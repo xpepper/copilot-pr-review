@@ -162,7 +162,10 @@ export async function executeQuickRun(parent, client, options, assignments, {
       boundary = evidenceBoundary(target.snapshot, target.context, binding);
       const collected = collectCandidates(report.reviewers, boundary);
       for (const file of target.context.files) {
-        if (file.reason) collected.issues.push(`${file.path ?? "(unknown path)"}: ${file.reason}; not reviewed.`);
+        if (file.reason) collected.diagnostics.push({
+          kind: "coverage-gap",
+          message: `${file.path ?? "(unknown path)"}: ${file.reason}; changed content not reviewed.`,
+        });
       }
       // Retain the specialist report even if adjudicator setup/transport fails.
       validation = adjudicateCandidates(collected, undefined, boundary);
@@ -193,7 +196,9 @@ export async function executeQuickRun(parent, client, options, assignments, {
       };
     },
   });
-  if (outcome.validation) await parent.log(formatFindings(outcome), { level: outcome.complete ? "info" : "error" });
+  if (outcome.coverage !== "not-started") {
+    await parent.log(formatFindings(outcome), { level: outcome.complete ? "info" : "error" });
+  }
   const selected = await finishSelection(parent, outcome, options, controller);
   const proposal = await finishPreview(parent, selected, options, controller, boundary, effectiveConfig);
   return publishCurrent(parent, proposal, boundary, { controller, cwd, gh, persist });

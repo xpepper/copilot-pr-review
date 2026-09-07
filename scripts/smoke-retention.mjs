@@ -9,6 +9,7 @@ import { parseQuickArgs } from "../extensions/pr-review/quick.mjs";
 import { reviewKey } from "../extensions/pr-review/findings.mjs";
 import { respond } from "./target-fixture.mjs";
 import { retentionFixture } from "./retention-fixture.mjs";
+import { formatCoverage } from "../extensions/pr-review/coverage.mjs";
 
 const directory = mkdtempSync(join(tmpdir(), "pr-review-retention-"));
 const sessionId = randomUUID();
@@ -65,6 +66,11 @@ try {
     (r) => { r.outcome.reviewers[0].result = "raw output"; },
     (r) => { r.outcome.reviewers[0].status = "incomplete"; },
     (r) => { r.outcome.cleanupErrors = ["cleanup failure"]; },
+    (r) => { r.outcome.validation.diagnostics = "not an array"; },
+    (r) => { r.outcome.validation.diagnostics.push({ kind: "info", message: "Unknown kind" }); },
+    (r) => { r.outcome.validation.diagnostics.push({ kind: "caveat", message: "" }); },
+    (r) => { r.outcome.validation.diagnostics.push({ kind: "coverage-gap", message: "Unrecorded gap" }); },
+    (r) => { r.outcome.validation.issues.push("Unclassified blocker"); },
   ]) {
     const invalid = structuredClone(record);
     mutate(invalid);
@@ -79,6 +85,43 @@ try {
     await assert.rejects(inspectRetained(parent));
   }
   console.log("PASS strict schemas, corruption, attribution, session/PR/head/digest binding and canonical-only selection");
+
+  for (const mixed of [false, true]) {
+    const value = await retentionFixture(sessionId, {
+      reviewerLimitations: [{ kind: "caveat", reason: "External library internals not audited.", impact: null }],
+      adjudicatorLimitations: mixed ? [{
+        kind: "coverage-gap", reason: "Rounding contract absent.",
+        impact: "The changed adapter's precision cannot be assessed.",
+      }] : [],
+    });
+    if (mixed) {
+      value.reviewers[2].status = "incomplete";
+      value.reviewers[2].error = "Synthetic reviewer crash";
+      value.executionComplete = false;
+    }
+    store.write(retainedRecord(value));
+    const loaded = (await sessionStore(parent)).read();
+    assert.equal(loaded.outcome.complete, !mixed);
+    assert.equal(loaded.outcome.validation.findings.length, 1);
+    assert.deepEqual(loaded.outcome.validation.diagnostics, value.validation.diagnostics);
+    await inspectRetained(parent);
+    assert(messages.at(-2).includes(formatCoverage(loaded.outcome)));
+    assert.match(messages.at(-2), /Informational caveat: correctness: External library/);
+    if (mixed) {
+      assert.match(messages.at(-2), /Coverage gap: Adjudicator: Rounding contract absent/);
+      assert.match(messages.at(-2), /Execution failure: security-performance-resources: incomplete; Synthetic reviewer crash/);
+    } else assert.doesNotMatch(messages.at(-2), /INCOMPLETE|incomplete/);
+  }
+  const legacy = structuredClone(outcome);
+  delete legacy.validation.diagnostics;
+  legacy.validation.issues = ["External library internals not audited."];
+  legacy.complete = legacy.reviewComplete = legacy.validation.complete = false;
+  legacy.coverage = "incomplete";
+  store.write(retainedRecord(legacy));
+  await inspectRetained(parent);
+  assert.match(messages.at(-2), /Legacy unclassified issue \(kept incomplete\)/);
+  assert.equal(store.read().outcome.validation.diagnostics, undefined, "Inspection does not migrate legacy uncertainty");
+  console.log("PASS classified inspection/reload and conservative unmodified legacy results");
 
   for (const state of ["empty", "none", "unavailable", "failed", "cancelled", "degraded"]) {
     const value = structuredClone(outcome);

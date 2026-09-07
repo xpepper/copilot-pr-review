@@ -2468,38 +2468,119 @@ approval for shell access, automatic mise/gh-aw execution, or implementation
 of investigation tools in the classification fix. Read-only investigation and
 approved safeguard execution are distinct capabilities.
 
+## Completed manual-feedback fix: coverage classification and presentation
+
+Implemented from clean priority checkpoint `cbe633c`, after startup fix
+`ff78dcb`, on 2026-09-07. This completes the classification increment, not M1.
+
+### Classification and compatibility boundary
+
+- Reviewer and adjudicator prompts now request output schema version 2.
+  `limitations` entries have explicit `kind`, `reason`, and `impact` fields.
+  A `coverage-gap` requires a nonempty explanation of the consequential
+  assessment blocked; a `caveat` requires null impact. Generic unaudited
+  dependency boundaries do not by themselves block completion. Unknown
+  categories, malformed entries and unusable output fail closed.
+- `findings.mjs` produces categorized diagnostics and derives the existing
+  blocking `issues` array only from execution failures and coverage gaps.
+  Invalid candidates/decisions remain visible output failures; uncertain
+  adjudication and code-detected unavailable changed content remain gaps.
+  Successful peer findings survive both kinds of incomplete coverage.
+  Runtime crashes, cancellation and cleanup errors remain incomplete even
+  when the validated portion contains only caveats.
+- `coverage.mjs` provides shared descriptions for final findings, retained
+  inspection, selection/confirmation and new COMMENT proposals/publish-later
+  descriptions. It retains reasons and blocked-assessment impact, distinguishes
+  failure/gap/caveat counts, and does not turn zero findings into a clean-PR
+  claim. Failures before validation also receive a classified summary.
+- Retained validation gains optional `diagnostics`, strictly checked against
+  the blocking `issues` and completion flag. Publication/authority schema
+  versions 1-4 keep their existing meanings; no migration is required.
+  Version-1 model limitation strings and old unclassified retained issues stay
+  conservatively incomplete, without keyword-based reinterpretation. Old
+  results with no issues are not newly made incomplete.
+- Legacy records without diagnostics reconstruct their exact original
+  proposal text. Reading them neither adds categories nor changes historical
+  authority. New classified proposals retain their exact text through reload
+  and publish-later. COMMENT-only events, canonical selection, explicit
+  authorization, evidence/head/lifecycle gates, write-ahead uncertainty and
+  no-blind-retry behavior remain unchanged.
+
+### Evidence and reproduction
+
+The existing synthetic suites were extended; no private review payload was
+read or copied, no private review was rerun, and no live GitHub write occurred.
+
+```sh
+for script in smoke-findings smoke-quick smoke-selection smoke-retention \
+  smoke-preview smoke-publication smoke-publish-later; do
+  node "scripts/$script.mjs" || exit
+done
+copilot plugin install "$(pwd)"
+COPILOT_CLI_PATH="$(command -v copilot)" \
+COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
+node scripts/smoke-retention-runtime.mjs
+COPILOT_CLI_PATH="$(command -v copilot)" \
+COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
+node scripts/smoke-runtime.mjs --targets --startup
+```
+
+All seven controlled suites passed. Cases include zero-finding caveat-only
+completion, consequential gaps with an impact explanation, reviewer/validator
+failures and malformed categories/output, cancellation, cleanup failure,
+uncertain adjudication despite a caveat, mixed results retaining useful
+findings, and binary changed content remaining uncovered despite caveats.
+Retention cases cover classified round trips, mixed inspection, unchanged old
+uncertainty and rejection of inconsistent diagnostic/issue records.
+Publication cases cover exact classified and legacy payload reconstruction,
+gated incomplete publish-later, preserved version-4 authority and repeat-write
+refusal, plus the existing selection/authorization/anchor/head/lifecycle and
+uncertain-write cases. All writes in these tests use synthetic `gh` functions.
+
+The updated plugin was installed successfully. Native no-inference retention
+session `5a83028a-bb3e-4c21-af68-0b612ae917cf` inspected a synthetic caveat-bearing
+result as completed, retained its caveat and finding across extension reload,
+and preserved isolation and schema/interruption errors without `gh` calls or
+checkout changes. This seed is retention/presentation evidence, not model
+classification evidence. Command-only cold resume remained unsupported;
+the retained file survived unchanged. The native startup/target probe also
+passed without an extension-side `COPILOT_CLI_PATH`, model turns, subagents or
+tool executions. Runtime cleanup completed.
+
+### Remaining limitations
+
+- Schema validation enforces explicit categories and required impact text, not
+  the truth of a model's categorization. No inference was spent on the new
+  prompts; ordinary model adherence and classification quality need manual
+  feedback. Existing fallible semantic adjudication/context limits still apply.
+- Reviewers still have no tools and cannot independently investigate beyond
+  supplied revision-bound context. Read-only investigation, shell access,
+  mise/gh-aw, safeguards/`--verify`, balanced/full/deep, fallbacks and timeouts
+  were not implemented. No runtime API was added or changed.
+- Personal configuration and project trust were not changed. The probes do
+  not run `smoke-config-runtime.mjs` or require an empty personal store.
+- Native evidence remains macOS arm64 / CLI 1.0.83 / Node 26.1.0, not other
+  platforms. Direct local plugin install still warns about deprecation.
+  Command-only cold resume, cross-process storage locking, non-atomic final
+  GET/POST, live anchor coverage and configuration-authorized live publication
+  limitations recorded above remain.
+
 ## Exact next increment
 
-**Fix coverage classification and presentation only, then resume manual tests.**
-Do not start M1 or add investigation tools as part of this increment.
+**More manual testing and feedback, not automatic continuation to M1.**
 
-Acceptance criteria:
+Use a fresh ordinary interactive runtime with the reinstalled plugin. The user
+chooses and authorizes any review target; do not rerun private reviews merely
+to demonstrate classification. Inspect user-provided results read-only when
+requested, and distinguish actual model behavior from the synthetic evidence
+above. Look for caveat-only completion, visible consequential gaps and
+execution failures, and zero-finding wording that does not imply a clean PR.
+Preserve personal settings, project trust and publication authority.
 
-- Distinguish execution failure, substantive review-coverage gaps and
-  informational caveats. A generic statement that an external dependency was
-  not independently audited must not automatically make the review incomplete.
-- Crashes, cancellation, unusable output, unavailable relevant changed content
-  and missing evidence needed for a specific consequential assessment remain
-  visible as incomplete. Do not downgrade every limitation to achieve a green
-  result, or imply that zero findings proves the PR clean.
-- Preserve useful caveats and show why a real coverage gap matters. Carry the
-  distinction consistently through the final summary, retained inspection and
-  publication-facing coverage descriptions; preserve authorization and
-  publication gates.
-- Establish explicit structured categories rather than guessing from keywords
-  in prose. Choose the smallest compatible schema change after inspecting
-  reviewer/adjudicator outputs and retained-result validation; handle older
-  retained results conservatively, without silently reclassifying uncertainty.
-- Use synthetic controlled cases for caveat-only results, genuine gaps,
-  execution failure and mixed results. Do not copy private review payloads into
-  repository fixtures. Demonstrate the distinction before requesting another
-  manual run; no inference rerun is required merely to reproduce classification.
-- Keep personal settings and trust unchanged. Do not enable tools, implement
-  `--verify`, add timeouts or alter models to make the result appear complete.
-
-After this fix, prioritize further manual-test feedback. Discuss read-only
-investigation tools separately when the user returns to that topic; do not
-assume an implementation priority relative to M1 has been settled.
+Address only the next concrete feedback item once identified. Do not start
+balanced mode or add investigation tools on the strength of the older feature
+plan below. Discuss read-only investigation separately if the user returns to
+it; no tool set, permission design or priority relative to M1 is agreed.
 
 ## Feature-plan increment after manual feedback
 

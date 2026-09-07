@@ -2,6 +2,7 @@ import { isDeepStrictEqual } from "node:util";
 import { minimumConfidence, reviewKey } from "./findings.mjs";
 import { waitForInteraction } from "./interaction.mjs";
 import { selectionBinding } from "./selection.mjs";
+import { formatCoverage } from "./coverage.mjs";
 
 const authorizedStatuses = ["flag-authorized", "config-authorized", "confirmed"];
 
@@ -82,7 +83,9 @@ export function reviewRequest(outcome) {
     payload: {
       commit_id: outcome.binding.head, event: "COMMENT",
       body: `Quick review: ${findings.length} selected validated finding(s). ` +
-        `Review coverage: ${outcome.complete ? "completed" : "INCOMPLETE"}. ` +
+        (outcome.validation.diagnostics === undefined
+          ? `Review coverage: ${outcome.complete ? "completed" : "INCOMPLETE"}. `
+          : `${formatCoverage(outcome)}\n`) +
         "This is not a clean-review claim.",
       comments: findings.map((finding) => inlineComment(finding, outcome.binding)),
     },
@@ -148,7 +151,7 @@ export async function finishPreview(parent, outcome, options, controller, bounda
           const answer = await waitForInteraction(controller.signal, () => parent.ui.elicitation({
             message: `Authorize this exact COMMENT review proposal for ${request.binding.repository.nameWithOwner}` +
               `#${request.binding.number} at head ${request.binding.head}?\n` +
-              `${request.payload.comments.length} selected finding(s); ${outcome.complete ? "completed" : "INCOMPLETE"} coverage.\n` +
+              `${request.payload.comments.length} selected finding(s).\n${formatCoverage(outcome)}\n` +
               "Acceptance authorizes publication after fresh head/lifecycle/anchor checks. This does not authorize safeguards.",
             requestedSchema: {
               type: "object",

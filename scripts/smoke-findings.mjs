@@ -41,7 +41,7 @@ const candidate = {
 };
 const reviewer = (candidates = [candidate], changes = {}) => ({
   label: "correctness", status: "completed",
-  result: JSON.stringify({ schemaVersion: 1, reviewKey: key, candidates, limitations: [] }), ...changes,
+  result: JSON.stringify({ schemaVersion: 2, reviewKey: key, candidates, limitations: [] }), ...changes,
 });
 const decision = (id = "correctness:1", changes = {}) => ({
   candidateId: id, verdict: "accept", allClaimsSupported: true,
@@ -49,7 +49,7 @@ const decision = (id = "correctness:1", changes = {}) => ({
   evidence: [citation("head", 1), citation("base"), citation("head")], duplicateOf: null, ...changes,
 });
 const validator = (decisions = [decision()], changes = {}) => ({
-  status: "completed", result: JSON.stringify({ schemaVersion: 1, reviewKey: key, decisions, limitations: [] }),
+  status: "completed", result: JSON.stringify({ schemaVersion: 2, reviewKey: key, decisions, limitations: [] }),
   ...changes,
 });
 const collected = collectCandidates([reviewer()], boundary);
@@ -167,6 +167,76 @@ assert.match(formatFindings({ validation: retained, complete: false }), /incompl
 const empty = adjudicateCandidates(collectCandidates([reviewer([])], boundary), undefined, boundary);
 assert.equal(empty.complete, true);
 assert.match(formatFindings({ validation: empty, complete: true }), /not proof of a clean PR/);
+
+const caveat = { kind: "caveat", reason: "External library internals were not independently audited.", impact: null };
+const gap = {
+  kind: "coverage-gap", reason: "The changed rounding adapter's contract is absent.",
+  impact: "Cannot assess whether the new caller rounds monetary totals correctly.",
+};
+const withLimitations = (report, limitations, schemaVersion = 2) => ({
+  ...report, result: JSON.stringify({ ...JSON.parse(report.result), schemaVersion, limitations }),
+});
+for (const [limitations, complete, kinds] of [
+  [[caveat], true, ["caveat"]],
+  [[gap], false, ["coverage-gap"]],
+  [[caveat, gap], false, ["caveat", "coverage-gap"]],
+]) {
+  const reports = collectCandidates([withLimitations(reviewer([]), limitations)], boundary);
+  const assessment = adjudicateCandidates(reports, undefined, boundary);
+  assert.equal(assessment.complete, complete);
+  assert.deepEqual(assessment.diagnostics.map((entry) => entry.kind), kinds);
+  assert.equal(assessment.issues.length, complete ? 0 : 1);
+  const display = formatFindings({ validation: assessment, complete });
+  assert.match(display, /0 validated finding/);
+  assert.match(display, /No accepted findings is not proof of a clean PR/);
+  if (complete) {
+    assert.match(display, /Informational caveat: correctness: External library/);
+    assert.doesNotMatch(display, /incomplete|INCOMPLETE/);
+  } else assert.match(display, /Blocked assessment: Cannot assess/);
+  const adjudicated = adjudicateCandidates(collected, withLimitations(validator(), limitations), boundary);
+  assert.equal(adjudicated.complete, complete, "Adjudicator uses the same limitation policy");
+  assert.equal(adjudicated.findings.length, 1, "Useful findings survive gaps and caveats");
+  assert.deepEqual(adjudicated.diagnostics.map((entry) => entry.kind), kinds);
+}
+const mixedCoverage = adjudicateCandidates(collectCandidates([
+  withLimitations(reviewer(), [caveat, gap]),
+  reviewer([], { label: "contracts", status: "incomplete", error: "Synthetic crash" }),
+], boundary), withLimitations(validator(), [caveat]), boundary);
+assert.equal(mixedCoverage.complete, false);
+assert.equal(mixedCoverage.findings.length, 1);
+assert.deepEqual(mixedCoverage.diagnostics.map((entry) => entry.kind),
+  ["caveat", "coverage-gap", "execution-failure", "caveat"]);
+assert.match(formatFindings({ validation: mixedCoverage, complete: false }), /Execution failure: contracts:.*Synthetic crash/);
+const caveatedUncertainty = adjudicateCandidates(collected, withLimitations(validator([decision(undefined, {
+  verdict: "uncertain", allClaimsSupported: false, evidence: [], reason: gap.impact,
+})]), [caveat]), boundary);
+assert.equal(caveatedUncertainty.complete, false);
+assert.deepEqual(caveatedUncertainty.diagnostics.map((entry) => entry.kind), ["caveat", "coverage-gap"]);
+for (const limitations of [
+  ["legacy text in v2"], [{ ...gap, impact: null }], [{ ...gap, impact: "" }],
+  [{ ...caveat, impact: "A specific assessment is blocked" }], [{ ...caveat, kind: "info" }],
+  [{ ...caveat, extra: true }], [{ ...caveat, reason: " " }],
+]) {
+  const malformed = adjudicateCandidates(
+    collectCandidates([withLimitations(reviewer([]), limitations)], boundary), undefined, boundary);
+  assert.equal(malformed.complete, false);
+  assert.equal(malformed.diagnostics[0].kind, "execution-failure");
+  const malformedAdjudication = adjudicateCandidates(collected, withLimitations(validator(), limitations), boundary);
+  assert.equal(malformedAdjudication.complete, false);
+  assert.equal(malformedAdjudication.findings.length, 0);
+  assert.equal(malformedAdjudication.diagnostics[0].kind, "execution-failure");
+}
+for (const assessment of [
+  adjudicateCandidates(collectCandidates([withLimitations(reviewer([]), [caveat.reason], 1)], boundary), undefined, boundary),
+  adjudicateCandidates(collected, withLimitations(validator(), [caveat.reason], 1), boundary),
+]) {
+  assert.equal(assessment.complete, false, "Legacy uncertainty is never reclassified by prose keywords");
+  assert.equal(assessment.diagnostics[0].kind, "coverage-gap");
+  assert.match(assessment.issues[0], /legacy unclassified limitation/);
+}
+assert.equal(uncertain.diagnostics[0].kind, "coverage-gap");
+assert.equal(retained.diagnostics[0].kind, "execution-failure");
+console.log("PASS explicit reviewer/adjudicator caveats, consequential gaps, failures, mixed results and conservative legacy output");
 
 for (const mutate of [
   (s, _c, _b) => { s.diff += "\n"; },

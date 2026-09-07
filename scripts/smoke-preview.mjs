@@ -7,6 +7,7 @@ import { reviewKey } from "../extensions/pr-review/findings.mjs";
 import { retainedRecord, validateRecord } from "../extensions/pr-review/retention.mjs";
 import { selectionBinding } from "../extensions/pr-review/selection.mjs";
 import { retentionFixture } from "./retention-fixture.mjs";
+import { formatCoverage } from "../extensions/pr-review/coverage.mjs";
 
 for (const autoPostReviews of [true, false]) {
   for (const comment of [true, false]) {
@@ -79,7 +80,8 @@ assert.deepEqual(request, {
   binding: selectionBinding(exact.outcome),
   payload: {
     commit_id: "b".repeat(40), event: "COMMENT",
-    body: "Quick review: 1 selected validated finding(s). Review coverage: completed. This is not a clean-review claim.",
+    body: "Quick review: 1 selected validated finding(s). Review coverage: completed.\n" +
+      "Execution failures: 0; coverage gaps: 0; informational caveats: 0.\nThis is not a clean-review claim.",
     comments: [{
       path: "total.js", line: 3, side: "RIGHT",
       body: "[P2] Multiply cents by quantity\n\nWhen: total(100, 3)\n\nExpected: 300 cents\n\nActual: 103 cents\n\n" +
@@ -89,6 +91,37 @@ assert.deepEqual(request, {
   },
 });
 assert.equal(request.payload.comments.length, 1, "Rejected/raw/duplicate bodies never become comments");
+for (const kind of ["caveat", "coverage-gap", "execution-failure", "mixed", "legacy"]) {
+  const h = await harness({ options: { comment: true } });
+  const diagnostics = [
+    { kind: "caveat", message: "External library not independently audited." },
+    { kind: "coverage-gap", message: "Changed adapter contract absent. Blocked assessment: compatibility cannot be settled." },
+    { kind: "execution-failure", message: "contracts: invalid candidate output." },
+  ].filter((entry) => kind === "mixed" || kind === "legacy" || entry.kind === kind);
+  h.outcome.validation.diagnostics = diagnostics;
+  h.outcome.validation.issues = diagnostics.filter((entry) => entry.kind !== "caveat").map((entry) => entry.message);
+  h.outcome.complete = h.outcome.reviewComplete = h.outcome.validation.complete = kind === "caveat";
+  h.outcome.coverage = h.outcome.complete ? "completed" : "incomplete";
+  if (kind === "legacy") delete h.outcome.validation.diagnostics;
+  const result = await h.run();
+  const record = retainedRecord(result);
+  validateRecord(record, h.parent.sessionId);
+  assert.equal(result.preview.authorized, true);
+  assert.equal(result.preview.request.payload.event, "COMMENT");
+  assert.match(result.preview.request.payload.body, /not a clean-review claim/);
+  if (kind === "legacy") {
+    assert.equal(result.preview.request.payload.body,
+      "Quick review: 1 selected validated finding(s). Review coverage: INCOMPLETE. This is not a clean-review claim.");
+    assert.match(formatCoverage(result), /Legacy unclassified issue \(kept incomplete\)/);
+  } else {
+    assert(result.preview.request.payload.body.includes(formatCoverage(record.outcome)),
+      "Publication and retained coverage descriptions must agree exactly");
+    for (const entry of diagnostics) assert(result.preview.request.payload.body.includes(entry.message));
+    if (kind === "caveat") assert.doesNotMatch(result.preview.request.payload.body, /INCOMPLETE/);
+    else assert.match(result.preview.request.payload.body, /INCOMPLETE/);
+  }
+}
+console.log("PASS classified publication summaries and unchanged legacy payload reconstruction/authority");
 const finding = exact.outcome.validation.findings[0];
 finding.location = { ...finding.before };
 let comments = buildReviewPreview(exact.outcome, exact.boundary).payload.comments;

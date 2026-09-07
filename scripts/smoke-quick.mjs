@@ -62,7 +62,9 @@ function fakeGh() {
   };
 }
 
-function harness({ failure, controller = new AbortController(), withCandidate = false, acceptCandidate = false } = {}) {
+function harness({
+  failure, controller = new AbortController(), withCandidate = false, acceptCandidate = false, limitations = [],
+} = {}) {
   const messages = [];
   const sessions = [];
   let sends = 0;
@@ -120,7 +122,7 @@ function harness({ failure, controller = new AbortController(), withCandidate = 
               return;
             }
             this.emit("assistant.message", { content: failure === "validator-malformed" ? "{}" : JSON.stringify({
-              schemaVersion: 1, reviewKey: input.reviewKey, limitations: [],
+              schemaVersion: 2, reviewKey: input.reviewKey, limitations: [],
               decisions: input.candidates.map((candidate) => ({
                 candidateId: candidate.id, verdict: acceptCandidate ? "accept" : "reject", allClaimsSupported: acceptCandidate,
                 reason: acceptCandidate ? "Controlled acceptance for selection plumbing, not a real semantic judgment." :
@@ -154,7 +156,7 @@ function harness({ failure, controller = new AbortController(), withCandidate = 
             });
             reviewer.emit("assistant.message", { content: i === 0 &&
                 ["reviewer", "tool-call", "usage", "missing-usage"].includes(failure) ? "partial candidate" : JSON.stringify({
-                schemaVersion: 1, reviewKey: input.reviewKey, limitations: [],
+                schemaVersion: 2, reviewKey: input.reviewKey, limitations: i === 1 ? limitations : [],
                 candidates: withCandidate && i === 0 ? [{
                   title: "Keep value at 1", severity: "P2", confidence: 0.9,
                   location: cite("head"), before: cite("base"), after: cite("head"),
@@ -243,6 +245,59 @@ for (const failure of [undefined, "reviewer", "tool-call", "usage", "missing-usa
   }
   if (failure === "cleanup") assert.equal(h.client.forces, 1);
 }
+
+for (const failure of [undefined, "reviewer", "cancel", "cleanup", "validator-malformed", "validator-setup"]) {
+  const limitations = [{ kind: "caveat", reason: "External dependency internals not audited.", impact: null }];
+  const h = harness({ failure, limitations, withCandidate: failure?.startsWith("validator") });
+  const report = await executeQuickRun(h.parent, h.client, options, structuredClone(assignments), {
+    controller: h.controller, gh: fakeGh(),
+  });
+  const record = retainedRecord(report);
+  validateRecord(record, h.parent.sessionId);
+  assert.equal(report.complete, !failure);
+  assert.equal(report.reviewComplete, !failure);
+  assert.equal(report.coverage, failure ? "incomplete" : "completed");
+  assert.equal(report.validation?.findings.length, 0);
+  assert.equal(report.publication.attempted, false);
+  if (failure !== "cancel") {
+    assert(record.outcome.validation.diagnostics.some((entry) => entry.kind === "caveat"));
+    assert(h.messages.some((message) => message.includes("Informational caveat:")));
+  }
+}
+const gapHarness = harness({ limitations: [{
+  kind: "coverage-gap", reason: "Changed export consumer is absent.",
+  impact: "Cannot settle compatibility of the changed value with the consuming adapter.",
+}] });
+const gapReport = await executeQuickRun(gapHarness.parent, gapHarness.client, options, structuredClone(assignments), {
+  controller: gapHarness.controller, gh: fakeGh(),
+});
+validateRecord(retainedRecord(gapReport), gapHarness.parent.sessionId);
+assert.equal(gapReport.executionComplete, true);
+assert.equal(gapReport.complete, false);
+assert.equal(gapReport.validation.diagnostics[0].kind, "coverage-gap");
+assert(gapHarness.messages.some((message) => message.includes("Blocked assessment: Cannot settle compatibility")));
+const binaryHarness = harness({ limitations: [{ kind: "caveat", reason: "No independent dependency audit.", impact: null }] });
+const binaryGh = fakeGh();
+const binaryReport = await executeQuickRun(binaryHarness.parent, binaryHarness.client, options, structuredClone(assignments), {
+  controller: binaryHarness.controller,
+  gh: async (args, cwd, settings) => {
+    const raw = await binaryGh(args, cwd, settings);
+    if (args.includes("Accept: application/vnd.github.diff")) {
+      return "diff --git a/image.png b/image.png\nBinary files a/image.png and b/image.png differ\n";
+    }
+    if (args[5] === "repos/fixture/repository/pulls/1") {
+      return JSON.stringify({ ...JSON.parse(raw), additions: 0, deletions: 0 });
+    }
+    return raw;
+  },
+});
+validateRecord(retainedRecord(binaryReport), binaryHarness.parent.sessionId);
+assert.equal(binaryReport.executionComplete, true);
+assert.equal(binaryReport.complete, false);
+assert(binaryReport.validation.diagnostics.some((entry) =>
+  entry.kind === "coverage-gap" && entry.message.includes("image.png: binary change")));
+assert(binaryReport.validation.diagnostics.some((entry) => entry.kind === "caveat"));
+console.log("PASS settled caveat-only, substantive gap and failure-with-caveat results without inference or publication");
 
 for (const number of [2, 3, 4, 5, 8, 9, 10]) {
   const h = harness();

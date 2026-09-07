@@ -1,13 +1,22 @@
 import { createHash } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
 import { formatContext, parseDiffFiles } from "./context.mjs";
+import { blockingIssues, formatCoverage } from "./coverage.mjs";
 
 export const minimumConfidence = 0.8;
 export const reviewKey = (binding) => createHash("sha256").update(JSON.stringify(binding)).digest("hex");
 
 const citationFormat = 'CITATION is {"path":"exact source path","side":"head|base","startLine":1,"endLine":1,"quote":"exact full lines, joined with \\n, no final newline"}.';
+const limitationFormat = [
+  'Each limitations entry is {"kind":"coverage-gap|caveat","reason":"specific limitation","impact":null}.',
+  'For coverage-gap, impact MUST instead be nonempty text naming the consequential assessment blocked and why it matters to this diff.',
+  "Use coverage-gap for relevant missing changed content or evidence needed to settle a specific consequential assessment.",
+  "Use caveat (impact=null) for informational boundaries, such as not independently auditing an external dependency,",
+  "when no specific consequential assessment of this diff is blocked. General tool/context boundaries alone are caveats.",
+  "Do not disguise a relevant evidence gap as a caveat. Preserve both kinds; do not infer completeness from zero candidates.",
+].join("\n");
 export const candidateFormat = [
-  'Return ONLY a JSON object, without markdown fences: {"schemaVersion":1,"reviewKey":"<supplied key>",',
+  'Return ONLY a JSON object, without markdown fences: {"schemaVersion":2,"reviewKey":"<supplied key>",',
   '"candidates":[{"title":"concise defect","severity":"P0|P1|P2","confidence":0.9,',
   '"location":CITATION,"trigger":"concrete reachable condition","expected":"required behavior",',
   '"actual":"failing behavior and impact","introduction":"why this diff newly causes that failure",',
@@ -23,7 +32,8 @@ export const candidateFormat = [
   "Every assertion must be supported; omit speculative consequences or embellishments even when the core defect is real.",
   `Omit candidates below confidence ${minimumConfidence}. P0 is unconditional widespread critical failure; P1 is high impact; P2 is normal actionable impact.`,
   "If evidence is missing, put that limitation in limitations rather than inventing a candidate.",
-  "limitations is ONLY for missing evidence or incomplete coverage, not a summary of a successful review or an empty result.",
+  limitationFormat,
+  "limitations is not a summary of a successful review or an empty result.",
   "An empty candidates array is permitted, but is not a claim that the PR is clean.",
 ].join("\n");
 
@@ -45,9 +55,10 @@ export const validationInstructions = [
   "Only mark a duplicate when root cause, triggering condition, and resulting failure are the SAME defect.",
   "Sharing a location or fix is not enough. Distinct defects at the same line must remain separate.",
   "Return ONLY JSON, no fences, no extra fields:",
-  '{"schemaVersion":1,"reviewKey":"<supplied key>","decisions":[{"candidateId":"<supplied id>",',
+  '{"schemaVersion":2,"reviewKey":"<supplied key>","decisions":[{"candidateId":"<supplied id>",',
   '"verdict":"accept|reject|uncertain","reason":"source-grounded explanation or missing evidence",',
   '"allClaimsSupported":true,"evidence":[CITATION],"duplicateOf":null}],"limitations":[]}.',
+  limitationFormat,
   "Use the supplied CITATION format. Accept requires at least one exact citation. Other verdicts may use [].",
   citationFormat,
   "Give exactly one decision per candidate, in supplied order. Do not rewrite titles, severity, confidence, or evidence.",
@@ -71,10 +82,25 @@ function envelope(raw, key, field) {
   // Deliberately no fence stripping, substring recovery, or malformed-output extraction.
   const parsed = JSON.parse(raw);
   object(parsed, ["schemaVersion", "reviewKey", field, "limitations"], "Review output");
-  if (parsed.schemaVersion !== 1 || parsed.reviewKey !== key) throw new Error("Wrong schema version or review binding.");
+  if (![1, 2].includes(parsed.schemaVersion) || parsed.reviewKey !== key) throw new Error("Wrong schema version or review binding.");
   if (!Array.isArray(parsed[field]) || !Array.isArray(parsed.limitations)) throw new Error("Expected result arrays.");
-  parsed.limitations.forEach((entry) => text(entry, "Limitation"));
+  parsed.limitations.forEach((entry) => {
+    if (parsed.schemaVersion === 1) return text(entry, "Legacy limitation");
+    object(entry, ["kind", "reason", "impact"], "Limitation");
+    text(entry.reason, "Limitation reason");
+    if (entry.kind === "coverage-gap") text(entry.impact, "Blocked assessment and impact");
+    else if (entry.kind !== "caveat" || entry.impact !== null) throw new Error("Invalid limitation category or impact.");
+  });
   return parsed;
+}
+
+function limitations(output, label) {
+  return output.limitations.map((entry) => output.schemaVersion === 1 ? {
+    kind: "coverage-gap", message: `${label}: legacy unclassified limitation (kept incomplete): ${entry}`,
+  } : {
+    kind: entry.kind,
+    message: `${label}: ${entry.reason}${entry.kind === "coverage-gap" ? ` Blocked assessment: ${entry.impact}` : ""}`,
+  });
 }
 
 export function evidenceBoundary(snapshot, context, binding) {
@@ -178,41 +204,46 @@ function candidate(value, boundary) {
 
 export function collectCandidates(reviewers, boundary) {
   const candidates = [];
-  const issues = [];
+  const diagnostics = [];
   for (const reviewer of reviewers) {
     if (reviewer.status !== "completed") {
-      issues.push(`${reviewer.label}: incomplete specialist execution; output not eligible for acceptance.`);
+      diagnostics.push({ kind: "execution-failure", message:
+        `${reviewer.label}: incomplete specialist execution; output not eligible for acceptance.${reviewer.error ? ` ${reviewer.error}` : ""}` });
       continue;
     }
     let output;
     try {
       output = envelope(reviewer.result, boundary.key, "candidates");
     } catch (error) {
-      issues.push(`${reviewer.label}: invalid candidate output: ${String(error)}`);
+      diagnostics.push({ kind: "execution-failure", message: `${reviewer.label}: invalid candidate output: ${String(error)}` });
       continue;
     }
-    issues.push(...output.limitations.map((reason) => `${reviewer.label}: ${reason}`));
+    diagnostics.push(...limitations(output, reviewer.label));
     for (const [index, value] of output.candidates.entries()) {
       const id = `${reviewer.label}:${index + 1}`;
       try {
         candidates.push({ ...candidate(value, boundary), id, reviewer: reviewer.label });
       } catch (error) {
-        issues.push(`${id}: rejected at evidence boundary: ${String(error)}`);
+        diagnostics.push({ kind: "execution-failure", message: `${id}: rejected at evidence boundary: ${String(error)}` });
       }
     }
   }
-  return { candidates, issues };
+  return { candidates, diagnostics, issues: blockingIssues(diagnostics) };
 }
 
 export function adjudicateCandidates(collected, reviewer, boundary) {
-  const issues = [...collected.issues];
+  const diagnostics = [...collected.diagnostics];
   const findings = [];
   const rejected = [];
   const duplicates = [];
-  const result = () => ({ complete: issues.length === 0, findings, rejected, duplicates, issues });
+  const result = () => {
+    const issues = blockingIssues(diagnostics);
+    return { complete: issues.length === 0, findings, rejected, duplicates, issues, diagnostics };
+  };
   if (!collected.candidates.length) return result();
   if (reviewer?.status !== "completed") {
-    issues.push("Evidence adjudication did not complete; no candidates accepted.");
+    diagnostics.push({ kind: "execution-failure", message:
+      `evidence-validator: Evidence adjudication did not complete; no candidates accepted.${reviewer?.error ? ` ${reviewer.error}` : ""}` });
     return result();
   }
   let output;
@@ -223,10 +254,10 @@ export function adjudicateCandidates(collected, reviewer, boundary) {
       throw new Error("Adjudication must decide every candidate exactly once in supplied order.");
     }
   } catch (error) {
-    issues.push(`Invalid adjudication output: ${String(error)}`);
+    diagnostics.push({ kind: "execution-failure", message: `evidence-validator: Invalid adjudication output: ${String(error)}` });
     return result();
   }
-  issues.push(...output.limitations.map((reason) => `Adjudicator: ${reason}`));
+  diagnostics.push(...limitations(output, "Adjudicator"));
   const accepted = new Map();
   for (const [index, decision] of output.decisions.entries()) {
     const entry = collected.candidates[index];
@@ -242,7 +273,9 @@ export function adjudicateCandidates(collected, reviewer, boundary) {
       if (decision.verdict !== "accept") {
         if (decision.duplicateOf !== null) throw new Error("Only accepted candidates can be duplicates.");
         rejected.push({ id: entry.id, verdict: decision.verdict, reason: decision.reason });
-        if (decision.verdict === "uncertain") issues.push(`${entry.id}: unresolved evidence: ${decision.reason}`);
+        if (decision.verdict === "uncertain") diagnostics.push({
+          kind: "coverage-gap", message: `${entry.id}: unresolved evidence: ${decision.reason}`,
+        });
         continue;
       }
       if (!decision.allClaimsSupported) throw new Error("Acceptance requires support for the entire candidate, not a partially true claim.");
@@ -282,7 +315,7 @@ export function adjudicateCandidates(collected, reviewer, boundary) {
       findings.push(finding);
       accepted.set(entry.id, finding);
     } catch (error) {
-      issues.push(`${entry.id}: invalid adjudication: ${String(error)}`);
+      diagnostics.push({ kind: "execution-failure", message: `${entry.id}: invalid adjudication: ${String(error)}` });
     }
   }
   findings.sort((left, right) => left.severity.localeCompare(right.severity) || right.confidence - left.confidence);
@@ -291,7 +324,10 @@ export function adjudicateCandidates(collected, reviewer, boundary) {
 
 export function formatFindings(outcome) {
   const validation = outcome.validation;
-  if (!validation) return "No validated result; review did not reach evidence validation.";
+  if (!validation) return [
+    "No validated result; review did not reach evidence validation.", formatCoverage(outcome),
+    "No accepted findings is not proof of a clean PR.",
+  ].join("\n\n");
   const target = outcome.binding
     ? ` ${outcome.binding.repository.nameWithOwner}#${outcome.binding.number} at ${outcome.binding.head}` : "";
   const heading = `Quick review${target}: ${validation.findings.length} validated finding(s); ` +
@@ -308,9 +344,8 @@ export function formatFindings(outcome) {
     `Reported by: ${[...new Set(finding.reportedBy)].join(", ")}`,
   ].join("\n"));
   return [
-    heading, ...sections,
+    heading, formatCoverage(outcome), ...sections,
     ...validation.rejected.map((entry) => `${entry.id}: ${entry.verdict}: ${entry.reason}`),
-    ...validation.issues.map((issue) => `Incomplete coverage: ${issue}`),
     "Validation combines exact source/diff checks with fallible model adjudication, not execution or formal proof.",
     "No accepted findings is not proof of a clean PR.",
   ].join("\n\n");

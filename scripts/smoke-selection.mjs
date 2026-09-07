@@ -22,7 +22,7 @@ function fixture({ all = false, complete = true, answer, ui = true } = {}) {
       })),
       rejected: [{ id: "rejected-id" }], duplicates: [{ id: "duplicate-id" }],
     },
-    reviewers: [{ result: "raw-id" }],
+    reviewers: [{ label: "correctness", status: complete ? "completed" : "incomplete", result: "raw-id" }],
   };
   const parent = {
     sessionId: "parent-session", capabilities: { ui: { elicitation: ui } },
@@ -52,7 +52,7 @@ for (const complete of [true, false]) {
   assert.deepEqual(result.selection.findingIds, ["candidate-1", "candidate-3"]);
   assert.equal(result.complete, complete);
   assert.equal(result.coverage, complete ? "completed" : "incomplete");
-  assert.match(subset.requests[0].message, complete ? /Completed review/ : /INCOMPLETE review/);
+  assert.match(subset.requests[0].message, complete ? /Review coverage: completed/ : /Review coverage: INCOMPLETE/);
   assert(subset.requests[0].requestedSchema.properties.findingIds.items.anyOf.every((choice) =>
     /\[P[12]\].*total.js:\d-\d \(head\); confidence 0.99/.test(choice.title)));
   assert(subset.messages.some((message) => /Nothing was published/.test(message)));

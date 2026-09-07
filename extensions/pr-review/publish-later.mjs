@@ -8,6 +8,7 @@ import {
 } from "./publication.mjs";
 import { retainedRecord, sessionStore } from "./retention.mjs";
 import { runGh } from "./target.mjs";
+import { formatCoverage } from "./coverage.mjs";
 
 function refuse(condition, message) {
   if (!condition) throw new Error(`Publish-later refused: ${message}.`);
@@ -44,7 +45,7 @@ export async function publishRetained(parent, { controller, gh = runGh, store, a
     `Publish-later: explicit authorization ${authority.invocationId} for retained invocation ` +
       `${record.invocation.invocationId}, ${outcome.binding.repository.nameWithOwner}` +
       `#${outcome.binding.number} at reviewed head ${outcome.binding.head}.`,
-    `${outcome.selection.findingIds.length} selected finding(s); review coverage: ${outcome.coverage}.`,
+    `${outcome.selection.findingIds.length} selected finding(s).\n${formatCoverage(outcome)}`,
     "This is a new explicit publication action. Retained posting flags, configuration and confirmations " +
       "are historical and authorize nothing. No reviewer, validator or parent inference runs.",
     ...(previous?.status === "failed"

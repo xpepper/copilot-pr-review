@@ -248,6 +248,27 @@ siblings, and a failed specialist does not discard validated findings from its
 successful peers. Non-textual changes are explicitly uncovered. Empty findings,
 completed execution, and skipped targets never claim a clean PR.
 
+Coverage diagnostics distinguish **execution failures** (including invalid
+output), **substantive coverage gaps**, and **informational caveats**. Only the
+first two make validation incomplete. Reviewer and adjudicator output schema
+version 2 uses explicit `limitations` entries with `kind`, `reason`, and
+`impact`: a `coverage-gap` requires a nonempty impact explaining which
+consequential assessment is blocked; a `caveat` requires `impact: null`.
+Not independently auditing a dependency is informational unless relevant
+missing evidence blocks a specific assessment of this diff. Code-detected
+unavailable changed content and uncertain adjudication remain coverage gaps.
+Classification of model-reported limitations is still fallible; structured
+output does not prove that the model chose the right category.
+
+Final summaries, retained inspection, and new publication proposals show these
+categories and their reasons. Retention keeps optional structured `diagnostics`
+alongside the existing blocking `issues`; caveats do not enter that blocking
+list. The publication/authorization record versions remain unchanged. Older
+unclassified issues and version-1 output limitations stay conservatively
+incomplete, without guessing from wording. Legacy publication proposals retain
+their exact original text for inspection and gated publish-later; no historical
+authority is upgraded or reused.
+
 Validation uses the existing tool-denial, progress, cancellation, no-timeout,
 usage-accounting, and cleanup machinery. Cancellation during validation stops the
 owned work. P2 retains the validated findings and their source provenance, not raw

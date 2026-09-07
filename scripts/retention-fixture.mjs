@@ -6,7 +6,9 @@ import { adjudicateCandidates, collectCandidates, evidenceBoundary, reviewKey } 
 import { selectFindings } from "../extensions/pr-review/selection.mjs";
 import { respond, validationBaseSource, validationHeadSource } from "./target-fixture.mjs";
 
-export async function retentionFixture(sessionId, { includeBoundary = false } = {}) {
+export async function retentionFixture(sessionId, {
+  includeBoundary = false, reviewerLimitations = [], adjudicatorLimitations = [],
+} = {}) {
   const history = [];
   const gh = async (args, cwd) => {
     const response = respond(args, cwd, history);
@@ -30,13 +32,16 @@ export async function retentionFixture(sessionId, { includeBoundary = false } = 
   const reviewers = ["correctness", "contracts", "security-performance-resources"].map((label) => ({
     label, model: "controlled-model", reasoningEffort: "high", status: "completed", sessionId: randomUUID(),
     usage: [{ model: "controlled-model", reasoningEffort: "high", isByok: false }],
-    result: JSON.stringify({ schemaVersion: 1, reviewKey: boundary.key, candidates: [candidate], limitations: [] }),
+    result: JSON.stringify({
+      schemaVersion: 2, reviewKey: boundary.key, candidates: [candidate],
+      limitations: label === "correctness" ? reviewerLimitations : [],
+    }),
   }));
   const collected = collectCandidates(reviewers, boundary);
   const adjudicator = {
     label: "evidence-validator", model: "controlled-model", status: "completed",
     result: JSON.stringify({
-      schemaVersion: 1, reviewKey: boundary.key, limitations: [],
+      schemaVersion: 2, reviewKey: boundary.key, limitations: adjudicatorLimitations,
       decisions: collected.candidates.map((entry, index) => ({
         candidateId: entry.id, verdict: index === 2 ? "reject" : "accept", allClaimsSupported: index !== 2,
         reason: "Controlled adjudication for retention plumbing, not live inference.",
@@ -51,6 +56,8 @@ export async function retentionFixture(sessionId, { includeBoundary = false } = 
     complete: true, reviewComplete: true, executionComplete: true, coverage: "completed",
     cancelled: false, cleanupErrors: [],
   };
+  outcome.complete = outcome.reviewComplete = outcome.validation.complete;
+  outcome.coverage = outcome.complete ? "completed" : "incomplete";
   outcome.selection = await selectFindings({ sessionId }, outcome, { all: true, controller: new AbortController() });
   return includeBoundary ? { outcome, boundary } : outcome;
 }

@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { finishPreview } from "../extensions/pr-review/preview.mjs";
+import { finishPreview, reviewRequest } from "../extensions/pr-review/preview.mjs";
 import { publishCurrent } from "../extensions/pr-review/publication.mjs";
 import { executePublishLater, publishRetained } from "../extensions/pr-review/publish-later.mjs";
 import {
@@ -136,6 +136,37 @@ try {
   assert.equal(positive.calls.filter((call) => call.args[4] === "POST").length, 1, "No repeat write");
   assert.deepEqual(positive.store.read(), published, "A refused repeat leaves the record untouched");
   console.log("PASS explicit publish-later of a --no-comment result: refetched evidence, exact payload, version-4 authority and no repeat");
+
+  for (const legacy of [false, true]) {
+    const h = await harness({ prepare(h) {
+      const value = h.reviewed;
+      value.validation.diagnostics = [
+        { kind: "caveat", message: "External dependency internals not audited." },
+        { kind: "coverage-gap", message: "Changed adapter contract absent; compatibility assessment blocked." },
+      ];
+      value.validation.issues = [value.validation.diagnostics[1].message];
+      value.complete = value.reviewComplete = value.validation.complete = false;
+      value.coverage = "incomplete";
+      if (legacy) delete value.validation.diagnostics;
+      value.preview.request = reviewRequest(value);
+      h.store.write(retainedRecord(value));
+    } });
+    const original = h.store.read();
+    if (legacy) assert.equal(original.outcome.preview.request.payload.body,
+      "Quick review: 1 selected validated finding(s). Review coverage: INCOMPLETE. This is not a clean-review claim.");
+    const result = await h.run();
+    assert.equal(result.publication.status, "succeeded");
+    const published = h.store.read();
+    assert.equal(published.schemaVersion, 4);
+    assert.deepEqual(published.outcome.preview, original.outcome.preview);
+    assert.deepEqual(published.outcome.validation, original.outcome.validation);
+    assert.equal(published.outcome.complete, false);
+    assert.equal(published.outcome.preview.authorized, false);
+    const repeated = await h.run();
+    assert.match(repeated.publishLater.error, /already published/);
+    assert.equal(h.calls.filter((call) => call.args[4] === "POST").length, 1);
+  }
+  console.log("PASS classified and legacy incomplete publish-later preserves exact proposals, uncertainty and version-4 gates");
 
   for (const [name, prepare, pattern] of [
     ["missing", (h) => rmSync(join(h.workspacePath, retainedFilename)), /no retained review result/],

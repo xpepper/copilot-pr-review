@@ -106,17 +106,29 @@ try {
       console.log(`P2 real inference retained: ${JSON.stringify(evidence)}; owned PID ${owned[0].pid} exited`);
     } finally { unsubscribe(); }
   } else {
-    const seeded = retainedRecord(await retentionFixture(sessionId));
+    const seeded = retainedRecord(await retentionFixture(sessionId, {
+      reviewerLimitations: [{
+        kind: "caveat", reason: "Synthetic external library internals not independently audited.", impact: null,
+      }],
+    }));
     await writeFile(join(metadata.workspacePath, retainedFilename), JSON.stringify(seeded), { mode: 0o600 });
     console.log("P2 controlled seed: findings/adjudication are fixtures, NOT native inference evidence");
   }
-  const initial = (await inspect(session)).record;
+  const inspection = await inspect(session);
+  const initial = inspection.record;
   assert(initial, "Settled record must be inspectable");
   assert.equal(initial.invocation.sessionId, sessionId);
   assert.equal(initial.outcome.binding.repository.nameWithOwner, target.quickTarget.repository);
   assert.equal(initial.outcome.binding.head, target.quickTarget.head);
   assert.equal(initial.outcome.validation.findings.length, 1, "Positive lifecycle probe requires a validated finding");
   assert.equal(initial.outcome.selection.status, "selected");
+  if (!live) {
+    assert.equal(initial.outcome.complete, true);
+    assert.deepEqual(initial.outcome.validation.issues, []);
+    assert.equal(initial.outcome.validation.diagnostics[0].kind, "caveat");
+    assert(inspection.messages.some((message) =>
+      message.includes("Informational caveat: correctness: Synthetic external library")));
+  }
   console.log(`P2 initial record: ${JSON.stringify(initial)}`);
   const tracePath = process.env.PR_REVIEW_SMOKE_TRACE;
   const traceBefore = await readFile(tracePath, "utf8");

@@ -9,6 +9,7 @@ import { formatFindings, minimumConfidence, reviewKey } from "./findings.mjs";
 import { validatePreview } from "./preview.mjs";
 import { selectionBinding } from "./selection.mjs";
 import { publicationSummary, validatePublication } from "./publication.mjs";
+import { blockingIssues, diagnosticKinds } from "./coverage.mjs";
 
 export const retainedFilename = "pr-review-result.json";
 const hash = /^[a-f0-9]{64}$/;
@@ -73,8 +74,18 @@ function citation(value, target) {
     source.ref === value.ref && source.blobSha === value.blobSha)), "citation outside reviewed binding");
 }
 function validation(value, target) {
-  object(value, ["complete", "findings", "rejected", "duplicates", "issues"]);
+  object(value, ["complete", "findings", "rejected", "duplicates", "issues"], ["diagnostics"]);
   strings(value.issues);
+  if (value.diagnostics !== undefined) {
+    requireValue(Array.isArray(value.diagnostics), "expected coverage diagnostics");
+    for (const entry of value.diagnostics) {
+      object(entry, ["kind", "message"]);
+      requireValue(diagnosticKinds.includes(entry.kind), "invalid diagnostic category");
+      text(entry.message);
+    }
+    requireValue(isDeepStrictEqual(value.issues, blockingIssues(value.diagnostics)),
+      "coverage diagnostics disagree with blocking issues");
+  }
   requireValue(typeof value.complete === "boolean" && value.complete === (value.issues.length === 0) &&
     [value.findings, value.rejected, value.duplicates].every(Array.isArray), "invalid validation state");
   const ids = new Set();
@@ -134,7 +145,8 @@ const outcomeKeys = ["invocation", "binding", "mode", "noComment", "complete", "
   "executionComplete", "coverage", "cancelled", "error", "cleanupErrors", "disposition", "reason", "selection", "preview", "publication"];
 
 // Version 4 marks a record whose write came from the explicit publish-later
-// command. Versions 1-3 stay readable exactly as they were written.
+// command. Optional validation diagnostics do not change publication authority.
+// Records without diagnostics stay readable and keep their original preview text.
 const publicationSchemaVersion = (outcome) =>
   outcome.publication ? (outcome.publication.authority ? 4 : 3) : outcome.preview ? 2 : 1;
 
@@ -144,7 +156,7 @@ export function retainedRecord(outcome) {
   if (outcome.adjudicator) result.adjudicator = pick(outcome.adjudicator, reviewerKeys);
   if (outcome.validation) {
     result.validation = {
-      ...pick(outcome.validation, ["complete", "findings", "rejected", "issues"]),
+      ...pick(outcome.validation, ["complete", "findings", "rejected", "issues", "diagnostics"]),
       duplicates: outcome.validation.duplicates.map((entry) => pick(entry, ["id", "duplicateOf", "reason"])),
     };
   }

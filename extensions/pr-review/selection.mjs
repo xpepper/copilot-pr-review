@@ -1,5 +1,6 @@
 import { reviewKey } from "./findings.mjs";
 import { waitForInteraction } from "./interaction.mjs";
+import { formatCoverage } from "./coverage.mjs";
 
 export function selectionBinding(outcome) {
   return outcome.binding ? {
@@ -33,7 +34,7 @@ export async function selectFindings(parent, outcome, { all = false, controller 
   const choices = new Map(findings.map((finding) => [`${binding.invocationId}:${finding.id}`, finding.id]));
   const answer = await waitForInteraction(signal, () => parent.ui.elicitation({
     message: `Select findings for ${binding.repository.nameWithOwner}#${binding.number} at head ${binding.head}.\n` +
-      `${outcome.complete ? "Completed" : "INCOMPLETE"} review coverage; this is not a clean-review claim.\n` +
+      `${formatCoverage(outcome)}\nThis is not a clean-review claim.\n` +
       "Accept with no choices or decline to select none; cancel to cancel this run. " +
       "Selected findings may publish if this run has posting authority and passes fresh publication gates.",
     requestedSchema: {
