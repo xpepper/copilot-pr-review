@@ -101,7 +101,7 @@ try {
       if (match) labels.add(match[1]);
       if (labels.size === 3) active.resolve();
       if (message.startsWith("P2 evidence: ")) done.resolve(JSON.parse(message.slice(13)));
-      if (message.startsWith("Review/retention failed:")) done.reject(new Error(message));
+      if (message.startsWith("Review/publication failed:")) done.reject(new Error(message));
     });
     const observing = new AbortController();
     try {

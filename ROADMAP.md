@@ -26,7 +26,7 @@ in [AGENTS.md](AGENTS.md); the replaceable next-session prompt lives in
 | P2 | Completed | Retain the latest settled quick result in its originating local session; inspect without inference/GitHub access. Reload and conversation-backed cold resume demonstrated; command-only resume caveat below. | P1; [Cached results](SCOPE.md#selection-publication-and-cached-results) |
 | P3 | Completed | Independent posting authority, explicit confirmation and code-built COMMENT payload preview; native cancellation/reload/resume and no-submission evidence below. | P1; [Publication controls](SCOPE.md#selection-publication-and-cached-results) |
 | P4 | Completed | Current-run COMMENT publication with fresh gates and durable uncertainty; nine native cases, reload/cold resume and real playground inline publication demonstrated below. | P3; [Publication gates](SCOPE.md#selection-publication-and-cached-results) |
-| P5 | In progress | Explicit publish-later of the retained selection implemented, with refetched evidence, fresh gates and version-4 authority; controlled evidence below. Native installed-plugin probes remain before completion. | P2, P4; [Cached publication](SCOPE.md#selection-publication-and-cached-results) |
+| P5 | Completed | Explicit publish-later of the retained selection without rerunning reviewers; refetched evidence, fresh gates, version-4 authority, seven native cases and a real playground publication demonstrated below. | P2, P4; [Cached publication](SCOPE.md#selection-publication-and-cached-results) |
 | C1 | Pending | Inspect/update personal tier configuration via text commands; validate capabilities, inheritance, and flag precedence; show effective assignments. | F3; [Configuration](SCOPE.md#models-configuration-and-execution) |
 | C2 | Pending | Explicit trust gates project overrides; prove a repository cannot authorize itself. | C1; [Configuration trust](SCOPE.md#models-configuration-and-execution) |
 | M1 | Pending | Balanced becomes default with required topology and P3 cap; full adds conventions reviewer and its findings policy. | Q4, C1; [Modes](SCOPE.md#review-modes-and-findings) |
@@ -1778,10 +1778,11 @@ no-power-loss guarantees and Q4 semantic/context-window limits remain. Full F3
 process-loss exercises are not rerun here. No P5, configuration, additional mode,
 fallback or safeguard work is included.
 
-## P5 implementation checkpoint
+## Completed increment: P5
 
-Continues from P4 `157747b`. No upstream source was copied and no reviewer,
-validator or parent inference participates in publish-later.
+Implementation checkpoint `f698df6` continues from P4 `157747b`. No upstream
+source was copied and no reviewer, validator or parent inference participates in
+publish-later. Nothing was pushed in this session.
 
 ### Publish-later boundary
 
@@ -1857,51 +1858,184 @@ any model or UI request, so no inference or elicitation can hide in the path.
 pass after the shared-gate refactor.
 
 These controlled proofs demonstrate neither remote acceptance nor native
-installed-plugin behavior; both remain open for P5 completion.
+installed-plugin behavior on their own; both are covered below.
+
+### Installed-plugin evidence
+
+All seven cases in `scripts/smoke-publish-later-runtime.mjs` passed against the
+installed plugin with actual `gpt-5.6-terra` / `high` inference and the
+child-only controlled `gh` fixture. Every case first runs a real
+`--quick --all --no-comment` review, so the retained result carries no posting
+authority, then publishes it with `/pr-review publish`. Each case requires
+positive canonical findings, exactly three specialists plus a validator, and an
+exited owned runtime before publication. For every POST the fixture holds its
+response until the harness reads the actual version-4 `in-flight` record from
+the host-reported session workspace.
+
+| Case | Session | Review inference PID | Publish-later result | Final digest |
+| --- | --- | --- | --- | --- |
+| publish | `43156406-c7b2-40a8-bf74-08cdf5ccb5ce` | 11329 | succeeded | `6d347f20afbadbe8566639bd2fa3a1be0488759a37ad182d108f6b0ce35e51a0` |
+| stale | `3281d598-03fb-4c28-a833-e9ef4cc8c9ff` | 14701 | refused; record unchanged at version 3 | `f93cb86f4387b6d4ac8eea6f84fe528baad92842734d9c1edb8e92b6cc80e275` |
+| uncertain | `01b002c5-1bd8-4fcb-9b9b-33718442a322` | 16062 | uncertain (HTTP 503) | `d4e2202db57901da7b9565cf38ee1f16f706111c4f63519721adf5ce0a3922c9` |
+| cancel | `92ee5b19-f196-4aeb-90b8-55f1c836acd7` | 17454 | uncertain + cancelRequested | `2cee32976fd1c49e045bbc27ef88587b333587ca3cf2f7907908143dd3b75e71` |
+| reject | `704dcc74-049d-4c06-98bd-beb6fb489ab6` | 18862 | failed (HTTP 422), then a gated retry failed again | `4a8123577232621769fae4c055523f33af394a3c1c53b3abe55700f82cf4d69d` |
+| draft | `2cd41217-a488-4aa6-adde-1229326f6caa` | 20171 | refused; record unchanged at version 3 | `d8df7efc52d87320c67ec258fb72a3dbb6304d68f58b28aa381abec1b5a3bb2d` |
+| resume | `4684084a-2096-4e4b-83ab-81bcfbff5041` | 21868 | succeeded after conversation-backed cold resume | `6017c43971e17c57c2c391cd1e6326d98b3f71a05ffc05818c152f5de415cd01` |
+
+Every publish command produced no `user.message`, `assistant.*`, `subagent.*` or
+`tool.execution_start` event, no `Reviewer ... starting` message, and no
+surviving owned process; the harness rejects any elicitation request outright.
+Each case reloaded the extension between the review and the publication, so the
+published record was reloaded from disk rather than run memory, and inspection
+after publication survived another reload. Each posted stdin equalled the
+retained canonical payload, and every dispatching case refetched
+`/contents/` source at the reviewed revisions.
+
+A second `/pr-review publish` ran in every case. It dispatched again only for
+`reject`, with a different authorizing invocation and a full gate rerun; it
+refused the succeeded, uncertain and cancelled records without contacting
+GitHub, and left them byte-identical. The `cancel` case verified that the owned
+`gh` POST process really exits when cancellation arrives while the response is
+held. The `resume` case saved and closed the session, stopped the runtime,
+reconnected and resumed it, and published from the resumed session; its one
+harness-only parent turn initialized resumable history and is not plugin
+behavior.
+
+The first `stale` attempt stopped because that inference run validated no
+finding, so there was nothing to publish later. That is fallible model output,
+not plugin behavior; the case was rerun deliberately and the harness performs no
+automatic positive-output retry. `smoke-publication-runtime.mjs --cases=comment`
+passed unchanged after the shared-gate refactor, retaining a version-3 record
+with no authority (session `034b88cb-91f2-4bba-9a13-24353227451c`, digest
+`08279c4e97b4098e9a5ce3219876ee5fe8807f224d1e59834b4a97cd6f4d8400`).
+`smoke-runtime.mjs --targets` and `smoke-retention-runtime.mjs` also passed
+without inference, and legacy version-1 inspection still works.
+
+### Real playground publish-later
+
+The user authorized synthetic playground branches, commits and PRs through the
+GitHub API. Fixture setup used the API only, separately from the review
+workflow: no `git push`, no local checkout switch, no main update and no merge.
+The new synthetic percentage-discount fixture lives only on two isolated remote
+branches:
+
+- Base `playground/p5-base-20260907`:
+  `160ec104c5fcd9f6028acd76e4a421a153dbc743`.
+- Head `playground/p5-publish-later-20260907`:
+  `64383e445ffff9677f1958a83829232f2089f0ce`.
+- Synthetic PR [#2](https://github.com/xpepper/copilot-pr-review/pull/2) remains
+  open, unmerged and based on the synthetic base, never main.
+
+Installed CLI 1.0.83 / bundled SDK, Node 26.1.0, macOS arm64, explicit
+`gpt-5.6-terra` / `high` ran `2 --quick --all --no-comment`, which retained a
+version-3 record with `preview.status=suppressed` and no write. After an
+extension reload, `/pr-review publish` refetched the identity, metadata, diff
+and both reviewed revisions from real GitHub and submitted review
+[`5131451227`](https://github.com/xpepper/copilot-pr-review/pull/2#pullrequestreview-5131451227)
+as COMMENTED at the reviewed head.
+
+Session `835f1310-a525-42be-a496-e31926ec008c`, review invocation
+`969958b6-0cec-48f4-a2ee-66271b949b11`, publish authorization
+`58861588-87b8-4f60-96bc-5ad2ef05dab0`, durable version-4 digest
+`240ad077014d16e3fd48d843d3cdefe0983e6015efcbf4245ce3f8517163841d`.
+The single P1 finding, confidence 0.99, was reported by the correctness and
+contracts specialists and deduplicated; because the changed function's caller
+lives in the same file, review coverage was **completed**, unlike P4's
+incomplete run. Remote comment
+[`3949275074`](https://github.com/xpepper/copilot-pr-review/pull/2#discussion_r3949275074)
+matches the exact retained text at `playground/discount.mjs:5`, RIGHT. GraphQL
+confirms unresolved, non-outdated thread `PRRT_kwDOUQilZc6f5Mm6`; the PR head is
+unchanged and the PR is not merged. Read-only re-verification of both the new
+version-4 record and P4's existing version-3 record passed without inference or
+mutation. **Do not repeat either POST.**
+
+### APIs, reproduction and remaining limits
+
+No new runtime API was adopted: publish-later reuses the extension command
+surface, the session metadata snapshot and the same read-only `gh` requests, and
+consulted the installed SDK `extension.d.ts` and the current
+[REST review endpoint documentation](https://docs.github.com/en/rest/pulls/reviews#create-a-review-for-a-pull-request)
+before reusing the pinned 2022-11-28 API version.
+
+```sh
+node scripts/smoke-publish-later.mjs
+node scripts/smoke-publication.mjs
+node scripts/smoke-preview.mjs
+node scripts/smoke-quick.mjs
+node scripts/smoke-retention.mjs
+copilot plugin install "$(pwd)"
+COPILOT_CLI_PATH="$(command -v copilot)" \
+COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
+PR_REVIEW_HEAVY_MODEL=gpt-5.6-terra PR_REVIEW_HEAVY_EFFORT=high \
+node scripts/smoke-publish-later-runtime.mjs --cases=publish,stale,uncertain,cancel,reject,draft
+# Cold resume runs alone; it initializes its own resumable history.
+COPILOT_CLI_PATH="$(command -v copilot)" \
+COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
+PR_REVIEW_HEAVY_MODEL=gpt-5.6-terra PR_REVIEW_HEAVY_EFFORT=high \
+node scripts/smoke-publish-later-runtime.mjs --cases=resume
+# Already published once. Do NOT repeat against PR 2 at the head below.
+# node scripts/smoke-publication-live.mjs --publish-later --pr=2 \
+#   --head=64383e445ffff9677f1958a83829232f2089f0ce
+node scripts/smoke-publication-live.mjs --pr=2 \
+  --head=64383e445ffff9677f1958a83829232f2089f0ce \
+  --verify-record="$HOME/.copilot/session-state/835f1310-a525-42be-a496-e31926ec008c/pr-review-result.json"
+```
+
+Remaining limits are inherited rather than new. The final GET and POST are still
+not an atomic compare-and-submit operation, so a concurrent remote update can
+still make an explicitly head-bound review outdated. Retained storage still has
+no cross-process lock or power-loss guarantee; the digest detects corruption,
+not a writer able to recompute it. Real LEFT, multiline, rename and deletion
+anchors remain undemonstrated remotely; controlled payload gates cover them.
+Command-only cold resume is still unsupported by the CLI, so publish-later after
+a resume needs conversation-backed history. There is still no automatic
+reconciliation or retry command for an uncertain write, and a definite failure
+must be republished deliberately. Q4 semantic and context-window limits and F3
+process-loss limits are unchanged and were not re-exercised here. No
+configuration, additional mode, fallback or safeguard work is included.
 
 ## Exact next increment
 
-**P5 only:** Explicitly publish this originating session's retained selected
-findings without rerunning reviewers. Reuse P4's code-controlled COMMENT gates
-and durable write-state handling; do not implement configuration or other modes.
+**C1 only:** Inspect and update personal tier configuration through text
+commands, with validated capabilities, tier inheritance and flag precedence.
+Do not implement project-override trust (C2), other review modes, fallbacks or
+safeguards, and do not change publication behavior.
 
 Acceptance criteria:
 
-- Add an explicit publish-later command for the current local originating
-  session only, with no cross-session or different-target argument. Publication
-  is a new explicit user authorization, never reuse of retained historical
-  `--comment`, confirmation or config authority. A prior `--no-comment` run can
-  be published by this later explicit command.
-- Publish only nonempty retained canonical selected IDs with their original
-  repository/PR/reviewed-head binding. Preserve incomplete coverage and finding
-  text. Reject unavailable/malformed/wrong-session/cancelled/unselected records.
-  Do not introduce an editor or new cross-session selection workflow.
-- Reread only GitHub evidence needed to reestablish valid current anchors,
-  source provenance and P4 gates. Retention does not contain the captured
-  `evidenceBoundary`; do not treat `reviewRequest` reconstruction or quotations
-  alone as a fresh source/diff check. Reject changed heads/base/diffs and
-  draft/non-open inline publication, never stale or body-only fallback.
-- Start no reviewer, validator or parent model inference, even on reload/resume.
-  Never read unrelated local source, switch branches or execute safeguards.
-  Host-reported originating session storage and explicit captured remote
-  identity must remain authoritative despite a changed session cwd.
-- Refuse blind repeat publication of confirmed success or unresolved
-  `in-flight`/`uncertain` results. Keep the journal and actual write outcome
-  intact on interruption, cancellation, error and storage failure. Any explicit
-  retry after a definite failure must rerun fresh gates with fresh authority.
-- Keep active-run exclusion and cancellation working for publish-later.
-  Persist uncertainty before dispatch and final outcomes before awaited logging;
-  cancellation after dispatch cannot undo a remote write. Preserve version-1/2
-  inspection compatibility and deliberately version any publication-schema
-  changes rather than manufacturing missing permissions.
-- Demonstrate no-inference publish-later and refusal cases through controlled
-  and installed-plugin probes, including reload and supported same-session
-  resume. Extend the permitted synthetic playground only when explicitly
-  authorized; never merge its branches or blindly repeat #1's existing review.
-- Consult installed SDK/current official documentation before new runtime APIs,
-  then record evidence, remaining limits and the next small increment. Follow
-  `AGENTS.md` checkpoint and final-file handoff rules in turn.
+- Add a code-owned configuration command following the upstream
+  `show` and `key=value` workflow, with no interactive menu and no finding
+  editor. Unknown keys, malformed assignments and unsupported values must be
+  explicit errors that change nothing.
+- Support light, medium and heavy model and reasoning-effort assignments.
+  Validate every explicit value against the session's actual available models
+  and their supported efforts. Never silently substitute a model or lower an
+  effort; refuse instead.
+- Preserve upstream nearest-configured-tier and ambient-model inheritance for
+  unset tiers, and display the resulting effective assignments before execution.
+  Keep `autoPostReviews` retained and inspectable, defaulting to false.
+- Persist personal configuration outside the reviewed checkout, in a documented
+  location, with a versioned schema and an explicit error for malformed or
+  incompatible stored settings. Do not read or trust any repository-provided
+  configuration file yet: a repository must not authorize itself, and project
+  overrides remain C2.
+- Explicit invocation flags must take precedence over saved settings for that
+  invocation only, without rewriting the saved configuration. `--comment` /
+  `--no-comment` must still conflict, and effective `autoPostReviews=true` with
+  `--all` must remain able to publish unattended, as recorded in `SCOPE.md`.
+- Configuration inspection and updates must start no inference, no GitHub
+  request and no review work, and must be refused while review or publication
+  work is active.
+- Demonstrate through controlled probes and installed-plugin probes that saved
+  settings actually drive quick reviewer assignments, that flags override them,
+  and that invalid explicit settings are refused rather than downgraded. Reuse
+  the existing no-inference runtime probes where possible instead of spending
+  new inference credits for plumbing.
+- Consult the installed SDK and current official documentation before adopting
+  new runtime APIs, then record evidence, remaining limits and the next small
+  increment. Follow `AGENTS.md` checkpoint and final-file handoff rules in turn.
 
-Keep L1 pending, copy no upstream source and implement no configuration, other
-modes, fallbacks or safeguards. The push authorization in this session was
-explicit; do not assume standing authorization to push in future sessions.
+Keep L1 pending, copy no upstream source and implement no additional modes,
+fallbacks or safeguards. Do not switch branches or modify reviewed source as
+part of review or publication. No push authorization exists in this session;
+do not assume one.

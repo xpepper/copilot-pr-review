@@ -39,7 +39,7 @@ export function selectionProbe() {
             }
             if (message.startsWith("P1 evidence: ")) finished.resolve(JSON.parse(message.slice("P1 evidence: ".length)));
             if (message.startsWith("P2 evidence: ")) retained.resolve(JSON.parse(message.slice("P2 evidence: ".length)));
-            if (message.startsWith("Review/retention failed:")) retained.reject(new Error(message));
+            if (message.startsWith("Review/publication failed:")) retained.reject(new Error(message));
           });
           try {
             const args = `${target.args} --quick --no-comment${mode === "all" ? " --all" : ""}` +

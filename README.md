@@ -543,9 +543,34 @@ after dispatch records `cancelRequested` and never claims the remote write was
 undone. Publishing holds the session's active-work slot, so a concurrent review
 is refused and `/pr-review cancel` still applies.
 
+Reproduce the controlled and native probes:
+
 ```sh
 node scripts/smoke-publish-later.mjs
+copilot plugin install "$(pwd)"
+COPILOT_CLI_PATH="$(command -v copilot)" \
+COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
+PR_REVIEW_HEAVY_MODEL=gpt-5.6-terra PR_REVIEW_HEAVY_EFFORT=high \
+node scripts/smoke-publish-later-runtime.mjs --cases=publish,stale,uncertain,cancel,reject,draft
 ```
+
+Every native case runs one real `--all --no-comment` review, reloads the
+extension, and then publishes the reloaded on-disk record. The controlled `gh`
+process holds each response until the harness observes the durable version-4
+`in-flight` record; the cancellation case kills that owned POST process. Add
+`--cases=resume` on its own to publish from a conversation-backed cold resume.
+Each case then invokes the command a second time, which dispatches again only
+after a definite failure. These fixture POSTs never contact GitHub, the harness
+rejects any elicitation request, and a run that validates no finding stops
+instead of retrying.
+
+The permitted playground PR [#2](https://github.com/xpepper/copilot-pr-review/pull/2)
+holds a real publish-later review and unresolved inline thread, published from a
+suppressed run with completed coverage. Its branches are isolated from main and
+must not be merged. `scripts/smoke-publication-live.mjs --publish-later` performs
+that live exercise and refuses a repeat at the same head; use
+`--verify-record=/absolute/path/to/pr-review-result.json` to re-check an existing
+record without inference or mutation.
 
 ### Two-reviewer fixture experiment (F2)
 

@@ -10,139 +10,121 @@ product decisions or assume access to this conversation.
 
 ## Recorded state
 
-P4 is complete. Implementation checkpoint **`5df3083`** follows P3 `1b6576e`
-and handoff `0f2a772`. The user subsequently authorized pushing this session's
-completed work; `5df3083` was pushed to `origin/main`. The session-ending
-evidence/handoff commit containing this prompt is intended to be committed and
-pushed too; inspect git state for its actual outcome. Do not assume that this
-session's push authorization applies to future sessions.
+P5 is complete. Implementation checkpoint **`f698df6`** follows P4 `5df3083` and
+its evidence/handoff commit `157747b`. Nothing was pushed in the P5 session:
+`origin/main` was still at `157747b`, so local `main` is ahead. **Do not push
+without new explicit authorization.**
 
-At handoff creation the uncommitted files are `README.md`, `ROADMAP.md`,
-`HANDOFF.md`, `scripts/fixtures/gh`, `scripts/runtime-target.mjs`,
-`scripts/target-fixture.mjs`, `scripts/smoke-preview-runtime.mjs`,
-`scripts/smoke-quick.mjs` and new `scripts/smoke-publication-runtime.mjs`.
-All belong to the validated final P4 evidence checkpoint and should be in the
-commit containing this prompt. No unfinished or unrelated work is carried
-forward. The delegated harness work is finished; no background work is pending.
+At handoff creation the uncommitted files are `HANDOFF.md`, `README.md`,
+`ROADMAP.md`, `scripts/runtime-selection.mjs`, `scripts/smoke-preview-runtime.mjs`,
+`scripts/smoke-publication-live.mjs`, `scripts/smoke-publication-runtime.mjs`,
+`scripts/smoke-retention-runtime.mjs` and new
+`scripts/smoke-publish-later-runtime.mjs`. All belong to the validated final P5
+evidence checkpoint and should be in the commit containing this prompt. No
+unfinished or unrelated work is carried forward, and no background work is
+pending.
 
-**Quick `--all --comment` now really publishes.** A bare PR number remains
-capture-only. Selection and authority remain independent, and reviewers stay
-read-only. Only code-built COMMENT requests can be submitted.
+**`/pr-review publish` really publishes.** It takes no argument, publishes only
+this session's retained selected findings, and starts no inference. Selection,
+run authority and this later authorization remain independent, and reviewers
+stay read-only.
 
 Relevant implementation:
 
-- `quick.mjs` owns parsing, captured binding, specialist/validator execution,
-  selection/proposal and current-run publication. It retains the actual capture
-  cwd and `evidenceBoundary` for publication, not a later session directory.
-- `preview.mjs` constructs the exact canonical payload, checks quotations and
-  anchors, and resolves current-run posting authority. `reviewRequest` can
-  reconstruct a retained request but does NOT prove current source/diff/head.
-- `publication.mjs` rechecks canonical selection/evidence, explicitly bound
-  repository identity, PR identity, head/base SHAs, lifecycle and diff; it GETs
-  PR metadata again immediately before a single POST. Drafts cannot publish.
-  Upstream allows non-open publication only as summaries; all current findings
-  need inline anchors, so closed/merged PRs cannot receive this payload even
-  when review capture was overridden. No body-only or stale fallback exists.
-- `retention.mjs` writes strict version-3 publication records, while versions
-  1/2 remain inspectable without fabricated write state or new authority.
-  `publication.status` is authoritative. Legacy `preview.submitted: false`
-  describes only the proposal stage, NOT the actual submission outcome.
-- Publication states are `not-attempted`, `in-flight`, `succeeded`, `failed`
-  and `uncertain`. `persist` synchronously writes the flushed-file/atomic-rename
-  journal before POST and the final outcome before awaited logging. Never
-  replace this seam with an unawaited asynchronous write.
-- A failed write-ahead checkpoint prevents dispatch; failed final persistence
-  leaves the in-flight journal. 403/422 rejection is definite failure, whereas
-  server/transport/interruption/malformed acknowledgment remains uncertain.
-  There is no automatic retry. `retained-run.mjs` refuses a new quick run over
-  an unresolved in-flight/uncertain record.
-- Before dispatch cancellation clears IDs/authority and marks incomplete
-  coverage. After dispatch `cancelPublication` preserves historical selection,
-  authority and actual/uncertain write state, adding `cancelRequested`.
-  Cancellation cannot undo a remote write; do not call `cancelPreview` on it.
-- The final cancellation check/atomic retention write and same-microtask
-  `activeRun` clearing remain intact. Inspection is session-bound, inference-free
-  and read-only; it never refreshes GitHub or treats historical authority as
-  permission to publish again.
+- `publish-later.mjs` owns the command. It refuses offline a missing, pending,
+  malformed, wrong-session, cancelled or unselected record, a record older than
+  schema version 2, a result that already succeeded, and an unresolved
+  `in-flight`/`uncertain` write. A definite `failed` write may be republished
+  only by a new invocation that reruns every gate under a new authorization.
+- Invoking the command **is** the new explicit authorization that `SCOPE.md`
+  allows in place of a final confirmation. It never consults a UI and never
+  reuses retained `--comment`, configuration or confirmation authority; a
+  `--no-comment` run is therefore publishable later.
+- Retention holds no captured `evidenceBoundary`. Publication refetches the
+  repository identity, PR metadata, diff and both reviewed source revisions via
+  `assembleContext`, rebuilds `evidenceBoundary` and `buildReviewPreview`, and
+  compares the result with the retained proposal when one exists. Stored
+  citations and `reviewRequest` reconstruction alone are never accepted.
+- `publication.mjs` now exposes shared `verifyPublicationTarget` (repository/PR
+  identity, head/base, draft, non-open, diff fingerprint, plus a `recheck()`
+  used immediately before dispatch) and `dispatchPublication` (write-ahead
+  journal, single POST, outcome interpretation). `publishCurrent` is unchanged
+  behaviorally and still stamps no authority.
+- Records are version 4 only when `publication.authority` is present, which
+  requires an attempted write and an invocation distinct from the review's.
+  Versions 1-3 stay readable exactly as written; a current-run write stays
+  version 3. `publication.status` is authoritative; legacy `preview.submitted`
+  is not the write state.
+- A refused publish-later writes nothing, leaving the retained record
+  byte-identical, and never marks a historical review cancelled. Cancellation
+  before dispatch stops without a write; after dispatch it adds `cancelRequested`
+  without claiming the remote write was undone. The final cancellation check and
+  atomic rewrite still precede no awaited call.
+- Publication holds the session's active-work slot through `startRun(...,
+  { ownsRuntime: false })`, so a concurrent review is refused and
+  `/pr-review cancel` still stops it. The generic failure log is now
+  `Review/publication failed:`; harnesses listen for that string.
 
-## Implement P5 only
+## Implement C1 only
 
-Follow the exact P5 acceptance criteria at the end of `ROADMAP.md`: explicit
-publish-later for this session's retained selected findings, **without rerunning
-reviewers or validators**.
+Follow the exact C1 acceptance criteria at the end of `ROADMAP.md`: personal
+tier configuration inspection and updates through text commands, with validated
+capabilities, inheritance and flag precedence.
 
-Use a new explicit user publication action, not retained flag/config/confirmation
-authority. A previous `--no-comment` run may be explicitly published later.
-Retain original findings, canonical selected IDs, incomplete coverage and
-repository/PR/reviewed-head binding. Reject missing, malformed, wrong-session,
-cancelled or unselected results. Do not add a cross-session archive or editor.
-
-Reestablish immutable source provenance and fresh diff/head/lifecycle gates
-before constructing the mutation. The cache lacks the captured evidence boundary;
-stored citations and `reviewRequest` reconstruction are not sufficient substitutes.
-Do not use a later checkout's source or silently accept head/base/diff changes.
-
-Preserve active-work exclusion, cancellation, write-ahead uncertainty and final
-retention boundaries. Refuse blind repeats of confirmed or unresolved writes.
-Fresh authorization and gates are necessary for any retry after definite failure.
-Version schema changes deliberately, preserving old inspection compatibility.
-Demonstrate no-inference behavior with controlled and installed-plugin probes,
-including reload/supported resume. Consult installed SDK and current official
-docs before choosing new runtime APIs.
-
-No configuration, additional modes, fallback models, safeguards or source reuse.
-Keep L1 pending. Do not switch branches or modify reviewed source as part of
-review/publication.
+Do not implement project-override trust (C2), other review modes, fallbacks or
+safeguards, and do not change publication behavior. Keep L1 pending and copy no
+upstream source. A repository must not be able to authorize itself, so do not
+read repository-provided configuration in this increment. Prefer the existing
+no-inference runtime probes over new inference spend for plumbing evidence.
+Consult the installed SDK and current official documentation before choosing new
+runtime APIs, and demonstrate capabilities instead of inferring them.
 
 ## Demonstrated behavior and runtime caveats
 
 CLI 1.0.83 / bundled SDK, Node 26.1.0, macOS arm64. Explicit native inference
 assignment `gpt-5.6-terra` / `high` is evidence, not a product default.
 
-Nine installed-plugin controlled cases passed: authorized all, stale head,
-HTTP 503 uncertainty, cancellation while POST is held, HTTP 422 rejection,
-final confirmation acceptance, refusal, suppression and draft transition.
-Every case produced positive canonical findings, used exactly three specialists
-plus a validator, stopped inference before posting, preserved exact JSON stdin,
-and retained the exact record through reload/inspection. The fixture holds each
-POST until the actual on-disk in-flight record is observed; cancellation checks
-the owned POST process really exits. All sessions/digests/PIDs are in the roadmap.
+Seven installed-plugin publish-later cases passed: publish, stale, uncertain
+(HTTP 503), cancel, reject (HTTP 422 plus a gated retry), draft and cold resume.
+Each ran a real `--all --no-comment` review first, reloaded the extension, then
+published the reloaded on-disk record. No publish command produced any
+`assistant.*`, `subagent.*`, `tool.execution_start` or `user.message` event, and
+none left an owned process. Sessions, PIDs and digests are in the roadmap. One
+earlier `stale` attempt stopped because that inference run validated no finding;
+that is fallible model output, and the harness performs no automatic retry.
+`smoke-publication-runtime.mjs --cases=comment`, `smoke-runtime.mjs --targets`
+and `smoke-retention-runtime.mjs` also passed after the shared-gate refactor.
 
-Updated preview/selection compatibility also passed: authorized all, pending UI
-cancellation with inert late acceptance, and subset selection despite `--comment`.
-Session `d994ac73-b839-4c2e-9035-5b0591f2eda3` preserved its version-3 record through
-conversation-backed cold resume; final digest:
-`e03fe25a27c8b453d8856decd3d71941084a590b12efecb29957d7cdcf803bb4`.
-One harness-only parent turn initialized resumable history. **Command-only SDK
-sessions still cannot cold-resume**; do not manufacture transcript history or
-spend hidden inference in plugin code.
+The user authorized synthetic remote branches/commits/PRs through the GitHub
+API. **Both playground PRs already hold a published plugin review; do not repeat
+either POST and never merge these branches.**
 
-The user authorized synthetic remote branches/commits through the GitHub API.
-Playground **#1** remains open and unmerged, base
-`playground/p4-base-20260907` at `155ed469b9f098e435435f020b2f4639abf9809a`,
-head `playground/p4-regression-20260907` at
-`a68b6cd97f2bbfdca28bda4e7fb20bcf48205b32`. Never merge these branches into main.
+- PR **#1** (P4), open, base `playground/p4-base-20260907` at
+  `155ed469b9f098e435435f020b2f4639abf9809a`, head
+  `playground/p4-regression-20260907` at
+  `a68b6cd97f2bbfdca28bda4e7fb20bcf48205b32`. Review `5130714400`, comment
+  `3948685115`, thread `PRRT_kwDOUQilZc6f3tE8`, INCOMPLETE coverage. Session
+  `ae279b4d-53e7-4116-9ccd-86248db90b73`.
+- PR **#2** (P5), open, base `playground/p5-base-20260907` at
+  `160ec104c5fcd9f6028acd76e4a421a153dbc743`, head
+  `playground/p5-publish-later-20260907` at
+  `64383e445ffff9677f1958a83829232f2089f0ce`. Review `5131451227`, comment
+  `3949275074` at `playground/discount.mjs:5` RIGHT, thread
+  `PRRT_kwDOUQilZc6f5Mm6`, completed coverage. Session
+  `835f1310-a525-42be-a496-e31926ec008c`, version-4 digest
+  `240ad077014d16e3fd48d843d3cdefe0983e6015efcbf4245ce3f8517163841d`.
 
-Real COMMENTED review `5130714400` created unresolved inline thread
-`PRRT_kwDOUQilZc6f3tE8`, comment `3948685115`, at `playground/total.mjs:3` RIGHT.
-The published summary correctly says INCOMPLETE because caller context was
-missing. Session `ae279b4d-53e7-4116-9ccd-86248db90b73` retains the success.
-**Do not repeat this POST.** The original live harness failed after publication
-on its endpoint choice: per-review comments are position-only. The corrected
-probe uses PR comments for line/side and verified the existing record read-only,
-without another review. Live LEFT/multiline/rename/deletion acceptance remains
-unproven; controlled payload gates cover those shapes.
-
-Fresh GET/POST is not an atomic compare-and-submit transaction. Explicit
-`commit_id` prevents silent head rebinding, but a concurrent update can still
-make a just-submitted review outdated. Storage has no acquired cross-process
-lock or power-loss guarantee; the digest detects corruption, not a writer able
-to recompute it. Full F3 process-loss, human UI and other-client/platform
-behavior were not re-exercised. Q4 semantic/context-window limitations remain.
+Command-only SDK sessions still cannot cold-resume; the resume case needs one
+harness-only parent turn. Do not manufacture transcript history or spend hidden
+inference in plugin code. The final GET/POST is still not an atomic
+compare-and-submit transaction, storage has no cross-process lock or power-loss
+guarantee, live LEFT/multiline/rename/deletion anchors remain unproven, and Q4
+semantic/context-window and F3 process-loss limits are unchanged.
 
 ## Reproduction
 
 ```sh
+node scripts/smoke-publish-later.mjs
 node scripts/smoke-publication.mjs
 node scripts/smoke-preview.mjs
 node scripts/smoke-quick.mjs
@@ -151,13 +133,11 @@ copilot plugin install "$(pwd)"
 COPILOT_CLI_PATH="$(command -v copilot)" \
 COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
 PR_REVIEW_HEAVY_MODEL=gpt-5.6-terra PR_REVIEW_HEAVY_EFFORT=high \
-node scripts/smoke-publication-runtime.mjs --cases=comment,stale,uncertain,cancel,reject,confirmed,declined,suppressed,draft
+node scripts/smoke-publish-later-runtime.mjs --cases=publish,stale,uncertain,cancel,reject,draft
 ```
 
-With the same explicit environment, run
-`node scripts/smoke-preview-runtime.mjs --cases=comment,cancel-pending,subset-comment --parent-turn`
-for selection/cold-resume compatibility. These native commands spend credits;
-no missing positive output is silently retried. Fixture `gh` stays in child-only
+Run `--cases=resume` alone for the cold-resume case. These native commands spend
+credits and are never retried automatically. Fixture `gh` stays in child-only
 PATH; never expose it to ordinary commands. Reinstall after extension edits,
 then use a fresh runtime. Direct local install still works with a deprecation
 warning; marketplace migration is not this increment.
@@ -165,9 +145,9 @@ warning; marketplace migration is not this increment.
 For safe existing live evidence, with no SDK/inference or mutation:
 
 ```sh
-node scripts/smoke-publication-live.mjs --pr=1 \
-  --head=a68b6cd97f2bbfdca28bda4e7fb20bcf48205b32 \
-  --verify-record="$HOME/.copilot/session-state/ae279b4d-53e7-4116-9ccd-86248db90b73/pr-review-result.json"
+node scripts/smoke-publication-live.mjs --pr=2 \
+  --head=64383e445ffff9677f1958a83829232f2089f0ce \
+  --verify-record="$HOME/.copilot/session-state/835f1310-a525-42be-a496-e31926ec008c/pr-review-result.json"
 ```
 
 ## Commit and hand off

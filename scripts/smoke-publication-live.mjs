@@ -10,9 +10,13 @@ import { validateRecord } from "../extensions/pr-review/retention.mjs";
 const number = Number(process.argv.find((arg) => arg.startsWith("--pr="))?.slice(5));
 const head = process.argv.find((arg) => arg.startsWith("--head="))?.slice(7);
 const verifyRecord = process.argv.find((arg) => arg.startsWith("--verify-record="))?.slice(16);
-assert(process.argv.includes("--publish") !== !!verifyRecord &&
+// `--publish-later` retains a suppressed review, then publishes it through the
+// explicit P5 command; `--publish` keeps the P4 current-run path.
+const publishLater = process.argv.includes("--publish-later");
+assert([process.argv.includes("--publish"), publishLater, !!verifyRecord].filter(Boolean).length === 1 &&
   Number.isSafeInteger(number) && number > 0 && /^[a-f0-9]{40}$/.test(head),
-  "Supply --pr=NUMBER --head=SHA and either --publish (LIVE MUTATION) or --verify-record=PATH (read-only)");
+  "Supply --pr=NUMBER --head=SHA and exactly one of --publish, --publish-later (LIVE MUTATION) " +
+  "or --verify-record=PATH (read-only)");
 const sdkPath = process.env.COPILOT_SDK_PATH;
 const cliPath = process.env.COPILOT_CLI_PATH;
 const settings = { model: process.env.PR_REVIEW_HEAVY_MODEL, reasoningEffort: process.env.PR_REVIEW_HEAVY_EFFORT };
@@ -51,7 +55,7 @@ function verifyRemote(record) {
 if (verifyRecord) {
   const record = JSON.parse(await readFile(resolve(verifyRecord), "utf8"));
   const comments = verifyRemote(record);
-  console.log(`PASS P4 read-only LIVE verification: ${JSON.stringify({
+  console.log(`PASS ${record.schemaVersion === 4 ? "P5" : "P4"} read-only LIVE verification: ${JSON.stringify({
     sessionId: record.invocation.sessionId, digest: record.digest, head,
     coverage: record.outcome.coverage, publication: record.outcome.publication, comments,
   })}`);
@@ -77,6 +81,7 @@ try {
   });
   await session.rpc.extensions.reload();
   const done = Promise.withResolvers();
+  const published = Promise.withResolvers();
   const active = Promise.withResolvers();
   const labels = new Set();
   const messages = [];
@@ -89,34 +94,67 @@ try {
     if (match) labels.add(match[1]);
     if (labels.size === 3) active.resolve();
     if (message.startsWith("P2 evidence: ")) done.resolve(JSON.parse(message.slice(13)));
-    if (message.startsWith("Review/retention failed:")) done.reject(new Error(message));
+    if (message.startsWith("P5 evidence: ")) published.resolve(JSON.parse(message.slice(13)));
+    if (message.startsWith("Review/publication failed:")) {
+      done.reject(new Error(message));
+      published.reject(new Error(message));
+    }
   });
   const command = async (args) => {
     const result = await session.rpc.commands.execute({ commandName: "pr-review", args });
     assert.equal(result.error, undefined, result.error);
   };
-  await command(`${number} --quick --all --comment heavyModel=${settings.model} heavyEffort=${settings.reasoningEffort}`);
+  const inspectRecord = () => JSON.parse(messages.findLast((message) => message.startsWith("P2 inspection: ")).slice(15));
+  await command(`${number} --quick --all ${publishLater ? "--no-comment" : "--comment"} ` +
+    `heavyModel=${settings.model} heavyEffort=${settings.reasoningEffort}`);
   await Promise.race([active.promise, done.promise.then(() => { throw new Error("Review did not reach specialists"); })]);
   const owned = (await descendants()).filter((row) => !processes.some((old) => old.pid === row.pid));
   assert.equal(owned.length, 1);
   const evidence = await done.promise;
   await assertExited(owned);
   await command("inspect");
-  const record = JSON.parse(messages.findLast((message) => message.startsWith("P2 inspection: ")).slice(15));
-  validateRecord(record, session.sessionId);
-  assert.equal(record.digest, evidence.digest);
-  assert.equal(record.outcome.binding.head, head);
-  assert.equal(record.outcome.publication.status, "succeeded", JSON.stringify(record.outcome.publication));
-  assert(record.outcome.validation.findings.length > 0);
+  const reviewed = inspectRecord();
+  validateRecord(reviewed, session.sessionId);
+  assert.equal(reviewed.digest, evidence.digest);
+  assert.equal(reviewed.outcome.binding.head, head);
+  assert(reviewed.outcome.validation.findings.length > 0,
+    "This inference run validated no finding; rerun the live exercise deliberately, never automatically.");
   assert.equal(messages.filter((message) => /^Reviewer [\w-]+: starting$/.test(message)).length, 4);
-  console.log(`P4 live settled: session=${session.sessionId}; digest=${record.digest}; ownedPid=${owned[0].pid}`);
+  let record = reviewed;
+  if (publishLater) {
+    assert.equal(reviewed.schemaVersion, 3);
+    assert.equal(reviewed.outcome.preview.status, "suppressed");
+    assert.equal(reviewed.outcome.preview.authorized, false);
+    assert.equal(reviewed.outcome.publication.status, "not-attempted");
+    // Publish from the reloaded on-disk record, under a new explicit authorization.
+    await session.rpc.extensions.reload();
+    await command("inspect");
+    assert.deepEqual(inspectRecord(), reviewed);
+    const before = await descendants();
+    await command("publish");
+    const publication = await published.promise;
+    assert.equal(publication.status, "succeeded", JSON.stringify(publication));
+    assert.equal(publication.authority.kind, "publish-later");
+    await assertExited((await descendants()).filter((row) => !before.some((old) => old.pid === row.pid)));
+    assert.equal(messages.filter((message) => /^Reviewer [\w-]+: starting$/.test(message)).length, 4,
+      "Publish-later reruns no reviewer");
+    await command("inspect");
+    record = inspectRecord();
+    validateRecord(record, session.sessionId);
+    assert.equal(record.schemaVersion, 4);
+    assert.equal(record.digest, publication.digest);
+    assert.deepEqual({ ...record.outcome, publication: undefined }, { ...reviewed.outcome, publication: undefined });
+  }
+  assert.equal(record.outcome.publication.status, "succeeded", JSON.stringify(record.outcome.publication));
+  console.log(`${publishLater ? "P5" : "P4"} live settled: session=${session.sessionId}; ` +
+    `digest=${record.digest}; ownedPid=${owned[0].pid}`);
   const comments = verifyRemote(record);
   await session.rpc.extensions.reload();
   await command("inspect");
-  assert.deepEqual(JSON.parse(messages.findLast((message) => message.startsWith("P2 inspection: ")).slice(15)), record);
+  assert.deepEqual(inspectRecord(), record);
   assert.equal(localState(), before);
   assert.equal(gh(endpoint).merged, false);
-  console.log(`PASS P4 LIVE: ${JSON.stringify({
+  console.log(`PASS ${publishLater ? "P5" : "P4"} LIVE: ${JSON.stringify({
     sessionId: session.sessionId, digest: record.digest, head, ownedPid: owned[0].pid,
     coverage: record.outcome.coverage, publication: record.outcome.publication,
     comments,
