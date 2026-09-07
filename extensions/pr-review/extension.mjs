@@ -11,6 +11,7 @@ import { executeRetainedQuick } from "./retained-run.mjs";
 import { inspectRetained } from "./retention.mjs";
 import { executePublishLater } from "./publish-later.mjs";
 import { publicationSummary } from "./publication.mjs";
+import { resolveCliPath } from "./cli-runtime.mjs";
 
 const help = [
   "Copilot PR Review - runtime feasibility prototype",
@@ -188,7 +189,9 @@ function startRun(execute, { ownsRuntime = true } = {}) {
   assertIdle();
   // Publication owns no inference runtime; it must still hold the active-run
   // slot so a concurrent review cannot race it, and stay cancellable.
-  const client = ownsRuntime ? new CopilotClient({ connection: RuntimeConnection.forStdio() }) : undefined;
+  const client = ownsRuntime ? new CopilotClient({
+    connection: RuntimeConnection.forStdio({ path: resolveCliPath() }),
+  }) : undefined;
   const controller = new AbortController();
   const run = { client, controller, ownsRuntime, runtimeStopped: !ownsRuntime };
   activeRun = run;

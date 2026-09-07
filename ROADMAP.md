@@ -2365,7 +2365,85 @@ Remaining limits:
 - No fallback models, additional modes, safeguards or interactive menu are
   included. `--verify` remains unimplemented.
 
+## Manual-test blocker: CLI discovery without a harness override
+
+On 2026-09-07 the user paused M1 to report that an ordinary interactive
+`copilot --experimental --yolo` session failed on
+`/pr-review 727 --quick --no-comment --all`, before any review work:
+the bundled SDK could not resolve `@github/copilot-darwin-arm64`.
+This was not a project-trust or model-assignment rejection.
+
+The clean starting checkpoint was `0a32e77` on local `main`, after C2 at
+`56ace3f`. The previous handoff's ahead-of-origin and absent-personal-config
+claims were stale; do not assume them. No product increment was added.
+
+Root cause: `startRun` constructed `CopilotClient` with
+`RuntimeConnection.forStdio()` and no path. The installed SDK resolves a
+platform npm package in that case; this host's bundled SDK cannot resolve one.
+Every prior native harness exported `COPILOT_CLI_PATH`, which the SDK inherited,
+so successful harness runs had hidden the ordinary-shell failure.
+
+`cli-runtime.mjs` now resolves an explicit `COPILOT_CLI_PATH` first, otherwise
+the installed executable in an absolute PATH directory, and passes that path
+to the existing stdio connection. Unusable explicit overrides fail without
+substitution; empty/relative PATH entries are not searched. No SDK dependency,
+model fallback, installation mutation by the plugin, inference timeout or
+publication-policy change was introduced. Both fixtures and quick reviews use
+the same corrected `startRun`; publish-later still constructs no SDK client.
+
+### Evidence and reproduction
+
+Consulted the installed CLI 1.0.83 SDK's `docs/extensions.md`,
+`types.d.ts` child-process connection definition and `index.js` constructor /
+runtime startup implementation, together with current official
+[bundled CLI](https://github.com/github/copilot-sdk/blob/main/docs/setup/bundled-cli.md)
+and [local CLI](https://github.com/github/copilot-sdk/blob/main/docs/setup/local-cli.md)
+documentation. The public local-CLI example uses `cliPath`; this installed
+SDK exposes `RuntimeConnection.forStdio({ path })`, which was already in use
+by our launchers and is now demonstrated here.
+
+- With `COPILOT_CLI_PATH` unset, constructing the original SDK client reproduced
+  the user's exact platform-package error.
+- The new `smoke-runtime.mjs --targets --startup` regression failed against the
+  previously installed plugin with the same error on actual quick dispatch.
+  After reinstalling the fix, the identical command passed.
+- The harness strips the launcher override from the parent's environment, so
+  the extension no longer inherits it. A real installed-plugin
+  `--quick --no-comment --all` invocation settles at the controlled draft skip.
+  Separately, the same resolver and stdio connection start, ping and stop an
+  actual CLI runtime without a prompt. Parent events contain no model turns,
+  subagents or tool executions; the fixture GH requests are read-only.
+- `smoke-cli-runtime.mjs` covers missing PATH entries, spaces, executable
+  symlinks, explicit-path precedence/refusal, non-executable files,
+  empty/relative PATH rejection and a readable explicit JS entrypoint.
+  `smoke-quick.mjs` also passed unchanged.
+- The corrected plugin is installed locally. Personal configuration/trust
+  files were not written; the private PR was not fetched or reviewed, and no
+  inference or GitHub publication was performed.
+
+```sh
+node scripts/smoke-cli-runtime.mjs
+node scripts/smoke-quick.mjs
+copilot plugin install "$(pwd)"
+COPILOT_CLI_PATH="$(command -v copilot)" \
+COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
+node scripts/smoke-runtime.mjs --targets --startup
+```
+
+Remaining limits: native evidence is macOS arm64 / CLI 1.0.83, not Windows or
+other installation layouts. PATH selects the installed executable; matching
+its version to the hosting SDK remains the installer's responsibility. The
+user's full private-PR review still needs a fresh interactive session; this
+startup regression does not claim successful end-to-end inference on that PR.
+Earlier publication, retention, configuration and runtime caveats remain.
+
 ## Exact next increment
+
+**First finish the user's manual testing before continuing the feature plan.**
+The CLI-discovery fix is installed; retry the same quick invocation in a fresh
+interactive session. Investigate any further blocker before starting M1.
+Do not change the user's project trust or personal model assignments to make a
+review pass.
 
 **The balanced half of M1 only.** Add the balanced review mode with its upstream
 reviewer assignment, so a mode other than quick runs and the light tier is

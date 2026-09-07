@@ -36,6 +36,29 @@ a model prompt. Status/help make no model calls. `models` queries the session's
 available subscription models and reasoning capabilities without inference.
 One extension registers both `/pr-review` and `/pr-review-config`.
 
+Reviewer startup uses the installed `copilot` executable from an absolute
+directory on `PATH`; no npm SDK/platform-package installation is required.
+An explicit `COPILOT_CLI_PATH` takes precedence and must point to a usable CLI
+file (a JavaScript CLI entrypoint is also supported). An invalid override is
+an error, not permission to choose a different executable. Empty and relative
+`PATH` entries are ignored to avoid implicitly executing a checkout-local file.
+Reinstall after plugin edits and start a fresh Copilot session before retrying.
+
+The no-inference startup regression can be reproduced with:
+
+```sh
+node scripts/smoke-cli-runtime.mjs
+COPILOT_CLI_PATH="$(command -v copilot)" \
+COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
+node scripts/smoke-runtime.mjs --targets --startup
+```
+
+Adjust the SDK path to your installed version. The harness uses the explicit
+CLI path only for its launcher; it removes `COPILOT_CLI_PATH` from the runtime
+environment inherited by the installed plugin. It dispatches a skipped quick
+review and separately starts, pings and stops the real owned-runtime transport
+using the plugin's resolver, without sending a model prompt.
+
 ### Read-only PR target capture (Q1)
 
 ```text

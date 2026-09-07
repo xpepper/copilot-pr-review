@@ -5,6 +5,7 @@ import { exerciseF3, startFixture } from "./runtime-fixture.mjs";
 import { prepareLiveTargetSmoke, prepareRegressionTargetSmoke, prepareTargetSmoke } from "./runtime-target.mjs";
 import { exerciseQuick } from "./runtime-quick.mjs";
 import { selectionProbe } from "./runtime-selection.mjs";
+import { resolveCliPath } from "../extensions/pr-review/cli-runtime.mjs";
 
 function fixtureSettings() {
   const settings = {
@@ -44,6 +45,10 @@ if (quickSettings) {
     "Set PR_REVIEW_HEAVY_MODEL and PR_REVIEW_HEAVY_EFFORT explicitly for inference-spending Q3 probes");
   assert(targetFlags.length === 1, "Quick runtime probe requires a controlled or live target");
 }
+const startup = process.argv.includes("--startup");
+if (startup) assert(process.argv.includes("--targets") && !quickSettings &&
+  !process.argv.includes("--fixture") && !process.argv.includes("--f3"),
+"--startup requires --targets without --quick, --fixture or --f3; it spends no inference");
 const targetSmoke = process.argv.includes("--targets") ? await prepareTargetSmoke()
   : process.argv.includes("--target-live") ? await prepareLiveTargetSmoke()
     : process.argv.includes("--regression-live") ? await prepareRegressionTargetSmoke() : undefined;
@@ -53,8 +58,12 @@ const selectionCases = process.argv.find((arg) => arg.startsWith("--selection-ca
 if (selection || selectionNoUi) {
   assert(quickSettings && process.argv.includes("--targets"), "Selection probes require --targets --quick");
 }
+// The launcher needs an explicit path; the installed extension must work without
+// inheriting the override that previously masked broken CLI discovery.
+const runtimeEnv = { ...process.env };
+delete runtimeEnv.COPILOT_CLI_PATH;
 const client = new CopilotClient({
-  connection: RuntimeConnection.forStdio({ path: resolve(cliPath) }),
+  connection: RuntimeConnection.forStdio({ path: resolve(cliPath), env: runtimeEnv }),
 });
 let parentKilled = false;
 
@@ -139,6 +148,49 @@ try {
   }
 
   if (targetSmoke && !selectionNoUi) await targetSmoke.exercise(session);
+
+  if (startup) {
+    const original = (await session.rpc.metadata.snapshot()).workingDirectory;
+    const settled = Promise.withResolvers();
+    const unsubscribe = session.on((event) => {
+      if (!["session.info", "session.error"].includes(event.type)) return;
+      if (event.data.message.startsWith("P2 evidence: ")) settled.resolve();
+      if (event.data.message.startsWith("Review/publication failed:")) {
+        settled.reject(new Error(event.data.message));
+      }
+    });
+    const before = (await session.getEvents()).length;
+    try {
+      await session.rpc.metadata.setWorkingDirectory({ workingDirectory: targetSmoke.quickTarget.workingDirectory });
+      const result = await session.rpc.commands.execute({
+        commandName: "pr-review",
+        args: `2 --quick --no-comment --all heavyModel=${available.id} ` +
+          `heavyEffort=${available.capabilities.supports.reasoning_effort[0]}`,
+      });
+      assert.equal(result.error, undefined, `CLI discovery without COPILOT_CLI_PATH: ${result.error}`);
+      await settled.promise;
+      const messages = (await session.getEvents()).slice(before)
+        .filter((event) => event.type === "session.info").map((event) => event.data.message);
+      assert(messages.some((message) => message.startsWith("Q3 evidence: ") &&
+        JSON.parse(message.slice("Q3 evidence: ".length)).coverage === "not-started"),
+      "Draft skip must settle without inference");
+    } finally {
+      unsubscribe();
+      await session.rpc.metadata.setWorkingDirectory({ workingDirectory: original });
+    }
+    // Exercise the exact resolver/transport used by startRun through a real
+    // runtime handshake, without creating a reviewer or sending a prompt.
+    const owned = new CopilotClient({
+      connection: RuntimeConnection.forStdio({ path: resolveCliPath(runtimeEnv), env: runtimeEnv }),
+    });
+    try {
+      await owned.start();
+      await owned.ping("pr-review startup regression");
+    } finally {
+      assert.deepEqual(await owned.stop(), []);
+    }
+    console.log("PASS installed quick dispatch and owned-runtime start/ping/stop without COPILOT_CLI_PATH or inference");
+  }
 
   const events = await session.getEvents();
   assert(!events.some((event) =>
