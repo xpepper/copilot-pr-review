@@ -41,7 +41,7 @@ const errorPattern = {
 };
 
 const { CopilotClient, RuntimeConnection } = await import(pathToFileURL(resolve(sdkPath, "index.js")).href);
-const target = await prepareTargetSmoke({ allowPublish: true, coordinatePost: true });
+const target = await prepareTargetSmoke({ allowPublish: true, coordinatePost: true, matchingCheckout: true });
 let client;
 const connect = () => new CopilotClient({ connection: RuntimeConnection.forStdio({ path: resolve(cliPath) }) });
 async function command(session, args) {

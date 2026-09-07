@@ -49,7 +49,7 @@ const shippingBaseSource = [
   "  return subtotal >= 5000 ? 0 : 500;",
   "}", "",
 ].join("\n");
-const shippingHeadSource = shippingBaseSource.replace("subtotal >= 5000", "subtotal <= 5000");
+export const shippingHeadSource = shippingBaseSource.replace("subtotal >= 5000", "subtotal <= 5000");
 const shippingDiff = [
   "diff --git a/shipping.js b/shipping.js",
   `index ${blobSha(shippingBaseSource)}..${blobSha(shippingHeadSource)} 100644`,
@@ -120,7 +120,7 @@ function httpResponse(status, statusText, body) {
   return `HTTP/2.0 ${status} ${statusText}\r\nContent-Type: application/json\r\n\r\n${body}`;
 }
 
-function postResponse(args, cwd, stdin) {
+function postResponse(args, cwd, stdin, head) {
   if (!publishOptIn()) {
     throw new Error(`Unexpected gh command (native publication opt-in required): ${JSON.stringify(args)} in ${cwd}`);
   }
@@ -133,7 +133,7 @@ function postResponse(args, cwd, stdin) {
   }
   const number = Number(endpoint[1]);
   const payload = JSON.parse(stdin);
-  if (payload.event !== "COMMENT" || payload.commit_id !== "b".repeat(40) || !payload.comments?.length) {
+  if (payload.event !== "COMMENT" || payload.commit_id !== head || !payload.comments?.length) {
     throw new Error("Unexpected publication payload");
   }
   const marker = process.env.PR_REVIEW_SMOKE_POST_MARKER;
@@ -167,12 +167,13 @@ function postResponse(args, cwd, stdin) {
   }));
 }
 
-export function respond(args, cwd, history, stdin) {
+export function respond(args, cwd, history, stdin, { head = "b".repeat(40) } = {}) {
+  if (!/^[0-9a-f]{40}$/.test(head)) throw new Error("Invalid fixture head");
   if (JSON.stringify(args) === JSON.stringify(["repo", "view", "--json", "id,nameWithOwner,url"])) {
     return JSON.stringify(repository);
   }
   if (args[0] === "api" && args[3] === "--method" && args[4] === "POST") {
-    return postResponse(args, cwd, stdin);
+    return postResponse(args, cwd, stdin, head);
   }
   if (args.length !== 8 || args[6] !== "-H" ||
       JSON.stringify(args.slice(0, 5)) !== JSON.stringify(["api", "--hostname", "github.com", "--method", "GET"])) {
@@ -183,16 +184,16 @@ export function respond(args, cwd, history, stdin) {
     return JSON.stringify({ node_id: repository.id, full_name: repository.nameWithOwner, html_url: repository.url });
   }
   const number = Number(/^repos\/fixture\/repository\/pulls\/(\d+)$/.exec(args[5])?.[1]);
-  if (number) return apiResponse(number, args[7], history);
+  if (number) return apiResponse(number, args[7], history, head);
   const contents = /^repos\/fixture\/repository\/contents\/([^?]+)\?ref=([0-9a-f]{40})$/.exec(args[5]);
   if (!contents) throw new Error(`Unexpected gh command: ${JSON.stringify(args)} in ${cwd}`);
   if (args[7] !== "Accept: application/vnd.github+json") throw new Error("Unexpected media type");
-  return contentsResponse(decodeURIComponent(contents[1]), contents[2]);
+  return contentsResponse(decodeURIComponent(contents[1]), contents[2] === head ? "b".repeat(40) : contents[2]);
 }
 
 const publicationDiffNumbers = new Set(Object.values(publicationNumbers));
 
-function apiResponse(number, accept, history) {
+function apiResponse(number, accept, history, head) {
   if (number === 8) throw new Error("fixture: HTTP 404 unavailable PR");
   if (accept === "Accept: application/vnd.github.diff") {
     return number === 13 ? validationDiff + shippingDiff
@@ -201,6 +202,7 @@ function apiResponse(number, accept, history) {
   }
   if (accept !== "Accept: application/vnd.github+json") throw new Error("Unexpected media type");
   const result = pull(number);
+  result.head.sha = head;
   const reads = history.filter((call) =>
     call.args.includes(`repos/fixture/repository/pulls/${number}`)).length;
   if (number === 9 && history.some((call) =>
@@ -208,11 +210,10 @@ function apiResponse(number, accept, history) {
     call.args.includes("Accept: application/vnd.github.diff"))) {
     result.head.sha = "c".repeat(40);
   }
-  // PR 11 advances only after a complete capture, never mid-capture.
-  if (number === 11 && reads >= 3) result.head.sha = "c".repeat(40);
-  // PR 54/55 stay stable through the quick run's own capture (2 metadata reads
-  // + 1 diff read), then drift exactly as publication re-reads them fresh.
-  if (number === publicationNumbers.stale && reads >= 3) result.head.sha = "d".repeat(40);
-  if (number === publicationNumbers.draft && reads >= 3) result.draft = true;
+  // History excludes this request. Capture takes 2 metadata reads + 1 diff
+  // read; the checkout gate is the fourth request. Drift on the next read.
+  if (number === 11 && reads >= 4) result.head.sha = "c".repeat(40);
+  if (number === publicationNumbers.stale && reads >= 4) result.head.sha = "d".repeat(40);
+  if (number === publicationNumbers.draft && reads >= 4) result.draft = true;
   return JSON.stringify(result);
 }

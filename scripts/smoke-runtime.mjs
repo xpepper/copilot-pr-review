@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { exerciseF3, startFixture } from "./runtime-fixture.mjs";
-import { prepareLiveTargetSmoke, prepareRegressionTargetSmoke, prepareTargetSmoke } from "./runtime-target.mjs";
+import { prepareLiveTargetSmoke, prepareReadTargetSmoke, prepareRegressionTargetSmoke, prepareTargetSmoke } from "./runtime-target.mjs";
 import { exerciseQuick } from "./runtime-quick.mjs";
 import { selectionProbe } from "./runtime-selection.mjs";
 import { resolveCliPath } from "../extensions/pr-review/cli-runtime.mjs";
@@ -32,9 +32,9 @@ if (!sdkPath || !cliPath) {
 const { CopilotClient, RuntimeConnection } = await import(
   pathToFileURL(resolve(sdkPath, "index.js")).href
 );
-const targetFlags = ["--targets", "--target-live", "--regression-live"].filter((flag) => process.argv.includes(flag));
+const targetFlags = ["--targets", "--target-live", "--regression-live", "--read-live"].filter((flag) => process.argv.includes(flag));
 if (targetFlags.length > 1) {
-  throw new Error("Use --targets, --target-live and --regression-live separately.");
+  throw new Error("Use --targets, --target-live, --regression-live and --read-live separately.");
 }
 const quickSettings = process.argv.includes("--quick") ? {
   model: process.env.PR_REVIEW_HEAVY_MODEL,
@@ -46,12 +46,23 @@ if (quickSettings) {
   assert(targetFlags.length === 1, "Quick runtime probe requires a controlled or live target");
 }
 const startup = process.argv.includes("--startup");
+const once = process.argv.includes("--once");
+assert(!once || (quickSettings && !process.argv.includes("--selection") && !process.argv.includes("--selection-no-ui") &&
+  !process.argv.includes("--fixture") && !process.argv.includes("--f3")), "--once requires only a target --quick probe");
+assert(!process.argv.includes("--read-live") || once, "--read-live requires --quick --once");
 if (startup) assert(process.argv.includes("--targets") && !quickSettings &&
   !process.argv.includes("--fixture") && !process.argv.includes("--f3"),
 "--startup requires --targets without --quick, --fixture or --f3; it spends no inference");
-const targetSmoke = process.argv.includes("--targets") ? await prepareTargetSmoke()
+const targetSmoke = process.argv.includes("--targets") ? await prepareTargetSmoke({
+  matchingCheckout: Boolean(quickSettings) || process.argv.includes("--matching-checkout"),
+})
   : process.argv.includes("--target-live") ? await prepareLiveTargetSmoke()
-    : process.argv.includes("--regression-live") ? await prepareRegressionTargetSmoke() : undefined;
+    : process.argv.includes("--regression-live") ? await prepareRegressionTargetSmoke()
+      : process.argv.includes("--read-live") ? await prepareReadTargetSmoke({
+        repository: process.env.PR_REVIEW_LIVE_REPOSITORY,
+        number: Number(process.env.PR_REVIEW_LIVE_NUMBER),
+        head: process.env.PR_REVIEW_LIVE_HEAD,
+      }) : undefined;
 const selection = process.argv.includes("--selection") ? selectionProbe() : undefined;
 const selectionNoUi = process.argv.includes("--selection-no-ui");
 const selectionCases = process.argv.find((arg) => arg.startsWith("--selection-cases="))?.split("=")[1].split(",");
@@ -204,7 +215,7 @@ try {
   if (selection || selectionNoUi) {
     await (selection ?? selectionProbe()).exercise(session, { ...targetSmoke.quickTarget, args: "13" },
       quickSettings, { noUi: selectionNoUi, cases: selectionCases });
-  } else if (quickSettings) await exerciseQuick(session, targetSmoke.quickTarget, quickSettings);
+  } else if (quickSettings) await exerciseQuick(session, targetSmoke.quickTarget, quickSettings, { once });
 
   if (process.argv.includes("--fixture") || process.argv.includes("--f3")) {
     const settings = fixtureSettings();

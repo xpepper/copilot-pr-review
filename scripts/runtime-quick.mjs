@@ -1,22 +1,25 @@
 import assert from "node:assert/strict";
 import { assertExited, descendants } from "./runtime-fixture.mjs";
 
-export async function exerciseQuick(session, target, settings) {
+export async function exerciseQuick(session, target, settings, { once = false } = {}) {
   const original = (await session.rpc.metadata.snapshot()).workingDirectory;
   await session.rpc.metadata.setWorkingDirectory({ workingDirectory: target.workingDirectory });
   try {
-    for (const mode of ["explicit", "ambient-alias", "cancel", ...(target.expectedFinding ? ["cancel-validation"] : [])]) {
+    for (const mode of once ? ["explicit"] :
+      ["explicit", "ambient-alias", "cancel", ...(target.expectedFinding ? ["cancel-validation"] : [])]) {
       const before = await descendants();
       let owned = [];
       const completion = Promise.withResolvers();
       const active = Promise.withResolvers();
       const validationActive = Promise.withResolvers();
       const selectionFinished = Promise.withResolvers();
+      const settled = Promise.withResolvers();
       const messages = [];
       const labels = new Set();
       const unsubscribe = session.on((event) => {
         if (!["session.info", "session.error"].includes(event.type)) return;
         const message = event.data.message;
+        if (once) console.log(message);
         messages.push(message);
         const match = /^Reviewer ([\w-]+): active$/.exec(message);
         if (match) labels.add(match[1]);
@@ -28,6 +31,7 @@ export async function exerciseQuick(session, target, settings) {
         if (message.startsWith("P1 evidence: ")) {
           selectionFinished.resolve(JSON.parse(message.slice("P1 evidence: ".length)));
         }
+        if (message.startsWith("P2 evidence: ")) settled.resolve();
       });
       try {
         const args = `${target.args} ${mode === "ambient-alias" ? "--major-only" : "--quick"} --no-comment --all` +
@@ -55,9 +59,17 @@ export async function exerciseQuick(session, target, settings) {
         }
         const report = await completion.promise;
         const selected = await selectionFinished.promise;
+        await settled.promise;
         assert.deepEqual(selected.selection.findingIds, selected.cancelled ? [] :
           (report.validation?.findings ?? []).map((finding) => finding.id));
         console.log(`Q3 ${mode} runtime evidence: ${JSON.stringify(report)}`);
+        const billedReviewers = [...report.reviewers, ...(report.adjudicator ? [report.adjudicator] : [])];
+        const charges = billedReviewers.flatMap((reviewer) => reviewer.billing ?? []);
+        console.log(`Q3 ${mode} credit cost: ${charges.length &&
+          billedReviewers.every((reviewer) => reviewer.billing?.length === reviewer.usage?.length) &&
+          charges.every(({ totalNanoAiu }) => Number.isFinite(totalNanoAiu) && totalNanoAiu >= 0)
+          ? `${charges.reduce((sum, charge) => sum + charge.totalNanoAiu, 0) / 1e9} AI credits (reported nano-AIU / 1e9)`
+          : "unavailable: runtime did not report every request charge"}`);
         await assertExited(owned);
         assert.equal(report.mode, "quick");
         assert.equal(report.noComment, true);

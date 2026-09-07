@@ -216,6 +216,10 @@ Skipped/declined/unconfirmed targets, and checkouts that fail the revision
 identity gate above, report `coverage: "not-started"` and start no reviewer
 runtime. Setup/capture failures and cancellation never become a
 clean-review result. P2 retains the settled quick result in its originating session.
+The raw timeline evidence also includes per-call `billing` charges when the
+runtime reports them (`totalNanoAiu`, divided by 1e9 for AI credits). Missing
+charges mean unknown cost, not zero. Billing details and read-tool traces are
+not part of the retained inspection record.
 Manual cancellation stops owned work without a review timeout; a pending host
 confirmation UI may remain visible, but a late answer cannot resume cancelled
 capture.

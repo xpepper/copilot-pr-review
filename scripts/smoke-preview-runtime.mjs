@@ -20,7 +20,7 @@ const parentTurn = process.argv.includes("--parent-turn");
 assert(!modes.includes("unavailable") || (modes.length === 1 && !parentTurn),
   "Run unavailable alone without --parent-turn; it uses a separate UI-less session");
 const { CopilotClient, RuntimeConnection } = await import(pathToFileURL(resolve(sdkPath, "index.js")).href);
-const target = await prepareTargetSmoke({ allowPublish: true });
+const target = await prepareTargetSmoke({ allowPublish: true, matchingCheckout: true });
 let client;
 const connect = () => new CopilotClient({ connection: RuntimeConnection.forStdio({ path: resolve(cliPath) }) });
 async function command(session, args) {

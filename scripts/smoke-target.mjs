@@ -3,6 +3,9 @@ import {
   captureTarget, contextSummary, executeTargetCapture, parseTargetArgs, skipReason, validateDiff,
 } from "../extensions/pr-review/target.mjs";
 import { blobSha, diff, headSource, pull, repository, respond } from "./target-fixture.mjs";
+import { prepareTargetSmoke } from "./runtime-target.mjs";
+import { runGh } from "../extensions/pr-review/target.mjs";
+import { runGit } from "../extensions/pr-review/checkout.mjs";
 
 const cwd = process.cwd();
 const options = parseTargetArgs("1");
@@ -156,3 +159,32 @@ session.rpc.metadata.snapshot = async () => ({ workingDirectory: cwd, isRemote: 
 await assert.rejects(executeTargetCapture(session, "1", { gh: fake.gh }), /local Copilot session/);
 assert.equal(fake.calls.length, 6, "Capture plus both bound source sides");
 console.log("PASS Q1 capture, gates, strict confirmation, races, malformed metadata/diffs, command summary");
+
+const matching = await prepareTargetSmoke({ matchingCheckout: true, allowPublish: true });
+try {
+  const directory = matching.quickTarget.workingDirectory;
+  const head = matching.quickTarget.head;
+  assert.notEqual(head, "b".repeat(40));
+  assert.equal((await runGit(["rev-parse", "HEAD"], directory)).trim(), head);
+  for (const number of [12, 13, 11, 54, 55]) {
+    const { access } = await matching.checkGate(number);
+    assert.equal(access.head, head);
+    const current = JSON.parse(await runGh(["api", "--hostname", "github.com", "--method", "GET",
+      `repos/fixture/repository/pulls/${number}`, "-H", "Accept: application/vnd.github+json"], directory));
+    assert.equal(current.head.sha, number === 11 ? "c".repeat(40) : number === 54 ? "d".repeat(40) : head);
+    assert.equal(current.draft, number === 55);
+  }
+  const args = ["api", "--hostname", "github.com", "--method", "POST",
+    "repos/fixture/repository/pulls/50/reviews", "--include", "--input", "-",
+    "-H", "Accept: application/vnd.github+json", "-H", "X-GitHub-Api-Version: 2022-11-28"];
+  const payload = { event: "COMMENT", commit_id: head, comments: [{ path: "total.js", line: 3, body: "fixture" }] };
+  const posted = await runGh(args, directory, { input: JSON.stringify(payload) });
+  assert(posted.includes(`"commit_id":"${head}"`));
+  await assert.rejects(runGh(args, directory, {
+    input: JSON.stringify({ ...payload, commit_id: "b".repeat(40) }),
+  }), /Unexpected publication payload/);
+  await matching.quickTarget.check();
+  console.log("PASS real fixture head/content, checkout gate, post-gate drift for 11/54/55, and fixture POST head binding");
+} finally {
+  await matching.cleanup();
+}

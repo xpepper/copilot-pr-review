@@ -18,7 +18,7 @@ const settings = {
   reasoningEffort: process.env.PR_REVIEW_HEAVY_EFFORT,
 };
 if (live || parentTurn) assert(Object.values(settings).every((value) => value && !/\s/.test(value)), "Set explicit heavy model/effort");
-const target = await prepareTargetSmoke();
+const target = await prepareTargetSmoke({ matchingCheckout: live });
 const options = {
   enableExperimentalMode: true, enableConfigDiscovery: true, requestExtensions: true,
   availableTools: [], onPermissionRequest: async () => ({ kind: "denied-no-approval-rule" }),

@@ -2862,10 +2862,103 @@ above pass without spending inference.
   from the captured SHAs. Selection, retention, publication, authorization,
   configuration and trust behavior are unchanged.
 
+## R1 second-half harness checkpoint
+
+On 2026-09-07, continuing from `e656ffc` / implementation checkpoint `340ab77`,
+the second-half harness work is implemented. R1 remains pending until the
+authorized live read experiment below is recorded.
+
+- `prepareTargetSmoke({ matchingCheckout: true })` commits the original fixture
+  head sources (`example.js`, `total.js`, `shipping.js`) in a fresh temporary
+  repository. The fixture `gh` receives the real commit SHA through
+  `PR_REVIEW_SMOKE_HEAD`, serves the corresponding head content, and accepts
+  fixture POST payloads only at that SHA. The default fixture remains dirty on
+  `not-the-pr-branch` with the synthetic head, preserving its refusal exercise.
+  Request traces live in `.git`, not among reviewer-visible source files.
+- All fixture-driven inference harnesses select the matching mode, including
+  retention, preview, publication and publish-later. No-inference retention
+  continues using its existing synthetic seed. Session cwd is explicitly the
+  fixture directory; callers no longer depend on a previous capture to set it.
+- Drift for fixture PRs 11, 54 and 55 now starts at `reads >= 4`. This counter
+  includes the diff request and excludes the current request: capture accounts
+  for three requests, the gate is the fourth, and the next request sees drift.
+- `preparePublicCheckout(repository, head)` fetches the exact head and detaches
+  it only in a newly allocated temporary checkout. It asserts the head,
+  detached state, origin and clean tree before/after use, removes the temporary
+  checkout on preparation failure or cleanup, and uses the existing sanitized
+  Git runner. No user checkout is switched, stashed, cleaned or pulled.
+- `smoke-runtime.mjs --quick --once` restricts the harness to one explicit quick
+  run, without alias/cancellation reruns; it waits for the retained-result
+  settlement. `--read-live` requires that single-run form and an explicitly
+  pinned repository, PR number and head through `PR_REVIEW_LIVE_*`.
+- Reviewer evidence now records each ephemeral
+  `assistant.usage.data.copilotUsage.totalNanoAiu` charge in `billing`, outside
+  the retained usage schema. Missing charges remain unknown. The harness prints
+  a credit total only when all recorded calls have charges. This is observation,
+  not a credit limit, retry, timeout or change to retention/publication gates.
+
+Demonstrated in this session, with CLI 1.0.83 and its bundled SDK:
+
+- `node scripts/smoke-target.mjs` passes real-commit/content/gate acceptance for
+  fixture PRs 12, 13, 11, 54 and 55, stable gate reads followed by correctly
+  timed drift, real-head fixture POST acceptance and synthetic-head rejection.
+  No network or inference is used.
+- Targeted controlled suites `target`, `context`, `fixture`, `quick` and
+  `retention` pass, as does `git diff --check`. These are harness checks, not
+  execution of safeguards in a reviewed project.
+- Installed `smoke-runtime.mjs --targets --startup` passes the mismatched
+  checkout refusal and existing capture assertions.
+- Installed `smoke-runtime.mjs --targets --matching-checkout --startup` captures
+  the fixture's real head and the harness calls the production checkout gate
+  successfully, without starting a reviewer model. This proves capture and
+  gate compatibility, not fixture reviewer output.
+- Installed `smoke-runtime.mjs --target-live` passes against
+  `github/copilot-sdk#2543`, including exact-head detached checkout and existing
+  capture fingerprints. This contacts GitHub but spends no inference.
+- Installed `smoke-reviewer-tools.mjs` and `smoke-retention-runtime.mjs` pass
+  without inference. The latter still reports command-only cold resume as
+  unsupported; no transcript recovery was added.
+
+Reproduction for the installed no-inference commands above:
+
+```sh
+copilot plugin install "$(pwd)"
+export COPILOT_CLI_PATH="$(command -v copilot)"
+export COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk"
+node scripts/smoke-runtime.mjs --targets --startup
+node scripts/smoke-runtime.mjs --targets --matching-checkout --startup
+node scripts/smoke-runtime.mjs --target-live
+node scripts/smoke-reviewer-tools.mjs
+node scripts/smoke-retention-runtime.mjs
+```
+
+API sources consulted in this session: installed SDK `docs/extensions.md`,
+`session.d.ts` event subscription API and `generated/session-events.d.ts`
+(`AssistantUsageEvent` is ephemeral; the charge is optional); current official
+[plugin creation guide](https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/plugins-creating)
+and [Node SDK README](https://github.com/github/copilot-sdk/blob/main/nodejs/README.md).
+Only existing runtime integration is reused; declarations do not prove live
+charge delivery. The plugin was reinstalled after the extension change.
+
+Remaining at this checkpoint: no reviewer inference has run yet in this
+session. The user explicitly authorized exactly one
+`primait/starsky#8126 --quick --all --no-comment` review on
+`gpt-5.6-terra` / `high`. A fresh GitHub metadata GET returned head
+`06155b5ea4ed2d97656d65fc4c24a2799c0a44cd`, matching the earlier recorded
+diff-only baseline. That earlier baseline has not been rerun in this session.
+No fixture inference/publication runs are authorized or demonstrated by these
+no-inference results. L1 remains pending; no upstream source was copied.
+
 ## Exact next increment
 
 **R1, second half: make the fixture and live harnesses able to satisfy the gate,
 then run one authorized live quick review that needs unchanged source.**
+
+The harness portion is now implemented and demonstrated above. The remaining
+step in this session is the single authorized live experiment, followed by an
+honest record of tool calls, read denials, findings versus the recorded baseline,
+and observed credit cost. The acceptance criteria below remain the boundary;
+do not repeat completed harness work or broaden scope.
 
 Acceptance criteria:
 

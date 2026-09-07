@@ -1,12 +1,14 @@
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
 import { existsSync, rmSync, writeFileSync } from "node:fs";
 import { mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { baseSource, blobSha, headSource } from "./target-fixture.mjs";
+import { baseSource, blobSha, headSource, shippingHeadSource, validationHeadSource } from "./target-fixture.mjs";
 import { descendants } from "./runtime-fixture.mjs";
+import { assertReviewableCheckout, runGit } from "../extensions/pr-review/checkout.mjs";
+import { captureTarget, parseTargetArgs, runGh } from "../extensions/pr-review/target.mjs";
+import { assembleContext } from "../extensions/pr-review/context.mjs";
 
 async function dispatchTarget(session, args) {
   const before = (await session.getEvents()).length;
@@ -24,27 +26,34 @@ async function dispatchTarget(session, args) {
   };
 }
 
-async function preparePublicCheckout(repository) {
+export async function preparePublicCheckout(repository, head) {
+  assert.match(repository, /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/);
+  assert.match(head, /^[0-9a-f]{40}$/);
   const directory = await realpath(await mkdtemp(join(tmpdir(), "pr-review-live-target-")));
-  execFileSync("git", ["init", "--quiet", directory]);
-  execFileSync("git", ["-C", directory, "remote", "add", "origin", `https://github.com/${repository}.git`]);
-  const sentinel = join(directory, "not-the-reviewed-source.txt");
-  await writeFile(sentinel, "Different local checkout; do not use as PR evidence.\n");
-  const state = () => execFileSync("git", ["-C", directory, "status", "--porcelain=v1", "--branch"], { encoding: "utf8" });
-  const before = state();
-  return {
-    directory,
-    async check() {
-      assert.equal(state(), before);
-      assert.equal(await readFile(sentinel, "utf8"), "Different local checkout; do not use as PR evidence.\n");
-    },
-    async cleanup() { await rm(directory, { recursive: true }); },
-  };
+  try {
+    await runGit(["init", "--quiet"], directory);
+    await runGit(["remote", "add", "origin", `https://github.com/${repository}.git`], directory);
+    await runGit(["fetch", "--quiet", "--depth=1", "origin", head], directory);
+    // Only populate this newly allocated disposable checkout, never the user's.
+    await runGit(["-c", "core.hooksPath=/dev/null", "checkout", "--quiet", "--detach", head], directory);
+    const check = async () => {
+      assert.equal((await runGit(["rev-parse", "HEAD"], directory)).trim(), head);
+      assert.equal(await runGit(["branch", "--show-current"], directory), "");
+      assert.equal(await runGit(["status", "--porcelain=v1", "--untracked-files=all"], directory), "");
+      assert.equal((await runGit(["remote", "get-url", "origin"], directory)).trim(),
+        `https://github.com/${repository}.git`);
+    };
+    await check();
+    return { directory, check, async cleanup() { await rm(directory, { recursive: true }); } };
+  } catch (error) {
+    await rm(directory, { recursive: true });
+    throw error;
+  }
 }
 
 export async function prepareRegressionTargetSmoke() {
-  const checkout = await preparePublicCheckout("ptitSeb/box64");
   const head = "4796469dc5ee55a8327cdffffc1da7f0050c54ad";
+  const checkout = await preparePublicCheckout("ptitSeb/box64", head);
   const base = "df37f6acf0e5becb3b73fb546768273d29813053";
   return {
     sessionOptions: { workingDirectory: checkout.directory },
@@ -76,7 +85,7 @@ export async function prepareRegressionTargetSmoke() {
 }
 
 export async function prepareLiveTargetSmoke() {
-  const checkout = await preparePublicCheckout("github/copilot-sdk");
+  const checkout = await preparePublicCheckout("github/copilot-sdk", "7525814ae7de890acf63b0eb665531292adaf96d");
   const directory = checkout.directory;
   return {
     sessionOptions: { workingDirectory: directory },
@@ -116,40 +125,72 @@ export async function prepareLiveTargetSmoke() {
       await checkout.check();
       console.log(`PASS live github/copilot-sdk#2543: head=${outcome.head} bytes=${outcome.diffBytes} sha256=${outcome.diffSha256}`);
       console.log(`PASS live head/base source bound to ${outcome.context.head}/${outcome.context.base}, context sha256=${outcome.context.contextSha256}`);
-      console.log("PASS live bot skip #2545, no-UI closed gate, and unchanged empty local Git checkout");
+      console.log("PASS live bot skip #2545, no-UI closed gate, and unchanged detached reviewed checkout");
     },
     cleanup: checkout.cleanup,
   };
 }
 
-export async function prepareTargetSmoke({ allowPublish = false, coordinatePost = false } = {}) {
+export async function prepareReadTargetSmoke({ repository, number, head }) {
+  assert(Number.isSafeInteger(number) && number > 0, "Set a positive live PR number");
+  const checkout = await preparePublicCheckout(repository, head);
+  return {
+    sessionOptions: { workingDirectory: checkout.directory },
+    quickTarget: {
+      args: String(number), workingDirectory: checkout.directory, repository, head, check: checkout.check,
+    },
+    async exercise(session) {
+      const outcome = await dispatchTarget(session, String(number));
+      assert.equal(outcome.disposition, "captured");
+      assert.equal(outcome.repository.nameWithOwner, repository);
+      assert.equal(outcome.head, head);
+      await checkout.check();
+      console.log(`PASS pinned read target: ${repository}#${number} at ${head}`);
+    },
+    cleanup: checkout.cleanup,
+  };
+}
+
+export async function prepareTargetSmoke({ allowPublish = false, coordinatePost = false, matchingCheckout = false } = {}) {
   const directory = await realpath(await mkdtemp(join(tmpdir(), "pr-review-runtime-target-")));
-  const trace = join(directory, "requests.jsonl");
+  const trace = join(directory, ".git", "requests.jsonl");
   const sentinel = join(directory, "source.txt");
   const previousPath = process.env.PATH;
   const previousRepo = process.env.GH_REPO;
   const previousTrace = process.env.PR_REVIEW_SMOKE_TRACE;
   const previousAllowPublish = process.env.PR_REVIEW_SMOKE_ALLOW_PUBLISH;
   const previousPostMarker = process.env.PR_REVIEW_SMOKE_POST_MARKER;
+  const previousHead = process.env.PR_REVIEW_SMOKE_HEAD;
+  await runGit(["init", "--quiet", "-b", matchingCheckout ? "feature" : "not-the-pr-branch"], directory);
   await writeFile(trace, "");
   await writeFile(sentinel, "Unrelated local source remains unchanged.\n");
   // A local checkout on another branch, holding different source at the reviewed path.
   const decoy = "export const value = 999;\nexport const label = \"local checkout\";\n";
   const reviewed = join(directory, "example.js");
-  execFileSync("git", ["init", "--quiet", "-b", "not-the-pr-branch", directory]);
-  await writeFile(reviewed, decoy);
-  execFileSync("git", ["-C", directory, "add", "example.js"]);
-  execFileSync("git", ["-C", directory, "-c", "user.email=fixture@example.invalid",
-    "-c", "user.name=Fixture", "commit", "--quiet", "-m", "local only"]);
-  const dirty = `${decoy}export const uncommitted = true;\n`;
-  await writeFile(reviewed, dirty);
   const totalDecoy = join(directory, "total.js");
-  await writeFile(totalDecoy, "Do not use local source as evidence.\n");
-  const localState = () => execFileSync("git", ["-C", directory, "status", "--porcelain=v1", "--branch"], { encoding: "utf8" });
-  const localBefore = localState();
+  await writeFile(reviewed, matchingCheckout ? headSource : decoy);
+  if (matchingCheckout) {
+    await writeFile(totalDecoy, validationHeadSource);
+    await writeFile(join(directory, "shipping.js"), shippingHeadSource);
+  }
+  await runGit(["add", ...(matchingCheckout
+    ? ["example.js", "total.js", "shipping.js", "source.txt"] : ["example.js"])], directory);
+  await runGit(["-c", "user.email=fixture@example.invalid", "-c", "user.name=Fixture",
+    "-c", "core.hooksPath=/dev/null", "-c", "commit.gpgsign=false",
+    "commit", "--quiet", "-m", matchingCheckout ? "reviewed fixture head" : "local only"], directory);
+  const dirty = `${decoy}export const uncommitted = true;\n`;
+  if (!matchingCheckout) {
+    await writeFile(reviewed, dirty);
+    await writeFile(totalDecoy, "Do not use local source as evidence.\n");
+  }
+  const localHead = (await runGit(["rev-parse", "HEAD"], directory)).trim();
+  const head = matchingCheckout ? localHead : "b".repeat(40);
+  const localState = () => runGit(["status", "--porcelain=v1", "--branch"], directory);
+  const localBefore = await localState();
   process.env.PATH = `${fileURLToPath(new URL("fixtures", import.meta.url))}${delimiter}${previousPath}`;
   process.env.GH_REPO = "wrong/repository";
   process.env.PR_REVIEW_SMOKE_TRACE = trace;
+  process.env.PR_REVIEW_SMOKE_HEAD = head;
   const postMarker = coordinatePost ? join(directory, ".git", "pr-review-post-marker") : undefined;
   if (allowPublish) process.env.PR_REVIEW_SMOKE_ALLOW_PUBLISH = "1";
   else delete process.env.PR_REVIEW_SMOKE_ALLOW_PUBLISH;
@@ -158,9 +199,25 @@ export async function prepareTargetSmoke({ allowPublish = false, coordinatePost 
   let confirmation = false;
   const questions = [];
   const calls = async () => (await readFile(trace, "utf8")).split("\n").filter(Boolean).map(JSON.parse);
+  const checkGate = async (number = 12) => {
+    assert(matchingCheckout, "Use the real-head fixture for gate acceptance");
+    const { snapshot } = await captureTarget(parseTargetArgs(String(number)), { cwd: directory });
+    const context = await assembleContext(snapshot, { cwd: directory, gh: runGh });
+    for (const file of context.files) {
+      for (const source of file.sources.filter((entry) => entry.side === "head")) {
+        assert.equal(blobSha(await readFile(join(directory, file.path), "utf8")), source.blobSha);
+      }
+    }
+    const access = await assertReviewableCheckout(snapshot, { cwd: directory, gh: runGh });
+    assert.equal(access.head, head);
+    assert.equal(access.root, directory);
+    assert.deepEqual(access.untracked, []);
+    return { snapshot, context, access };
+  };
   return {
+    checkGate,
     quickTarget: {
-      args: "12", workingDirectory: directory, repository: "fixture/repository", head: "b".repeat(40),
+      args: "12", workingDirectory: directory, repository: "fixture/repository", head,
       expectedFinding: { path: "total.js", line: 3 },
       postMarker,
       resetPost() {
@@ -180,9 +237,11 @@ export async function prepareTargetSmoke({ allowPublish = false, coordinatePost 
         }
       },
       async check() {
-        assert.equal(localState(), localBefore);
-        assert.equal(await readFile(reviewed, "utf8"), dirty);
-        assert.equal(await readFile(totalDecoy, "utf8"), "Do not use local source as evidence.\n");
+        assert.equal(await localState(), localBefore);
+        assert.equal((await runGit(["rev-parse", "HEAD"], directory)).trim(),
+          matchingCheckout ? head : localHead);
+        assert.equal(await readFile(reviewed, "utf8"), matchingCheckout ? headSource : dirty);
+        assert.equal(await readFile(totalDecoy, "utf8"), matchingCheckout ? validationHeadSource : "Do not use local source as evidence.\n");
         assert.equal(await readFile(sentinel, "utf8"), "Unrelated local source remains unchanged.\n");
         assert((await calls()).every(({ args }) => args[0] === "repo" ||
           (args[0] === "api" && args[3] === "--method" && (args[4] === "GET" ||
@@ -191,6 +250,7 @@ export async function prepareTargetSmoke({ allowPublish = false, coordinatePost 
       },
     },
     sessionOptions: {
+      workingDirectory: directory,
       onElicitationRequest: async (request) => {
         questions.push(request.message);
         assert.equal(request.requestedSchema.properties.confirmed.type, "boolean");
@@ -198,6 +258,15 @@ export async function prepareTargetSmoke({ allowPublish = false, coordinatePost 
       },
     },
     async exercise(session) {
+      if (matchingCheckout) {
+        const outcome = await dispatchTarget(session, "12");
+        assert.equal(outcome.head, head);
+        assert.equal(outcome.context.head, head);
+        assert.equal(outcome.context.entries[0].sources[0].blob, blobSha(validationHeadSource));
+        await checkGate();
+        console.log(`PASS installed capture at real fixture commit ${head}`);
+        return;
+      }
       const original = (await session.rpc.metadata.snapshot()).workingDirectory;
       try {
         await session.rpc.metadata.setWorkingDirectory({ workingDirectory: directory });
@@ -235,10 +304,10 @@ export async function prepareTargetSmoke({ allowPublish = false, coordinatePost 
         assert(questions.every((message) => /head b{40}/.test(message)));
         console.log("PASS native closed/merged confirmation decline and acceptance");
 
-        const localHead = execFileSync("git", ["-C", directory, "rev-parse", "HEAD"], { encoding: "utf8" }).trim();
+        const localHead = (await runGit(["rev-parse", "HEAD"], directory)).trim();
         assert.notEqual(localHead, "b".repeat(40), "The local HEAD is not the reviewed revision");
         assert.equal(await readFile(reviewed, "utf8"), dirty, "The dirty working tree is untouched");
-        assert.equal(localState(), localBefore);
+        assert.equal(await localState(), localBefore);
         assert.notEqual(blobSha(dirty), blobSha(headSource));
         console.log(`PASS local branch not-the-pr-branch at ${localHead} contributed no review evidence`);
 
@@ -270,7 +339,7 @@ export async function prepareTargetSmoke({ allowPublish = false, coordinatePost 
           assert.match(refused, /gh pr checkout 1/);
           assert(!refusalMessages.some((message) => /^Reviewer /.test(message)), "No reviewer may start");
           assert.deepEqual(await descendants(), beforeRefusal, "A refused review starts no owned runtime");
-          assert.equal(localState(), localBefore, "The gate never touches the checkout");
+          assert.equal(await localState(), localBefore, "The gate never touches the checkout");
           console.log(`PASS /pr-review 1 --quick refused on a mismatched checkout: ${refused.split("\n")[1]}`);
         } finally { unsubscribe(); }
 
@@ -278,6 +347,8 @@ export async function prepareTargetSmoke({ allowPublish = false, coordinatePost 
         assert.equal(bound.disposition, "captured");
         assert.equal(bound.context.head, "b".repeat(40));
         assert.equal(bound.context.entries[0].sources[0].blob, blobSha(headSource));
+        await runGh(["api", "--hostname", "github.com", "--method", "GET",
+          "repos/fixture/repository/pulls/11", "-H", "Accept: application/vnd.github+json"], directory);
         const advanced = await session.rpc.commands.execute({ commandName: "pr-review", args: "11" });
         assert.match(advanced.error, /not the blob recorded in the captured diff/);
         assert.match(advanced.error, /cccccccc/, "The advanced head is refused, not silently reviewed");
@@ -313,6 +384,7 @@ export async function prepareTargetSmoke({ allowPublish = false, coordinatePost 
       for (const [key, value] of [
         ["PATH", previousPath], ["GH_REPO", previousRepo], ["PR_REVIEW_SMOKE_TRACE", previousTrace],
         ["PR_REVIEW_SMOKE_ALLOW_PUBLISH", previousAllowPublish], ["PR_REVIEW_SMOKE_POST_MARKER", previousPostMarker],
+        ["PR_REVIEW_SMOKE_HEAD", previousHead],
       ]) {
         if (value === undefined) delete process.env[key];
         else process.env[key] = value;

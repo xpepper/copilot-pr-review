@@ -139,6 +139,17 @@ assert.equal((await runReviewer(readingSession, "quick", { toolCalls: recorded }
 assert.deepEqual(recorded, [{ tool: "grep", arguments: { pattern: "lapin" } }]);
 assert.equal((await runReviewer(fakeSession(readingEvents))).status, "incomplete",
   "A zero-tool reviewer's tool call must still fail the run");
+const billed = await runReviewer(fakeSession([
+  { type: "assistant.usage", data: { model: "model-a", copilotUsage: { totalNanoAiu: 123456789 } } },
+  { type: "assistant.usage", data: { model: "model-a" } },
+  { type: "assistant.message", data: { content: "candidate output" } },
+  { type: "session.idle" },
+]));
+assert.deepEqual(billed.billing, [{ totalNanoAiu: 123456789 }, { totalNanoAiu: undefined }]);
+assert.deepEqual(billed.usage, [
+  { model: "model-a", reasoningEffort: undefined, isByok: undefined },
+  { model: "model-a", reasoningEffort: undefined, isByok: undefined },
+], "Billing evidence does not change retained usage attribution");
 
 for (const [events, sendError, expected] of [
   [[{ type: "assistant.message", data: { content: "retained output" } }, { type: "session.idle" }], undefined, "completed"],

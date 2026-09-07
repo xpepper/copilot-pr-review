@@ -214,9 +214,11 @@ assert(advancing.calls.filter(({ args }) => args[5]?.includes("/contents/"))
   "Context stays on the captured revisions after the PR advances");
 assert(boundContext.text.includes("export const value = 2;"));
 assert(!boundContext.text.includes(advancedSource.split("\n")[0]));
-const moved = JSON.parse(await advancing.gh(
-  ["api", "--hostname", "github.com", "--method", "GET", "repos/fixture/repository/pulls/11",
-    "-H", "Accept: application/vnd.github+json"], cwd));
+const metadataArgs = ["api", "--hostname", "github.com", "--method", "GET", "repos/fixture/repository/pulls/11",
+  "-H", "Accept: application/vnd.github+json"];
+const gateRead = JSON.parse(await advancing.gh(metadataArgs, cwd));
+assert.equal(gateRead.head.sha, "b".repeat(40), "The checkout gate's metadata read stays stable");
+const moved = JSON.parse(await advancing.gh(metadataArgs, cwd));
 assert.equal(moved.head.sha, "c".repeat(40), "The fixture PR really did advance");
 assert.notEqual(contentsResponse("example.js", "c".repeat(40)), contentsResponse("example.js", "b".repeat(40)));
 

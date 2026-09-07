@@ -196,7 +196,7 @@ export async function runReviewer(session, prompt, {
   toolCalls,
   onActive = async () => {},
 } = {}) {
-  const evidence = { sessionId: session.sessionId, usage: [], result: "", startedAt: null, completedAt: null };
+  const evidence = { sessionId: session.sessionId, usage: [], billing: [], result: "", startedAt: null, completedAt: null };
   const { promise, resolve, reject } = Promise.withResolvers();
   // Cancellation can reject before send, while cleanup is still awaiting an RPC.
   promise.catch(() => {});
@@ -212,6 +212,9 @@ export async function runReviewer(session, prompt, {
         if (injectFailure) reject(new Error("Injected reviewer failure after turn start."));
         break;
       case "assistant.usage":
+        // Usage events are ephemeral. Preserve the reported charge for runtime
+        // evidence; absence stays unknown, never a zero-cost claim.
+        evidence.billing.push({ totalNanoAiu: event.data.copilotUsage?.totalNanoAiu });
         evidence.usage.push({
           model: event.data.model,
           reasoningEffort: event.data.reasoningEffort,
