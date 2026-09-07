@@ -133,6 +133,11 @@ const reviewerKeys = ["label", "model", "reasoningEffort", "sessionId", "status"
 const outcomeKeys = ["invocation", "binding", "mode", "noComment", "complete", "reviewComplete",
   "executionComplete", "coverage", "cancelled", "error", "cleanupErrors", "disposition", "reason", "selection", "preview", "publication"];
 
+// Version 4 marks a record whose write came from the explicit publish-later
+// command. Versions 1-3 stay readable exactly as they were written.
+const publicationSchemaVersion = (outcome) =>
+  outcome.publication ? (outcome.publication.authority ? 4 : 3) : outcome.preview ? 2 : 1;
+
 export function retainedRecord(outcome) {
   const result = pick(outcome, outcomeKeys);
   result.reviewers = (outcome.reviewers ?? []).map((reviewer) => pick(reviewer, reviewerKeys));
@@ -146,14 +151,14 @@ export function retainedRecord(outcome) {
   // Normalize optional undefined properties in selection/binding before schema checks.
   const clean = JSON.parse(JSON.stringify(result));
   return {
-    schemaVersion: clean.publication ? 3 : clean.preview ? 2 : 1, state: "settled", invocation: clean.invocation,
+    schemaVersion: publicationSchemaVersion(clean), state: "settled", invocation: clean.invocation,
     outcome: clean, digest: reviewKey(clean),
   };
 }
 
 export function validateRecord(record, sessionId) {
   object(record, ["schemaVersion", "state", "invocation"], ["outcome", "digest"]);
-  requireValue([1, 2, 3].includes(record.schemaVersion) && ["pending", "settled"].includes(record.state), "unsupported schema/state");
+  requireValue([1, 2, 3, 4].includes(record.schemaVersion) && ["pending", "settled"].includes(record.state), "unsupported schema/state");
   identity(record.invocation);
   requireValue(record.invocation.sessionId === sessionId, "wrong originating session");
   if (record.state === "pending") {
@@ -164,7 +169,7 @@ export function validateRecord(record, sessionId) {
   object(value, ["invocation", "mode", "noComment", "complete", "reviewComplete", "executionComplete",
     "coverage", "cancelled", "cleanupErrors", "selection", "reviewers"],
   ["binding", "validation", "adjudicator", "error", "disposition", "reason",
-    ...(record.schemaVersion >= 2 ? ["preview"] : []), ...(record.schemaVersion === 3 ? ["publication"] : [])]);
+    ...(record.schemaVersion >= 2 ? ["preview"] : []), ...(record.schemaVersion >= 3 ? ["publication"] : [])]);
   requireValue(record.digest === reviewKey(value) && isDeepStrictEqual(value.invocation, record.invocation),
     "record digest or invocation mismatch");
   requireValue(value.mode === "quick" && typeof value.noComment === "boolean" &&
@@ -227,7 +232,11 @@ export function validateRecord(record, sessionId) {
     requireValue(value.preview, "missing preview state");
     validatePreview(value);
   }
-  if (record.schemaVersion === 3) validatePublication(value);
+  if (record.schemaVersion >= 3) {
+    validatePublication(value);
+    requireValue((record.schemaVersion === 4) === (value.publication.authority !== undefined),
+      "publish-later authorization does not match the record schema version");
+  }
   return record;
 }
 
@@ -240,6 +249,9 @@ export async function sessionStore(parent) {
   requireValue(basename(directory) === parent.sessionId && directory !== realpathSync(metadata.workingDirectory),
     "workspace is not a distinct session-state directory");
   const filename = join(directory, retainedFilename);
+  // The session working directory only hosts gh; remote identity always comes
+  // from the explicitly captured binding, never from this checkout.
+  const cwd = metadata.workingDirectory;
   function read() {
     let raw;
     try {
@@ -269,7 +281,7 @@ export async function sessionStore(parent) {
       if (existsSync(temporary)) unlinkSync(temporary);
     }
   }
-  return { read, write };
+  return { read, write, cwd };
 }
 
 export async function inspectRetained(parent) {
@@ -292,6 +304,8 @@ export async function inspectRetained(parent) {
     value.preview ? `Proposal: ${value.preview.status}; historical authorized=${value.preview.authorized}. ` +
       "Not permission for later publication." : "Legacy P2 record: no posting authority or preview.",
     publicationSummary(value.publication),
+    ...(value.publication?.authority ? ["This write was attempted by the later explicit publish command, " +
+      `authorization ${value.publication.authority.invocationId}, not by this run's flags or configuration.`] : []),
     ...(value.publication?.cancelRequested ? ["Cancellation was requested after dispatch; it cannot undo a remote write."] : []),
     ...(value.preview?.request ? [JSON.stringify(value.preview.request, null, 2)] : []),
     formatFindings(value),

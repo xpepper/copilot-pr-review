@@ -8,6 +8,7 @@ import { executeTargetCapture } from "./target.mjs";
 import { parseQuickArgs, quickAssignments } from "./quick.mjs";
 import { executeRetainedQuick } from "./retained-run.mjs";
 import { inspectRetained } from "./retention.mjs";
+import { executePublishLater } from "./publish-later.mjs";
 import { publicationSummary } from "./publication.mjs";
 
 const help = [
@@ -25,6 +26,7 @@ const help = [
   "failure      Same settings; inject a failure in the first active reviewer.",
   "cancel       Cancel active review work and stop its owned runtime.",
   "inspect      Show this session's latest retained result without inference or GitHub requests.",
+  "publish      Explicitly publish this session's retained selected findings without rerunning reviewers.",
   "",
   "NUMBER  Capture PR metadata and diff, then bind source context to the captured",
   "        head/base revisions. No reviewers, no publication, no local source.",
@@ -39,7 +41,9 @@ const help = [
   "Authorized selections submit a code-built COMMENT review after fresh head/lifecycle/anchor checks.",
   "Draft/closed/merged PRs cannot receive the current inline payload. Uncertain writes are never retried.",
   "Results are retained only in the originating local session; a new quick run replaces the previous result.",
-  "No safeguards or cached publish-later yet. Validation also uses Copilot credits.",
+  "publish is a new explicit authorization; retained flags, configuration and confirmations authorize nothing.",
+  "It refetches the reviewed evidence and reruns every gate, and refuses repeats of published or unresolved writes.",
+  "No safeguards yet. Validation also uses Copilot credits; publish uses none.",
   "Other review flags are not supported yet.",
 ].join("\n");
 
@@ -55,6 +59,7 @@ const status = [
   "Validated findings can be selected via the host UI or --all, then retained in this local session.",
   "Use /pr-review inspect after extension reload or a CLI-supported same-session resume.",
   "Current-run COMMENT publication is implemented with fresh gates and a durable write-ahead journal.",
+  "Use /pr-review publish to publish the retained selection later, under a new explicit authorization.",
   "",
   "Status/help start no models or background work. PR capture and source context use",
   "read-only gh requests against the captured revisions, never the local checkout.",
@@ -85,7 +90,8 @@ const session = await joinSession({
             if (outcome.cleanupErrors.length) {
               throw new Error(`Cancellation cleanup was not clean: ${outcome.cleanupErrors.join("; ")}`);
             }
-            await session.log(`Review cancellation finished; owned runtime stopped. ${publicationSummary(outcome.publication)}`);
+            await session.log(`${run.ownsRuntime ? "Review cancellation finished; owned runtime stopped."
+              : "Publication cancellation finished; no reviewers were running."} ${publicationSummary(outcome.publication)}`);
             return;
           }
           case "":
@@ -108,6 +114,11 @@ const session = await joinSession({
           case "inspect":
             assertIdle();
             await inspectRetained(session);
+            return;
+          case "publish":
+            // No target, session or authority argument: this session's retained
+            // selection is the only publishable result.
+            startRun((client, lifecycle) => executePublishLater(session, lifecycle), { ownsRuntime: false });
             return;
           default: {
             if (/^\d/.test(args.trim())) {
@@ -145,11 +156,13 @@ function assertIdle() {
   if (shuttingDown) throw new Error("Extension is shutting down.");
 }
 
-function startRun(execute) {
+function startRun(execute, { ownsRuntime = true } = {}) {
   assertIdle();
-  const client = new CopilotClient({ connection: RuntimeConnection.forStdio() });
+  // Publication owns no inference runtime; it must still hold the active-run
+  // slot so a concurrent review cannot race it, and stay cancellable.
+  const client = ownsRuntime ? new CopilotClient({ connection: RuntimeConnection.forStdio() }) : undefined;
   const controller = new AbortController();
-  const run = { client, controller, runtimeStopped: false };
+  const run = { client, controller, ownsRuntime, runtimeStopped: !ownsRuntime };
   activeRun = run;
   const clearRun = () => {
     if (activeRun === run) activeRun = undefined;
@@ -160,10 +173,11 @@ function startRun(execute) {
   // Return dispatch so cancel remains available. Parent transport loss can prevent timeline delivery.
   void run.done.then(async (outcome) => {
     if (outcome.retention) await session.log(`P2 evidence: ${JSON.stringify(outcome.retention)}`);
+    if (outcome.publishLater) await session.log(`P5 evidence: ${JSON.stringify(outcome.publishLater)}`);
   }).catch(async (error) => {
     console.error(`Review run failed: ${String(error)}`);
     try {
-      await session.log(`Review/retention failed: ${String(error)}. No settled result is guaranteed; ` +
+      await session.log(`Review/publication failed: ${String(error)}. No settled result is guaranteed; ` +
         "use /pr-review inspect to examine the retained state. Publication may be uncertain; do not retry blindly.", { level: "error" });
     } catch (logError) { console.error(`Could not report review/retention failure: ${String(logError)}`); }
   });

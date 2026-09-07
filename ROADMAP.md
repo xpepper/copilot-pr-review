@@ -26,7 +26,7 @@ in [AGENTS.md](AGENTS.md); the replaceable next-session prompt lives in
 | P2 | Completed | Retain the latest settled quick result in its originating local session; inspect without inference/GitHub access. Reload and conversation-backed cold resume demonstrated; command-only resume caveat below. | P1; [Cached results](SCOPE.md#selection-publication-and-cached-results) |
 | P3 | Completed | Independent posting authority, explicit confirmation and code-built COMMENT payload preview; native cancellation/reload/resume and no-submission evidence below. | P1; [Publication controls](SCOPE.md#selection-publication-and-cached-results) |
 | P4 | Completed | Current-run COMMENT publication with fresh gates and durable uncertainty; nine native cases, reload/cold resume and real playground inline publication demonstrated below. | P3; [Publication gates](SCOPE.md#selection-publication-and-cached-results) |
-| P5 | Pending | Publish retained selected findings without rerunning reviewers; reject changed heads and prevent publication after cancellation. | P2, P4; [Cached publication](SCOPE.md#selection-publication-and-cached-results) |
+| P5 | In progress | Explicit publish-later of the retained selection implemented, with refetched evidence, fresh gates and version-4 authority; controlled evidence below. Native installed-plugin probes remain before completion. | P2, P4; [Cached publication](SCOPE.md#selection-publication-and-cached-results) |
 | C1 | Pending | Inspect/update personal tier configuration via text commands; validate capabilities, inheritance, and flag precedence; show effective assignments. | F3; [Configuration](SCOPE.md#models-configuration-and-execution) |
 | C2 | Pending | Explicit trust gates project overrides; prove a repository cannot authorize itself. | C1; [Configuration trust](SCOPE.md#models-configuration-and-execution) |
 | M1 | Pending | Balanced becomes default with required topology and P3 cap; full adds conventions reviewer and its findings policy. | Q4, C1; [Modes](SCOPE.md#review-modes-and-findings) |
@@ -1777,6 +1777,87 @@ outdated. No stale fallback is used. P2's command-only cold-resume/no-lock/
 no-power-loss guarantees and Q4 semantic/context-window limits remain. Full F3
 process-loss exercises are not rerun here. No P5, configuration, additional mode,
 fallback or safeguard work is included.
+
+## P5 implementation checkpoint
+
+Continues from P4 `157747b`. No upstream source was copied and no reviewer,
+validator or parent inference participates in publish-later.
+
+### Publish-later boundary
+
+`/pr-review publish` takes no argument. It publishes only the current local
+originating session's retained result, so there is no cross-session archive,
+target argument or finding editor. Invoking the command is itself the new
+explicit publication action that `SCOPE.md` allows in place of a final
+confirmation; retained `--comment`, configuration or confirmation authority is
+historical and grants nothing. A `--no-comment` run is therefore publishable
+later, while a retained `flag-authorized` proposal still needs this new action.
+
+`publish-later.mjs` refuses, before any GitHub request, a missing, pending,
+malformed, wrong-session, cancelled or unselected record, and a record older
+than schema version 2, which predates posting authority. It refuses a result
+that already succeeded and one whose previous write is `in-flight` or
+`uncertain`. A definite `failed` outcome may be published again only through a
+new invocation that reruns every gate under a new authorization.
+
+Retention deliberately holds no captured `evidenceBoundary`, so reconstruction
+from stored citations is not accepted as provenance. Publication refetches the
+bound repository identity, PR metadata, complete diff and both reviewed source
+revisions through `assembleContext`, rebuilds the boundary with
+`evidenceBoundary`, and rebuilds the payload with `buildReviewPreview`. Blob
+identity, diff fingerprint, context digest, quotations and changed-line anchors
+must still match the retained binding; when the record also holds a proposal,
+the rebuilt request must equal it. The local checkout is never read: every
+request names the captured host, repository and PR explicitly, so the session's
+current working directory only hosts `gh`.
+
+P4's gates and durability are shared code, not reimplemented.
+`verifyPublicationTarget` reruns repository/PR identity, head/base, draft and
+non-open lifecycle and the diff fingerprint, and `recheck()` reads PR metadata
+again immediately before dispatch. `dispatchPublication` writes the flushed-file
+atomic `in-flight` journal before the single POST and the final outcome after
+it, and stamps both with the authorizing invocation. There is no stale,
+body-only or partial fallback and no retry loop.
+
+Version 4 marks a record whose write came from this command; versions 1 to 3
+stay readable exactly as written, and a current-run write stays version 3.
+`publication.authority` records `kind`, the authorizing invocation and the
+session, must differ from the review invocation, and is rejected on any other
+shape. An attempted write now requires either historical run authority or this
+explicit authorization, never neither. Refused attempts write nothing, leaving
+the retained record byte-identical, and never mark a historical review
+cancelled. Cancellation before dispatch stops without a write; after dispatch it
+adds `cancelRequested` without claiming the remote write was undone. The final
+cancellation check and atomic rewrite still precede no awaited call, and
+publication holds the session's active-work slot without owning a runtime.
+
+### Controlled evidence
+
+`node scripts/smoke-publish-later.mjs` retains a real suppressed `--no-comment`
+result in a session workspace, then publishes it with the explicit command.
+It asserts the exact refetch sequence, repository, PR metadata, diff, both
+reviewed source revisions and a final metadata read before one POST whose stdin
+equals the retained canonical payload; the durable version-4 `in-flight` journal
+is observed from disk during that POST. The published record keeps the original
+invocation, findings, canonical selection, coverage and historical
+`suppressed`/`authorized=false` proposal, and inspection reports that the write
+came from the later explicit command.
+
+The probe also covers offline refusals for missing, pending, legacy version-1,
+wrong-session, corrupt, cancelled, unselected and unresolved records; fresh
+repository, PR identity, head, base, draft, closed, merged, diff, source-blob
+and final-head drift; pre-dispatch cancellation; HTTP 422 rejection versus 503,
+transport and malformed-acknowledgment uncertainty; post-dispatch cancellation;
+refusal to repeat a succeeded or unresolved write; a gated retry with a distinct
+authorization after a definite failure; storage failure before and after
+dispatch; and tampered version-4 authority schemas. The parent double throws on
+any model or UI request, so no inference or elicitation can hide in the path.
+`smoke-context`, `smoke-target`, `smoke-findings`, `smoke-selection`,
+`smoke-retention`, `smoke-preview`, `smoke-quick` and `smoke-publication` still
+pass after the shared-gate refactor.
+
+These controlled proofs demonstrate neither remote acceptance nor native
+installed-plugin behavior; both remain open for P5 completion.
 
 ## Exact next increment
 

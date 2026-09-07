@@ -3,7 +3,8 @@
 An original Copilot CLI plugin prototype. **Quick reviews now include grounded
 candidate validation, deduplication, finding selection, posting-authority controls,
 code-controlled COMMENT publication, and session-bound retention with
-uncertain-write protection. Cached publish-later is not implemented.**
+uncertain-write protection. A retained selection can also be published later by
+an explicit command, without rerunning reviewers.**
 [SCOPE.md](SCOPE.md) is the authoritative product specification;
 [ROADMAP.md](ROADMAP.md) records delivery status and runtime evidence.
 
@@ -25,6 +26,7 @@ Wait for plugin/extension loading to finish, then enter:
 /pr-review help
 /pr-review models
 /pr-review inspect
+/pr-review publish
 ```
 
 These commands are implemented in JavaScript by a plugin-shipped extension, not
@@ -59,8 +61,8 @@ approval instead of silently applying it to the new target.
 Successful capture creates an invocation-local snapshot. The `Q1 target:` line
 reports repository/PR identity, lifecycle, base/head SHAs, diff byte count, and
 SHA-256. The complete diff and PR-controlled prose are not dumped into the
-parent conversation. The snapshot is not retained across commands and is not
-the future publish-later cache. `captured`, `skipped`, and `declined` are
+parent conversation. The snapshot is not retained across commands; only a
+settled review result is retained for publish-later. `captured`, `skipped`, and `declined` are
 **not review results**, and none claims a clean review.
 
 Repository identity is resolved with `gh repo view` from the session directory,
@@ -288,7 +290,8 @@ reviewer coverage and errors, and repository/PR/reviewed-head identity. It perfo
 no inference, GitHub requests, current-head refresh, local source reads, or
 publication. It always refers to the originating repository shown in the result,
 even if the session's current directory has since changed. It accepts no target
-or session-ID argument; it is not a cross-session archive or publish command.
+or session-ID argument; it is not a cross-session archive, and it publishes
+nothing. Publishing a retained result requires `/pr-review publish` below.
 Inspection is refused while review work is active.
 
 The plugin uses the installed SDK's local session workspace metadata and writes
@@ -359,7 +362,6 @@ review; inspection/reload/resume never rerun reviewers. It uses controlled targe
 12, not GitHub mutations. The existing selection runtime probe now also inspects
 retained results; use `--selection-cases=subset,none,cancel-pending` to cover
 subset selection, no selection, and cancellation with an inert late UI answer.
-Cached publish-later execution does not exist yet.
 
 ### Posting authority and COMMENT publication (P3/P4)
 
@@ -402,11 +404,13 @@ silently converted into body-only comments.
 
 No GitHub refresh or mutation occurs during preview/confirmation. This is
 **captured-head evidence, not a current-head or publication-lifecycle check**.
-Publication follows with fresh code-controlled checks. There is no separate preview/publish-later command;
-`/pr-review inspect` displays the stored proposal without rerunning anything.
+Publication follows with fresh code-controlled checks. There is no separate
+preview command; `/pr-review inspect` displays the stored proposal without
+rerunning anything, and `/pr-review publish` republishes nothing by itself.
 
-New records use schema version 3 and retain the policy, historical authority,
-exact proposal and a separate publication disposition. The proposal's legacy
+New records use schema version 3, or version 4 once the explicit publish-later
+command has written, and retain the policy, historical authority, exact proposal
+and a separate publication disposition. The proposal's legacy
 `submitted: false` describes the proposal stage, not the final write outcome;
 `publication.status` is authoritative. Inspection reconstructs the expected request to
 reject changed payloads, anchors or authority combinations. It does not reload
@@ -495,6 +499,54 @@ Use `--verify-record=/absolute/path/to/pr-review-result.json` instead of
 or mutation. The per-review comments API returns legacy position-only objects;
 the probe checks line/side fields through the PR comments API.
 
+### Cached publish-later (P5)
+
+```text
+/pr-review publish
+```
+
+This publishes **this session's retained selected findings** without rerunning
+reviewers, validators, or any model. It takes no PR, session, or authority
+argument: the retained result is the only publishable target, and it must belong
+to the current local session. A previous `--no-comment` run can be published this
+way; conversely, retained `--comment`, configuration, or confirmation authority
+from the original run authorizes nothing here. Invoking the command **is** the
+new explicit publication action, so it can post immediately.
+
+Retention holds findings, canonical selection, and the review binding, but not
+the captured evidence. Publication therefore refetches the repository identity,
+PR metadata, complete diff, and both reviewed source revisions, and rebuilds the
+payload from that refetched evidence. Blob identity, diff fingerprint, context
+digest, quotations, and diff anchors must all still match the retained binding.
+Reconstructing the request from the record alone is never accepted as proof.
+Requests name the captured host, repository, and PR explicitly, so a changed
+session directory cannot retarget them; the local checkout is never read.
+
+Every P4 gate reruns: repository/PR identity, reviewed head and base, draft and
+non-open lifecycle, the diff fingerprint, and a final metadata read immediately
+before the single POST. There is no stale, body-only, or partial fallback.
+
+Publication is refused, without contacting GitHub, when there is no retained
+result, when it is unfinished, cancelled, unselected, from another session,
+malformed, or written by a schema older than the posting-authority record. It is
+also refused for a result that already published successfully, or whose previous
+write is `in-flight`/`uncertain`. A **definite** failure such as HTTP 422 may be
+published again, but only through a new invocation that reruns every gate under
+a new authorization. Refused attempts leave the retained record byte-identical.
+
+A successful, failed, or uncertain publish-later write upgrades the record to
+schema version 4 and stores the authorizing invocation, so inspection shows that
+the write came from this command rather than the original run's flags. Version 1
+to 3 records stay readable exactly as written. The write-ahead journal, uncertain
+outcomes, and post-dispatch cancellation behave exactly as in P4: cancellation
+after dispatch records `cancelRequested` and never claims the remote write was
+undone. Publishing holds the session's active-work slot, so a concurrent review
+is refused and `/pr-review cancel` still applies.
+
+```sh
+node scripts/smoke-publish-later.mjs
+```
+
 ### Two-reviewer fixture experiment (F2)
 
 After checking `/pr-review models`, supply **all four settings**:
@@ -519,8 +571,8 @@ must match the assignments or execution is reported as incomplete. A final
 `F2 evidence:` JSON line records outputs, session IDs, usage, and turn timestamps
 for reproduction, after runtime cleanup. Dispatch success means the command
 was accepted, not that the review completed. Read the final evidence's
-`complete`, `cancelled`, and `cleanupErrors` fields. It is **not** the
-publish-later cache or a validated finding format.
+`complete`, `cancelled`, and `cleanupErrors` fields. It is **not** a retained
+review result or a validated finding format.
 
 Both reviewers are awaited without a review timeout. Normal completion stops the
 runtime in `finally`. Manual cancellation force-stops it immediately, even when
