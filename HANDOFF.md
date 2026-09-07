@@ -38,6 +38,16 @@ before you start.
   the same branch: the integration-test commands now derive the SDK path from
   `copilot --version` instead of pinning a version, and the effort-less tier
   model question is tracked as increment `C4` rather than sitting in prose.
+- Pull request #4 was itself reviewed with the plugin at head `ae2c55c`, on the
+  user's explicit authorization. Read "Documentation checkpoint: pull request #4
+  and its review" in `ROADMAP.md` before running your own. Three validated
+  findings, all fixed; 79.82605 credits; coverage incomplete. That review is
+  spent. **Yours needs its own authorization, and this one does not carry over.**
+- Two things it taught us. The light tier ran a light model for the first time
+  and found something no heavy reviewer did, so a distinct light model earns its
+  place. And the evidence gate discards true findings whose citations are
+  mis-anchored, so read the rejected candidates yourself rather than trusting
+  the validated list to be complete.
 
 Read "Completed increment: M1, balanced half" in `ROADMAP.md`. Do not repeat it:
 
@@ -144,8 +154,8 @@ tool; never weaken a gate to make the run pass.
 - Controlled suites (no inference/network): `node scripts/smoke-<name>.mjs` for
   `findings`, `review`, `selection`, `retention`, `preview`, `publication`,
   `publish-later`, `checkout`, `config`, `context`, `fixture`, `target`. All
-  twelve passed on this branch at `c34f352`, as did `git diff --check`. Only
-  documentation changed afterwards.
+  twelve passed on this branch at `55be5af`, as did `git diff --check`. Only
+  documentation has changed on this branch throughout.
 - Installed probes require both `COPILOT_CLI_PATH` and `COPILOT_SDK_PATH`, set
   the same derived way as the integration test above rather than pinned to a
   version.
