@@ -60,8 +60,18 @@ diff.
 1. Install the branch's extension and check out exactly the PR head with a clean
    tree: `copilot plugin install "$(pwd)"`, then `gh pr checkout 3`.
 2. In a fresh Copilot CLI session started in this repository, run
-   `/pr-review 3 --no-comment`. Balanced is the default, so no mode flag is
-   needed. Do not use `--comment` or `/pr-review publish`.
+   `/pr-review 3 --all --no-comment`. Balanced is the default, so no mode flag
+   is needed. Do not use `--comment` or `/pr-review publish`. If your agent
+   cannot type a slash command, dispatch the same command through the SDK:
+
+   ```sh
+   COPILOT_CLI_PATH="$(command -v copilot)" \
+   COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
+   node scripts/dogfood-review.mjs 3 --all --no-comment
+   ```
+
+   `copilot -p "/pr-review 3"` is not a substitute: prompt mode starts an
+   ambient model turn instead of dispatching the command.
 3. Record the outcome in `ROADMAP.md` under the M1 balanced-half section: mode,
    model and effort actually used, reviewer coverage, findings and withheld
    minor findings, the reported credit cost, and what you changed in response.
@@ -123,6 +133,11 @@ Acceptance criteria:
 - `smoke-config-runtime.mjs` refuses to run while a personal
   `<copilot-config-home>/pr-review/config.json` exists. Copy it aside and
   restore it byte-identically, or skip that probe.
+- Pull request #3 changes about 195 KB of diff across 26 files, including large
+  documentation files. A balanced review sends that diff plus its bound context
+  to five reviewers, so expect a materially larger charge than R1's 27.89
+  credits for three reviewers on a small diff, and a real chance of hitting a
+  model's context limit. Report the actual cost; do not guess it.
 - Inference authorization does not accumulate. The workflow authorizes **one**
   review per increment pull request. The recorded R1 live command, harness
   `--quick` paths, `--read-live`, fixture inference and any publication still
