@@ -26,83 +26,73 @@ before you start.
 
 ## Recorded state
 
-- `main` is the squash merge of pull request #4, which is documentation only. It
-  recorded that an increment's pull-request review is its real integration test,
-  documented how to run that review, added increment `C4`, and fixed the three
-  findings its own review returned. Pull request #3, squash-merged as `db8bd69`,
-  delivered the balanced half of M1 before it.
-- This session is on branch `m1-full-mode` with open pull request #5. The
-  implementation checkpoints `665f052` and `e8da43b` are already on that branch;
-  the current documentation checkpoint records the remaining integration step.
-  After committing it, keep the working tree clean and do not merge the pull
-  request.
+- **Pull request #5 is open and unmerged**, on branch `m1-full-mode`. It carries
+  the full half of `M1` and is the work described below. Merging is the user's
+  call; nothing in it has landed on `main` yet.
+- `main` is still the squash merge of pull request #4. Pull requests #3 and #4
+  are merged and their branches deleted, so read `git log` and the pull requests
+  rather than looking for hashes from those branches.
 - Pull requests #1 and #2 are synthetic publication playgrounds from P4 and P5.
   **Never merge them**, and never republish to them.
-- Pull request #4 was reviewed with the plugin at head `ae2c55c`, on the user's
-  explicit authorization. Read "Documentation checkpoint: pull request #4 and
-  its review" in `ROADMAP.md` before running your own. Balanced mode, five
-  reviewers, incomplete coverage, three validated findings all since fixed, and
-  79.82605 credits. That review is spent. **Yours needs its own authorization,
-  and this one does not carry over.**
-- Two things it taught us. The light tier ran a light model for the first time
-  and found something no heavy reviewer did, so a distinct light model earns its
-  place. And the evidence gate discards true findings whose citations are
-  mis-anchored, so read the rejected candidates yourself rather than trusting
-  the validated list to be complete.
+- `M1` is now recorded as Completed. Both halves are in `ROADMAP.md` under
+  "Completed increment: M1, balanced half" and "Completed increment: M1, full
+  half". Read the second one in full before you start; do not repeat it.
+- Three live reviews of this repository's own pull requests now exist: #3 and #4
+  in balanced mode, #5 in full mode. All three are spent. **Yours needs its own
+  authorization, and none of these carry over.**
 
-Read "Completed increment: M1, balanced half" in `ROADMAP.md`. Do not repeat it:
+What pull request #5 added, in one paragraph each:
 
-- `extensions/pr-review/modes.mjs` declares each mode as data: reviewer topology
-  with each reviewer's tier, findings policy, label, flag and evidence prefix.
-  `quick.mjs` is now `review.mjs`, and `scripts/smoke-quick.mjs` is now
-  `scripts/smoke-review.mjs`.
-- `--balanced` runs four heavy specialists plus one light overview reviewer and
-  is the default when no mode flag is given. `--major-only` is still the quick
-  alias, mode flags are mutually exclusive, and `--capture-only` is the
-  capture-without-reviewers path that the no-inference probes use.
-- Balanced presents P0-P2 plus at most three P3/nit findings. Accepted minor
-  findings beyond the cap are recorded in `validation.capped`, reported, and can
-  never be selected or published. Retention enforces the mode's reviewer count,
-  admitted severities and the cap.
-- Each reviewer resolves its own tier through the existing layering, and an
-  `Effective reviewer assignments:` block shows every reviewer, tier, model,
-  effort and origin before execution.
-- Two live balanced reviews exist, both of this repository's own pull requests.
-  #3 reviewed itself at head `5c05b7c`: five reviewers completed on
-  `gpt-5.6-terra` at high effort, made 89 confined reads with no denials,
-  returned zero findings with incomplete coverage, and the runtime reported
-  414.14627 AI credits. It produced no candidate, so nothing was adjudicated,
-  and its light tier inherited the heavy assignment. #4 reviewed itself at head
-  `ae2c55c` and did run a light model: `overview` on `gpt-5.6-luna`, and that
-  light reviewer produced a finding no heavy reviewer raised. Both pull requests
-  were documentation-heavy, so balanced behaviour on a real code diff is still
-  undemonstrated, and the minor-finding cap has never been exercised.
+- `--full` runs the balanced five plus one `conventions-maintainability`
+  reviewer on the **medium** tier, and presents every qualifying severity with
+  no minor cap. Balanced is still the default, mode flags are still mutually
+  exclusive, and quick and `--major-only` are untouched.
+- The medium tier resolves through the existing layering, so no configuration
+  key and no medium invocation flag were added. `mediumModel=`/`mediumEffort=`
+  on `/pr-review NUMBER` are rejected exactly as the light keys are.
+- `modes.mjs` declares the severity vocabulary once through a `minorPolicy`
+  helper. The full policy's `minorCap` is `Infinity`, so one number still drives
+  the cap arithmetic, the retention check and the wording; `admitsMinor` and
+  `capsMinor` read it.
+- Nothing else changed. Evidence validation, deduplication, coverage reporting,
+  selection, retention, publication gates and cancellation already read the
+  topology and the policy from `modes.mjs`.
 
-The full half of M1 is already implemented on this branch. `--full` runs the
-balanced five plus the medium `conventions-maintainability` reviewer, presents
-all qualifying severities without a minor cap, and is covered by the controlled
-and no-inference installed probes recorded in `ROADMAP.md`. The max code review
-requested on pull request #5 found stale next-step instructions in this handoff
-and the roadmap; that documentation defect is the current checkpoint. It is not
-the installed-plugin dogfood evidence.
+## What the pull request #5 review taught us
 
-## Complete only the exact remaining step
+It ran full mode at head `e8da43b`, all six reviewers completed, 95 confined
+reads with zero denials, **276.266849 credits**, and **zero validated findings
+with incomplete coverage**. Two things matter more than those numbers.
 
-Do not reimplement `--full`. M1 stays Pending only because the installed plugin
-has not reviewed pull request #5 in full mode; deep remains M2.
+**The medium tier's model fenced its JSON, and the whole output was discarded.**
+`claude-sonnet-5` returned its candidates wrapped in a ```` ```json ```` fence.
+The parser does no fence stripping by design, so `conventions-maintainability`
+contributed an execution failure and a charge instead of candidates. This is the
+first time any live run used a Claude-family model as a reviewer. Full mode is
+the only mode that assigns the medium tier, so `--full` is partly broken today
+for that model family. **This is the next increment**, and it needs a product
+decision from the user first, because `SCOPE.md` deliberately drops
+malformed-output extraction from v1. The two candidate paths, the recommendation
+and the acceptance criteria are at the end of `ROADMAP.md`. Do not just relax the
+parser on your own judgment.
 
-1. Ensure the checkout is the clean head of pull request #5 and reinstall the
-   current plugin.
-2. Run `node scripts/dogfood-review.mjs 5 --full --all --no-comment`, or dispatch
-   the equivalent `/pr-review 5 --full --all --no-comment` command.
-3. Record the actual reviewer models and efforts, coverage, findings, withheld
-   findings, coverage gaps, tool calls, denials and runtime-reported credits in
-   `ROADMAP.md`.
-4. Fix any real finding on this branch in a new validated checkpoint; a refusal
-   or failure is evidence about the shipped tool and must remain recorded.
-5. Update the M1 row to Completed only after the full mode is demonstrated by
-   that installed-plugin review. Keep L1 pending, copy no upstream source, and
-   leave merging to the user.
+**The evidence gate rejected a true finding for the second time in two reviews.**
+`correctness:1` correctly observed that a README sentence stated the medium
+tier's tie-break unconditionally, and was rejected because its introduction
+citations did not identify the same changed hunk as its location. The point was
+acted on anyway. Read the rejected candidates and the discarded reviewer output
+yourself; the validated list is not the whole review.
+
+## Implement only the exact next increment
+
+The exact next increment, its required product decision, and its acceptance
+criteria are at the end of `ROADMAP.md` under "Exact next increment". Implement
+only that, on its own branch and pull request. `M2`, deep mode, comes after it,
+and the roadmap says why that ordering.
+
+Ask the user which of the two paths to take before implementing. Everything that
+does not depend on that answer, the probes, the reproduction, the handoff, can be
+prepared either way.
 
 ## Running the real integration test
 
@@ -114,11 +104,12 @@ COPILOT_SDK_PATH="$(ls -d "$HOME"/.copilot/pkg/*/"$(copilot --version | sed -n '
 node scripts/dogfood-review.mjs NUMBER --full --all --no-comment
 ```
 
-Pass `--full`. Your increment is the full half of M1, and the review is what
-demonstrates it. Without a mode flag the runner takes the default, balanced,
-and would spend the increment's one authorized review without ever running
-the medium conventions reviewer or the unrestricted findings policy that
-`--full` is supposed to add.
+Pass `--full`, and make sure a Claude-family model is the configured medium
+tier. The next increment is about the medium reviewer's output surviving, so a
+review that never runs a medium reviewer, or runs one on a GPT-family model,
+would not demonstrate it. Without a mode flag the runner takes the default,
+balanced, and would spend the increment's one authorized review on the wrong
+topology.
 
 Derive the SDK path instead of pinning a version. Old packages under
 `~/.copilot/pkg/` are never pruned, so a pinned path keeps resolving after a
@@ -143,38 +134,46 @@ dispatching the command.
 
 Record from that run: the mode, the model and effort each reviewer actually
 used, coverage, findings, withheld findings, coverage gaps, tool calls and
-denials, and the reported credits. Fix real findings on the same branch and say
-which you rejected and why. A refusal or failure is a defect report about the
-tool; never weaken a gate to make the run pass.
+denials, and the reported credits. The per-reviewer `policy.toolCalls`,
+`policy.reads`, `policy.permissionDenials` and `policy.toolDenials` fields in the
+`M1 evidence:` record carry the read evidence; `billing` carries the charge. Fix
+real findings on the same branch and say which you rejected and why. A refusal or
+failure is a defect report about the tool; never weaken a gate to make the run
+pass.
 
 ## Runtime and validation caveats
 
 - Consult the installed SDK and current official documentation before adopting
   runtime APIs. Installed SDK:
-  `~/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk`. Demonstrate capabilities;
-  declarations and plugin format support alone are not proof.
+  `~/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk`, CLI `1.0.83`. Demonstrate
+  capabilities; declarations and plugin format support alone are not proof.
 - Reinstall with `copilot plugin install "$(pwd)"` after every extension change,
   before running any installed-runtime probe or the integration test.
 - Controlled suites (no inference/network): `node scripts/smoke-<name>.mjs` for
   `findings`, `review`, `selection`, `retention`, `preview`, `publication`,
   `publish-later`, `checkout`, `config`, `context`, `fixture`, `target`. All
-  twelve passed on pull request #4 before it merged, as did `git diff --check`.
-  Re-run them before you start: they need no network and no inference.
+  twelve passed on pull request #5, as did `git diff --check`. Re-run them
+  before you start: they need no network and no inference.
 - Installed probes require both `COPILOT_CLI_PATH` and `COPILOT_SDK_PATH`, set
   the same derived way as the integration test above rather than pinned to a
-  version.
-  No-inference probes: `smoke-runtime.mjs --targets --startup`,
+  version. No-inference probes, all rerun on pull request #5:
+  `smoke-runtime.mjs --targets --startup`,
   `smoke-runtime.mjs --targets --matching-checkout --startup`,
   `smoke-retention-runtime.mjs`, `smoke-reviewer-tools.mjs` with
   `PR_REVIEW_HEAVY_MODEL=gpt-5.6-terra` and with `claude-sonnet-5`, and
   `smoke-config-runtime.mjs`.
+- The installed draft-skip loop in `smoke-runtime.mjs --startup` now dispatches
+  all three modes and asserts each one's reviewer count, tier lines and
+  findings-policy text. Extend it the same way for any new mode.
 - `smoke-config-runtime.mjs` refuses to run while a personal
   `<copilot-config-home>/pr-review/config.json` exists. Copy it aside and
-  restore it byte-identically, or skip that probe.
+  restore it byte-identically, or skip that probe. Verify the restore with
+  `shasum -a 256`; a shell that dies mid-script can leave it moved away.
 - Reviewing costs real credits and scales with the diff and the reviewer count:
-  414.14627 credits for five reviewers on a 27-file documentation-heavy pull
-  request, against 27.89 for three reviewers on a small one. Report the
-  runtime's figure; never estimate it.
+  276.266849 for six full reviewers on a 13-file pull request, 414.14627 for
+  five balanced reviewers on a 27-file one, 79.82605 for five on a 4-file one,
+  and 27.89 for three quick reviewers on a small one. Report the runtime's
+  figure; never estimate it.
 - Inference authorization does not accumulate. The workflow authorizes the one
   review of your increment's pull request. The recorded R1 live command, harness
   `--quick` paths, `--read-live`, fixture inference and any publication still
