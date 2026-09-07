@@ -32,6 +32,13 @@ before you start.
 - `main` is still the squash merge of pull request #4. Pull requests #3 and #4
   are merged and their branches deleted, so read `git log` and the pull requests
   rather than looking for hashes from those branches.
+- **Two sessions worked on this branch at once.** `3d88a47`, by
+  `copilot-swe-agent[bot]`, is a documentation checkpoint written from the branch
+  state before the review had run; it says the review is still outstanding and
+  gives instructions for running it. It is preserved in history but entirely
+  superseded by the commits after it. Read `ROADMAP.md` at `HEAD`, not that
+  commit. If you find two sessions on one branch again, rebase rather than
+  force-push, and say so in your report.
 - Pull requests #1 and #2 are synthetic publication playgrounds from P4 and P5.
   **Never merge them**, and never republish to them.
 - `M1` is now recorded as Completed. Both halves are in `ROADMAP.md` under
