@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
@@ -7,6 +7,9 @@ import { pathToFileURL } from "node:url";
 import {
   configFilename, configSchemaVersion, configDirectoryName, sessionStateDirectoryName,
 } from "../extensions/pr-review/config.mjs";
+import {
+  projectConfigSegments, projectSchemaVersion, trustFilename, trustSchemaVersion,
+} from "../extensions/pr-review/project.mjs";
 import { prepareTargetSmoke } from "./runtime-target.mjs";
 import { assertExited, descendants } from "./runtime-fixture.mjs";
 
@@ -30,6 +33,9 @@ const options = {
   enableExperimentalMode: true, enableConfigDiscovery: true, requestExtensions: true,
   availableTools: [], onPermissionRequest: async () => ({ kind: "denied-no-approval-rule" }),
   ...settings, ...target.sessionOptions,
+  // C2 reads a project file from the reviewed working directory, so the session
+  // must run in the controlled fixture checkout rather than this repository.
+  workingDirectory: target.quickTarget.workingDirectory,
   // A closed-PR confirmation that never answers keeps a quick review active
   // without starting any reviewer runtime or spending inference.
   onElicitationRequest: async (request) => {
@@ -114,19 +120,34 @@ try {
   assert.equal(basename(dirname(metadata.workspacePath)), sessionStateDirectoryName);
   const home = dirname(dirname(metadata.workspacePath));
   const filename = join(home, configDirectoryName, configFilename);
-  const existed = existsSync(filename);
+  const trustPath = join(home, configDirectoryName, trustFilename);
+  const projectFile = join(target.quickTarget.workingDirectory, ...projectConfigSegments);
   const directoryExisted = existsSync(dirname(filename));
-  const original = existed ? readFileSync(filename, "utf8") : undefined;
+  const snapshots = [filename, trustPath].map((path) => ({
+    path, existed: existsSync(path), original: existsSync(path) ? readFileSync(path, "utf8") : undefined,
+  }));
+  const existed = snapshots[0].existed;
   restore = () => {
-    if (existed) writeFileSync(filename, original, { mode: 0o600 });
-    else rmSync(filename, { force: true });
+    // Every probe write to the real personal store is snapshotted and restored,
+    // and the project file lives only in the disposable fixture checkout.
+    rmSync(join(target.quickTarget.workingDirectory, ".copilot"), { recursive: true, force: true });
+    for (const snapshot of snapshots) {
+      if (snapshot.existed) writeFileSync(snapshot.path, snapshot.original, { mode: 0o600 });
+      else rmSync(snapshot.path, { force: true });
+    }
     if (!directoryExisted && existsSync(dirname(filename)) && !readdirSync(dirname(filename)).length) {
       rmSync(dirname(filename), { recursive: true });
     }
   };
+  const writeProject = (record) => {
+    mkdirSync(dirname(projectFile), { recursive: true });
+    writeFileSync(projectFile, typeof record === "string" ? record : JSON.stringify(record, null, 2));
+  };
   assert(!filename.startsWith(`${target.quickTarget.workingDirectory}/`),
     "Personal configuration lives outside the reviewed checkout");
-  console.log(`C1 personal configuration location: ${filename} (pre-existing=${existed})`);
+  assert.equal((await session.rpc.metadata.snapshot()).workingDirectory, target.quickTarget.workingDirectory);
+  console.log(`C1 personal configuration location: ${filename} ` +
+    `(pre-existing=${existed}, trust record pre-existing=${snapshots[1].existed})`);
 
   const tracePath = process.env.PR_REVIEW_SMOKE_TRACE;
   const traceBefore = await readFile(tracePath, "utf8");
@@ -229,6 +250,116 @@ try {
   pending = Promise.withResolvers();
   assert.match(await show(session), /not created yet/);
   console.log("PASS configuration is refused while review work holds the session slot, and works again once it settles");
+
+
+  // --- C2: explicitly trusted project overrides ------------------------------
+  const canonicalWorkingDirectory = realpathSync(target.quickTarget.workingDirectory);
+  const personalSet = await run(session, `heavyModel=${current.modelId} heavyEffort=${other}`);
+  assert.equal(personalSet.error, undefined, `personal set failed: ${personalSet.error}`);
+  const personalBytes = readFileSync(filename, "utf8");
+  writeProject({
+    schemaVersion: projectSchemaVersion,
+    settings: { heavyEffort: current.reasoningEffort, autoPostReviews: true },
+  });
+  const projectBytes = readFileSync(projectFile, "utf8");
+
+  const ignored = await show(session);
+  assert.match(ignored, /Project trust: NOT TRUSTED/);
+  assert(ignored.includes(`Project configuration: IGNORED. ${projectFile}`), ignored);
+  assert(ignored.includes(`heavy: model=${current.modelId} [configured:heavy] reasoning=${other} [configured:heavy]`),
+    `An untrusted project file changes no assignment: ${ignored}`);
+  assert.match(ignored, /autoPostReviews: false \[default\]/);
+  assert(!existsSync(trustPath), "An untrusted repository's file creates no trust record");
+
+  // Whatever a repository writes into its own file, it cannot become trusted.
+  for (const selfTrust of [
+    { schemaVersion: projectSchemaVersion, settings: {},
+      trustedProjects: [{ path: canonicalWorkingDirectory, trustedAt: new Date().toISOString() }] },
+    { schemaVersion: projectSchemaVersion, settings: { trustedProjects: [] } },
+  ]) {
+    writeProject(selfTrust);
+    assert.match(await show(session), /Project trust: NOT TRUSTED/);
+    assert(!existsSync(trustPath), "A repository cannot record its own trust");
+    const tolerated = (await quickRun(session, "2 --quick --no-comment")).find((message) =>
+      message.startsWith("Effective PR review configuration for this invocation."));
+    assert.match(tolerated, /Project configuration: IGNORED/,
+      "An untrusted repository's file is never parsed, so it cannot even fail a review");
+  }
+  writeProject(projectBytes);
+  console.log("PASS an untrusted project file is ignored natively, is never parsed, and cannot trust itself");
+
+  const traceBeforeTrust = await readFile(tracePath, "utf8");
+  const granted = await run(session, "trust");
+  assert.equal(granted.error, undefined, `trust failed: ${granted.error}`);
+  const record = JSON.parse(readFileSync(trustPath, "utf8"));
+  assert.equal(record.schemaVersion, trustSchemaVersion);
+  assert.equal(record.trustedProjects.length, 1);
+  assert.equal(record.trustedProjects[0].path, canonicalWorkingDirectory,
+    "Trust records the canonical path of the reviewed working directory");
+  assert(Number.isFinite(Date.parse(record.trustedProjects[0].trustedAt)));
+  const trustBytes = readFileSync(trustPath, "utf8");
+  assert.equal(readFileSync(projectFile, "utf8"), projectBytes, "Trust never writes the project file");
+  assert.equal(readFileSync(filename, "utf8"), personalBytes, "Trust never rewrites the personal settings");
+
+  await reload(session);
+  const applied = await show(session);
+  assert.match(applied, /Project trust: TRUSTED by an explicit personal command/);
+  assert(applied.includes(
+    `heavy: model=${current.modelId} [configured:heavy] reasoning=${current.reasoningEffort} [project:heavy]`),
+  `The reloaded extension applies the trusted project file: ${applied}`);
+  assert.match(applied, /autoPostReviews: true \[project\]/);
+  assert.match(applied, /overriding personal heavyEffort/);
+  assert.equal(await readFile(tracePath, "utf8"), traceBeforeTrust,
+    "Trust, revocation and inspection make no GitHub request");
+  console.log("PASS explicit trust survives an extension reload and overrides a personal tier with no gh request");
+
+  const projected = (await quickRun(session, "2 --quick --no-comment")).find((message) =>
+    message.startsWith("Effective PR review configuration for this invocation."));
+  assert(projected.includes(`reasoning=${current.reasoningEffort} [project:heavy]`),
+    `A trusted project drives the quick heavy assignment: ${projected}`);
+  assert.match(projected, /autoPostReviews: true \[project\]/);
+  const overriddenByFlag = (await quickRun(session, `2 --quick --no-comment heavyEffort=${other}`)).find((message) =>
+    message.startsWith("Effective PR review configuration for this invocation."));
+  assert(overriddenByFlag.includes(`reasoning=${other} [flag]`),
+    `Invocation flags still win over a trusted project: ${overriddenByFlag}`);
+  assert.equal(readFileSync(filename, "utf8"), personalBytes, "An invocation rewrites no personal setting");
+  assert.equal(readFileSync(trustPath, "utf8"), trustBytes, "An invocation rewrites no trust record");
+  assert.equal(readFileSync(projectFile, "utf8"), projectBytes, "An invocation rewrites no project file");
+  console.log("PASS a trusted project drives a real quick invocation and flags override it, rewriting no saved file");
+
+  const traceBeforeRefusals = await readFile(tracePath, "utf8");
+  for (const [broken, expected] of [
+    ["{ not json", /not valid JSON/],
+    [{ schemaVersion: 99, settings: {} }, /incompatible schema version/],
+    [{ schemaVersion: projectSchemaVersion, settings: {}, trustedProjects: [] },
+      /does not hold a supported project configuration record/],
+    [{ schemaVersion: projectSchemaVersion, settings: { trustedProjects: [] } }, /unknown configuration key/],
+    [{ schemaVersion: projectSchemaVersion, settings: { verify: true } }, /unknown configuration key/],
+    [{ schemaVersion: projectSchemaVersion, settings: { heavyModel: "definitely-not-a-model" } },
+      /Unavailable or disabled Copilot-subscription model/],
+  ]) {
+    writeProject(broken);
+    const refused = await run(session, "2 --quick --no-comment", "pr-review");
+    assert.match(refused.error ?? "", expected, JSON.stringify(broken));
+    assert.match((await run(session, "autoPostReviews=false")).error ?? "", expected,
+      "A trusted project's error refuses a personal update too");
+    assert.equal(readFileSync(filename, "utf8"), personalBytes, "A refused review rewrites nothing");
+    assert.equal(readFileSync(trustPath, "utf8"), trustBytes, "A project file never changes the trust record");
+  }
+  console.log("PASS a trusted project's malformed, unknown-key and unavailable settings refuse and change nothing");
+
+  writeProject(projectBytes);
+  const revoked = await run(session, "untrust");
+  assert.equal(revoked.error, undefined, `untrust failed: ${revoked.error}`);
+  assert.deepEqual(JSON.parse(readFileSync(trustPath, "utf8")).trustedProjects, []);
+  const afterRevocation = await show(session);
+  assert.match(afterRevocation, /Project trust: NOT TRUSTED/);
+  assert(afterRevocation.includes(`reasoning=${other} [configured:heavy]`), afterRevocation);
+  assert.match(afterRevocation, /autoPostReviews: false \[default\]/);
+  assert.equal(await readFile(tracePath, "utf8"), traceBeforeRefusals,
+    "Refused reviews, revocation and inspection make no GitHub request");
+  rmSync(join(target.quickTarget.workingDirectory, ".copilot"), { recursive: true });
+  console.log("PASS revoked trust ignores the project file again and restores the personal assignment");
 
   await target.quickTarget.check();
   console.log("PASS native personal configuration: no inference, no owned runtime, no checkout change");

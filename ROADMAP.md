@@ -28,7 +28,7 @@ in [AGENTS.md](AGENTS.md); the replaceable next-session prompt lives in
 | P4 | Completed | Current-run COMMENT publication with fresh gates and durable uncertainty; nine native cases, reload/cold resume and real playground inline publication demonstrated below. | P3; [Publication gates](SCOPE.md#selection-publication-and-cached-results) |
 | P5 | Completed | Explicit publish-later of the retained selection without rerunning reviewers; refetched evidence, fresh gates, version-4 authority, seven native cases and a real playground publication demonstrated below. | P2, P4; [Cached publication](SCOPE.md#selection-publication-and-cached-results) |
 | C1 | Completed | Personal light/medium/heavy tier configuration and `autoPostReviews` inspected and updated by `/pr-review-config`; validated capabilities, nearest-tier/ambient inheritance, flag precedence and effective-assignment display demonstrated below. | F3; [Configuration](SCOPE.md#models-configuration-and-execution) |
-| C2 | Pending | Explicit trust gates project overrides; prove a repository cannot authorize itself. | C1; [Configuration trust](SCOPE.md#models-configuration-and-execution) |
+| C2 | Completed | Explicit per-directory trust gates `.copilot/pr-review/config.json` overrides; untrusted files ignored unparsed, self-trust impossible, precedence and revocation demonstrated below. | C1; [Configuration trust](SCOPE.md#models-configuration-and-execution) |
 | M1 | Pending | Balanced becomes default with required topology and P3 cap; full adds conventions reviewer and its findings policy. | Q4, C1; [Modes](SCOPE.md#review-modes-and-findings) |
 | M2 | Pending | Deep uses one holistic reviewer; reject conflicting mode flags. | M1; [Modes](SCOPE.md#review-modes-and-findings) |
 | C3 | Pending | Explicit optional fallback with at most one eligible retry per failed reviewer; no timers or silent substitutions. | C1, Q3; [Fallbacks/execution](SCOPE.md#models-configuration-and-execution) |
@@ -2173,47 +2173,231 @@ Remaining limits:
 - No fallback models, additional modes, safeguards, project trust or interactive
   menu are included. `--verify` remains unimplemented.
 
+## Completed increment: C2
+
+Implementation: new `extensions/pr-review/project.mjs` for the trusted-project
+boundary, layered resolution and the trust store in `config.mjs`, effective
+settings in `quick.mjs`, and the pre-execution report moved ahead of assignment
+resolution in `extension.mjs`. Exercises: `scripts/smoke-config.mjs` and
+`scripts/smoke-config-runtime.mjs`, both extended. No upstream source was copied.
+
+### Trusted-project boundary
+
+- A repository may carry `.copilot/pr-review/config.json`, a record of the same
+  shape as the personal file, `{"schemaVersion": 1, "settings": {...}}`, with the
+  same seven keys and no others. Its own schema version is tracked separately
+  from the personal record's.
+- It is read **only** when the personal store holds an explicit trust record for
+  that exact working directory. Without one the file is located but never parsed,
+  never merged, and reported as ignored by `/pr-review-config show` and by the
+  pre-execution report of every review. An untrusted file that is malformed
+  therefore cannot even fail a review.
+- Trust is granted only by `/pr-review-config trust` and revoked by
+  `/pr-review-config untrust [ABSOLUTE_PATH]`. Records live in
+  `<copilot-config-home>/pr-review/trusted-projects.json`, a second personal file
+  with its own `{"schemaVersion": 1, "trustedProjects": [...]}` record, written
+  through the same temporary-file, `fsync` and rename path with mode `0600`.
+- **The binding is the canonical absolute path of the session working directory.**
+  It proves the user explicitly trusted that exact directory on this machine. It
+  does **not** prove which repository, remote, branch or file content is there
+  now: a different checkout later placed at the same path inherits the trust, and
+  moving or renaming the directory silently drops it. `realpathSync` resolves the
+  path at both grant and use time, so one directory is never two trust decisions.
+  A repository cannot forge this identity, because its own contents cannot choose
+  where it is checked out.
+- Nothing inside a repository can grant, widen or refresh trust. Trust is a
+  separate top-level file, never part of `settings`, so a project file carrying a
+  `trustedProjects` key or an extra top-level field is a validation error rather
+  than a trust grant.
+- Precedence is per key: invocation flags, then a trusted project's settings,
+  then personal settings, then the ambient session assignment. Tier inheritance
+  runs over the merged result, and the origin travels with the value:
+  `flag`, `project:heavy`, `project-inherited:light`, `configured:heavy`,
+  `inherited:light`, `ambient`, `unset`. `autoPostReviews` reports
+  `[project]`, `[configured]` or `[default]`.
+- An invocation rewrites no saved file: not the personal settings, not the trust
+  record, and never the project file, which is only ever read.
+- A trusted project file that is malformed JSON, carries an unsupported schema
+  version, an unknown key or a wrongly typed value is an explicit error that
+  merges nothing and refuses both the review and any personal configuration
+  update. `show` still renders the error so it is diagnosable, and `untrust`
+  still works, so a repository cannot lock the user out of revoking its trust.
+  This is a deliberate difference from the personal file, whose failure also
+  refuses inspection: a broken personal file hides the settings themselves.
+- Unavailable or disabled models and unsupported reasoning efforts are refused
+  the same way and never substituted or lowered. Granting trust is itself refused
+  when the file it would activate is broken or unusable, and records nothing.
+- `autoPostReviews` stays overridable by a trusted project, as `SCOPE.md`
+  records, so trusting a repository lets its file authorize an unattended `--all`
+  publication. That consequence is stated in the trust command's own output, in
+  `/pr-review-config help`, and in the README.
+- A project file cannot enable safeguards or bypass a publication gate: the key
+  set is closed, `--verify` is still unimplemented, and publication re-runs every
+  head, lifecycle and anchor check regardless of configuration.
+- Path handling refuses a symlinked component anywhere under the project path, a
+  non-regular file, and a file larger than 64 KiB, without following a link out
+  of the checkout.
+- Configuration commands still issue only `metadata.snapshot`,
+  `model.getCurrent` and `model.list`, start no inference, make no GitHub request
+  and stay refused while a review or publication holds the active-work slot.
+
+### Controlled evidence
+
+`scripts/smoke-config.mjs` passes with no runtime, no network and no inference.
+Beyond the C1 coverage it now proves: the trust-record schema and every rejected
+shape; the atomic `0600` trust file; safe project-file location including a
+symlinked component, a non-regular file and an oversize file; an untrusted file
+ignored and never parsed for six different contents, including two that try to
+record their own trust; explicit trust recording the canonical path; a trusted
+file overriding a personal tier and shadowing reported by name; invocation flags
+still winning; revocation restoring the personal assignment; every malformed,
+unknown-key and unusable trusted file refusing and changing nothing; revocation
+remaining available while the trusted file is unreadable; trust refused when it
+would activate a broken or unusable file; and per-key layering with origins
+preserved through tier inheritance.
+
+Two full `executeRetainedQuick` runs against the skipped draft fixture record
+`preview.policy.autoPostReviews` taken from the trusted project rather than the
+opposite personal value, and assert the personal file, the trust record and the
+project file are all byte-identical afterwards. The client double fails the probe
+if any reviewer runtime starts.
+
+`smoke-quick`, `smoke-preview`, `smoke-retention`, `smoke-publication`,
+`smoke-publish-later`, `smoke-selection`, `smoke-findings`, `smoke-context`,
+`smoke-target` and `smoke-fixture` still pass unchanged.
+
+### Installed-plugin evidence
+
+On 2026-09-07, CLI 1.0.83 with its bundled SDK, Node.js 26.1.0, macOS arm64,
+`scripts/smoke-config-runtime.mjs` passed against the **installed** plugin,
+spending no Copilot credits: the `gpt-5.6-terra` / `high` pair it passes is
+session configuration and no prompt is ever sent. Every command was asserted to
+produce no `user.message`, `assistant.*`, `subagent.*` or `tool.execution_start`
+event, and each `/pr-review-config` command to leave the descendant process list
+unchanged. The session now runs in the disposable fixture checkout, so the
+project file never touches this repository.
+
+- The trust record was written to `~/.copilot/pr-review/trusted-projects.json`
+  holding exactly the canonical fixture checkout path. No such file existed
+  before the run; the probe snapshots and restores both personal files and
+  removes the directory it created. Nothing remained afterwards.
+- Before trust, `show` reported `Project trust: NOT TRUSTED` and
+  `Project configuration: IGNORED` for the real file, kept the heavy tier at
+  `[configured:heavy]`, and reported `autoPostReviews: false [default]`.
+- A project file declaring its own `trustedProjects`, and one putting
+  `trustedProjects` inside `settings`, both left no trust record, and a real
+  quick invocation still ran with the file reported as ignored, proving an
+  untrusted file is never parsed.
+- After `/pr-review-config trust` and an extension reload, `show` reported
+  `TRUSTED`, the heavy tier as `reasoning=<ambient> [project:heavy]`,
+  `autoPostReviews: true [project]`, and `overriding personal heavyEffort`, so
+  the reloaded process read the stored trust and project file rather than run
+  memory.
+- A real `/pr-review 2 --quick --no-comment` invocation logged the effective
+  configuration with `[project:heavy]` and `autoPostReviews: true [project]`.
+  Repeating with `heavyEffort=` reported `[flag]`. Neither rewrote the personal
+  file, the trust record or the project file.
+- With trust in place, a project file that was invalid JSON, version 99, carried
+  an extra top-level `trustedProjects`, put `trustedProjects` or `verify` inside
+  `settings`, or named an unavailable model, each refused both the quick review
+  and a personal update, leaving the personal file and trust record unchanged.
+- `/pr-review-config untrust` emptied the trust list, and `show` reported the
+  file as ignored again with the personal `[configured:heavy]` assignment and
+  `autoPostReviews: false [default]` restored.
+- The recorded `gh` request trace was byte-identical across the trust, reload and
+  inspection span, and again across the refusal and revocation span, so trust,
+  revocation, inspection and refused reviews make no GitHub request. The decoy
+  checkout, its dirty reviewed path and its branch were unchanged.
+
+`scripts/smoke-runtime.mjs`, `scripts/smoke-runtime.mjs --targets` and
+`scripts/smoke-retention-runtime.mjs` also passed after the change, without
+inference.
+
+### APIs, reproduction and remaining limits
+
+No new runtime API was adopted; the trusted-project boundary is plain filesystem
+access plus the `metadata.snapshot` working directory already in use. The
+installed SDK's experimental `rpc.permissions.folderTrust.isTrusted` /
+`addTrusted` and the `enableConfigDiscovery` / added-root documentation in
+`generated/rpc.d.ts` were consulted. The CLI's folder trust was deliberately
+**not** reused as the authorization: it is granted for ordinary CLI use in a
+folder, so reusing it would let a folder trusted for another purpose silently
+change review models and posting authority, and `SCOPE.md` requires an explicit
+command. Requiring it in addition was also rejected, because arming it in a probe
+would write to the user's real global trust list.
+
+```sh
+node scripts/smoke-config.mjs
+node scripts/smoke-quick.mjs
+node scripts/smoke-preview.mjs
+node scripts/smoke-retention.mjs
+copilot plugin install "$(pwd)"
+COPILOT_CLI_PATH="$(command -v copilot)" \
+COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
+PR_REVIEW_HEAVY_MODEL=gpt-5.6-terra PR_REVIEW_HEAVY_EFFORT=high \
+node scripts/smoke-config-runtime.mjs
+```
+
+Remaining limits:
+
+- The trust binding proves a directory, not a repository. A different checkout
+  placed at a trusted path inherits the trust; a moved or renamed directory
+  silently loses it. Binding to the GitHub repository identity was rejected
+  because obtaining it needs a `gh` request, which configuration commands must
+  not make, and because it would be verified only after the effective
+  configuration is displayed.
+- Trust is exact-path, never a prefix: a session whose working directory is a
+  subdirectory of a trusted repository reads no project file. That is
+  fail-closed, and it also prevents a symlink inside a trusted subtree from
+  reaching content outside it.
+- A configuration-authorized publication has still **not** been exercised
+  natively, whether the authority is personal or project-supplied, because it
+  needs a real inference review. `smoke-preview.mjs` proves the
+  `config-authorized` status and the controlled retained runs prove the effective
+  setting reaches the retained posting policy.
+- Only the heavy tier is consumed until M1; light and medium are stored,
+  resolved and displayed only.
+- Validation binds to the models the current session reports, so a saved or
+  project-supplied assignment can become unusable under a different ambient
+  model; `show` marks it `UNUSABLE` and the review refuses.
+- Neither personal file has a cross-process lock. Two sessions writing at once
+  still leave a complete file thanks to the rename, but the last writer wins.
+- No fallback models, additional modes, safeguards or interactive menu are
+  included. `--verify` remains unimplemented.
+
 ## Exact next increment
 
-**C2 only:** Let an explicitly trusted project supply configuration overrides,
-and prove that a repository cannot establish its own trust. Do not implement
-other review modes, fallbacks, safeguards or an interactive menu, and do not
-change publication gates.
+**The balanced half of M1 only.** Add the balanced review mode with its upstream
+reviewer assignment, so a mode other than quick runs and the light tier is
+actually consumed. M1 stays Pending until the full mode's conventions reviewer
+and findings policy also land, which is the increment after this one. Do not add
+full or deep now, nor fallbacks, safeguards or an interactive menu, and do not
+change publication gates or the configuration surface.
 
 Acceptance criteria:
 
-- Read a project configuration file from the reviewed repository's working
-  directory only when the personal configuration records explicit trust for that
-  exact repository. An untrusted repository's file must be ignored with a visible
-  message, never merged, and never able to mark itself trusted. Nothing inside
-  the repository may grant, widen or refresh trust.
-- Trust must be granted by an explicit personal command, recorded in the personal
-  store, revocable, and bound to an identity the repository cannot forge on its
-  own. Record what the chosen binding does and does not prove.
-- Apply precedence explicitly: invocation flags, then trusted project settings,
-  then personal settings, then ambient. Show the origin of every effective value
-  in `/pr-review-config show` and before execution, and keep saved files
-  unmodified by an invocation.
-- Project overrides may carry the same keys as personal configuration only.
-  Unknown keys, malformed values, an unsupported schema version and unavailable
-  models or efforts must be explicit errors that change nothing and never
-  downgrade an assignment. A project file must not be able to enable project
-  safeguards or bypass any publication gate.
-- Keep `autoPostReviews` overridable by a trusted project, as `SCOPE.md`
-  records, and state plainly in the docs that trusting a repository can let its
-  file authorize unattended posting for `--all` runs.
-- Configuration commands must still start no inference, no GitHub request and no
-  review work, and stay refused while review or publication work is active.
-- Demonstrate with controlled probes and no-inference installed-plugin probes:
-  an ignored untrusted file, a trusted file overriding a personal tier, revoked
-  trust, a repository trying to trust itself, and a malformed project file
-  refusing the review. Reuse the existing probes rather than spending new
-  inference credits for plumbing.
+- `--balanced` runs four heavy specialists (correctness, contracts, security,
+  performance/resources) plus one light overview reviewer, per `SCOPE.md`.
+  Balanced is the default when no mode flag is given; mode flags stay mutually
+  exclusive and `--major-only` remains the alias for `--quick`.
+- The light reviewer resolves the light tier through the existing layered
+  configuration, so a personal or trusted-project light assignment is what
+  actually runs, and the pre-execution report keeps showing every origin.
+- Findings policy follows `SCOPE.md`: P0-P2 plus at most three direct-diff
+  P3/nit findings. Evidence validation and deduplication apply unchanged, and a
+  failed or incomplete reviewer stays visible as incomplete coverage.
+- Reviewer count and concurrency follow the selected mode. No timeouts are
+  imposed, and cancellation still stops all owned work.
+- Selection, retention and publication gates are untouched.
+- Demonstrate with controlled probes first, and reuse the existing no-inference
+  installed-plugin probes for plumbing. Spend inference only for the one live
+  balanced review needed to prove real reviewer output, and record whether it
+  was run.
 - Consult the installed SDK and current official documentation before adopting
   new runtime APIs, then record evidence, remaining limits and the next small
   increment. Follow `AGENTS.md` checkpoint and final-file handoff rules in turn.
 
-Keep L1 pending, copy no upstream source and implement no additional modes,
-fallbacks or safeguards. Do not switch branches or modify reviewed source as
-part of review or publication. No push authorization exists in this session;
-do not assume one.
+Keep L1 pending, copy no upstream source and implement no fallbacks, safeguards
+or additional modes beyond balanced. Do not switch branches or modify reviewed
+source as part of review or publication. No push authorization exists in this
+session; do not assume one.

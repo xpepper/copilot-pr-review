@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { ambientAssignment, resolveTier, resolvedAssignment } from "./config.mjs";
+import { ambientAssignment, requireUsableProject, resolveTier, resolvedAssignment } from "./config.mjs";
 import { reviewAssignments, validateModelAssignment } from "./fixture.mjs";
 import { finishSelection } from "./selection.mjs";
 import { finishPreview, postingAuthority } from "./preview.mjs";
@@ -45,13 +45,17 @@ export function parseQuickArgs(args) {
   return { captureArgs, settings, all: seen.has("--all"), comment: policy.comment, noComment: policy.noComment };
 }
 
-// Quick mode runs the heavy tier only. Invocation flags win over saved tiers,
-// which in turn win over the ambient session model and reasoning effort.
+// Quick mode runs the heavy tier only. Invocation flags win over a trusted
+// project's settings, which win over personal settings, which win over the
+// ambient session model and reasoning effort.
 export async function quickAssignments(parent, flags, configuration) {
   const context = configuration ?? {
-    settings: {}, ambient: await ambientAssignment(parent), models: (await parent.rpc.model.list()).list,
+    effective: { settings: {}, origins: {} },
+    ambient: await ambientAssignment(parent), models: (await parent.rpc.model.list()).list,
   };
-  const resolution = resolveTier("heavy", { settings: context.settings, ambient: context.ambient, flags });
+  requireUsableProject(context);
+  const { settings, origins } = context.effective;
+  const resolution = resolveTier("heavy", { settings, origins, ambient: context.ambient, flags });
   const assignment = resolvedAssignment(resolution);
   validateModelAssignment(assignment, context.models);
   return quickSpecialists.map(({ label }) => ({ label, ...assignment }));

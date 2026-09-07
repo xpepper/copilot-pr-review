@@ -622,8 +622,8 @@ checkout. The file is a versioned record, `{"schemaVersion": 1, "settings": {...
 written atomically with mode `0600`. Malformed JSON, an unsupported schema
 version, an unknown stored key, or a wrongly typed value is an explicit error
 that refuses both inspection and review; nothing is rewritten or repaired.
-**No repository-provided configuration file is read**, so a repository cannot
-authorize itself; explicitly trusted project overrides remain unimplemented.
+A repository-provided file is read only after the explicit trust command
+described below, and a repository can never authorize itself.
 
 Inspection and updates start no inference, make no GitHub request, and run no
 review work. They are refused while a review or publication holds the session's
@@ -644,6 +644,80 @@ The native probe spends no inference credits: the model and effort it passes are
 session configuration, and no prompt is ever sent. It snapshots and restores any
 pre-existing personal configuration file, and uses the controlled `gh` fixture
 plus draft and closed fixture PRs so that no reviewer ever starts.
+
+### Trusted project configuration (C2)
+
+```text
+/pr-review-config trust
+/pr-review-config untrust
+/pr-review-config untrust /absolute/path/to/a/checkout
+```
+
+A repository may carry `.copilot/pr-review/config.json`, a record of the same
+shape as the personal file: `{"schemaVersion": 1, "settings": {...}}` with the
+same seven keys and no others. It is read **only** when the personal store holds
+an explicit trust record for that exact working directory. Without one the file
+is located but never parsed, never merged, and reported as ignored in every
+configuration report and before every review.
+
+Trust is granted only by `/pr-review-config trust`, which records the canonical
+absolute path of the session's working directory in
+`<copilot-config-home>/pr-review/trusted-projects.json`, a second personal file
+with its own versioned record and `0600` mode. Nothing inside a repository can
+grant, widen, or refresh trust: the project file may carry configuration keys and
+nothing else, and a `trustedProjects` key or extra top-level field is a validation
+error rather than a trust grant.
+
+**What the binding proves.** It proves that you explicitly trusted that exact
+directory on this machine. It does not prove which repository, remote, branch, or
+file contents are there now. A different checkout later placed at the same path
+inherits the trust, and moving or renaming the directory silently drops it.
+Revoke with `/pr-review-config untrust`, which also accepts an absolute path so a
+deleted directory can still be revoked. Trust is deliberately not taken from the
+CLI's own folder-trust list: that trust is granted for ordinary CLI use, and
+reusing it would let a folder trusted for another purpose silently change review
+models and posting authority.
+
+Precedence is per key: invocation flags, then a trusted project's settings, then
+personal settings, then the ambient session assignment. Tier inheritance then
+runs over the merged result, and `show` and the pre-execution report name the
+origin of every value: `flag`, `project:heavy`, `project-inherited:light`,
+`configured:heavy`, `inherited:light`, `ambient`, or `unset`. An invocation never
+rewrites the personal file, the trust record, or the project file.
+
+`autoPostReviews` is overridable by a trusted project, as the scope records.
+**Trusting a repository therefore lets its file set `autoPostReviews=true`, which
+can publish an `--all` run unattended.** Nothing else is delegated: a project file
+cannot enable project safeguards, cannot add a key that would, and cannot bypass
+any publication gate, because publication reads no configuration beyond the
+effective posting setting and re-runs every head, lifecycle, and anchor check.
+
+A trusted project file that is malformed JSON, carries an unsupported schema
+version, an unknown key, or a wrongly typed value is an explicit error that
+merges nothing and refuses both the review and any personal configuration update.
+`show` still reports it, so the failure is diagnosable, and `untrust` still works,
+so a repository cannot lock you out of revoking its trust. An unavailable or
+disabled model, or an unsupported reasoning effort, is refused the same way and
+is never substituted or lowered. Granting trust is itself refused when the file
+it would activate is broken or unusable, and records nothing.
+
+Reproduce the controlled and native probes:
+
+```sh
+node scripts/smoke-config.mjs
+copilot plugin install "$(pwd)"
+COPILOT_CLI_PATH="$(command -v copilot)" \
+COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
+PR_REVIEW_HEAVY_MODEL=gpt-5.6-terra PR_REVIEW_HEAVY_EFFORT=high \
+node scripts/smoke-config-runtime.mjs
+```
+
+Both probes cover an ignored untrusted file, a repository trying to trust itself,
+a trusted file overriding a personal tier and `autoPostReviews`, invocation flags
+still winning, an extension reload, revoked trust, and malformed or unusable
+project files refusing the review. Neither spends inference credits. The native
+probe runs in a disposable fixture checkout, and snapshots and restores both
+personal files before and after the run.
 
 ### Two-reviewer fixture experiment (F2)
 
@@ -745,9 +819,9 @@ Signal/parent-EOF handlers force-stop owned work without waiting for parent
 logging. An abruptly lost parent cannot receive a final report; there is no
 clean-review claim or publication. Normal SDK transcripts may persist, and
 forced termination does not guarantee a final transcript flush. The prototype
-can capture PRs, bind source context, resolve personal tier configuration, run
-quick specialists, and validate/deduplicate findings, but cannot execute project
-safeguards. It does not restrict or change the model of the surrounding Copilot session. The SDK may
+can capture PRs, bind source context, resolve personal and explicitly trusted
+project configuration, run quick specialists, and validate/deduplicate findings,
+but cannot execute project safeguards. It does not restrict or change the model of the surrounding Copilot session. The SDK may
 retain its own session transcripts; no plugin review archive is implemented.
 
 No upstream source has been copied. Source reuse/licensing assessment remains

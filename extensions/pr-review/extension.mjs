@@ -29,8 +29,9 @@ const help = [
   "inspect      Show this session's latest retained result without inference or GitHub requests.",
   "publish      Explicitly publish this session's retained selected findings without rerunning reviewers.",
   "",
-  "Personal configuration: /pr-review-config [show] | key=value ... | unset key ... | help.",
-  "Saved tiers supply unset assignments; invocation flags override them for that invocation only.",
+  "Configuration: /pr-review-config [show] | key=value ... | unset key ... | trust | untrust [PATH] | help.",
+  "Saved tiers supply unset assignments; a trusted project's file overrides them; invocation flags win.",
+  "An untrusted repository's .copilot/pr-review/config.json is ignored; a repository cannot trust itself.",
   "",
   "NUMBER  Capture PR metadata and diff, then bind source context to the captured",
   "        head/base revisions. No reviewers, no publication, no local source.",
@@ -65,7 +66,8 @@ const status = [
   "Current-run COMMENT publication is implemented with fresh gates and a durable write-ahead journal.",
   "Use /pr-review publish to publish the retained selection later, under a new explicit authorization.",
   "Personal light/medium/heavy tier configuration and autoPostReviews are inspected and updated by",
-  "/pr-review-config. Project-provided configuration is never read; project overrides remain unimplemented.",
+  "/pr-review-config, which also grants and revokes explicit per-directory project trust.",
+  "Only an explicitly trusted directory's .copilot/pr-review/config.json overrides personal settings.",
   "",
   "Status/help start no models or background work. PR capture and source context use",
   "read-only gh requests against the captured revisions, never the local checkout.",
@@ -131,13 +133,15 @@ const session = await joinSession({
               if (args.trim().split(/\s+/).some((token) => ["--quick", "--major-only"].includes(token))) {
                 const options = parseQuickArgs(args);
                 assertIdle();
-                // Saved settings are resolved and displayed before any reviewer starts;
-                // an unusable effective assignment refuses the review instead of substituting.
+                // Saved and trusted-project settings are displayed before any reviewer
+                // starts, and before the assignment is resolved, so a refusal explains
+                // itself. An unusable effective assignment refuses the review instead
+                // of substituting.
                 const configuration = await loadConfiguration(session);
-                const assignments = await quickAssignments(session, options.settings, configuration);
                 await session.log(describeConfiguration(configuration, {
                   flags: options.settings, heading: "Effective PR review configuration for this invocation.",
                 }));
+                const assignments = await quickAssignments(session, options.settings, configuration);
                 startRun((client, lifecycle) => executeRetainedQuick(session, client, options, assignments, lifecycle,
                   { autoPostReviews: configuration.autoPostReviews }));
                 return;
@@ -163,7 +167,7 @@ const session = await joinSession({
     },
     {
       name: "pr-review-config",
-      description: "Inspect or update personal PR review model tiers and posting settings",
+      description: "Inspect or update personal PR review settings, or trust a project's overrides",
       handler: async ({ args }) => {
         if (shuttingDown) throw new Error("Extension is shutting down.");
         // Configuration is refused while review or publication work holds the run

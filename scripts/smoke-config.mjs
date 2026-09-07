@@ -1,12 +1,16 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import {
   configFilename, configSchemaVersion, configurationStore, describeConfiguration, executeConfiguration,
-  loadConfiguration, parseConfigArgs, resolveTier, validateConfiguredTiers, validateSettings,
+  layerSettings, loadConfiguration, parseConfigArgs, resolveTier, validateConfiguredTiers, validateSettings,
 } from "../extensions/pr-review/config.mjs";
+import {
+  locateProjectConfig, projectConfigSegments, projectSchemaVersion, readProjectConfig, trustFilename,
+  trustSchemaVersion, validateTrustedProjects,
+} from "../extensions/pr-review/project.mjs";
 import { parseQuickArgs, quickAssignments } from "../extensions/pr-review/quick.mjs";
 import { executeRetainedQuick } from "../extensions/pr-review/retained-run.mjs";
 import { sessionStore } from "../extensions/pr-review/retention.mjs";
@@ -20,11 +24,11 @@ const catalog = [
 ];
 const root = mkdtempSync(join(tmpdir(), "pr-review-config-"));
 
-function harness({ ambient = { modelId: "heavy", reasoningEffort: "high" }, home = "home" } = {}) {
+function harness({ ambient = { modelId: "heavy", reasoningEffort: "high" }, home = "home", work = "checkout" } = {}) {
   const sessionId = randomUUID();
   const copilotHome = join(root, home);
   const workspace = join(copilotHome, "session-state", sessionId);
-  const working = join(root, "checkout");
+  const working = join(root, work);
   mkdirSync(workspace, { recursive: true });
   mkdirSync(working, { recursive: true });
   const messages = [];
@@ -41,7 +45,17 @@ function harness({ ambient = { modelId: "heavy", reasoningEffort: "high" }, home
     },
     async log(message) { messages.push(message); },
   };
-  return { parent, copilotHome, filename: join(copilotHome, "pr-review", configFilename), working };
+  return {
+    parent, copilotHome, working, canonical: realpathSync(working),
+    filename: join(copilotHome, "pr-review", configFilename),
+    trustFile: join(copilotHome, "pr-review", trustFilename),
+    projectFile: join(working, ...projectConfigSegments),
+    writeProject(record) {
+      mkdirSync(dirname(join(working, ...projectConfigSegments)), { recursive: true });
+      writeFileSync(join(working, ...projectConfigSegments),
+        typeof record === "string" ? record : JSON.stringify(record, null, 2));
+    },
+  };
 }
 
 // --- argument parsing -------------------------------------------------------
@@ -60,7 +74,12 @@ for (const args of [
   "heavyModel", "=heavy", "heavyModel=", "heavy=model", "heavyModel=a heavyModel=b",
   "autoPostReviews=yes", "autoPostReviews=1", "autoPostReviews=TRUE", "autoPost=true",
   "heavy_thinking=high", "light=heavy", "verify=true",
+  "trust me", "trust now", "untrust relative/path", "untrust .",
 ]) assert.throws(() => parseConfigArgs(args), /Invalid PR review configuration/, args);
+assert.deepEqual(parseConfigArgs("trust"), { action: "trust" });
+assert.deepEqual(parseConfigArgs(" untrust "), { action: "untrust" });
+assert.deepEqual(parseConfigArgs("untrust /tmp/a repo with spaces"),
+  { action: "untrust", path: "/tmp/a repo with spaces" });
 for (const settings of [
   null, [], "x", { heavyModel: 1 }, { heavyModel: "" }, { heavyModel: "a b" }, { heavyModel: " a" },
   { autoPostReviews: "true" }, { unknown: "x" },
@@ -148,7 +167,7 @@ console.log("PASS configuration argument parsing, unknown keys, malformed assign
 {
   const h = harness();
   const shown = await executeConfiguration(h.parent, "");
-  assert.deepEqual(shown, { action: "show", settings: {} });
+  assert.deepEqual(shown, { action: "show", settings: {}, effective: {} });
   assert(!existsSync(h.filename), "show must not create the configuration file");
   const report = h.parent.messages.at(-1);
   assert.match(report, /not created yet/);
@@ -253,5 +272,258 @@ for (const autoPostReviews of [true, false]) {
 }
 console.log("PASS effective autoPostReviews reaches the retained posting policy through a real retained run");
 
+// --- C2: the trusted-project boundary --------------------------------------
+{
+  const h = harness({ home: "home-c2-shapes", work: "c2-shapes" });
+  assert.deepEqual(validateTrustedProjects([]), []);
+  validateTrustedProjects([{ path: "/a", trustedAt: new Date().toISOString() }]);
+  for (const entries of [
+    null, {}, [null], [{ path: "/a" }], [{ trustedAt: new Date().toISOString() }],
+    [{ path: "relative", trustedAt: new Date().toISOString() }],
+    [{ path: "/a", trustedAt: "not-a-date" }],
+    [{ path: "/a", trustedAt: new Date().toISOString(), extra: 1 }],
+    [{ path: "/a", trustedAt: new Date().toISOString() }, { path: "/a", trustedAt: new Date().toISOString() }],
+  ]) assert.throws(() => validateTrustedProjects(entries), /Invalid PR review configuration/, JSON.stringify(entries));
+
+  const store = await configurationStore(h.parent);
+  assert.equal(store.trustFile, h.trustFile);
+  assert.deepEqual(store.readTrust(), [], "An absent trust file trusts nothing");
+  store.writeTrust([{ path: h.working, trustedAt: "2026-09-07T00:00:00.000Z" }]);
+  assert.deepEqual(JSON.parse(readFileSync(h.trustFile, "utf8")), {
+    schemaVersion: trustSchemaVersion, trustedProjects: [{ path: h.working, trustedAt: "2026-09-07T00:00:00.000Z" }],
+  });
+  assert.equal(statSync(h.trustFile).mode & 0o777, 0o600);
+  for (const raw of ["{", "[]", '{"schemaVersion":1}', '{"trustedProjects":[]}',
+    '{"schemaVersion":2,"trustedProjects":[]}', '{"schemaVersion":1,"trustedProjects":{}}',
+    '{"schemaVersion":1,"trustedProjects":[{"path":"nope","trustedAt":"2026-09-07T00:00:00.000Z"}]}',
+    '{"schemaVersion":1,"trustedProjects":[],"settings":{}}']) {
+    writeFileSync(h.trustFile, raw);
+    assert.throws(() => store.readTrust(), /Invalid PR review configuration/, raw);
+    await assert.rejects(executeConfiguration(h.parent, "show"), /Invalid PR review configuration/);
+    assert.equal(readFileSync(h.trustFile, "utf8"), raw, "A refused command changes the trust record nothing");
+  }
+  rmSync(h.trustFile);
+
+  assert.equal(locateProjectConfig(h.working).status, "absent");
+  assert.equal(locateProjectConfig(h.working).filename, h.projectFile);
+  h.writeProject({ schemaVersion: projectSchemaVersion, settings: { heavyModel: "other" } });
+  assert.equal(locateProjectConfig(h.working).status, "file");
+  assert.deepEqual(readProjectConfig(h.working, validateSettings).settings, { heavyModel: "other" });
+  rmSync(h.projectFile);
+  mkdirSync(h.projectFile);
+  assert.equal(locateProjectConfig(h.working).status, "unsafe");
+  assert.throws(() => readProjectConfig(h.working, validateSettings), /is not a regular file/);
+  rmSync(h.projectFile, { recursive: true });
+  writeFileSync(h.projectFile, `{"schemaVersion":1,"settings":{},"pad":"${"x".repeat(70000)}"}`);
+  assert.match(locateProjectConfig(h.working).reason, /exceeds \d+ bytes/);
+  assert.throws(() => readProjectConfig(h.working, validateSettings), /exceeds \d+ bytes/);
+  rmSync(join(h.working, ".copilot"), { recursive: true });
+  symlinkSync(join(root, "elsewhere"), join(h.working, ".copilot"));
+  assert.match(locateProjectConfig(h.working).reason, /is a symbolic link/);
+  assert.throws(() => readProjectConfig(h.working, validateSettings), /is a symbolic link/);
+  rmSync(join(h.working, ".copilot"));
+  console.log("PASS trust-record schema, atomic 0600 trust file, and safe project-file location");
+}
+
+// --- C2: an untrusted repository's file is ignored, never parsed ------------
+{
+  const h = harness({ home: "home-c2-untrusted", work: "c2-untrusted" });
+  for (const record of [
+    { schemaVersion: projectSchemaVersion, settings: { heavyModel: "other", autoPostReviews: true } },
+    "{ not json at all",
+    { schemaVersion: 99, settings: {} },
+    // A repository cannot trust itself, whatever it writes in its own file.
+    { schemaVersion: projectSchemaVersion, settings: {}, trustedProjects: [{ path: h.working, trustedAt: "2026-09-07T00:00:00.000Z" }] },
+    { schemaVersion: projectSchemaVersion, settings: { trustedProjects: [] } },
+    { schemaVersion: projectSchemaVersion, settings: { verify: true } },
+  ]) {
+    h.writeProject(record);
+    const shown = await executeConfiguration(h.parent, "show");
+    assert.deepEqual(shown.effective, {}, "An untrusted project file is never merged");
+    const report = h.parent.messages.at(-1);
+    assert.match(report, /Project trust: NOT TRUSTED/);
+    assert(report.includes(`Project configuration: IGNORED. ${h.projectFile}`), report);
+    assert.match(report, /A repository cannot trust itself/);
+    assert.match(report, /heavy: model=heavy \[ambient\] reasoning=high \[ambient\]/);
+    assert.match(report, /autoPostReviews: false \[default\]/);
+    assert(!existsSync(h.trustFile), "Nothing in a repository creates a trust record");
+    const configuration = await loadConfiguration(h.parent);
+    assert.equal(configuration.trustRecord, undefined);
+    assert.equal(configuration.project.settings, undefined, "An untrusted file is located, never parsed");
+    assert((await quickAssignments(h.parent, {}, configuration))
+      .every((a) => a.model === "heavy" && a.reasoningEffort === "high"),
+    "An untrusted project file cannot change a review's assignment");
+  }
+  console.log("PASS an untrusted repository's configuration file is ignored with a visible message and never parsed");
+}
+
+// --- C2: explicit trust, override, precedence and revocation ---------------
+{
+  const h = harness({ home: "home-c2-trusted", work: "c2-trusted" });
+  h.writeProject({ schemaVersion: projectSchemaVersion, settings: { heavyModel: "other", heavyEffort: "low" } });
+  await executeConfiguration(h.parent,
+    "lightModel=heavy lightEffort=high heavyModel=heavy heavyEffort=high autoPostReviews=false");
+  const personal = readFileSync(h.filename, "utf8");
+  const projectBytes = readFileSync(h.projectFile, "utf8");
+
+  const trusted = await executeConfiguration(h.parent, "trust");
+  assert.deepEqual(trusted, { action: "trust", changed: true, path: h.canonical });
+  assert.deepEqual(JSON.parse(readFileSync(h.trustFile, "utf8")).trustedProjects.map(({ path }) => path), [h.canonical],
+    "Trust records the canonical absolute path, so one directory is never two trust decisions");
+  assert.equal(readFileSync(h.filename, "utf8"), personal, "Trust never rewrites the personal settings file");
+  assert.equal(readFileSync(h.projectFile, "utf8"), projectBytes, "Nothing ever writes the project file");
+  const granted = h.parent.messages.at(-1);
+  assert.match(granted, /Project trusted:/);
+  assert.match(granted, /can publish an --all run unattended/);
+  assert.match(granted, /heavy: model=other \[project:heavy\] reasoning=low \[project:heavy\]/);
+  assert.match(granted, /light: model=heavy \[configured:light\] reasoning=high \[configured:light\]/);
+  assert.match(granted, /medium: model=other \[project-inherited:heavy\] reasoning=low \[project-inherited:heavy\]/);
+  assert.match(granted, /overriding personal heavyModel, heavyEffort/,
+    "The report names the personal keys the project shadows");
+
+  const configuration = await loadConfiguration(h.parent);
+  assert.deepEqual(configuration.effective.settings,
+    { lightModel: "heavy", lightEffort: "high", heavyModel: "other", heavyEffort: "low", autoPostReviews: false });
+  assert.deepEqual(configuration.effective.origins,
+    { lightModel: "personal", lightEffort: "personal", heavyModel: "project", heavyEffort: "project", autoPostReviews: "personal" });
+  assert((await quickAssignments(h.parent, {}, configuration))
+    .every((a) => a.model === "other" && a.reasoningEffort === "low"), "A trusted project drives the review assignment");
+  assert((await quickAssignments(h.parent, { heavyModel: "heavy", heavyEffort: "high" }, configuration))
+    .every((a) => a.model === "heavy" && a.reasoningEffort === "high"), "Invocation flags still win over a trusted project");
+  assert.deepEqual((await loadConfiguration(h.parent)).settings, JSON.parse(personal).settings,
+    "Resolving a review never rewrites the personal file");
+
+  assert.deepEqual(await executeConfiguration(h.parent, "trust"), { action: "trust", changed: false, path: h.canonical });
+  assert.match(h.parent.messages.at(-1), /already trusted/);
+
+  // A trusted project may override autoPostReviews, as SCOPE.md records.
+  h.writeProject({ schemaVersion: projectSchemaVersion, settings: { autoPostReviews: true } });
+  const posting = await loadConfiguration(h.parent);
+  assert.equal(posting.autoPostReviews, true);
+  assert.equal(posting.autoPostSource, "project");
+  assert.match(describeConfiguration(posting), /autoPostReviews: true \[project\]/);
+
+  const revoked = await executeConfiguration(h.parent, "untrust");
+  assert.deepEqual(revoked, { action: "untrust", changed: true, path: h.canonical });
+  assert.deepEqual(JSON.parse(readFileSync(h.trustFile, "utf8")).trustedProjects, []);
+  assert.match(h.parent.messages.at(-1), /Project trust revoked/);
+  assert.match(h.parent.messages.at(-1), /Project configuration: IGNORED/);
+  const after = await loadConfiguration(h.parent);
+  assert.equal(after.autoPostReviews, false, "Revoked trust drops the project's posting authority");
+  assert.deepEqual(after.effective.settings, JSON.parse(personal).settings);
+  assert.deepEqual(await executeConfiguration(h.parent, "untrust"), { action: "untrust", changed: false, path: h.canonical });
+  assert.match(h.parent.messages.at(-1), /No trust record to revoke/);
+  assert.deepEqual(await executeConfiguration(h.parent, `untrust ${join(root, "somewhere-else")}`),
+    { action: "untrust", changed: false, path: h.canonical });
+  console.log("PASS explicit trust applies a project override, flags still win, and revocation restores personal settings");
+}
+
+// --- C2: a trusted project's errors change nothing and refuse the review ----
+{
+  const h = harness({ home: "home-c2-refusals", work: "c2-refusals" });
+  h.writeProject({ schemaVersion: projectSchemaVersion, settings: {} });
+  await executeConfiguration(h.parent, "trust");
+  await executeConfiguration(h.parent, "heavyModel=heavy heavyEffort=high");
+  const personal = readFileSync(h.filename, "utf8");
+  const trust = readFileSync(h.trustFile, "utf8");
+
+  for (const [record, expected] of [
+    ["{ not json", /is not valid JSON/],
+    [{ schemaVersion: 99, settings: {} }, /incompatible schema version/],
+    [{ schemaVersion: projectSchemaVersion }, /does not hold a supported project configuration record/],
+    [{ schemaVersion: projectSchemaVersion, settings: {}, trustedProjects: [] }, /does not hold a supported project configuration record/],
+    [{ schemaVersion: projectSchemaVersion, settings: { trustedProjects: [] } }, /unknown configuration key "trustedProjects"/],
+    [{ schemaVersion: projectSchemaVersion, settings: { verify: true } }, /unknown configuration key "verify"/],
+    [{ schemaVersion: projectSchemaVersion, settings: { autoPostReviews: "true" } }, /must be the boolean/],
+  ]) {
+    h.writeProject(record);
+    const configuration = await loadConfiguration(h.parent);
+    assert.match(configuration.project.error ?? "", expected, JSON.stringify(record));
+    assert.deepEqual(configuration.effective.settings, JSON.parse(personal).settings, "A broken project file merges nothing");
+    // Inspection still explains the failure; everything that consumes the settings refuses.
+    const report = describeConfiguration(configuration);
+    assert.match(report, /Project configuration: ERROR/);
+    assert.match(report, /Reviews and configuration updates are refused/);
+    await assert.rejects(quickAssignments(h.parent, {}, configuration), expected);
+    await assert.rejects(executeConfiguration(h.parent, "autoPostReviews=true"), expected);
+    assert.equal(readFileSync(h.filename, "utf8"), personal, "A refused update leaves the personal file byte-identical");
+    assert.equal(readFileSync(h.trustFile, "utf8"), trust, "A broken project file never changes the trust record");
+  }
+  // Revocation stays available even while the trusted file is unreadable.
+  assert.equal((await executeConfiguration(h.parent, "untrust")).changed, true);
+  assert.deepEqual(JSON.parse(readFileSync(h.trustFile, "utf8")).trustedProjects, []);
+  assert.deepEqual((await loadConfiguration(h.parent)).effective.settings, JSON.parse(personal).settings);
+
+  // Trusting a directory whose file is already broken is refused and records nothing.
+  await assert.rejects(executeConfiguration(h.parent, "trust"), /must be the boolean/);
+  assert.deepEqual(JSON.parse(readFileSync(h.trustFile, "utf8")).trustedProjects, []);
+
+  // An unusable but well-formed project model refuses the review, never downgrades it.
+  h.writeProject({ schemaVersion: projectSchemaVersion, settings: { heavyModel: "disabled" } });
+  await assert.rejects(executeConfiguration(h.parent, "trust"),
+    /Refused .*-tier configuration: Unavailable or disabled Copilot-subscription model: disabled/);
+  assert.deepEqual(JSON.parse(readFileSync(h.trustFile, "utf8")).trustedProjects, []);
+  h.writeProject({ schemaVersion: projectSchemaVersion, settings: { heavyModel: "other", heavyEffort: "low" } });
+  await executeConfiguration(h.parent, "trust");
+  // A trusted file that becomes unusable later is reported, never silently lowered.
+  h.writeProject({ schemaVersion: projectSchemaVersion, settings: { heavyModel: "other", heavyEffort: "high" } });
+  const unusable = await loadConfiguration(h.parent);
+  assert.match(describeConfiguration(unusable), /UNUSABLE: Unsupported reasoning effort high for other/);
+  await assert.rejects(quickAssignments(h.parent, {}, unusable), /No substitution/);
+  assert.equal(readFileSync(h.filename, "utf8"), personal);
+  console.log("PASS a trusted project's malformed, unknown-key and unusable settings refuse and change nothing");
+}
+
+// --- C2: a trusted project's posting authority reaches the retained policy ---
+for (const projectPosting of [true, false]) {
+  const h = harness({ home: `home-c2-posting-${projectPosting}`, work: `c2-posting-${projectPosting}` });
+  h.writeProject({ schemaVersion: projectSchemaVersion, settings: { autoPostReviews: projectPosting } });
+  await executeConfiguration(h.parent, "trust");
+  await executeConfiguration(h.parent, `autoPostReviews=${!projectPosting}`);
+  const personal = readFileSync(h.filename, "utf8");
+  const trust = readFileSync(h.trustFile, "utf8");
+  const project = readFileSync(h.projectFile, "utf8");
+  const configuration = await loadConfiguration(h.parent);
+  assert.equal(configuration.autoPostReviews, projectPosting, "The trusted project overrides the personal setting");
+
+  const store = await sessionStore(h.parent);
+  const history = [];
+  const assignments = await quickAssignments(h.parent, {}, configuration);
+  const result = await executeRetainedQuick(h.parent, {
+    async start() { assert.fail("A skipped target must not start inference"); },
+    async stop() { return []; },
+  }, parseQuickArgs("2 --quick --all"), assignments, {
+    controller: new AbortController(),
+    gh: async (args, cwd) => {
+      const response = respond(args, cwd, history);
+      history.push({ args, cwd });
+      return response;
+    },
+  }, { autoPostReviews: configuration.autoPostReviews });
+  assert.equal(result.retention.state, "settled");
+  assert.equal(store.read().outcome.preview.policy.autoPostReviews, projectPosting);
+  assert.equal(readFileSync(h.filename, "utf8"), personal, "An invocation leaves the personal file unmodified");
+  assert.equal(readFileSync(h.trustFile, "utf8"), trust, "An invocation leaves the trust record unmodified");
+  assert.equal(readFileSync(h.projectFile, "utf8"), project, "An invocation leaves the project file unmodified");
+}
+console.log("PASS a trusted project's autoPostReviews reaches the retained posting policy, with every saved file unmodified");
+
+// --- C2: layering is per key ------------------------------------------------
+{
+  assert.deepEqual(layerSettings({ heavyModel: "a", lightModel: "b" }, { heavyModel: "c" }), {
+    settings: { lightModel: "b", heavyModel: "c" },
+    origins: { lightModel: "personal", heavyModel: "project" },
+  });
+  assert.deepEqual(layerSettings({ heavyModel: "a" }, undefined),
+    { settings: { heavyModel: "a" }, origins: { heavyModel: "personal" } });
+  assert.deepEqual(layerSettings({}, { autoPostReviews: false }),
+    { settings: { autoPostReviews: false }, origins: { autoPostReviews: "project" } },
+    "A project may override a personal true with an explicit false");
+  const layered = layerSettings({ lightModel: "other" }, { heavyModel: "heavy" });
+  assert.deepEqual(resolveTier("medium", { ...layered, ambient: { model: "heavy", reasoningEffort: "high" } }).model,
+    { value: "heavy", source: "project-inherited:heavy" }, "Inheritance keeps the origin of the value it inherits");
+  console.log("PASS per-key layering and origin reporting through tier inheritance");
+}
+
 rmSync(root, { recursive: true });
-console.log("PASS personal tier configuration probe: no inference, no GitHub request, no review work");
+console.log("PASS tier configuration and trusted-project probe: no inference, no GitHub request, no review work");
