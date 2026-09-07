@@ -45,8 +45,9 @@ posting them.
 | C1 | Completed | Personal light/medium/heavy tier configuration and `autoPostReviews` inspected and updated by `/pr-review-config`; validated capabilities, nearest-tier/ambient inheritance, flag precedence and effective-assignment display demonstrated below. | F3; [Configuration](SCOPE.md#models-configuration-and-execution) |
 | C2 | Completed | Explicit per-directory trust gates `.copilot/pr-review/config.json` overrides; untrusted files ignored unparsed, self-trust impossible, precedence and revocation demonstrated below. | C1; [Configuration trust](SCOPE.md#models-configuration-and-execution) |
 | R1 | Completed | Verified-checkout reads and matching-head harnesses demonstrated. One authorized live quick review used unchanged source without denials; prior coverage gaps disappeared, but no additional finding was produced. GPT's `rg` alias is supported without widening the grant. | F4, Q3; [Modes/findings](SCOPE.md#review-modes-and-findings) |
-| M1 | Balanced half completed | Balanced is the default with its four heavy specialists, light overview reviewer and three-finding P3/nit cap. Demonstrated by controlled probes, no-inference installed dispatch and one live review of this repository's own pull request #3. Pending until full adds the conventions reviewer and its findings policy. | Q4, C1; [Modes](SCOPE.md#review-modes-and-findings) |
-| M2 | Pending | Deep uses one holistic reviewer; reject conflicting mode flags. | M1; [Modes](SCOPE.md#review-modes-and-findings) |
+| M1 | Completed | Balanced is the default with its four heavy specialists, light overview reviewer and three-finding P3/nit cap. `--full` adds a medium conventions/maintainability reviewer and presents every qualifying severity with no minor cap. Demonstrated by controlled probes, no-inference installed dispatch, and live reviews of this repository's own pull requests #3, #4 and #5; #5 ran all three tiers on distinct models. A Claude-family medium model's fenced output is a recorded open defect. | Q4, C1; [Modes](SCOPE.md#review-modes-and-findings) |
+| F5 | Pending | Decide how reviewer output stops depending on a model family's willingness to emit bare JSON. Establish by demonstration whether the runtime can return parsed structured output for a reviewer, at what cost to the confined tool grant, coverage reporting and credits; recommend adopt or fall back. No reviewer is migrated in F5. | M1, F3; [Technical feasibility](SCOPE.md#technical-uncertainties-and-proposed-sequence) |
+| M2 | Pending | Deep uses one holistic reviewer; reject conflicting mode flags. | F5, M1; [Modes](SCOPE.md#review-modes-and-findings) |
 | C3 | Pending | Explicit optional fallback with at most one eligible retry per failed reviewer; no timers or silent substitutions. | C1, Q3; [Fallbacks/execution](SCOPE.md#models-configuration-and-execution) |
 | C4 | Pending | A tier whose resolved model supports no configurable reasoning effort resolves to no effort instead of inheriting one, so such a model can serve a tier. An explicit effort is still validated and never silently lowered. | C1; [Configuration](SCOPE.md#models-configuration-and-execution) |
 | V1 | Pending | `--verify` enforces matching branch/SHA/cleanliness before reviewers and presents discovered existing commands for approval. | Q1; [Safeguards](SCOPE.md#optional-project-safeguards) |
@@ -3397,10 +3398,15 @@ it afterwards.
 
 ### Remaining limitations
 
-- One live balanced review exists, on this project's own doc-heavy pull request.
-  It produced no findings and no adjudication, so balanced review quality and
-  minor-finding behavior are still undemonstrated. No light model has ever run,
-  because the light tier inherited the heavy assignment.
+- Two live balanced reviews exist, both on this project's own documentation-heavy
+  pull requests: #3 at head `5c05b7c` and #4 at head `ae2c55c`. #3 produced no
+  candidate and no adjudication. #4 raised seven candidates, admitted four at the
+  evidence gate, and returned three validated findings. Balanced behaviour on a
+  real code diff is therefore still undemonstrated, and the minor-finding cap has
+  never been exercised: at most one P3 has ever been validated, against a cap of
+  three. A light model has run exactly once, on #4, where `overview` used
+  `gpt-5.6-luna` and produced the only finding no heavy reviewer raised. Every
+  earlier balanced run inherited the heavy assignment for the light tier.
 - No light-tier invocation flag, so a per-invocation light override requires
   `/pr-review-config`. Deliberate: no configuration surface was added.
 - `--capture-only` is prototype surface outside `SCOPE.md`, introduced only
@@ -3518,42 +3524,413 @@ documentation.
 - One review, on a documentation pull request. Balanced behaviour on a real code
   diff remains undemonstrated.
 
+## Completed increment: M1, full half
+
+Implementation: `extensions/pr-review/modes.mjs`, `findings.mjs`,
+`extension.mjs` and `config.mjs` wording. Probes: `scripts/smoke-review.mjs`,
+`smoke-findings.mjs`, `smoke-retention.mjs`, `smoke-checkout.mjs`,
+`smoke-runtime.mjs` and `smoke-config-runtime.mjs`. No upstream source was
+copied. No deep mode, fallback, timeout, safeguard, reviewer shell tool, gate
+override, configuration key or interactive menu was added, and no user checkout
+was altered to satisfy the revision gate. L1 remains pending.
+
+### Mode boundary
+
+`--full` declares a sixth specialist beside the balanced five: a
+`conventions-maintainability` reviewer on the **medium** tier, focused on
+project conventions, naming, structure, error handling, tests, documentation
+and maintainability of the changed code, judged against the surrounding
+codebase. Everything else about the topology is the balanced set unchanged.
+The medium tier resolves through the existing layering, so no new configuration
+key and no medium invocation flag were introduced; `mediumModel=`/`mediumEffort=`
+on `/pr-review NUMBER` are still rejected as invalid review settings, exactly as
+the light keys are.
+
+The full findings policy admits the same severities as balanced and presents all
+of them. `minorCap` is declared `Infinity` rather than absent, so one number
+still drives the cap arithmetic, the retention check and the wording. Two
+predicates read it: `admitsMinor` separates quick from the rest, and `capsMinor`
+separates balanced from full. A full run therefore withholds nothing, leaves
+`validation.capped` empty, and keeps a duplicate of a presented minor finding as
+an ordinary alias instead of withholding it alongside a capped representative.
+
+Balanced remains the default when no mode flag is given, mode flags remain
+mutually exclusive, `--major-only` remains the quick alias, and quick is
+untouched. Evidence validation, deduplication, incomplete-coverage reporting,
+selection, retention, publication gates and cancellation are unchanged: the only
+mode-dependent inputs they read are the reviewer topology and the findings
+policy, which is why full needed no change to any of them. The refactor that
+made this possible is small: the four balanced specialist declarations moved to
+module constants so both modes share the same objects.
+
+### Controlled evidence
+
+All twelve controlled suites passed in this session, and `git diff --check` is
+clean. The suite list is unchanged: `findings`, `review`, `selection`,
+`retention`, `preview`, `publication`, `publish-later`, `checkout`, `config`,
+`context`, `fixture`, `target`.
+
+New demonstrations, all without inference or network access:
+
+- Mode parsing: `--full` alone, with `--all --comment`, and with
+  `--include-drafts`; `--full` rejected against `--quick`, `--balanced` and
+  `--major-only`; `--full --full` rejected as a duplicate; `--full` rejected
+  with `--capture-only` and with conflicting posting flags; and
+  `--full ... mediumModel=other` / `mediumEffort=low` rejected as invalid review
+  settings.
+- Topology and tiers: full resolves six reviewers, four heavy, one light and one
+  medium. An unconfigured medium tier falls back to the ambient assignment. With
+  only light and heavy configured, the medium tier is equidistant and inherits
+  the **heavier** one, reported as `inherited:heavy`, rather than downgrading. A
+  saved `mediumModel`/`mediumEffort` reaches the conventions reviewer with
+  `configured:medium` origins and leaves the heavy specialists alone. An
+  unusable medium model refuses the review with no substitution.
+- A settled full run through `executeReviewRun`: six concurrent specialist
+  sessions plus one adjudicator, the overview and conventions sessions created
+  on their own tiers while the adjudicator stays heavy, `M1 binding:` markers,
+  six accepted P3 candidates all presented with `capped` empty, selection of all
+  six, and a proposed body reading `Full review: 6 selected validated
+  finding(s)`.
+- Findings policy at unit level: the full policy admits the same five candidates
+  balanced admits, presents four of them (three P3 then one nit, in declared
+  severity order) instead of three, records the fifth as an ordinary duplicate
+  alias rather than a withheld entry, caps nothing, and reports no withheld
+  section.
+- Retention: a full record with six reviewers validates. The same record
+  relabelled `balanced` is rejected for exceeding that mode's findings policy or
+  for incomplete reviewer coverage, depending on which constraint it breaks
+  first; relabelled `quick` it is rejected for a severity outside the policy; and
+  dropping the conventions reviewer is rejected as incomplete reviewer coverage.
+- The checkout gate refuses with full's own label and fixing command
+  (`Full review refused ...`, `rerun /pr-review 12 --full`), on the same evidence
+  as quick and balanced.
+
+### Installed-plugin evidence
+
+The extension was reinstalled with `copilot plugin install "$(pwd)"` (the
+deprecation warning is expected) before every runtime probe. No probe below sent
+a model prompt; each asserts the absence of model turns, subagents and tool
+executions, or of any `Reviewer ` timeline message.
+
+- `smoke-runtime.mjs --targets --startup` and
+  `smoke-runtime.mjs --targets --matching-checkout --startup` passed. The
+  draft-skip loop now dispatches **three** modes and asserts for each a settled
+  `coverage: "not-started"` result, one assignment line per reviewer (three,
+  five and six), and that no reviewer started. For `--full` it additionally
+  asserts the `overview [light]` line, a
+  `conventions-maintainability [medium]` line with a resolved model, effort and
+  origin, and the findings-policy text `P0-P2 findings, plus every substantiated
+  P3/nit finding`.
+- `123 --full --no-comment` left the unsupported-arguments list, because it now
+  parses. New installed rejections without inference: `--balanced --full`,
+  `--full --major-only`, `--capture-only --full`, `--full --no-comment
+  --comment`, `--full ... mediumModel=missing-m1-model`, `--full ...
+  heavyModel=missing-m1-model` and `--full ... heavyEffort=invalid-effort`. Each
+  returns an explicit command error and starts no reviewer.
+- `smoke-config-runtime.mjs` passed, including a new full case: with a saved
+  personal light tier and a saved medium tier at a **different** reasoning
+  effort, a skipped-draft full dispatch reported `full mode, 6 reviewer(s)`, the
+  uncapped findings-policy text, `conventions-maintainability [medium]:
+  model=<saved> [configured:medium] reasoning=<saved> [configured:medium]`,
+  `overview [light]: ... [configured:light]`, and `correctness [heavy]: ...
+  [inherited:medium]`, with no inference and no GitHub request. Unsetting the
+  medium tier again left the rest of the saved configuration untouched. This
+  probe requires an empty personal configuration store; the existing personal
+  `config.json` was moved aside for the run and restored byte-identically, which
+  was verified by SHA-256.
+- `smoke-retention-runtime.mjs` passed; command-only cold `session.resume`
+  remains unsupported. `smoke-reviewer-tools.mjs` passed with
+  `PR_REVIEW_HEAVY_MODEL=gpt-5.6-terra` (catalog `glob, rg, view`) and with
+  `claude-sonnet-5` (`glob, grep, view`). Neither is affected by this increment;
+  they were rerun to show confinement and non-leakage are unchanged.
+
+### Live inference: the dogfood review of this pull request
+
+On 2026-09-07, at head `e8da43b2d5e6f2aa651f48dd83861b7a10df3ad5`, the installed
+plugin reviewed **pull request #5**, this increment's own pull request,
+dispatched with `node scripts/dogfood-review.mjs 5 --full --all --no-comment`.
+This is the one review the standing workflow authorizes for this increment.
+Parent session `313a8616-c61c-438c-a7da-1682c0e838e8`, invocation
+`0a936a64-203b-4c1d-a20e-8e46f1621bd4`. Diff reviewed: 544 additions, 94
+deletions, 13 files.
+
+- Mode: full, six reviewers, `findings policy: P0-P2 findings, plus every
+  substantiated P3/nit finding anchored on this diff's changed lines`.
+- Project trust: NOT TRUSTED. Assignments came from personal configuration only.
+- **This is the first run in which the medium tier ever executed a model.** The
+  conventions reviewer ran `claude-sonnet-5` at `medium`, `[configured:medium]`,
+  while `overview` ran `gpt-5.6-luna` at `high`, `[configured:light]`, and the
+  four heavy specialists ran `gpt-5.6-terra` at `high`, `[configured:heavy]`. All
+  three tiers ran genuinely distinct models in one review, which no earlier run
+  had done.
+
+| Reviewer | Tier | Model | Effort | Status | Requests | Reported credits | Duration | Tool calls |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| correctness | heavy | `gpt-5.6-terra` | high | completed | 5 | 51.19701 | 62451 ms | 19 |
+| contracts | heavy | `gpt-5.6-terra` | high | completed | 6 | 51.39055 | 40202 ms | 19 |
+| security | heavy | `gpt-5.6-terra` | high | completed | 5 | 45.55724 | 36138 ms | 18 |
+| performance-resources | heavy | `gpt-5.6-terra` | high | completed | 4 | 43.80279 | 30566 ms | 14 |
+| overview | light | `gpt-5.6-luna` | high | completed | 8 | 6.50463 | 97963 ms | 19 |
+| conventions-maintainability | medium | `claude-sonnet-5` | medium | completed | 7 | 77.81463 | 125063 ms | 6 |
+
+Six reviewers overlapped for 30395 ms inside a 125521 ms wall time. The runtime
+reported **276.266849 AI credits**. That is the runtime's own figure, not a
+billing reconciliation. For scale, balanced cost 414.14627 on the 27-file pull
+request #3 and 79.82605 on the 4-file pull request #4. The light reviewer cost
+6.50463 against the heavy specialists' 43-51 each, so a genuinely light model is
+what makes the extra reviewers affordable; the medium reviewer was the single
+most expensive at 77.81463, and also the slowest by a wide margin.
+
+The reviewers made **95 confined read-only calls with zero permission or tool
+denials**: 59 `view`, 33 `rg` and 3 `grep`. The `grep` calls are the conventions
+reviewer's, because `claude-sonnet-5` exposes the shared `builtin:grep` grant
+under that name while the GPT-family sessions expose it as `rg`. The read grant
+therefore works unchanged for the new tier, on a real checkout.
+
+The result was **0 validated findings with incomplete coverage**: two execution
+failures, three coverage gaps and two informational caveats. No adjudicator ran,
+because no candidate survived the evidence gate. Selection was `empty`, the
+proposal was `empty`, publication was `not-attempted`, and nothing was written to
+GitHub. Zero findings is not a clean-review claim, and here it is emphatically
+not one: both execution failures are about candidates that existed.
+
+### Recorded tool defect: the medium tier's model fenced its JSON
+
+`conventions-maintainability` returned its entire result wrapped in a
+```` ```json ```` code fence, so `envelope` rejected the whole output:
+
+```text
+conventions-maintainability: invalid candidate output: SyntaxError: Unexpected token '`', "```json
+{""... is not valid JSON
+```
+
+The parser deliberately performs no fence stripping, substring recovery or
+malformed-output extraction; `SCOPE.md` drops experimental malformed-output
+extraction from v1, and the reviewer instructions already say "plain JSON only,
+no markdown fences". The gate is behaving as designed, and it was **not**
+weakened to make this run pass. But the consequence is specific and serious:
+full mode is the only mode that assigns the medium tier, so on a Claude-family
+medium model the sixth reviewer's output is discarded wholesale, every time, and
+the mode's own addition contributes nothing but an execution failure and a
+charge. Every earlier live review used GPT-family models only, so no run had ever
+met this.
+
+Read by hand afterwards, the discarded output held two `nit` candidates and two
+limitations. Both candidates would have been rejected at the evidence boundary
+anyway: their citations omit the required `quote` field. That does not reduce the
+defect, because a compliant candidate from the same model would have been lost
+the same way.
+
+Both discarded points were nonetheless acted on, since they were about
+duplication this diff introduced:
+
+1. `scripts/smoke-checkout.mjs` carried literal `"Balanced review"`/`"--balanced"`
+   and `"Full review"`/`"--full"` strings in the new refusal loop, while the loop
+   immediately above reads `mode.label` and `mode.flag` from the same objects.
+   The new loop now reads them the same way, so it cannot drift from the source
+   of truth it verifies.
+2. `full.policy` restated balanced's `severities` and `minorSeverities` arrays
+   verbatim. A shared `minorPolicy(label, minorCap)` helper now declares that
+   vocabulary once, so the two policies cannot silently diverge.
+
+### Rejected at the evidence boundary, and what that cost
+
+`correctness:1`, a P3 at confidence 0.97, was rejected:
+
+```text
+correctness:1: rejected at evidence boundary: Error: Introduction citations and location must identify the same changed hunk.
+```
+
+**The point was substantively right.** It observed that the new README sentence
+"An unset medium tier sits equidistant between light and heavy, so it inherits
+the heavy tier rather than downgrading to the light one" states the tie-break
+unconditionally, while `resolveField` only reaches heavy first: with a light tier
+configured and no heavy tier, the medium tier inherits light. Verified by hand
+against `config.mjs`, and now covered by a controlled assertion in
+`smoke-review.mjs`. The wording was corrected in both places it appeared.
+
+The rejection itself is correct: the candidate passed `before: null` while its
+hunk does remove base-side lines, so its introduction citations do not identify
+the same changed hunk as its location. This is the second recorded instance of
+the same pattern the pull request #4 review produced, and it is worth naming
+plainly: **the citation rule keeps discarding true findings whose evidence is
+merely mis-anchored.** Read the rejected candidates by hand; the validated list
+is not the whole review.
+
+The three coverage gaps, from `correctness`, `contracts` and `security`, all say
+the same true thing: the diff they were given documents that full mode had never
+run a model, so they could not settle from source whether the installed runtime
+would create and complete a medium-tier session with the confined tool grant.
+This run answers exactly that gap, from outside the review.
+
+### Reproduction
+
+```sh
+for suite in findings review selection retention preview publication \
+  publish-later checkout config context fixture target; do
+  node "scripts/smoke-$suite.mjs" || break
+done
+git diff --check
+
+copilot plugin install "$(pwd)"
+export COPILOT_CLI_PATH="$(command -v copilot)"
+export COPILOT_SDK_PATH="$(ls -d "$HOME"/.copilot/pkg/*/"$(copilot --version \
+  | sed -n 's/.*CLI \([0-9][0-9.]*[0-9]\).*/\1/p')"/copilot-sdk)"
+node scripts/smoke-runtime.mjs --targets --startup
+node scripts/smoke-runtime.mjs --targets --matching-checkout --startup
+node scripts/smoke-retention-runtime.mjs
+PR_REVIEW_HEAVY_MODEL=gpt-5.6-terra node scripts/smoke-reviewer-tools.mjs
+PR_REVIEW_HEAVY_MODEL=claude-sonnet-5 node scripts/smoke-reviewer-tools.mjs
+PR_REVIEW_HEAVY_MODEL=claude-sonnet-5 PR_REVIEW_HEAVY_EFFORT=high \
+  node scripts/smoke-config-runtime.mjs
+```
+
+Derive the SDK path rather than pinning a version: old packages under
+`~/.copilot/pkg/` are never pruned, so a pinned path keeps resolving after a
+`copilot update` and silently drives a stale SDK against a newer CLI. The
+recorded run used CLI `1.0.83` and SDK
+`~/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk` on macOS `darwin-arm64`.
+
+`smoke-config-runtime.mjs` refuses to run while a personal
+`<copilot-config-home>/pr-review/config.json` exists; move it aside and restore
+it afterwards.
+
+### Remaining limitations
+
+- **A Claude-family medium model loses its whole output to the fence check.**
+  This is the increment's most consequential open defect: full mode is the only
+  mode that assigns the medium tier, so with `claude-sonnet-5` configured there
+  the sixth reviewer reliably contributes an execution failure and a charge
+  instead of candidates. It is recorded, not worked around; the parser was not
+  relaxed. A later increment should decide between a stricter output contract the
+  model actually honours and a narrowly specified envelope tolerance, and must
+  demonstrate whichever it picks with its own live review. Until then, prefer a
+  GPT-family medium model, or expect `--full` to spend a sixth reviewer's credits
+  for nothing.
+- One live full review, on this project's own pull request, with a change set
+  that is roughly half documentation. It demonstrates that full executes end to
+  end with three genuinely distinct tiers, real confined reads and a real charge.
+  It demonstrates nothing about full review quality, and it produced no validated
+  finding, so the uncapped minor policy has still never presented a real minor
+  finding. Whether a medium conventions reviewer earns its cost is undecided; on
+  this run it was the most expensive and the slowest of the six, and its output
+  was discarded.
+- The uncapped minor policy is otherwise demonstrated only against synthetic
+  candidates. A real full review could present many more minor findings than a
+  balanced one, and nothing bounds that number.
+- No medium invocation flag, so a per-invocation medium override requires
+  `/pr-review-config`. Deliberate: no configuration surface was added.
+- Everything the balanced half recorded still holds: `--capture-only` is
+  prototype surface outside `SCOPE.md`; a tier can inherit an assignment the user
+  never asked for and then refuse it, tracked as `C4`; cold command-only resume
+  is unsupported; the adjudicator receives zero tools; and the changed-line
+  anchoring rule can hide a real stale-reference regression as a coverage gap.
+  The pull request #5 review produced a second instance of the mis-anchored
+  rejection the pull request #4 review recorded.
+- The fixes made in response to this review, the corrected README wording, the
+  shared severity vocabulary and the deduplicated checkout assertion, were
+  verified by the twelve controlled suites only. They were not reviewed by the
+  plugin, because the increment's single authorized review is spent.
+
 ## Exact next increment
 
-**The full half of M1.** Add `--full`: the balanced reviewer set plus one medium
-conventions/maintainability reviewer, with the full findings policy (all
-qualifying severities). M1 completes when that lands; deep stays with M2.
+**`F5`: settle how reviewer output stops depending on a model family's
+willingness to emit bare JSON.** Pull request #5's review, recorded above,
+showed `claude-sonnet-5` wrapping its candidates in a ```` ```json ```` fence, so
+`envelope` rejected the whole output. Frame the defect correctly before working
+on it: it is **not** specific to full mode or the medium tier. The same parser
+handles specialist candidates and adjudicator decisions, so a Claude-family
+*heavy* tier would lose every reviewer's output and every adjudication decision
+too. Full mode only exposed it first, because the medium tier was the first place
+a Claude model was ever configured for a live run. Three separate instructions
+already tell the reviewer to return plain JSON with no markdown fences, and the
+model ignored all three, so strengthening the prompt is not a fix on its own.
+
+The user chose to research a structural answer before considering a parser
+change. **Do not relax `envelope` in this increment**, and do not migrate any
+reviewer to a new runtime surface in it either. `F5` produces evidence and a
+recommendation, nothing else.
+
+What is already known, from reading the installed SDK at `1.0.83`, and what still
+has to be demonstrated rather than inferred:
+
+- `SessionConfig` and `MessageOptions` carry **no** output-schema or
+  response-format option, so the stdio `createSession` path selected at `F3`
+  cannot constrain output today. Confirmed by reading `types.d.ts`.
+- The only structured-output surface is the experimental Agent Factories API:
+  `ctx.agent(prompt, options)` accepts `label`, `schema`, `model`, `agent`,
+  `reasoningEffort` and `contextTier`, and **with `schema` it resolves to the
+  parsed JSON value instead of the subagent's final text**. That would remove
+  the fence problem at its source. `SCOPE.md` permits experimental CLI APIs where
+  they are needed to deliver core behaviour.
+- Four things make that trade unclear, and `F5` exists to settle them:
+  1. **Tool confinement.** Reviewers depend on the `view`/`grep`/`glob` grant
+     confined to the verified checkout by a permission handler. Whether a
+     factory-owned subagent can be given exactly that grant, and nothing more, is
+     unknown. If it cannot, the option is dead: `R1` and `F4` are not negotiable.
+  2. **An implicit retry.** The documentation states a `schema` call retries once
+     on a parse or match failure, so it may spawn twice and both spawns count
+     toward `maxTotalSubagents`. That is an unrequested extra charge, and it sits
+     next to the settled decisions that there are no timeouts and that fallbacks
+     are explicit and bounded. Measure it; do not assume it is free.
+  3. **Failure semantics.** A failing subagent resolves to `null` rather than
+     throwing. Incomplete coverage must stay visible as incomplete; a `null` that
+     silently becomes an empty result would be exactly the clean-review claim this
+     project refuses to make.
+  4. **Code structure.** A factory `run` body is emitted verbatim into a
+     generated module, closes over nothing, and cannot use static imports. The
+     current orchestration spans `review.mjs`, `fixture.mjs`, `findings.mjs` and
+     others. Establish whether they are reachable by dynamic `await import(...)`
+     from that body before assuming a migration is even shaped like the current
+     code.
+- The schema subset is structural, not a validator: it ignores
+  `additionalProperties`, `pattern`, lengths, formats and numeric ranges. Every
+  existing exact-key, citation, quote and changed-line check therefore stays,
+  whatever `F5` concludes. Structured output would replace `JSON.parse`, not the
+  evidence boundary.
 
 Acceptance criteria:
 
-- `--full` runs the four heavy specialists, the light overview reviewer and one
-  medium conventions/maintainability reviewer, resolving the medium tier through
-  the existing layering, with every origin shown before execution.
-- The full findings policy presents all qualifying severities, with no minor cap,
-  while evidence validation, deduplication, incomplete-coverage reporting and
-  cancellation stay unchanged.
-- Mode flags stay mutually exclusive; balanced stays the default; quick and its
-  alias are unchanged. Do not add deep, fallbacks, timeouts, safeguards,
-  reviewer shell tools, gate overrides, configuration keys or an interactive
-  menu, and do not alter user checkouts to satisfy the revision gate.
-- Update the M1 row to Completed only when the full mode is demonstrated.
-- Demonstrate with controlled probes and the no-inference installed dispatch
-  first, extending `smoke-review.mjs`, `smoke-findings.mjs`,
-  `smoke-retention.mjs` and the installed draft-skip loop the way balanced did.
-  Any live review, balanced or full, needs new explicit authorization in that
-  session; none is carried over.
-- Consult the installed SDK and current official documentation before adopting
-  new runtime APIs, then record evidence, remaining limits and the next small
-  increment. Follow the `AGENTS.md` checkpoint and final-file handoff rules.
-- Land the increment on its own branch and pull request, and review that pull
-  request with this plugin before asking for a merge, as `AGENTS.md` now
-  requires. That review is the increment's real integration test: dispatch it
-  with `node scripts/dogfood-review.mjs NUMBER --all --no-comment` if you cannot
-  type a slash command, and record its outcome here. That single review is
-  authorized by the workflow; nothing else that spends credits is.
+- A small, reversible probe under `scripts/` demonstrates the answer to each of
+  the four questions above on this host, against a Claude-family model, because
+  that is the family that exposed the defect. Declarations and documentation are
+  not evidence; `AGENTS.md` requires demonstration.
+- The probe spends inference, so it needs **explicit authorization in that
+  session**. None carries over. Ask before running it, and say what it will cost.
+- `ROADMAP.md` records the outcome and a recommendation: adopt structured output
+  in a named follow-up increment, or fall back to the narrowly specified fence
+  unwrap, which strips one opening fence and its matching closing fence only when
+  they wrap the entire response and changes nothing else. If the recommendation
+  is the fallback, say plainly what it costs against the `SCOPE.md` decision to
+  drop malformed-output extraction, and leave the choice to the user.
+- No shipped behaviour changes in `F5`. `envelope` is untouched, no reviewer
+  moves, no mode changes, no configuration key, no fallback, no timeout, no
+  safeguard, no reviewer shell tool and no gate override. Keep `L1` pending and
+  copy no upstream source.
+- The increment still lands on its own branch and pull request and is reviewed
+  with this plugin once, because it changes `scripts/`. That review is authorized
+  by the workflow; nothing else that spends credits is.
 
-A live balanced review remains an open, separately authorizable step. It is the
-only way to learn whether the light overview reviewer and the minor-finding
-policy produce useful output; the plumbing itself is already demonstrated.
-Keep L1 pending and copy no upstream source. Push the increment branch and open
-its pull request; `main` refuses direct pushes and merging stays the user's call.
+`M2`, deep mode, now depends on `F5`. Deep uses one integrated heavy reviewer
+considering the whole pull request, with all substantiated severities, and
+rejects conflicting mode flags. Deep means holistic review, not a larger parallel
+one and not a fourth effort level. Building it before `F5` would add a fifth mode
+on top of an output path that is known to fail for a whole model family.
+
+Until `F5` lands, `--full` remains usable but wasteful with a Claude-family
+medium tier, and `README.md` says so. Prefer GPT-family models for reviewer
+tiers.
+
+Two older observations remain open and separately authorizable. No review of any
+mode has run against a substantial code diff, so review quality is still
+undemonstrated; every live run so far reviewed this project's own
+documentation-heavy pull requests. And the changed-line anchoring rule has now
+twice discarded a true finding whose citations were merely mis-anchored, on pull
+requests #4 and #5; a later increment should decide how a candidate can anchor on
+the changed line that causes a breakage while citing the unchanged line it
+breaks.
+
+Keep `L1` pending and copy no upstream source. Land every increment on its own
+branch and pull request, review that pull request with this plugin before asking
+for a merge, and record the outcome here; `main` refuses direct pushes and
+merging stays the user's call.

@@ -122,7 +122,7 @@ try {
     console.log(`PASS /pr-review ${args}`);
   }
 
-  for (const args of ["123 --full --no-comment", "123 --deep --no-comment", "status extra", "cancel extra", "--comment"]) {
+  for (const args of ["123 --deep --no-comment", "status extra", "cancel extra", "--comment"]) {
     const result = await session.rpc.commands.execute({ commandName: "pr-review", args });
     assert.match(result.error, /Unsupported arguments\. No review was started\./);
     console.log(`PASS rejected /pr-review ${args}`);
@@ -146,13 +146,20 @@ try {
     [`fixture model1=${available.id} effort1=invalid-effort model2=b effort2=high`, /Unsupported reasoning/],
     ["123 --quick --major-only --no-comment", /mutually exclusive/],
     ["123 --quick --balanced --no-comment", /mutually exclusive/],
+    ["123 --balanced --full --no-comment", /mutually exclusive/],
+    ["123 --full --major-only --no-comment", /mutually exclusive/],
     ["123 --capture-only --balanced", /cannot be combined/],
+    ["123 --capture-only --full", /cannot be combined/],
     ["123 --quick --no-comment --comment", /Conflicting posting flags/],
     ["123 --balanced --no-comment --comment", /Conflicting posting flags/],
+    ["123 --full --no-comment --comment", /Conflicting posting flags/],
+    ["123 --full --no-comment mediumModel=missing-m1-model", /Invalid or duplicate review setting/],
     ["123 --quick --no-comment heavyModel=missing-q3-model", /Unavailable/],
     ["123 --balanced --no-comment heavyModel=missing-m1-model", /Unavailable/],
+    ["123 --full --no-comment heavyModel=missing-m1-model", /Unavailable/],
     [`123 --quick --no-comment heavyModel=${available.id} heavyEffort=invalid-effort`, /Unsupported reasoning/],
     [`123 --balanced --no-comment heavyModel=${available.id} heavyEffort=invalid-effort`, /Unsupported reasoning/],
+    [`123 --full --no-comment heavyModel=${available.id} heavyEffort=invalid-effort`, /Unsupported reasoning/],
   ]) {
     const before = (await session.getEvents()).length;
     const result = await session.rpc.commands.execute({ commandName: "pr-review", args });
@@ -177,10 +184,10 @@ try {
     });
     try {
       await session.rpc.metadata.setWorkingDirectory({ workingDirectory: targetSmoke.quickTarget.workingDirectory });
-      // A draft target settles both modes before any reviewer starts, so this
+      // A draft target settles every mode before any reviewer starts, so this
       // exercises installed dispatch, tier resolution and settlement without
       // spending inference.
-      for (const [mode, prefix, reviewers] of [["--quick", "Q3", 3], ["--balanced", "M1", 5]]) {
+      for (const [mode, prefix, reviewers] of [["--quick", "Q3", 3], ["--balanced", "M1", 5], ["--full", "M1", 6]]) {
         const before = (await session.getEvents()).length;
         settled = Promise.withResolvers();
         const result = await session.rpc.commands.execute({
@@ -200,10 +207,18 @@ try {
         assert.equal(assignments.split("\n").filter((line) => line.startsWith("  ")).length, reviewers,
           `${mode} must show one assignment line per reviewer`);
         assert(assignments.includes("[flag]"), "An invocation flag is reported as the origin it is");
-        if (mode === "--balanced") {
+        if (mode !== "--quick") {
           assert.match(assignments, /overview \[light\]: model=\S+ \[[^\]]+\]/,
             "The light overview reviewer resolves and reports its own tier");
+        }
+        if (mode === "--balanced") {
           assert.match(assignments, /findings policy: P0-P2 findings, plus at most 3 P3\/nit finding\(s\)/);
+        }
+        if (mode === "--full") {
+          assert.match(assignments, /conventions-maintainability \[medium\]: model=\S+ \[[^\]]+\] reasoning=\S+ \[[^\]]+\]/,
+            "The medium conventions reviewer resolves and reports its own tier");
+          assert.match(assignments,
+            /findings policy: P0-P2 findings, plus every substantiated P3\/nit finding/);
         }
         assert(!messages.some((message) => /^Reviewer /.test(message)), "A skipped draft starts no reviewer");
         console.log(`PASS installed ${mode} dispatch settled a skipped draft without inference`);
@@ -223,7 +238,7 @@ try {
     } finally {
       assert.deepEqual(await owned.stop(), []);
     }
-    console.log("PASS installed quick dispatch and owned-runtime start/ping/stop without COPILOT_CLI_PATH or inference");
+    console.log("PASS installed mode dispatch and owned-runtime start/ping/stop without COPILOT_CLI_PATH or inference");
   }
 
   const events = await session.getEvents();

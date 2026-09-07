@@ -56,6 +56,19 @@ try {
   wrongTopology.digest = reviewKey(wrongTopology.outcome);
   assert.throws(() => validateRecord(wrongTopology, sessionId), /incomplete reviewer coverage/);
 
+  // A full record carries the same schema with one more reviewer again.
+  const full = retainedRecord(await retentionFixture(sessionId, { mode: "full" }));
+  validateRecord(full, sessionId);
+  assert.equal(full.outcome.mode, "full");
+  assert.equal(full.outcome.reviewers.length, 6);
+  assert.deepEqual(full.outcome.reviewers.map((reviewer) => reviewer.label),
+    ["correctness", "contracts", "security", "performance-resources", "overview", "conventions-maintainability"]);
+  assert.deepEqual(full.outcome.validation.capped, []);
+  const fullAsBalanced = structuredClone(full);
+  fullAsBalanced.outcome.mode = "balanced";
+  fullAsBalanced.digest = reviewKey(fullAsBalanced.outcome);
+  assert.throws(() => validateRecord(fullAsBalanced, sessionId), /incomplete reviewer coverage/);
+
   for (const mutate of [
     (r) => { r.schemaVersion = 2; }, (r) => { r.extra = true; },
     (r) => { r.outcome.invocation.invocationId = randomUUID(); },
