@@ -3397,10 +3397,15 @@ it afterwards.
 
 ### Remaining limitations
 
-- One live balanced review exists, on this project's own doc-heavy pull request.
-  It produced no findings and no adjudication, so balanced review quality and
-  minor-finding behavior are still undemonstrated. No light model has ever run,
-  because the light tier inherited the heavy assignment.
+- Two live balanced reviews exist, both on this project's own documentation-heavy
+  pull requests: #3 at head `5c05b7c` and #4 at head `ae2c55c`. #3 produced no
+  candidate and no adjudication. #4 raised seven candidates, admitted four at the
+  evidence gate, and returned three validated findings. Balanced behaviour on a
+  real code diff is therefore still undemonstrated, and the minor-finding cap has
+  never been exercised: at most one P3 has ever been validated, against a cap of
+  three. A light model has run exactly once, on #4, where `overview` used
+  `gpt-5.6-luna` and produced the only finding no heavy reviewer raised. Every
+  earlier balanced run inherited the heavy assignment for the light tier.
 - No light-tier invocation flag, so a per-invocation light override requires
   `/pr-review-config`. Deliberate: no configuration surface was added.
 - `--capture-only` is prototype surface outside `SCOPE.md`, introduced only
@@ -3552,8 +3557,10 @@ Acceptance criteria:
   type a slash command, and record its outcome here. That single review is
   authorized by the workflow; nothing else that spends credits is.
 
-A live balanced review remains an open, separately authorizable step. It is the
-only way to learn whether the light overview reviewer and the minor-finding
-policy produce useful output; the plumbing itself is already demonstrated.
+A live balanced review of a real code diff remains an open, separately
+authorizable step. Pull request #4 already showed the light overview reviewer
+earning its place on a documentation diff, but the minor-finding cap is still
+unexercised and no balanced review has ever run against substantial code
+changes; the plumbing itself is demonstrated.
 Keep L1 pending and copy no upstream source. Push the increment branch and open
 its pull request; `main` refuses direct pushes and merging stays the user's call.

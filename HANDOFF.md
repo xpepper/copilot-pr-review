@@ -65,14 +65,16 @@ Read "Completed increment: M1, balanced half" in `ROADMAP.md`. Do not repeat it:
 - Each reviewer resolves its own tier through the existing layering, and an
   `Effective reviewer assignments:` block shows every reviewer, tier, model,
   effort and origin before execution.
-- One live balanced review exists: pull request #3 reviewed itself at head
-  `5c05b7c`. Five reviewers completed on `gpt-5.6-terra` at high effort, made 89
-  confined reads with no denials, returned zero findings with incomplete
-  coverage, and the runtime reported 414.14627 AI credits. It found one real
-  defect, a stale documentation command left by a rename, which is fixed. It
-  produced no candidate, so nothing was adjudicated: balanced review quality and
-  minor-finding behavior are still undemonstrated, and no light model has ever
-  run, because the light tier inherits the heavy assignment when it is unset.
+- Two live balanced reviews exist, both of this repository's own pull requests.
+  #3 reviewed itself at head `5c05b7c`: five reviewers completed on
+  `gpt-5.6-terra` at high effort, made 89 confined reads with no denials,
+  returned zero findings with incomplete coverage, and the runtime reported
+  414.14627 AI credits. It produced no candidate, so nothing was adjudicated,
+  and its light tier inherited the heavy assignment. #4 reviewed itself at head
+  `ae2c55c` and did run a light model: `overview` on `gpt-5.6-luna`, and that
+  light reviewer produced a finding no heavy reviewer raised. Both pull requests
+  were documentation-heavy, so balanced behaviour on a real code diff is still
+  undemonstrated, and the minor-finding cap has never been exercised.
 
 ## Implement only the exact next increment
 
