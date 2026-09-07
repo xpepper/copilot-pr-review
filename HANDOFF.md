@@ -6,77 +6,65 @@ anything. `SCOPE.md` is the authoritative product specification; `ROADMAP.md`
 records demonstrated evidence, runtime caveats and the exact next increment.
 Do not rely on previous conversations or reopen settled product decisions.
 
-**The working agreement changed on 2026-09-07: every increment lands on a branch
-and a pull request that you review with this plugin before asking for a merge.**
-`main` carries repository ruleset `22479389`, which requires a pull request with
-zero approving reviews and grants no bypass, so direct pushes to `main` are
-refused for admins and agents alike. Read "Land every increment on a reviewed
-pull request" in `AGENTS.md` before you start.
+## How work lands here
+
+Every increment lands on a branch and a pull request. `main` carries repository
+ruleset `22479389`, which requires a pull request with zero approving reviews
+and grants no bypass, so direct pushes to `main` are refused for admins and
+agents alike. If you find yourself committing on `main`, move the commits to a
+branch before pushing.
+
+The increment's pull request is then reviewed **with this plugin**, and that
+review is the increment's real integration test. The controlled suites run
+against test doubles and prove logic only. The pull-request review runs the
+installed plugin with the real Copilot runtime, real models, real `gh` requests,
+the real revision gate against a real checkout, and real confined read tools. An
+increment that changes anything under `extensions/` or `scripts/` is not
+demonstrated until that review has run once and its evidence is in `ROADMAP.md`.
+Read "Land every increment on a reviewed pull request" in `AGENTS.md` in full
+before you start.
 
 ## Recorded state
 
-- `main` is at `d88774c` ("fix: accept the runtime search alias and complete R1")
-  and is not directly pushable.
-- Branch `m1-balanced-mode` and **open pull request #3** hold the balanced half
-  of M1 plus the new pull-request workflow. Its commits are `6d231c7`
-  (balanced mode), `1b924cb` and the documentation commits that follow,
-  including this handoff. Inspect git history rather than assuming this file
-  contains its own hash.
+- `main` is at `db8bd69`, the squash merge of pull request #3, which delivered
+  the balanced half of M1 and this working agreement. Its branch is deleted; the
+  individual commits from that branch are not ancestors of `main`, so read
+  `git log` and the pull request rather than looking for those hashes.
 - Pull requests #1 and #2 are synthetic publication playgrounds from P4 and P5.
   **Never merge them**, and never republish to them.
-- Nothing else is uncommitted, and the extension installed by
-  `copilot plugin install "$(pwd)"` matches that branch.
+- Check whether an open pull request already carries unmerged documentation from
+  the previous session before starting new work.
 
 Read "Completed increment: M1, balanced half" in `ROADMAP.md`. Do not repeat it:
 
 - `extensions/pr-review/modes.mjs` declares each mode as data: reviewer topology
   with each reviewer's tier, findings policy, label, flag and evidence prefix.
-  `quick.mjs` was renamed to `review.mjs` and serves every mode;
-  `scripts/smoke-quick.mjs` was renamed to `scripts/smoke-review.mjs`.
+  `quick.mjs` is now `review.mjs`, and `scripts/smoke-quick.mjs` is now
+  `scripts/smoke-review.mjs`.
 - `--balanced` runs four heavy specialists plus one light overview reviewer and
   is the default when no mode flag is given. `--major-only` is still the quick
-  alias and mode flags are mutually exclusive.
-- Because a bare PR number now runs a review, the capture-only path moved to an
-  explicit `--capture-only` flag, which refuses to combine with a mode, posting,
-  selection or model argument. That flag is prototype surface outside `SCOPE.md`.
+  alias, mode flags are mutually exclusive, and `--capture-only` is the
+  capture-without-reviewers path that the no-inference probes use.
 - Balanced presents P0-P2 plus at most three P3/nit findings. Accepted minor
   findings beyond the cap are recorded in `validation.capped`, reported, and can
   never be selected or published. Retention enforces the mode's reviewer count,
   admitted severities and the cap.
 - Each reviewer resolves its own tier through the existing layering, and an
   `Effective reviewer assignments:` block shows every reviewer, tier, model,
-  effort and origin before execution. No light-tier invocation flag was added;
-  the adjudicator still runs heavy with zero tools.
-- One live balanced review has been run, on pull request #3 itself. It produced
-  no findings, so balanced review quality and minor-finding behavior remain
-  undemonstrated, and no light model has ever run: the light tier inherited the
-  saved heavy assignment.
-
-## State of pull request #3: reviewed, not merged
-
-The workflow's dogfooding step is **already done for #3**, so do not repeat it:
-that would spend credits again. One balanced review ran at head
-`5c05b7c` with `node scripts/dogfood-review.mjs 3 --all --no-comment`. All five
-reviewers completed on `gpt-5.6-terra` at high effort, made 89 confined reads
-with no denials, produced zero findings with incomplete coverage, and the
-runtime reported 414.14627 AI credits. Nothing was published. The full record is
-in "Live inference: the dogfood review of pull request #3" in `ROADMAP.md`.
-
-That review found one real defect, a `README.md` command still naming the
-renamed `scripts/smoke-quick.mjs`, which is fixed on the branch in commit
-`5061b79`. It also exposed a tool limitation worth acting on later: a real
-regression whose broken line is unchanged context cannot be anchored as a
-candidate, so it surfaced only as a coverage gap.
-
-What remains for #3 is a merge decision, which is the user's. If you push
-further commits to that branch, the pull request head moves and its review
-becomes stale; say so plainly rather than implying the new head was reviewed.
+  effort and origin before execution.
+- One live balanced review exists: pull request #3 reviewed itself at head
+  `5c05b7c`. Five reviewers completed on `gpt-5.6-terra` at high effort, made 89
+  confined reads with no denials, returned zero findings with incomplete
+  coverage, and the runtime reported 414.14627 AI credits. It found one real
+  defect, a stale documentation command left by a rename, which is fixed. It
+  produced no candidate, so nothing was adjudicated: balanced review quality and
+  minor-finding behavior are still undemonstrated, and no light model has ever
+  run, because the light tier inherits the heavy assignment when it is unset.
 
 ## Implement only the exact next increment
 
 Implement **the full half of M1**, as specified at the end of `ROADMAP.md`, on
-its own branch and pull request. M1 stays Pending until it lands; deep belongs
-to M2.
+its own branch and pull request. M1 stays Pending until it lands; deep is M2.
 
 Acceptance criteria:
 
@@ -94,7 +82,33 @@ Acceptance criteria:
 5. Demonstrate with controlled probes and the no-inference installed dispatch
    first, extending `smoke-review.mjs`, `smoke-findings.mjs`,
    `smoke-retention.mjs` and the installed draft-skip loop the way balanced did.
-   Update the M1 row to Completed only once full is demonstrated.
+6. Finish by opening the pull request and reviewing it with the plugin, then
+   record that review in `ROADMAP.md`. Update the M1 row to Completed only once
+   the full mode is demonstrated that way.
+
+## Running the real integration test
+
+```sh
+copilot plugin install "$(pwd)"
+gh pr checkout NUMBER
+COPILOT_CLI_PATH="$(command -v copilot)" \
+COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
+node scripts/dogfood-review.mjs NUMBER --all --no-comment
+```
+
+`scripts/dogfood-review.mjs` dispatches the real `/pr-review` command through
+the SDK's command RPC, for agents that cannot type a Copilot CLI slash command.
+It refuses to run unless local `HEAD` is the pull request head with a clean
+tree, refuses `--comment`, prints the whole plugin timeline, and reports the
+settled outcome with the runtime's credit figure. `copilot -p "/pr-review N"` is
+not a substitute: prompt mode starts an ambient model turn instead of
+dispatching the command.
+
+Record from that run: the mode, the model and effort each reviewer actually
+used, coverage, findings, withheld findings, coverage gaps, tool calls and
+denials, and the reported credits. Fix real findings on the same branch and say
+which you rejected and why. A refusal or failure is a defect report about the
+tool; never weaken a gate to make the run pass.
 
 ## Runtime and validation caveats
 
@@ -103,15 +117,14 @@ Acceptance criteria:
   `~/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk`. Demonstrate capabilities;
   declarations and plugin format support alone are not proof.
 - Reinstall with `copilot plugin install "$(pwd)"` after every extension change,
-  before running installed-runtime probes. The deprecation warning is expected.
+  before running any installed-runtime probe or the integration test.
 - Controlled suites (no inference/network): `node scripts/smoke-<name>.mjs` for
   `findings`, `review`, `selection`, `retention`, `preview`, `publication`,
   `publish-later`, `checkout`, `config`, `context`, `fixture`, `target`. All
-  twelve passed in the previous session, as did `git diff --check`. The suite is
-  named `review`, not `quick`.
+  twelve passed in the previous session, as did `git diff --check`.
 - Installed probes require both `COPILOT_CLI_PATH="$(command -v copilot)"` and
   `COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk"`.
-  No-inference probes rerun previously: `smoke-runtime.mjs --targets --startup`,
+  No-inference probes: `smoke-runtime.mjs --targets --startup`,
   `smoke-runtime.mjs --targets --matching-checkout --startup`,
   `smoke-retention-runtime.mjs`, `smoke-reviewer-tools.mjs` with
   `PR_REVIEW_HEAVY_MODEL=gpt-5.6-terra` and with `claude-sonnet-5`, and
@@ -119,19 +132,14 @@ Acceptance criteria:
 - `smoke-config-runtime.mjs` refuses to run while a personal
   `<copilot-config-home>/pr-review/config.json` exists. Copy it aside and
   restore it byte-identically, or skip that probe.
-- Reviewing a doc-heavy pull request is expensive. Pull request #3 cost
-  414.14627 credits for five reviewers on a 27-file diff, against R1's 27.89 for
-  three reviewers on a small one. Budget for that before you dispatch, and
-  report the runtime's actual figure rather than an estimate.
-- `scripts/dogfood-review.mjs NUMBER --all --no-comment` is the SDK dispatcher
-  for agents that cannot type a slash command. It refuses to run unless the
-  local head is the pull request head with a clean tree, and refuses
-  `--comment`. Reinstall the plugin from the checkout first.
-- Inference authorization does not accumulate. The workflow authorizes **one**
-  review per increment pull request. The recorded R1 live command, harness
+- Reviewing costs real credits and scales with the diff and the reviewer count:
+  414.14627 credits for five reviewers on a 27-file documentation-heavy pull
+  request, against 27.89 for three reviewers on a small one. Report the
+  runtime's figure; never estimate it.
+- Inference authorization does not accumulate. The workflow authorizes the one
+  review of your increment's pull request. The recorded R1 live command, harness
   `--quick` paths, `--read-live`, fixture inference and any publication still
-  need a fresh explicit instruction in your own session. There is still no
-  balanced path in the live harness; adding one is implementation work.
+  need a fresh explicit instruction in your own session.
 - Cold `session.resume` of retained command-only records remains unsupported.
   Do not invent transcript recovery. The adjudicator remains zero-tool and
   citations remain restricted to captured diff/context evidence.
@@ -139,19 +147,19 @@ Acceptance criteria:
 ## Commit, pull-request and final-file handoff rules
 
 Work on a branch named for the increment. Commit locally at meaningful validated
-checkpoints, staging only the files of that checkpoint and preserving unrelated
+checkpoints, staging only that checkpoint's files and preserving unrelated
 changes. Do not amend, rewrite published history, force-push, or push to `main`.
 Update `ROADMAP.md` with evidence and remaining limitations before committing; a
 checkpoint does not by itself complete an increment.
 
-Push the branch, open its pull request with `gh pr create`, review that pull
-request with this plugin, record the outcome, and leave merging to the user.
+Push the branch, open its pull request with `gh pr create`, run the integration
+test above, record the outcome, and leave merging to the user.
 
 Recent commits omit the `Co-authored-by: Copilot
 <223556219+Copilot@users.noreply.github.com>` trailer that older commits carry,
-because that session was instructed to add no attribution lines. Follow whatever
-attribution rule your own session gives you; the history is deliberately
-inconsistent on this point.
+because those sessions were instructed to add no attribution lines. Follow
+whatever attribution rule your own session gives you; the history is
+deliberately inconsistent on this point.
 
 Before ending, finish implementation and applicable validation, update
 `ROADMAP.md` with outcomes, reproduction commands, uncertainties and the exact
