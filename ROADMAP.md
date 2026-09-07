@@ -1238,8 +1238,9 @@ whole-claim requirements and read-only capability-isolation caveats still apply.
 
 ## Completed increment: P2
 
-P2 follows implementation `c0d3d16` and handoff `55a3a8a`. No upstream source
-was copied, no GitHub mutation was performed, and nothing was pushed.
+Implementation checkpoint **`083684a`** completes P2 after implementation
+`c0d3d16` and handoff `55a3a8a`. No upstream source was copied, no GitHub mutation
+was performed, and nothing was pushed.
 
 ### Implementation boundary
 
