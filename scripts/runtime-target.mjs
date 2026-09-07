@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { baseSource, blobSha, headSource } from "./target-fixture.mjs";
+import { descendants } from "./runtime-fixture.mjs";
 
 async function dispatchTarget(session, args) {
   const before = (await session.getEvents()).length;
@@ -240,6 +241,38 @@ export async function prepareTargetSmoke({ allowPublish = false, coordinatePost 
         assert.equal(localState(), localBefore);
         assert.notEqual(blobSha(dirty), blobSha(headSource));
         console.log(`PASS local branch not-the-pr-branch at ${localHead} contributed no review evidence`);
+
+        // R1: reviewers read the checkout, so a checkout that is not the
+        // reviewed revision refuses the whole run before any reviewer starts.
+        // This spends no inference: no owned runtime is ever launched.
+        const beforeRefusal = await descendants();
+        const refusal = Promise.withResolvers();
+        const refusalMessages = [];
+        const unsubscribe = session.on((event) => {
+          if (!["session.info", "session.error"].includes(event.type)) return;
+          refusalMessages.push(event.data.message);
+          if (event.data.message.startsWith("Q3 evidence: ")) {
+            refusal.resolve(JSON.parse(event.data.message.slice("Q3 evidence: ".length)));
+          }
+        });
+        try {
+          const dispatched = await session.rpc.commands.execute({
+            commandName: "pr-review", args: "1 --quick --no-comment --all",
+          });
+          assert.equal(dispatched.error, undefined);
+          const outcome = await refusal.promise;
+          assert.equal(outcome.coverage, "not-started");
+          assert.equal(outcome.disposition, "refused");
+          assert.deepEqual(outcome.reviewers, []);
+          assert.equal(outcome.complete, false);
+          const refused = refusalMessages.find((message) => message.startsWith("Quick review refused"));
+          assert.match(refused, /Failed condition: (local-head|working-tree)/);
+          assert.match(refused, /gh pr checkout 1/);
+          assert(!refusalMessages.some((message) => /^Reviewer /.test(message)), "No reviewer may start");
+          assert.deepEqual(await descendants(), beforeRefusal, "A refused review starts no owned runtime");
+          assert.equal(localState(), localBefore, "The gate never touches the checkout");
+          console.log(`PASS /pr-review 1 --quick refused on a mismatched checkout: ${refused.split("\n")[1]}`);
+        } finally { unsubscribe(); }
 
         const bound = await dispatchTarget(session, "11");
         assert.equal(bound.disposition, "captured");

@@ -1,9 +1,15 @@
 import assert from "node:assert/strict";
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   parseFixtureArgs, reasoningEfforts, subscriptionModels, validateAssignments,
   runReviewer,
 } from "../extensions/pr-review/fixture.mjs";
-import { reviewerPolicy, assertNoReviewerTools, probeForbiddenTools } from "../extensions/pr-review/read-only.mjs";
+import {
+  assertNoReviewerTools, assertReviewerTools, probeForbiddenTools, readOnlyTools, readingReviewerPolicy,
+  reviewerEvidence, reviewerPolicy,
+} from "../extensions/pr-review/read-only.mjs";
 import { executeFixtureRun } from "../extensions/pr-review/fixture-run.mjs";
 
 const command = "fixture model1=model-a effort1=low model2=model-b effort2=high";
@@ -52,15 +58,57 @@ assert.throws(() => validateAssignments({ ...settings, extra: "value" }, catalog
 assert.throws(() => validateAssignments(settings, []), /Unavailable/);
 console.log("PASS fixture argument, subscription policy, and reasoning validation (no models run)");
 
-const policyEvidence = { permissionDenials: [], toolDenials: [] };
+const policyEvidence = reviewerEvidence();
 const policy = reviewerPolicy(policyEvidence);
 assert.equal(policy.enableConfigDiscovery, false);
 assert.deepEqual(policy.availableTools, []);
+// The runtime accepts only its fixed decision vocabulary; an unknown variant
+// would turn a denial into a transport failure.
 for (const kind of ["write", "shell", "read", "url", "custom-tool"]) {
-  assert.equal((await policy.onPermissionRequest({ kind })).kind, "denied-no-approval-rule");
+  assert.equal((await policy.onPermissionRequest({ kind })).kind, "reject");
 }
 assert.equal((await policy.hooks.onPreToolUse({ toolName: "task" })).permissionDecision, "deny");
 assert.deepEqual(policyEvidence.toolDenials, ["task"]);
+assert.deepEqual(policyEvidence.permissionDenials, ["write", "shell", "read", "url", "custom-tool"]);
+
+const root = realpathSync(mkdtempSync(join(tmpdir(), "pr-review-read-only-")));
+mkdirSync(join(root, "src"));
+writeFileSync(join(root, "src", "caller.js"), "import { value } from \"../example.js\";\n");
+const outsideRoot = realpathSync(mkdtempSync(join(tmpdir(), "pr-review-outside-")));
+writeFileSync(join(outsideRoot, "secret.txt"), "not reviewed content\n");
+const readEvidence = reviewerEvidence({ root });
+const reading = readingReviewerPolicy(readEvidence, root);
+assert.deepEqual(reading.availableTools, ["builtin:view", "builtin:grep", "builtin:glob"]);
+assert.deepEqual(readOnlyTools, ["view", "grep", "glob"]);
+assert.throws(() => readingReviewerPolicy(readEvidence, "relative/path"), /absolute reviewed checkout root/);
+for (const path of [root, join(root, "src"), join(root, "src", "caller.js"), join(root, "src", "..", "src")]) {
+  assert.equal((await reading.onPermissionRequest({ kind: "read", path })).kind, "approve-once");
+}
+for (const request of [
+  { kind: "read", path: join(outsideRoot, "secret.txt") },
+  { kind: "read", path: join(root, "..") },
+  { kind: "read", path: join(root, "src", "..", "..", "escape.js") },
+  { kind: "read", path: join(root, "missing.js") },
+  { kind: "read" },
+  { kind: "write", path: join(root, "src", "caller.js") },
+  { kind: "shell", path: root },
+]) {
+  assert.equal((await reading.onPermissionRequest(request)).kind, "reject", JSON.stringify(request));
+}
+assert.deepEqual(readEvidence.reads, [".", "src", join("src", "caller.js"), "src"]);
+assert.deepEqual(readEvidence.permissionDenials, ["read", "read", "read", "read", "read", "write", "shell"]);
+// Granted read tools must reach the permission handler instead of being
+// hook-approved, so confinement still applies to every read.
+for (const toolName of readOnlyTools) {
+  assert.equal(await reading.hooks.onPreToolUse({ toolName }), undefined);
+}
+for (const toolName of ["bash", "create", "edit", "task", "sql", "web_fetch", "write_agent"]) {
+  assert.equal((await reading.hooks.onPreToolUse({ toolName })).permissionDecision, "deny");
+}
+assert.deepEqual(readEvidence.toolDenials, ["bash", "create", "edit", "task", "sql", "web_fetch", "write_agent"]);
+rmSync(root, { recursive: true, force: true });
+rmSync(outsideRoot, { recursive: true, force: true });
+console.log("PASS zero-tool and confined read-only reviewer policies without a runtime");
 
 function fakeSession(events, sendError) {
   const handlers = new Set();
@@ -78,6 +126,19 @@ function fakeSession(events, sendError) {
     get listenerCount() { return handlers.size; },
   };
 }
+
+// A granted reviewer's read is recorded evidence, not a failed read-only claim.
+const readingEvents = [
+  { type: "tool.execution_start", data: { toolName: "grep", arguments: { pattern: "lapin" } } },
+  { type: "assistant.message", data: { content: "candidate output" } },
+  { type: "session.idle" },
+];
+const recorded = [];
+const readingSession = fakeSession(readingEvents);
+assert.equal((await runReviewer(readingSession, "quick", { toolCalls: recorded })).status, "completed");
+assert.deepEqual(recorded, [{ tool: "grep", arguments: { pattern: "lapin" } }]);
+assert.equal((await runReviewer(fakeSession(readingEvents))).status, "incomplete",
+  "A zero-tool reviewer's tool call must still fail the run");
 
 for (const [events, sendError, expected] of [
   [[{ type: "assistant.message", data: { content: "retained output" } }, { type: "session.idle" }], undefined, "completed"],
@@ -131,7 +192,12 @@ for (const result of [{ resultType: "success" }, { resultType: "failure", error:
   await assert.rejects(probeForbiddenTools(toolsSession), /did not produce/);
 }
 toolsSession.rpc.tools.getCurrentMetadata = async () => ({ tools: [{ name: "bash" }] });
-await assert.rejects(assertNoReviewerTools(toolsSession), /empty reviewer tool set/);
+await assert.rejects(assertNoReviewerTools(toolsSession), /reviewer tool set \(none\).*offered: bash/);
+toolsSession.rpc.tools.getCurrentMetadata = async () => ({ tools: readOnlyTools.map((name) => ({ name })) });
+await assertReviewerTools(toolsSession, readOnlyTools);
+await assert.rejects(assertNoReviewerTools(toolsSession), /reviewer tool set \(none\)/);
+toolsSession.rpc.tools.getCurrentMetadata = async () => ({ tools: [{ name: "view" }, { name: "grep" }, { name: "bash" }] });
+await assert.rejects(assertReviewerTools(toolsSession, readOnlyTools), /glob, grep, view.*offered: bash, grep, view/);
 console.log("PASS read-only guards, reviewer errors, partial evidence, cancellation, and listener cleanup");
 
 for (const cleanupFailure of [false, true]) {

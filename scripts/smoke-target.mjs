@@ -146,7 +146,8 @@ assert(!logs[0].includes(diff), "Do not put the diff in the parent conversation"
 assert.match(logs[1], /^Q2 context: /);
 assert(logs[1].includes(`"blob":"${blobSha(headSource)}"`), "Report the bound source provenance");
 assert(!logs[1].includes("export const value"), "Do not put source context in the parent conversation");
-assert.match(logs[1], /local checkout, its branch, and its uncommitted changes are not review evidence/);
+assert.match(logs[1], /local checkout, its branch, and its uncommitted changes are never context evidence/);
+assert.match(logs[1], /requires the checkout to be exactly this head before reviewers may read it/);
 assert.equal(executed.context.head, "b".repeat(40));
 assert.deepEqual(contextSummary(executed.context, 0),
   { ...contextSummary(executed.context), entries: [], undisplayedFiles: 1 },

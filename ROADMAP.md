@@ -2749,53 +2749,151 @@ granted. It was deliberately left unchanged here to keep this increment a probe.
 - No reviewer prompt, policy module, configuration, trust, selection, retention,
   publication or authorization behavior changed in this increment.
 
+## Completed increment: R1, first half
+
+Implementation: new `extensions/pr-review/checkout.mjs`; changes to
+`read-only.mjs`, `fixture.mjs`, `quick.mjs`, `target.mjs` and `extension.mjs`;
+new controlled probe `scripts/smoke-checkout.mjs`; harness changes in
+`smoke-quick.mjs`, `smoke-fixture.mjs`, `smoke-reviewer-tools.mjs`,
+`smoke-target.mjs` and `runtime-target.mjs`. No inference was spent, and no
+review was published.
+
+Quick reviewers now receive `view`, `grep` and `glob` confined to the local
+checkout, but only after the run proves the checkout is exactly the reviewed
+revision. The Q4 adjudicator keeps the zero-tool policy.
+
+### Demonstrated outcome
+
+On 2026-09-07 with Copilot CLI 1.0.83, its bundled SDK, Node.js 26.1.0 and
+macOS arm64:
+
+- The revision-identity gate refuses on four distinct conditions, each named in
+  the message together with the fixing command: `not-a-git-checkout`,
+  `local-head` (local `HEAD` differs from the captured PR head, including an
+  unborn branch), `working-tree` (a tracked file is modified or staged) and
+  `remote-head` (the PR head moved since capture). A clean matching checkout is
+  accepted, the repository root is resolved from a nested working directory, and
+  non-ignored untracked files warn without blocking. `scripts/smoke-checkout.mjs`
+  proves all of this against real temporary git repositories; the gate runs
+  `git` resolved from `PATH` with an absolute `cwd` and with `GIT_DIR`,
+  `GIT_WORK_TREE`, `GIT_COMMON_DIR`, `GIT_INDEX_FILE` and
+  `GIT_CEILING_DIRECTORIES` stripped, and it only reads: no checkout, stash,
+  clean, fetch or pull.
+- `readingReviewerPolicy` offers exactly `builtin:view`, `builtin:grep` and
+  `builtin:glob`; its pre-tool hook denies every other tool and returns
+  `undefined` for the three read tools so the permission handler stays the
+  confinement point. The handler resolves real paths and approves only
+  `kind: "read"` inside the verified root.
+- Against the installed runtime, `scripts/smoke-reviewer-tools.mjs` now
+  exercises the *shipped* policy rather than an ad-hoc copy: the plain
+  `builtin:<name>` filter strings it ships are identical to
+  `new ToolSet().addBuiltIn([...]).toArray()`; an in-root read succeeds; a read
+  outside the root is rejected and leaks no content; write and exec tools are
+  refused natively in a hook-less session and denied by the hook in the policy
+  session; and the grant does not leak into a later zero-tool session.
+- The latent F4 defect is fixed: `reject` denies cleanly where the unknown
+  `denied-no-approval-rule` variant turned a read into a transport failure. Both
+  behaviors are asserted side by side in the same probe.
+- `executeQuickRun` runs the gate after capture and before `startRuntime()`. A
+  refused run logs the failing condition, emits
+  `coverage: "not-started"`, `disposition: "refused"`, `reviewers: []`,
+  `complete: false`, and starts no reviewer session and no owned runtime.
+- The installed plugin demonstrates the refusal end to end with no inference:
+  `smoke-runtime.mjs --targets --startup` dispatches
+  `/pr-review 1 --quick --no-comment --all` from a checkout parked on an
+  unrelated branch and asserts the refusal message, zero reviewer messages, an
+  unchanged descendant process set, and an unchanged checkout state.
+- `quickInstructions` now permits reading surrounding files, callers and tests
+  while keeping the in-scope rule (only defects introduced by this diff, no
+  repository-wide audit, no writes), and the prompt states the verified checkout
+  root and head. Citations are still restricted to the supplied binding and
+  context windows, so `findings.mjs` evidence validation is unchanged and every
+  published citation still resolves against the captured revision.
+
+```sh
+for suite in findings quick selection retention preview publication \
+  publish-later checkout config context fixture target; do
+  node scripts/smoke-$suite.mjs >/dev/null || echo "FAIL $suite"
+done
+git diff --check
+copilot plugin install "$(pwd)"
+COPILOT_CLI_PATH="$(command -v copilot)" \
+COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
+node scripts/smoke-reviewer-tools.mjs
+COPILOT_CLI_PATH="$(command -v copilot)" \
+COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
+node scripts/smoke-runtime.mjs --targets --startup
+COPILOT_CLI_PATH="$(command -v copilot)" \
+COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
+node scripts/smoke-retention-runtime.mjs
+```
+
+All twelve controlled suites pass, `git diff --check` is clean, the plugin was
+reinstalled after the extension changes, and the three installed-runtime probes
+above pass without spending inference.
+
+### Remaining limitations
+
+- **No live inference ran.** It is still unproven that a reviewer *model* uses
+  the read tools well, stays in PR scope while reading, or produces better
+  findings than the diff-only reviewers. That is the second half of R1.
+- **The controlled runtime fixture now blocks inference-spending quick probes.**
+  `prepareTargetSmoke` deliberately creates a dirty checkout on
+  `not-the-pr-branch` with the synthetic head `"b" * 40`, which can never
+  satisfy the gate. Every fixture-driven `--quick` runtime probe
+  (`smoke-runtime.mjs --targets --quick`, and the retention, preview,
+  publication and publish-later `--quick` variants) will now refuse instead of
+  running reviewers. The no-inference paths are unaffected and all pass. The
+  live public targets have the same problem: `preparePublicCheckout` does not
+  fetch or detach the reviewed head, so a live `--quick` probe would also
+  refuse.
+- Because the gate performs a fresh metadata read, capture-plus-gate now issues
+  three metadata reads instead of two. `target-fixture.mjs` drift thresholds
+  keyed on `reads >= 3` (fixture PR 11, and `publicationNumbers.stale` /
+  `draft` = 54 / 55) are unchanged and therefore mis-timed for any future
+  inference-spending publication probe; they need to become `4`.
+- Reads are confined by plugin-owned real-path checks, not by an OS sandbox. A
+  symlink is resolved before the check, but nothing prevents a granted tool from
+  reading any file inside the reviewed checkout, including ignored ones.
+- Untracked files are only warned about. A reviewer can therefore read a file
+  that is not part of the reviewed revision, though it cannot be mistaken for
+  modified reviewed code and cannot be cited.
+- No custom revision-bound tool was built; reads come from the working tree, not
+  from the captured SHAs. Selection, retention, publication, authorization,
+  configuration and trust behavior are unchanged.
+
 ## Exact next increment
 
-**R1, first half: grant quick reviewers confined read-only access to the local
-checkout, gated on revision identity.**
+**R1, second half: make the fixture and live harnesses able to satisfy the gate,
+then run one authorized live quick review that needs unchanged source.**
 
 Acceptance criteria:
 
-- `read-only.mjs` gains a read-only reviewer policy that offers exactly `view`,
-  `grep` and `glob`, keeps every other built-in natively refused, and returns
-  `reject` rather than the malformed `denied-no-approval-rule` for anything it
-  declines. The existing zero-tool policy and its F3 evidence stay intact.
-- The permission handler approves only `kind: "read"` requests whose real path
-  resolves inside the reviewed checkout root, and rejects everything else.
-- Reviewer sessions are pointed at the checkout with `metadata.setWorkingDirectory`.
-- **The review stops before any reviewer starts unless the checkout is provably
-  the reviewed code.** All of the following must hold: local `HEAD` equals the
-  captured PR head SHA; the PR head on GitHub still equals the captured head at
-  review start; and no tracked file is modified or staged. On any mismatch,
-  refuse with a clear message naming which condition failed and the exact
-  command that fixes it, such as `gh pr checkout <number>`. No reviewer runs, no
-  degraded context-only fallback, and no override flag. A moved remote head
-  means the captured snapshot is stale: stop and let the user re-run rather than
-  re-capturing mid-run. Non-ignored untracked files warn but do not block, since
-  they cannot be mistaken for modified reviewed code. Never switch branches,
-  stash, pull, clean or otherwise touch the checkout to satisfy the gate.
-- `quickInstructions` is updated to permit reading surrounding files, callers
-  and tests to establish context and confirm impact, while keeping the upstream
-  in-scope rule: report only defects introduced by this diff, never a
-  whole-repository audit, and never modify anything.
-- Evidence citations and the existing validation gates keep working; a citation
-  must still resolve against the captured revision.
-- Demonstrate with a controlled probe first, then one authorized live quick
-  review of a PR whose risk lives in unchanged callers, and record whether the
-  reviewers actually consulted surrounding source.
+- `runtime-target.mjs` gains a fixture mode whose PR head is a real commit in
+  the temporary checkout instead of `"b" * 40`, so fixture-driven `--quick`
+  probes can pass the gate again. `target-fixture.mjs` serves that commit's
+  content for the head side, and the existing mismatched-checkout refusal
+  demonstration keeps its own fixture and stays passing. Both must be
+  demonstrated, not assumed.
+- The `reads >= 3` drift thresholds in `target-fixture.mjs` become `4` so that
+  fixture PRs 11, 54 and 55 still drift at the intended step now that the gate
+  adds a metadata read.
+- `preparePublicCheckout` fetches and detaches the reviewed head for live public
+  targets, without modifying any repository the user cares about.
+- Then, with explicit user authorization, run **one** live quick review on a PR
+  whose real risk lives in code the diff does not contain, and record verbatim:
+  whether the reviewers actually called `view`/`grep`/`glob`, what they read,
+  whether any read was denied, whether the findings improved over the diff-only
+  baseline, and the credit cost. Record an honest negative result if reads went
+  unused or produced noise.
+- If reviewers read badly, prefer changing `quickInstructions` over widening the
+  tool grant, and record what was tried.
 
-The hard stop is a deliberate product decision with a real usability cost: quick
-review will require the user to check out the PR head first, so `/pr-review`
-refuses on an unrelated branch instead of reviewing whatever happens to be in the
-working directory. That is the intended trade. Reviewers must see exactly the
-code published on the PR, and a silently mismatched checkout would let a finding
-cite source that is not the reviewed revision. Record the refusal messages and
-the required user step in `README.md` as part of this increment.
-
-Do not add `--verify`, test or lint execution, `bash`, revision-bound custom
-tools, balanced/full/deep, fallbacks or timeouts in this increment. Do not
-change personal configuration, project trust, selection, binding, lifecycle,
-publication or authorization gates. Keep L1 pending and copy no upstream source.
+Do not add `--verify`, test or lint execution, `bash`, custom revision-bound
+tools, balanced/full/deep, fallbacks, timeouts or an override flag for the gate.
+Do not change personal configuration, project trust, selection, binding,
+lifecycle, publication or authorization gates. Keep L1 pending and copy no
+upstream source.
 
 Presentation consolidation stays as it is for now. It is cosmetic relative to
 this cause, and once reviewers can read surrounding code the repeated identical

@@ -4,9 +4,11 @@
 import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve, sep } from "node:path";
+import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { reviewerPolicy } from "../extensions/pr-review/read-only.mjs";
+import {
+  readOnlyToolFilters, readOnlyTools, readingReviewerPolicy, reviewerEvidence, reviewerPolicy,
+} from "../extensions/pr-review/read-only.mjs";
 
 const sdkPath = process.env.COPILOT_SDK_PATH;
 const cliPath = process.env.COPILOT_CLI_PATH;
@@ -49,29 +51,20 @@ try {
 
   // 2. Regression: today's reviewer policy must still offer nothing at all.
   const denied = await client.createSession({
-    enableConfigDiscovery: false, ...reviewerPolicy({ permissionDenials: [], toolDenials: [] }),
+    enableConfigDiscovery: false, ...reviewerPolicy(reviewerEvidence()),
   });
   assert.deepEqual(await offered(denied), [], "Current reviewer policy must remain zero-tool");
   console.log("PASS existing zero-tool reviewer policy unchanged");
 
-  // 3. Grant exactly the read-only subset; nothing else may appear.
-  const permissionRequests = [];
-  const reader = await client.createSession({
-    enableConfigDiscovery: false,
-    availableTools: new ToolSet().addBuiltIn(readTools),
-    // The handler is the real confinement point: reads are approved only inside
-    // the reviewed checkout, and every other permission kind stays denied.
-    onPermissionRequest: async (request) => {
-      permissionRequests.push({ kind: request.kind, path: request.path });
-      if (request.kind !== "read" || typeof request.path !== "string") return { kind: "reject" };
-      const path = realpathSync(request.path);
-      return path === root || path.startsWith(`${root}${sep}`)
-        ? { kind: "approve-once" }
-        : { kind: "reject" };
-    },
-  });
+  // 3. The shipped read-only policy must grant exactly the read subset. It uses
+  // plain `builtin:` filter strings, which must behave like the ToolSet builder.
+  assert.deepEqual(new ToolSet().addBuiltIn(readOnlyTools).toArray(), readOnlyToolFilters,
+    "The shipped filter strings must equal what the SDK builder produces");
+  assert.deepEqual(readOnlyTools, readTools);
+  const evidence = reviewerEvidence({ root });
+  const reader = await client.createSession(readingReviewerPolicy(evidence, root));
   const readerTools = await offered(reader);
-  assert.deepEqual(readerTools, [...readTools].sort(),
+  assert.deepEqual(readerTools, [...readOnlyTools].sort(),
     `Runtime did not honor the read-only subset: ${readerTools.join(", ")}`);
   for (const name of writeTools) {
     assert(!readerTools.includes(name), `Write/exec tool ${name} leaked into the read-only reviewer set`);
@@ -79,21 +72,35 @@ try {
   console.log(`PASS read-only subset granted exactly: ${readerTools.join(", ")}`);
 
   // 4. Forbidden tools must fail through the native pipeline, not just be absent.
-  for (const name of writeTools) {
-    let rejection;
-    let result;
-    try {
-      result = await reader.rpc.tools.execute({ name, arguments: {} });
-    } catch (error) {
-      rejection = String(error);
+  // The shipped policy also denies them in its pre-tool-use hook, so check both
+  // the hook-guarded session and a hook-less session with the same filters.
+  const unguarded = await client.createSession({
+    enableConfigDiscovery: false, availableTools: readOnlyToolFilters,
+    onPermissionRequest: async () => ({ kind: "reject" }),
+  });
+  assert.deepEqual(await offered(unguarded), [...readOnlyTools].sort(),
+    "Plain builtin: filter strings must grant exactly the read subset");
+  for (const [session, label, pattern] of [
+    [unguarded, "native exclusion", /not (available|found)|unknown tool|does not exist/i],
+    [reader, "policy hook", /not (available|found)|unknown tool|does not exist|only read inside the reviewed checkout/i],
+  ]) {
+    for (const name of writeTools) {
+      let rejection;
+      let result;
+      try {
+        result = await session.rpc.tools.execute({ name, arguments: {} });
+      } catch (error) {
+        rejection = String(error);
+      }
+      // An excluded tool must be refused by the runtime, not merely prompted for.
+      const refusal = rejection ?? (["denied", "failure"].includes(result?.resultType) ? result.error : undefined);
+      assert(refusal !== undefined && pattern.test(refusal),
+        `Forbidden tool ${name} was not refused (${label}): ${rejection ?? JSON.stringify(result)}`);
     }
-    // An excluded tool must be absent from the pipeline, not merely prompted for.
-    const refusal = rejection ?? (result?.resultType === "denied" ? result.error : undefined) ??
-      (result?.resultType === "failure" ? result.error : undefined);
-    assert(refusal !== undefined && /not (available|found)|unknown tool|does not exist/i.test(refusal),
-      `Forbidden tool ${name} was not refused: ${rejection ?? JSON.stringify(result)}`);
   }
-  console.log("PASS write/exec tools refused natively inside the read-only reviewer session");
+  assert.deepEqual(evidence.toolDenials, writeTools,
+    "Every refused write/exec tool is recorded as reviewer evidence");
+  console.log("PASS write/exec tools refused natively and by the reviewer policy hook");
 
   // 5. A granted read tool must really execute, bound to a chosen directory.
   const moved = await reader.rpc.metadata.setWorkingDirectory({ workingDirectory: checkout });
@@ -105,7 +112,8 @@ try {
   const text = JSON.stringify(read);
   assert(read.resultType !== "denied", `Granted read tool was denied: ${text}`);
   assert(text.includes("lapin"), `Granted read tool returned no file content: ${text}`);
-  assert.deepEqual(permissionRequests.map((entry) => entry.kind), ["read"]);
+  assert.deepEqual(evidence.reads, [join("src", "consumer.rs")]);
+  assert.deepEqual(evidence.permissionDenials, []);
   console.log("PASS granted read tool executed against the chosen checkout directory");
 
   // 5b. Confinement: the same granted tool must not read outside the checkout.
@@ -113,11 +121,14 @@ try {
   const escapedText = JSON.stringify(escaped);
   assert(escaped.resultType === "rejected", `Read outside the checkout was not rejected: ${escapedText}`);
   assert(!escapedText.includes("must never be readable"), "Denied read still leaked file content");
+  assert.deepEqual(evidence.permissionDenials, ["read"], "The refused read is recorded as a denial");
+  assert.deepEqual(evidence.reads, [join("src", "consumer.rs")], "A refused read is never recorded as read evidence");
   console.log("PASS reads outside the reviewed checkout are denied by the permission handler");
 
-  // 5c. The runtime accepts only a fixed decision vocabulary. Record it, because
-  // read-only.mjs currently returns "denied-no-approval-rule", which is NOT in
-  // it; that denial is unreachable today only because reviewers hold no tools.
+  // 5c. The runtime accepts only a fixed decision vocabulary. F4 demonstrated
+  // that the previous `denied-no-approval-rule` value was refused as an unknown
+  // variant, turning a denial into a transport failure. Show both halves now:
+  // the malformed value still fails, and the shipped `reject` denies cleanly.
   const malformed = await client.createSession({
     enableConfigDiscovery: false,
     availableTools: new ToolSet().addBuiltIn(["view"]),
@@ -128,13 +139,24 @@ try {
     name: "view", arguments: { path: join(checkout, "src", "consumer.rs") },
   }));
   assert(/unknown variant `denied-no-approval-rule`/.test(rejected),
-    `Expected the runtime to reject the current denial kind: ${rejected}`);
+    `Expected the runtime to reject the malformed denial kind: ${rejected}`);
   assert(!rejected.includes("lapin"), "A malformed denial must not fall through to file content");
-  console.log("PASS runtime rejects the current denial kind; grants require approve-once/reject");
+  const clean = await client.createSession({
+    enableConfigDiscovery: false,
+    availableTools: ["builtin:view"],
+    onPermissionRequest: async () => ({ kind: "reject" }),
+  });
+  assert.deepEqual(await offered(clean), ["view"], "Plain builtin: filter strings grant the same tool");
+  const denied2 = await clean.rpc.tools.execute({
+    name: "view", arguments: { path: join(checkout, "src", "consumer.rs") },
+  });
+  assert.equal(denied2.resultType, "rejected", `A "reject" decision must deny cleanly: ${JSON.stringify(denied2)}`);
+  assert(!JSON.stringify(denied2).includes("lapin"), "A clean denial must not leak file content");
+  console.log("PASS the corrected reject denial refuses cleanly where denied-no-approval-rule fails transport");
 
   // 6. The grant must not become ambient: a fresh policy session stays empty.
   const stillDenied = await client.createSession({
-    enableConfigDiscovery: false, ...reviewerPolicy({ permissionDenials: [], toolDenials: [] }),
+    enableConfigDiscovery: false, ...reviewerPolicy(reviewerEvidence()),
   });
   assert.deepEqual(await offered(stillDenied), [], "Reviewer tool grant leaked into a zero-tool session");
   console.log("PASS the grant is per-session and does not leak");

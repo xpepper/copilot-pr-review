@@ -169,10 +169,35 @@ candidate outputs follow in the timeline. The `Q3 binding:` line identifies the
 captured repository, PR, head/base SHAs, diff/context fingerprints, and allowed
 paths with source provenance. Each independent reviewer receives the captured
 diff and numbered context as untrusted JSON data, with code-owned system
-instructions to ignore embedded requests and use no other evidence. Reviewers
-have no tools, configuration discovery, or allowed permissions. No checkout
-source, branch switching, source writes, GitHub mutations, or safeguards are used
-by the reviewers. Publication is a separate code-controlled step.
+instructions to ignore embedded requests.
+
+Quick reviewers additionally get `view`, `grep`, and `glob`, confined to the
+local checkout, so they can read unchanged callers, callees, and tests that the
+captured diff and context windows do not include. That access requires the
+checkout to be exactly the reviewed revision. Before any reviewer starts, the
+run re-reads the PR head and inspects the checkout, and it refuses unless all of
+the following hold:
+
+- the working directory is inside a git checkout with a resolvable `HEAD`;
+- local `HEAD` equals the captured PR head;
+- the PR head has not moved since capture;
+- no tracked file is modified or staged.
+
+Untracked files are reported as a warning, not a refusal. There is no override
+flag and no degraded diff-only fallback: a refused review reports
+`coverage: "not-started"`, `disposition: "refused"`, starts no reviewer session
+and no owned runtime, and tells you to run `gh pr checkout NUMBER` (and, for a
+dirty tree, to commit or stash). Refusal is deliberate — a reviewer reading a
+different revision would produce citations that do not describe the reviewed
+code.
+
+The read grant is per reviewer session and confined by a permission handler that
+resolves real paths and denies anything outside the verified checkout root; a
+pre-tool-use hook denies every other tool, and no other tool is even offered.
+The Q4 adjudicator keeps zero tools and decides only on captured evidence, so
+every published citation still resolves against the captured revision. Branch
+switching, source writes, GitHub mutations, and safeguards remain unavailable to
+reviewers. Publication is a separate code-controlled step.
 
 Reviewers return strict JSON candidates with severity, confidence, location,
 exact source quotations, concrete triggering conditions, expected/actual behavior,
@@ -187,8 +212,9 @@ specialist execution separately. `complete: true` additionally requires finished
 validation without unresolved evidence or cleanup errors; it never means the PR
 is correct. Failed reviewers retain partial output alongside successful reviewers
 and report incomplete coverage.
-Skipped/declined/unconfirmed targets report `coverage: "not-started"` and start
-no reviewer runtime. Setup/capture failures and cancellation never become a
+Skipped/declined/unconfirmed targets, and checkouts that fail the revision
+identity gate above, report `coverage: "not-started"` and start no reviewer
+runtime. Setup/capture failures and cancellation never become a
 clean-review result. P2 retains the settled quick result in its originating session.
 Manual cancellation stops owned work without a review timeout; a pending host
 confirmation UI may remain visible, but a late answer cannot resume cancelled
@@ -854,13 +880,19 @@ demonstrated through SDK command dispatch. Agent factories were unavailable in
 the observed session, so the candidate uses plugin-owned SDK sessions instead.
 The SDK resolves its bundled runtime; no machine-specific SDK path is shipped.
 
-Reviewer sessions disable configuration discovery, assert that the initialized
-tool set is empty, deny pre-tool hooks, and deny permission requests. Actual
-hook denials, explicit failure handling, cancellation (including a suspended
-runtime), extension reload, and abrupt runtime/extension/parent loss have been
-demonstrated on the recorded CLI/macOS environment. Permission denial is
-defense in depth; the native denial probes hit the hook before that callback.
-This is model capability isolation, **not an OS filesystem sandbox**.
+Reviewer sessions disable configuration discovery and deny pre-tool hooks.
+The Q4 adjudicator and every non-quick reviewer session assert an empty
+initialized tool set and deny all permission requests. Quick reviewers offer
+only `builtin:view`, `builtin:grep`, and `builtin:glob`; their hook denies every
+other tool, and their permission handler rejects reads whose real path escapes
+the verified checkout root, so the handler — not a model promise — is the
+confinement point. Actual hook denials, native exclusion of unoffered tools,
+out-of-root read rejection, explicit failure handling, cancellation (including a
+suspended runtime), extension reload, and abrupt runtime/extension/parent loss
+have been demonstrated on the recorded CLI/macOS environment.
+This is model capability isolation, **not an OS filesystem sandbox**: a granted
+read tool is constrained by plugin-owned path checks, not by the operating
+system.
 
 The plugin-owned stdio integration is selected for the next increments.
 Signal/parent-EOF handlers force-stop owned work without waiting for parent

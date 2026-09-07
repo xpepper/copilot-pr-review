@@ -1,5 +1,9 @@
+import { realpathSync } from "node:fs";
 import { readFile } from "node:fs/promises";
-import { assertNoReviewerTools, probeForbiddenTools, reviewerPolicy } from "./read-only.mjs";
+import {
+  assertNoReviewerTools, assertReviewerTools, probeForbiddenTools, readOnlyTools,
+  readingReviewerPolicy, reviewerEvidence, reviewerPolicy,
+} from "./read-only.mjs";
 
 const keys = ["model1", "effort1", "model2", "effort2"];
 
@@ -98,7 +102,7 @@ export async function reviewFixture(parent, client, settings, {
 }
 
 export async function reviewAssignments(parent, client, assignments, {
-  signal, prompt, intro, outputLabel, systemMessage,
+  signal, prompt, intro, outputLabel, systemMessage, access,
   probeTools = false, injectFailure = false,
 }) {
   const log = (message, level = "info") => parent.log(message, { level });
@@ -107,12 +111,12 @@ export async function reviewAssignments(parent, client, assignments, {
   const enforcement = [];
   for (const assignment of assignments) {
     signal.throwIfAborted();
-    const policy = { permissionDenials: [], toolDenials: [] };
+    const policy = reviewerEvidence(access);
     const session = await client.createSession({
       model: assignment.model,
       reasoningEffort: assignment.reasoningEffort,
       ...(systemMessage ? { systemMessage } : {}),
-      ...reviewerPolicy(policy),
+      ...(access ? readingReviewerPolicy(policy, access.root) : reviewerPolicy(policy)),
     });
     sessions.push(session);
     policies.push(policy);
@@ -128,7 +132,16 @@ export async function reviewAssignments(parent, client, assignments, {
     // An unset effort uses the runtime's resolved default, which must also be displayed and checked.
     assignment.reasoningEffort = current.reasoningEffort;
     validateModelAssignment(assignment, catalog);
-    await assertNoReviewerTools(session);
+    if (access) {
+      // Reads resolve against the reviewed checkout, not the extension's cwd.
+      const moved = await session.rpc.metadata.setWorkingDirectory({ workingDirectory: access.root });
+      if (realpathSync(moved.workingDirectory) !== access.root) {
+        throw new Error(`Runtime did not point reviewer ${assignment.label} at the reviewed checkout ${access.root}. No review started.`);
+      }
+      await assertReviewerTools(session, readOnlyTools);
+    } else {
+      await assertNoReviewerTools(session);
+    }
     if (probeTools) {
       enforcement.push({ label: assignment.label, probes: await probeForbiddenTools(session) });
     }
@@ -144,6 +157,7 @@ export async function reviewAssignments(parent, client, assignments, {
       signal,
       injectFailure: injectFailure && index === 0,
       onActive: () => log(`Reviewer ${assignment.label}: active`),
+      toolCalls: access ? policies[index].toolCalls : undefined,
     });
     if (evidence.status === "completed" && (!evidence.usage.length || evidence.usage.some((usage) =>
       usage.model !== assignment.model ||
@@ -179,6 +193,7 @@ export async function reviewAssignments(parent, client, assignments, {
 export async function runReviewer(session, prompt, {
   signal = new AbortController().signal,
   injectFailure = false,
+  toolCalls,
   onActive = async () => {},
 } = {}) {
   const evidence = { sessionId: session.sessionId, usage: [], result: "", startedAt: null, completedAt: null };
@@ -207,7 +222,13 @@ export async function runReviewer(session, prompt, {
         evidence.result = event.data.content;
         break;
       case "tool.execution_start":
-        reject(new Error("Reviewer attempted a tool call; no read-only claim can be made."));
+        // A tool call is a hard failure unless this reviewer was granted the
+        // confined read-only set; then the runtime, not the model, bounds it.
+        if (!toolCalls) {
+          reject(new Error("Reviewer attempted a tool call; no read-only claim can be made."));
+          break;
+        }
+        toolCalls.push({ tool: event.data.toolName, arguments: event.data.arguments });
         break;
       case "session.error":
         reject(new Error(event.data.message));
