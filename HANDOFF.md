@@ -47,46 +47,32 @@ Read "Completed increment: M1, balanced half" in `ROADMAP.md`. Do not repeat it:
   `Effective reviewer assignments:` block shows every reviewer, tier, model,
   effort and origin before execution. No light-tier invocation flag was added;
   the adjudicator still runs heavy with zero tools.
-- **No live balanced review has been run.** All balanced evidence is controlled
-  probes plus no-inference installed dispatch.
+- One live balanced review has been run, on pull request #3 itself. It produced
+  no findings, so balanced review quality and minor-finding behavior remain
+  undemonstrated, and no light model has ever run: the light tier inherited the
+  saved heavy assignment.
 
-## Do this first: review pull request #3 with the tool
+## State of pull request #3: reviewed, not merged
 
-This is the dogfooding step the new workflow requires, and it is the one review
-the workflow authorizes. It is also the first time this plugin reviews its own
-repository, so treat the outcome as evidence about the tool, not just about the
-diff.
+The workflow's dogfooding step is **already done for #3**, so do not repeat it:
+that would spend credits again. One balanced review ran at head
+`5c05b7c` with `node scripts/dogfood-review.mjs 3 --all --no-comment`. All five
+reviewers completed on `gpt-5.6-terra` at high effort, made 89 confined reads
+with no denials, produced zero findings with incomplete coverage, and the
+runtime reported 414.14627 AI credits. Nothing was published. The full record is
+in "Live inference: the dogfood review of pull request #3" in `ROADMAP.md`.
 
-1. Install the branch's extension and check out exactly the PR head with a clean
-   tree: `copilot plugin install "$(pwd)"`, then `gh pr checkout 3`.
-2. In a fresh Copilot CLI session started in this repository, run
-   `/pr-review 3 --all --no-comment`. Balanced is the default, so no mode flag
-   is needed. Do not use `--comment` or `/pr-review publish`. If your agent
-   cannot type a slash command, dispatch the same command through the SDK:
+That review found one real defect, a `README.md` command still naming the
+renamed `scripts/smoke-quick.mjs`, which is fixed on the branch in commit
+`5061b79`. It also exposed a tool limitation worth acting on later: a real
+regression whose broken line is unchanged context cannot be anchored as a
+candidate, so it surfaced only as a coverage gap.
 
-   ```sh
-   COPILOT_CLI_PATH="$(command -v copilot)" \
-   COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
-   node scripts/dogfood-review.mjs 3 --all --no-comment
-   ```
+What remains for #3 is a merge decision, which is the user's. If you push
+further commits to that branch, the pull request head moves and its review
+becomes stale; say so plainly rather than implying the new head was reviewed.
 
-   `copilot -p "/pr-review 3"` is not a substitute: prompt mode starts an
-   ambient model turn instead of dispatching the command.
-3. Record the outcome in `ROADMAP.md` under the M1 balanced-half section: mode,
-   model and effort actually used, reviewer coverage, findings and withheld
-   minor findings, the reported credit cost, and what you changed in response.
-   Zero findings is not a clean-review claim, and one review is not evidence
-   about review quality in general.
-4. Fix real findings on that same branch with new validated commits, and state
-   which findings you rejected and why. Do not amend or force-push.
-5. Ask the user to merge. Merging is their call.
-
-If the tool refuses to review the pull request, for example because of the
-revision gate, a skip rule, or a diff it cannot bind, record the refusal and its
-cause as a defect report about the tool. Do not weaken a gate to make the review
-run, and do not switch branches or modify the checkout to satisfy it.
-
-## Then implement only the exact next increment
+## Implement only the exact next increment
 
 Implement **the full half of M1**, as specified at the end of `ROADMAP.md`, on
 its own branch and pull request. M1 stays Pending until it lands; deep belongs
@@ -133,11 +119,14 @@ Acceptance criteria:
 - `smoke-config-runtime.mjs` refuses to run while a personal
   `<copilot-config-home>/pr-review/config.json` exists. Copy it aside and
   restore it byte-identically, or skip that probe.
-- Pull request #3 changes about 195 KB of diff across 26 files, including large
-  documentation files. A balanced review sends that diff plus its bound context
-  to five reviewers, so expect a materially larger charge than R1's 27.89
-  credits for three reviewers on a small diff, and a real chance of hitting a
-  model's context limit. Report the actual cost; do not guess it.
+- Reviewing a doc-heavy pull request is expensive. Pull request #3 cost
+  414.14627 credits for five reviewers on a 27-file diff, against R1's 27.89 for
+  three reviewers on a small one. Budget for that before you dispatch, and
+  report the runtime's actual figure rather than an estimate.
+- `scripts/dogfood-review.mjs NUMBER --all --no-comment` is the SDK dispatcher
+  for agents that cannot type a slash command. It refuses to run unless the
+  local head is the pull request head with a clean tree, and refuses
+  `--comment`. Reinstall the plugin from the checkout first.
 - Inference authorization does not accumulate. The workflow authorizes **one**
   review per increment pull request. The recorded R1 live command, harness
   `--quick` paths, `--read-live`, fixture inference and any publication still
