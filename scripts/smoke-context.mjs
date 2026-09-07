@@ -43,6 +43,7 @@ assert.deepEqual(only.hunks, [{
   oldStart: 1, oldLines: 1, newStart: 1, newLines: 1,
   oldText: ["export const value = 1;"], newText: ["export const value = 2;"],
 }]);
+assert.deepEqual(only.changed, { base: [1], head: [1] });
 
 const mixed = [
   "diff --git a/added.txt b/added.txt",
@@ -99,6 +100,9 @@ assert.deepEqual(parsed.map((file) => [file.newPath ?? file.oldPath, file.status
 ]);
 assert.deepEqual(parsed[2].hunks[0],
   { oldStart: 3, oldLines: 2, newStart: 3, newLines: 2, oldText: ["kept", "dropped"], newText: ["kept", "appended"] });
+assert.deepEqual(parsed[0].changed, { base: [], head: [1, 2] });
+assert.deepEqual(parsed[1].changed, { base: [1, 2], head: [] });
+assert.deepEqual(parsed[2].changed, { base: [4], head: [4] }, "Context lines are not changed anchors");
 assert.deepEqual(parsed[5].hunks[0].newText, ["après\r"], "Keep CRLF bytes exactly as reviewed");
 assert.deepEqual(parsed[3].hunks, []);
 assert.deepEqual(parsed[4].hunks, []);

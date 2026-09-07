@@ -22,23 +22,66 @@ async function dispatchTarget(session, args) {
   };
 }
 
-export async function prepareLiveTargetSmoke() {
+async function preparePublicCheckout(repository) {
   const directory = await realpath(await mkdtemp(join(tmpdir(), "pr-review-live-target-")));
   execFileSync("git", ["init", "--quiet", directory]);
-  execFileSync("git", ["-C", directory, "remote", "add", "origin", "https://github.com/github/copilot-sdk.git"]);
+  execFileSync("git", ["-C", directory, "remote", "add", "origin", `https://github.com/${repository}.git`]);
   const sentinel = join(directory, "not-the-reviewed-source.txt");
   await writeFile(sentinel, "Different local checkout; do not use as PR evidence.\n");
   const state = () => execFileSync("git", ["-C", directory, "status", "--porcelain=v1", "--branch"], { encoding: "utf8" });
   const before = state();
   return {
+    directory,
+    async check() {
+      assert.equal(state(), before);
+      assert.equal(await readFile(sentinel, "utf8"), "Different local checkout; do not use as PR evidence.\n");
+    },
+    async cleanup() { await rm(directory, { recursive: true }); },
+  };
+}
+
+export async function prepareRegressionTargetSmoke() {
+  const checkout = await preparePublicCheckout("ptitSeb/box64");
+  const head = "4796469dc5ee55a8327cdffffc1da7f0050c54ad";
+  const base = "df37f6acf0e5becb3b73fb546768273d29813053";
+  return {
+    sessionOptions: { workingDirectory: checkout.directory },
+    quickTarget: {
+      args: "3902 --include-closed", workingDirectory: checkout.directory,
+      repository: "ptitSeb/box64", head, check: checkout.check,
+      // Either the removed normalization or its changed CPUID consumers can anchor the same regression.
+      expectedFinding: { paths: ["src/tools/env.c", "src/os/my_cpuid.c"] },
+    },
+    async exercise(session) {
+      const outcome = await dispatchTarget(session, "3902 --include-closed");
+      assert.equal(outcome.disposition, "captured");
+      assert.equal(outcome.repository.nameWithOwner, "ptitSeb/box64");
+      assert.equal(outcome.state, "MERGED");
+      assert.equal(outcome.head, head);
+      assert.equal(outcome.context.head, head);
+      assert.equal(outcome.context.base, base);
+      assert.equal(outcome.context.files, 6);
+      assert.equal(outcome.diffSha256, "87b7e554a1445005395d4d6f8962e740c94a48dba89a7f0c9cc583ae5803b02b");
+      assert.equal(outcome.diffBytes, 5251);
+      assert.equal(outcome.context.contextSha256, "3a8814f10b25da28cae6939252a834893e7ee7ec64c275a05844758b3518e9fe");
+      assert.equal(outcome.context.contextBytes, 52582);
+      assert.equal(outcome.context.sources, 12);
+      await checkout.check();
+      console.log(`PASS public regression capture: ${JSON.stringify({ ...outcome, contextMessage: undefined })}`);
+    },
+    cleanup: checkout.cleanup,
+  };
+}
+
+export async function prepareLiveTargetSmoke() {
+  const checkout = await preparePublicCheckout("github/copilot-sdk");
+  const directory = checkout.directory;
+  return {
     sessionOptions: { workingDirectory: directory },
     quickTarget: {
       args: "2543 --include-closed", workingDirectory: directory, repository: "github/copilot-sdk",
       head: "7525814ae7de890acf63b0eb665531292adaf96d",
-      async check() {
-        assert.equal(state(), before);
-        assert.equal(await readFile(sentinel, "utf8"), "Different local checkout; do not use as PR evidence.\n");
-      },
+      check: checkout.check,
     },
     async exercise(session) {
       const pending = await dispatchTarget(session, "2543");
@@ -68,13 +111,12 @@ export async function prepareLiveTargetSmoke() {
       assert.equal(bot.disposition, "skipped");
       assert.equal(bot.reason, "obvious-bot");
       assert.equal(bot.context, undefined, "Skipped PRs assemble no context");
-      assert.equal(state(), before);
-      assert.equal(await readFile(sentinel, "utf8"), "Different local checkout; do not use as PR evidence.\n");
+      await checkout.check();
       console.log(`PASS live github/copilot-sdk#2543: head=${outcome.head} bytes=${outcome.diffBytes} sha256=${outcome.diffSha256}`);
       console.log(`PASS live head/base source bound to ${outcome.context.head}/${outcome.context.base}, context sha256=${outcome.context.contextSha256}`);
       console.log("PASS live bot skip #2545, no-UI closed gate, and unchanged empty local Git checkout");
     },
-    async cleanup() { await rm(directory, { recursive: true }); },
+    cleanup: checkout.cleanup,
   };
 }
 
@@ -97,6 +139,8 @@ export async function prepareTargetSmoke() {
     "-c", "user.name=Fixture", "commit", "--quiet", "-m", "local only"]);
   const dirty = `${decoy}export const uncommitted = true;\n`;
   await writeFile(reviewed, dirty);
+  const totalDecoy = join(directory, "total.js");
+  await writeFile(totalDecoy, "Do not use local source as evidence.\n");
   const localState = () => execFileSync("git", ["-C", directory, "status", "--porcelain=v1", "--branch"], { encoding: "utf8" });
   const localBefore = localState();
   process.env.PATH = `${fileURLToPath(new URL("fixtures", import.meta.url))}${delimiter}${previousPath}`;
@@ -107,10 +151,12 @@ export async function prepareTargetSmoke() {
   const calls = async () => (await readFile(trace, "utf8")).split("\n").filter(Boolean).map(JSON.parse);
   return {
     quickTarget: {
-      args: "1", workingDirectory: directory, repository: "fixture/repository", head: "b".repeat(40),
+      args: "12", workingDirectory: directory, repository: "fixture/repository", head: "b".repeat(40),
+      expectedFinding: { path: "total.js", line: 3 },
       async check() {
         assert.equal(localState(), localBefore);
         assert.equal(await readFile(reviewed, "utf8"), dirty);
+        assert.equal(await readFile(totalDecoy, "utf8"), "Do not use local source as evidence.\n");
         assert.equal(await readFile(sentinel, "utf8"), "Unrelated local source remains unchanged.\n");
         assert((await calls()).every(({ args }) => args[0] === "repo" ||
           (args[0] === "api" && args[3] === "--method" && args[4] === "GET")));

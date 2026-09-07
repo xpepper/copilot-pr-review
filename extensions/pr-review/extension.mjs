@@ -28,7 +28,8 @@ const help = [
   "Closed/merged PRs require confirmation or an explicit closed-PR override.",
   "--quick / --major-only  Run three heavy specialists on captured PR content.",
   "Requires --no-comment. Unset heavy settings inherit the ambient model/effort.",
-  "Candidates are unvalidated; no selection, publication, caching, or safeguards.",
+  "Strict evidence checks and an isolated adjudication pass validate/deduplicate candidates.",
+  "No selection, publication, caching, or safeguards. Validation also uses Copilot credits.",
   "Other review flags are not supported yet.",
 ].join("\n");
 
@@ -40,7 +41,7 @@ const status = [
   "listing, three quick PR specialists, and a two-reviewer fixture prototype.",
   "The fixture requires explicit distinct models and reasoning efforts.",
   "F3 experiments: adversarial read-only probes, failure injection, and manual cancellation.",
-  "Quick execution is available with --quick --no-comment; candidate validation is pending.",
+  "Quick execution is available with --quick --no-comment, grounded validation and deduplication.",
   "",
   "Status/help start no models or background work. PR capture and source context use",
   "read-only gh requests against the captured revisions, never the local checkout.",

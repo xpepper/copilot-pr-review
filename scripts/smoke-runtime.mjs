@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { exerciseF3, startFixture } from "./runtime-fixture.mjs";
-import { prepareLiveTargetSmoke, prepareTargetSmoke } from "./runtime-target.mjs";
+import { prepareLiveTargetSmoke, prepareRegressionTargetSmoke, prepareTargetSmoke } from "./runtime-target.mjs";
 import { exerciseQuick } from "./runtime-quick.mjs";
 
 function fixtureSettings() {
@@ -30,8 +30,9 @@ if (!sdkPath || !cliPath) {
 const { CopilotClient, RuntimeConnection } = await import(
   pathToFileURL(resolve(sdkPath, "index.js")).href
 );
-if (process.argv.includes("--targets") && process.argv.includes("--target-live")) {
-  throw new Error("Use --targets and --target-live separately (stub versus real gh).");
+const targetFlags = ["--targets", "--target-live", "--regression-live"].filter((flag) => process.argv.includes(flag));
+if (targetFlags.length > 1) {
+  throw new Error("Use --targets, --target-live and --regression-live separately.");
 }
 const quickSettings = process.argv.includes("--quick") ? {
   model: process.env.PR_REVIEW_HEAVY_MODEL,
@@ -40,11 +41,11 @@ const quickSettings = process.argv.includes("--quick") ? {
 if (quickSettings) {
   assert(Object.values(quickSettings).every((value) => value && !/\s/.test(value)),
     "Set PR_REVIEW_HEAVY_MODEL and PR_REVIEW_HEAVY_EFFORT explicitly for inference-spending Q3 probes");
-  assert(process.argv.includes("--targets") || process.argv.includes("--target-live"),
-    "Q3 runtime probe requires --targets or --target-live");
+  assert(targetFlags.length === 1, "Quick runtime probe requires a controlled or live target");
 }
 const targetSmoke = process.argv.includes("--targets") ? await prepareTargetSmoke()
-  : process.argv.includes("--target-live") ? await prepareLiveTargetSmoke() : undefined;
+  : process.argv.includes("--target-live") ? await prepareLiveTargetSmoke()
+    : process.argv.includes("--regression-live") ? await prepareRegressionTargetSmoke() : undefined;
 const client = new CopilotClient({
   connection: RuntimeConnection.forStdio({ path: resolve(cliPath) }),
 });

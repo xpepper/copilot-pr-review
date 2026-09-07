@@ -21,7 +21,7 @@ in [AGENTS.md](AGENTS.md); the replaceable next-session prompt lives in
 | Q1 | Completed | Read-only code-owned PR capture with repository/head-bound snapshot, skip/override/confirmation gates, consistency guards, and installed-plugin controlled/live evidence below. | F3; [Targets](SCOPE.md#targets-and-local-behavior) |
 | Q2 | Completed | Source context bound to the captured head/base revisions with blob-verified provenance; local-checkout, moved-head, and inconsistent source refused. Evidence below. | Q1; [Targets](SCOPE.md#targets-and-local-behavior) |
 | Q3 | Completed | Three concurrent quick specialists consume bound PR input; explicit/ambient assignments, alias, incomplete coverage, and cancellation demonstrated below. Candidates remain unvalidated. | Q2; [Modes](SCOPE.md#review-modes-and-findings) |
-| Q4 | Pending | Validate evidence, severity/location/confidence, and deduplicate candidates; demonstrate real `--quick --no-comment` findings. | Q3; [Modes/findings](SCOPE.md#review-modes-and-findings) |
+| Q4 | In progress | Strict candidate/evidence boundary, isolated adjudication, deduplication, degraded findings and positive installed-plugin controlled inference implemented; real positive PR demonstration pending. | Q3; [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | P1 | Pending | Select validated findings with a minimal UI and `--all`; no writes yet. | Q4; [Selection/publication](SCOPE.md#selection-publication-and-cached-results) |
 | P2 | Pending | Retain results with session/repository/PR/head binding and reload/resume where supported; inspect without rerunning reviewers. | P1; [Cached results](SCOPE.md#selection-publication-and-cached-results) |
 | P3 | Pending | Resolve posting authority and conflicting flags; display a code-built inline review payload without submitting it. | P1; [Publication controls](SCOPE.md#selection-publication-and-cached-results) |
@@ -778,7 +778,7 @@ or a new runtime abstraction.
 
 ### Remaining limitations
 
-No evidence-validation or deduplication implementation exists yet. The
+At the Q3 checkpoint, no evidence-validation or deduplication implementation existed. The
 reviewer's human-readable structure, claimed severity/confidence, and cited
 paths/lines are requests in the prompt, not a trusted findings schema. The
 code-owned envelope cannot make a hallucinated location valid or prove a
@@ -825,3 +825,181 @@ and cleanup guarantees. Do not add selection, caching, publication, saved
 configuration, other modes, fallback, or safeguards. Do not modify reviewed
 source, switch branches, or fetch/reset the checkout. Respect `SCOPE.md`,
 keep L1 pending unless separately authorized, and copy no upstream source.
+
+## Q4 implementation checkpoint
+
+Starting checkpoint: `de4f00a` (Q3); the working tree was clean. The Q4 code is
+original; L1 remains pending and no upstream source was copied.
+
+### Implemented boundary
+
+- `findings.mjs` defines strict versioned candidate/adjudication JSON. A SHA-256
+  key binds responses to the code-owned repository/PR/head/base/diff/context
+  envelope. Unknown fields, fenced/malformed JSON, invalid confidence/severity,
+  missing evidence and wrong binding are rejected with visible coverage issues.
+  No malformed-output extraction or silent repair is used.
+- Candidate admission requires P0-P2, numeric confidence 0.8-1, concrete trigger,
+  expected/actual behavior and introduction reasoning. The 0.8 threshold is a
+  conservative policy, not calibrated confidence or proof of impact.
+- Every quotation is compared byte-for-byte with the delivered Q2 source window,
+  with exact path/side/line/ref/blob provenance. Primary locations are at most
+  ten lines, inside one captured hunk, and intersect an actually changed line.
+  The diff parser now retains added/removed line numbers separately from context.
+  Introduction evidence compares the same hunk on base/head, including rename
+  paths; null is permitted only on a side with no removed/added lines, including
+  pure insertions/deletions that retain unchanged hunk context.
+- Eligible candidates receive a separate tool-isolated heavy-tier adjudication
+  pass, reusing `reviewAssignments` and the existing owned runtime. This is not
+  a fourth specialist: the three quick reviewers still run concurrently first.
+  The validator's effective model/effort is displayed and actual subscription
+  usage checked. It is instructed to challenge reachability, guards, contracts,
+  pre-existing behavior, causal impact, severity and confidence. Its acceptance
+  citations are checked again by code.
+- Deterministic grounding is distinct from fallible model judgment. Neither a
+  matching quotation nor a second model's assertion is standalone proof of a
+  defect. The final result explicitly says that no code execution/formal proof
+  occurred. Missing context leads to rejection/uncertainty, not invented evidence.
+- Deduplication requires an explicit same-cause/trigger/impact verdict and
+  shared bound changed-source evidence; location equality alone never merges
+  findings. The strongest accepted severity/confidence representative is shown,
+  with original reports and reviewer attribution retained. Supporting citations
+  allow the same cause to be identified across different primary anchors/files.
+  Without shared causal change evidence, a merge is conservatively refused.
+- Completed reviewers' useful findings survive failed peers and invalid sibling
+  candidates/decisions. Unresolved/malformed output and uncovered non-textual
+  changes keep coverage incomplete. Validator setup failures preserve specialist
+  reports. Cancellation during validation uses the existing force-stop path.
+  No review timeout, fallback, configuration, selection, cache, publication, or
+  safeguards were added.
+- The existing `Q3 evidence:` diagnostic now carries `executionComplete`,
+  `validation`, and optional `adjudicator` evidence after cleanup. `complete`
+  additionally requires resolved validation and clean cleanup. A target-bound
+  human-readable findings view follows. Neither completed nor empty results
+  claim a clean PR.
+
+### Demonstrated before the real-positive PR exercise
+
+On 2026-09-07, with the same CLI 1.0.83 / bundled SDK / macOS arm64 runtime:
+
+- Existing Node.js/assert probes passed, including new `smoke-findings.mjs`.
+  Coverage includes strict parsing, exact quotes, provenance tampering, unchanged
+  anchors, confidence/severity rejection, missing context, renames/additions/
+  deletions/zero-length hunk sides, same-defect versus distinct same-line reports,
+  varying quote ranges, stronger duplicate representatives, failed-peer retention,
+  and validator failure/malformed output/cancellation/cleanup. Semantic accept/
+  reject judgments in pure probes are mocks, not actual-model evidence.
+- The first installed `claude-sonnet-5` / `high` live exercise on the existing
+  `github/copilot-sdk#2543` fixture returned fenced JSON from all three
+  specialists in both explicit and alias runs. All were rejected, with zero
+  findings and incomplete coverage. Three-way overlap was 54288 ms / 124841 ms;
+  owned PIDs 98862 / 3802 / 7672 exited on explicit/alias/cancellation. This is
+  native failure-containment evidence, **not** a positive review demonstration.
+  No output was unfenced, repaired, extracted, or accepted to make a probe pass.
+- The prompt was clarified, and a separate explicitly configured
+  `gpt-5.6-terra` / `high` experiment was used. This is manual development
+  configuration, not plugin fallback or a hardcoded product model default.
+- Controlled PR 12 serves an original `total.js` regression: the unchanged
+  comment requires unit cents multiplied by quantity, while head changes `*`
+  to `+`. No fetched third-party source is stored in the fixture. Both explicit
+  quick and ambient alias runs accepted one P2 finding at head line 3 with
+  confidence 0.99, merging the correctness/contracts duplicate. The concrete
+  example `total(100, 2)` changes from 200 to 102; both validator explanations
+  match the actual original source. Each run had zero coverage issues and
+  `complete: true`.
+- Controlled three-way overlap was **2828 ms** / **1911 ms**. Owned PIDs
+  **13829**, **14829**, **16077**, **16660** exited on explicit completion,
+  alias completion, specialist cancellation, and validation cancellation.
+  The last case retained three completed specialists and a cancelled validator,
+  with no accepted findings. Cleanup errors were empty; no harness kill was used.
+  The dirty decoy checkout and traced read-only GitHub request invariant held.
+- Controlled explicit sessions: correctness
+  `a80b5d3f-a909-47a7-b52b-63846935bd44`, contracts
+  `502d859e-5d2e-4ee3-bcb5-8823054f2c42`, combined specialist
+  `64cc9a19-7dd2-43c9-ba76-119cc2927b98`, validator
+  `cb46fe30-e896-4a37-a478-a36a3f3ac535`. Validator ran after specialist
+  completion. All actual usage was the explicitly assigned subscription model
+  and high effort, `isByok: false`.
+
+### Real-positive target and remaining acceptance
+
+Read-only investigation identified public merged `ptitSeb/box64#3902`, a small
+six-file change with a later regression fix in `ptitSeb/box64#3963`. No source
+from either PR was copied into the repository. The latter PR is independent
+historical corroboration for the demonstration, not supplied to the reviewers.
+
+The no-inference installed-plugin capture passed with these pinned identities:
+
+| Identity | Value |
+| --- | --- |
+| Head | `4796469dc5ee55a8327cdffffc1da7f0050c54ad` |
+| Base | `df37f6acf0e5becb3b73fb546768273d29813053` |
+| Diff SHA-256 | `87b7e554a1445005395d4d6f8962e740c94a48dba89a7f0c9cc583ae5803b02b` |
+| Context SHA-256 | `3a8814f10b25da28cae6939252a834893e7ee7ec64c275a05844758b3518e9fe` |
+| Size | 5251 diff bytes; 52582 context bytes; six files and twelve revision-bound sources |
+
+The new `--regression-live` harness creates an empty temporary Git repository
+owning this remote, never checks out source, and asserts those identities. Its
+inference variant requires a finding on the changed normalization/CPUID source
+and exercises validation cancellation as well.
+
+The first real-positive explicit run accepted one P2 CPUID finding (confidence
+0.98), merging correctness/contracts reports, with 24776 ms specialist overlap.
+It identified `BOX64_AVX=2` surviving the removed normalization and reaching
+raw shifts: `2 << 3` sets bit 4, not BMI1 bit 3. The same change drops XSAVE
+bit 26 from the combined leaf-1 mask. Other adjacent shifted contributions
+overlap, so do not incorrectly claim that every AVX/F16C feature disappears.
+This matches the later recorded fix, without executing PR code.
+
+That run correctly retained a coverage issue for the combined specialist's
+`after: null`; the subsequent alias produced no accepted findings and failed
+the positive harness assertion. Investigation found the boundary unnecessarily
+treated unchanged hunk context as replacement code. It now permits null on a
+side with no actual additions/removals, rather than requiring zero context
+lines. The strict JSON schema and no-repair policy are unchanged. This also
+motivated shared changed-source evidence for duplicate reports anchored in
+different files. Deterministic probes cover both cases.
+
+Final native inference after these corrections is still pending at this
+implementation checkpoint; **Q4 is not yet marked complete**.
+
+### Q4 reproduction and runtime limits
+
+```sh
+node scripts/smoke-fixture.mjs
+node scripts/smoke-target.mjs
+node scripts/smoke-context.mjs
+node scripts/smoke-quick.mjs
+node scripts/smoke-findings.mjs
+copilot plugin install "$(pwd)"
+COPILOT_CLI_PATH="$(command -v copilot)" \
+COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
+PR_REVIEW_HEAVY_MODEL=gpt-5.6-terra PR_REVIEW_HEAVY_EFFORT=high \
+node scripts/smoke-runtime.mjs --targets --quick
+COPILOT_CLI_PATH="$(command -v copilot)" \
+COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
+PR_REVIEW_HEAVY_MODEL=gpt-5.6-terra PR_REVIEW_HEAVY_EFFORT=high \
+node scripts/smoke-runtime.mjs --regression-live --quick
+```
+
+Use `--targets`, `--target-live`, and `--regression-live` separately; omitting
+`--quick` remains no-inference. The original live fixture still demonstrates
+strict rejection but is not expected to contain a proven defect. Positive
+native runs use subscription credits; model compliance is not guaranteed.
+Malformed output stays incomplete rather than triggering a repair/fallback.
+
+Consulted the current official plugin-creation documentation, extension author
+guide, installed SDK `docs/extensions.md`, and installed typings for output-format
+support (no structured-output setting was found). Q4 reuses demonstrated session
+APIs instead of assuming an SDK response-schema capability. No new dependency or
+runtime abstraction was introduced. SDK transcripts may persist, but results are
+not plugin-cached. Q2 context/window and GitHub path-to-blob trust caveats remain.
+The complete native F3 adversarial/loss/SIGSTOP suite was not rerun; existing pure
+F3 checks and new native quick/validation cancellation are separate evidence.
+
+## Next work after the Q4 implementation checkpoint
+
+Finish **Q4 only**: inspect the real-positive installed-plugin inference,
+independently assess its accepted claims against the pinned source and known
+regression, and record actual evidence and remaining caveats. Do not mark Q4
+complete merely because the harness captures a target or models agree.
+Only after Q4 acceptance is demonstrated does P1 finding selection become next.

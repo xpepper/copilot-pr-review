@@ -1,7 +1,7 @@
 # Copilot PR Review
 
-An original Copilot CLI plugin prototype. **Quick PR specialists run, but their
-candidates are not yet validated or publishable.**
+An original Copilot CLI plugin prototype. **Quick reviews now include grounded
+candidate validation and deduplication. Selection and publication are not implemented.**
 [SCOPE.md](SCOPE.md) is the authoritative product specification;
 [ROADMAP.md](ROADMAP.md) records delivery status and runtime evidence.
 
@@ -138,23 +138,78 @@ instructions to ignore embedded requests and use no other evidence. Reviewers
 have no tools, configuration discovery, or allowed permissions. No checkout
 source, branch switching, source writes, GitHub mutations, or safeguards are used.
 
-Reviewers are asked for substantiated P0-P2 candidates with severity, confidence,
-path/side/lines, and concrete evidence. **Their prose is still untrusted and
-unvalidated:** code binds the output envelope, not the factual correctness of
-its citations. Evidence/location validation, severity filtering, deduplication,
-and a final findings presentation belong to Q4. Candidate output may quote PR
-source; full captured input is not dumped into the parent timeline.
+Reviewers return strict JSON candidates with severity, confidence, location,
+exact source quotations, concrete triggering conditions, expected/actual behavior,
+and before/after evidence of introduction. Raw candidate output remains untrusted;
+only findings surviving the Q4 boundary below appear in the final findings view.
+Candidate output may quote PR source; full captured input is not dumped into the
+parent timeline.
 
-`Q3 evidence:` is emitted after owned-runtime cleanup. `complete: true` means
-only that every specialist finished with matching usage and clean cleanup, not
-that the PR is correct or its candidates are validated. Failed reviewers retain
-partial output alongside successful reviewers and report incomplete coverage.
+`Q3 evidence:` is emitted after owned-runtime cleanup and now includes Q4
+`validation` and optional `adjudicator` records. `executionComplete` reports
+specialist execution separately. `complete: true` additionally requires finished
+validation without unresolved evidence or cleanup errors; it never means the PR
+is correct. Failed reviewers retain partial output alongside successful reviewers
+and report incomplete coverage.
 Skipped/declined/unconfirmed targets report `coverage: "not-started"` and start
 no reviewer runtime. Setup/capture failures and cancellation never become a
 clean-review result. Results are invocation-local, not a publish-later cache.
 Manual cancellation stops owned work without a review timeout; a pending host
 confirmation UI may remain visible, but a late answer cannot resume cancelled
 capture.
+
+### Grounded findings and deduplication (Q4)
+
+No extra flag is required. After the three quick specialists finish, code rejects
+malformed output rather than extracting fragments or removing markdown fences.
+Candidates must echo a digest of the code-owned review binding and use exactly the
+defined schema. Only P0-P2 candidates with numeric confidence **0.8 through 1**
+are eligible. This is a conservative admission threshold, not calibrated certainty.
+
+Code checks every cited path, side, line range and verbatim quotation against Q2's
+captured context windows and blob/revision provenance. The primary location must
+span at most ten lines in a diff hunk and include an actually added or removed
+line, not merely nearby unchanged code. Before/after evidence must describe the
+same hunk, citing changed code where present; a null side is allowed only when
+the hunk has no removals/additions on that side, including pure insertions and
+deletions with unchanged context. Renamed paths retain their
+separate base/head identities. Unsupported citations and missing evidence remain
+visible coverage issues, not silent filtering into a clean result.
+
+When eligible candidates exist, one **separate, isolated validation session**
+uses the effective heavy model/effort in the same owned runtime. Its assignment
+is displayed before its prompt. This uses additional subscription credits; it
+does not change the three-specialist quick topology or start a fourth specialist.
+The validator attempts to disprove each claim against the original diff and
+source, checking guards, reachability, contract changes, pre-existing behavior,
+severity/confidence, and causal impact. Acceptance requires a reason and
+source citations that code checks again. A failed, malformed, incomplete, or
+wrong-usage validator cannot authorize findings.
+
+**Exact source checks are deterministic; causal and severity adjudication is
+model-based and fallible.** A matching quotation alone is not proof of a defect,
+and a second model's agreement is not an executable reproduction. No PR code is
+run and this is not formal verification. Claims that need absent caller/context
+evidence must be rejected or marked uncertain, not accepted on assertions alone.
+
+Duplicate reports merge only after an explicit same-root-cause/trigger/impact
+decision and shared bound changed-source evidence of the cause, including
+supporting citations when primary anchors differ across files. Sharing a file or location
+does not itself merge anything. The strongest accepted severity/confidence report
+is displayed, with original reports and reviewer attribution retained. Different
+causal change evidence is conservatively left unresolved rather than silently merged.
+
+The final view presents title, severity, location/revision, confidence, trigger,
+expected/actual behavior, introduction, and validation reasoning. Rejections and
+unresolved limitations remain visible. Malformed candidates do not discard valid
+siblings, and a failed specialist does not discard validated findings from its
+successful peers. Non-textual changes are explicitly uncovered. Empty findings,
+completed execution, and skipped targets never claim a clean PR.
+
+Validation uses the existing tool-denial, progress, cancellation, no-timeout,
+usage-accounting, and cleanup machinery. Cancellation during validation stops the
+owned work. Everything remains invocation-local: no selection, cache, GitHub
+publication, or safeguards are added.
 
 ### Two-reviewer fixture experiment (F2)
 
@@ -256,8 +311,8 @@ Signal/parent-EOF handlers force-stop owned work without waiting for parent
 logging. An abruptly lost parent cannot receive a final report; there is no
 clean-review claim or publication. Normal SDK transcripts may persist, and
 forced termination does not guarantee a final transcript flush. The prototype
-can capture PRs, bind source context, and run quick specialists, but cannot
-validate candidates, publish to GitHub, or execute project safeguards. It does not restrict or change the model of the surrounding Copilot session. The SDK may
+can capture PRs, bind source context, run quick specialists, and validate/deduplicate
+findings, but cannot publish to GitHub or execute project safeguards. It does not restrict or change the model of the surrounding Copilot session. The SDK may
 retain its own session transcripts; no plugin review archive is implemented.
 
 No upstream source has been copied. Source reuse/licensing assessment remains
@@ -273,13 +328,18 @@ node scripts/smoke-fixture.mjs
 node scripts/smoke-target.mjs
 node scripts/smoke-context.mjs
 node scripts/smoke-quick.mjs
+node scripts/smoke-findings.mjs
 COPILOT_CLI_PATH="$(command -v copilot)" \
 COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
 node scripts/smoke-runtime.mjs
 ```
 
 The pure probes exercise fixture guards/lifecycle, PR capture/gates, and
-revision-bound context assembly, and quick orchestration without a runtime. The context probe covers
+revision-bound context assembly, and quick orchestration without a runtime. The findings probe exercises strict
+schema/provenance gates, changed-line anchors, renamed/added/deleted files,
+pure insertion/deletion context, cross-file deduplication, and degraded coverage. Its semantic
+accept/reject decisions are explicit test doubles, not live-model evidence.
+The context probe covers
 diff parsing, blob and hunk verification, window binding, an advancing PR, and
 a decoy working-tree file at the reviewed path. The runtime probe discovers the **installed** extension, dispatches status/help,
 model listing, and invalid settings, and asserts explicit errors without model
@@ -330,6 +390,25 @@ owned-process exit, and an unchanged checkout. Replace `--targets` with
 `--target-live` to use the pinned public PR through real GitHub GETs. Do not
 combine the stub and live variants. Adding `--quick` is inference-spending;
 the capture-only variants without it still start no reviewers.
+
+The controlled quick target is now synthetic PR 12, an original four-line
+`total.js` multiplication-to-addition regression with an unchanged contract.
+It requires an accepted finding at the changed expression and additionally
+cancels an active validation session, checking owned-process exit. This is real
+installed-plugin inference over controlled GitHub responses, not a real GitHub
+PR. The live variant still uses public `github/copilot-sdk#2543`; it checks
+pipeline results without requiring a defect to exist. Real malformed/unsupported
+outputs must remain rejected rather than being repaired to make the probe pass.
+
+For a real positive regression target, replace `--targets` with
+`--regression-live`. This captures historical public `ptitSeb/box64#3902` at
+pinned head/base/diff/context identities, requires a finding on its changed
+normalization/CPUID code, and exercises active validation cancellation.
+Its later fix, `ptitSeb/box64#3963`, independently corroborates the regression but
+is not supplied to the plugin reviewers. Only captured PR source is used as
+review input; no third-party code is copied into the bundled fixtures. Run this
+variant separately from the other target variants. `gpt-5.6-terra` with `high`
+effort is the Q4 demonstration assignment, not a product default or fallback.
 
 The original F2 inference probe remains available separately:
 

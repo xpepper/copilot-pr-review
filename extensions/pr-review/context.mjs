@@ -60,6 +60,7 @@ export function parseDiffFiles(diff) {
       file = {
         ...headerPaths(line.slice("diff --git ".length)),
         status: "modified", binary: false, oldBlob: null, newBlob: null, hunks: [],
+        changed: { base: [], head: [] },
       };
       files.push(file);
       hunk = undefined;
@@ -67,8 +68,13 @@ export function parseDiffFiles(diff) {
     }
     if (!file || line === "\\ No newline at end of file") continue;
     if (hunk && (oldRemaining > 0 || newRemaining > 0)) {
-      if (line.startsWith("+")) { hunk.newText.push(line.slice(1)); newRemaining--; }
-      else if (line.startsWith("-")) { hunk.oldText.push(line.slice(1)); oldRemaining--; }
+      if (line.startsWith("+")) {
+        file.changed.head.push(hunk.newStart + hunk.newText.length);
+        hunk.newText.push(line.slice(1)); newRemaining--;
+      } else if (line.startsWith("-")) {
+        file.changed.base.push(hunk.oldStart + hunk.oldText.length);
+        hunk.oldText.push(line.slice(1)); oldRemaining--;
+      }
       else if (line.startsWith(" ")) {
         hunk.oldText.push(line.slice(1));
         hunk.newText.push(line.slice(1));

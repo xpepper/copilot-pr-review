@@ -21,6 +21,21 @@ export const baseSource = [
 ].join("\n");
 export const headSource = baseSource.replace("value = 1;", "value = 2;");
 export const advancedSource = baseSource.replace("value = 1;", "value = 3;");
+export const validationBaseSource = [
+  "// Total is unit cents multiplied by quantity.",
+  "export function total(cents, quantity) {",
+  "  return cents * quantity;",
+  "}", "",
+].join("\n");
+export const validationHeadSource = validationBaseSource.replace("cents * quantity", "cents + quantity");
+export const validationDiff = [
+  "diff --git a/total.js b/total.js",
+  `index ${blobSha(validationBaseSource)}..${blobSha(validationHeadSource)} 100644`,
+  "--- a/total.js", "+++ b/total.js", "@@ -1,4 +1,4 @@",
+  " // Total is unit cents multiplied by quantity.",
+  " export function total(cents, quantity) {",
+  "-  return cents * quantity;", "+  return cents + quantity;", " }", "",
+].join("\n");
 
 const sources = new Map([
   ["a".repeat(40), baseSource],
@@ -55,13 +70,15 @@ export function pull(number = 1) {
 }
 
 export function contentsResponse(path, ref) {
-  const text = sources.get(ref);
-  if (!text || path !== "example.js") {
+  const text = path === "total.js"
+    ? ref === "a".repeat(40) ? validationBaseSource : ref === "b".repeat(40) ? validationHeadSource : undefined
+    : path === "example.js" ? sources.get(ref) : undefined;
+  if (!text) {
     throw new Error(`fixture: HTTP 404 no content for ${path} at ${ref}`);
   }
   const bytes = Buffer.from(text, "utf8");
   return JSON.stringify({
-    name: "example.js", path, sha: blobSha(text), size: bytes.length,
+    name: path, path, sha: blobSha(text), size: bytes.length,
     type: "file", encoding: "base64", content: bytes.toString("base64"),
   });
 }
@@ -84,7 +101,9 @@ export function respond(args, cwd, history) {
 
 function apiResponse(number, accept, history) {
   if (number === 8) throw new Error("fixture: HTTP 404 unavailable PR");
-  if (accept === "Accept: application/vnd.github.diff") return number === 10 ? diff.slice(0, -2) : diff;
+  if (accept === "Accept: application/vnd.github.diff") {
+    return number === 12 ? validationDiff : number === 10 ? diff.slice(0, -2) : diff;
+  }
   if (accept !== "Accept: application/vnd.github+json") throw new Error("Unexpected media type");
   const result = pull(number);
   const reads = history.filter((call) =>

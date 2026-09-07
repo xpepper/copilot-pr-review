@@ -5,6 +5,7 @@ import {
 import { captureTarget, parseTargetArgs } from "../extensions/pr-review/target.mjs";
 import { assembleContext } from "../extensions/pr-review/context.mjs";
 import { respond } from "./target-fixture.mjs";
+import { reviewKey, validationInstructions } from "../extensions/pr-review/findings.mjs";
 
 const catalog = [
   { id: "heavy", capabilities: { supports: { reasoning_effort: ["low", "high"] } } },
@@ -51,7 +52,7 @@ function fakeGh() {
   };
 }
 
-function harness({ failure, controller = new AbortController() } = {}) {
+function harness({ failure, controller = new AbortController(), withCandidate = false } = {}) {
   const messages = [];
   const sessions = [];
   let sends = 0;
@@ -67,7 +68,11 @@ function harness({ failure, controller = new AbortController() } = {}) {
     async createSession(config) {
       assert.equal(config.enableConfigDiscovery, false);
       assert.deepEqual(config.availableTools, []);
-      assert.deepEqual(config.systemMessage, { mode: "append", content: quickInstructions });
+      const validating = sessions.length === 3;
+      assert.deepEqual(config.systemMessage, {
+        mode: "append", content: validating ? validationInstructions : quickInstructions,
+      });
+      if (validating && failure === "validator-setup") throw new Error("validator setup failed");
       assert.equal((await config.onPermissionRequest({ kind: "read" })).kind, "denied-no-approval-rule");
       assert.equal((await config.hooks.onPreToolUse({ toolName: "bash" })).permissionDecision, "deny");
       const handlers = new Set();
@@ -97,6 +102,27 @@ function harness({ failure, controller = new AbortController() } = {}) {
           this.prompt = prompt;
           sends++;
           this.emit("assistant.turn_start");
+          if (validating) {
+            const input = JSON.parse(prompt.split("\n").at(-1));
+            if (failure === "validator-cancel") {
+              controller.abort(new DOMException("cancel validation", "AbortError"));
+              await client.forceStop();
+              return;
+            }
+            this.emit("assistant.message", { content: failure === "validator-malformed" ? "{}" : JSON.stringify({
+              schemaVersion: 1, reviewKey: input.reviewKey, limitations: [],
+              decisions: input.candidates.map((candidate) => ({
+                candidateId: candidate.id, verdict: "reject",
+                reason: "No source contract says the exported value must remain 1; an intentional value update is not a defect.",
+                evidence: [], duplicateOf: null,
+              })),
+            }) });
+            this.emit("assistant.usage", {
+              model: config.model, reasoningEffort: config.reasoningEffort ?? "low", isByok: false,
+            });
+            this.emit("session.idle");
+            return;
+          }
           // No reviewer completes until all three prompts are in flight.
           if (sends !== 3) return;
           await new Promise(setImmediate);
@@ -106,7 +132,22 @@ function harness({ failure, controller = new AbortController() } = {}) {
             return;
           }
           for (const [i, reviewer] of sessions.entries()) {
-            reviewer.emit("assistant.message", { content: i === 0 ? "partial candidate" : "No supported candidate in this focus." });
+            const input = JSON.parse(reviewer.prompt.split("\n").at(-1));
+            const cite = (side) => ({
+              path: "example.js", side, startLine: 1, endLine: 1,
+              quote: `export const value = ${side === "head" ? 2 : 1};`,
+            });
+            reviewer.emit("assistant.message", { content: i === 0 &&
+                ["reviewer", "tool-call", "usage", "missing-usage"].includes(failure) ? "partial candidate" : JSON.stringify({
+                schemaVersion: 1, reviewKey: input.reviewKey, limitations: [],
+                candidates: withCandidate && i === 0 ? [{
+                  title: "Keep value at 1", severity: "P2", confidence: 0.9,
+                  location: cite("head"), before: cite("base"), after: cite("head"),
+                  trigger: "Read value", expected: "1", actual: "2",
+                  introduction: "The constant changed", evidence: [cite("base")],
+                }] : [],
+              }),
+            });
             if (failure === "reviewer" && i === 0) {
               reviewer.emit("session.error", { message: "failed after output" });
               continue;
@@ -147,7 +188,7 @@ for (const failure of [undefined, "reviewer", "tool-call", "usage", "missing-usa
     controller: h.controller, gh: fakeGh(), onStopped() { stopped = true; },
   });
   assert.equal(report.complete, !failure, failure);
-  assert.equal(report.validated, false);
+  if (report.validation) assert.equal(report.validation.findings.length, 0);
   assert.equal(report.noComment, true);
   assert.equal(report.binding.head, "b".repeat(40));
   assert.equal(report.binding.paths[0].path, "example.js");
@@ -259,3 +300,28 @@ assert.equal(defaultReport.complete, true);
 assert(defaultReport.reviewers.every((r) => r.reasoningEffort === "low"));
 assert(defaults.messages.filter((m) => m.startsWith("Assignment ")).every((m) => m.endsWith("reasoning=low")));
 console.log("PASS concurrent bound prompts, isolated sessions, partial results, usage, gates, cancellation and cleanup");
+
+for (const failure of [undefined, "validator-setup", "validator-malformed", "validator-cancel", "cleanup"]) {
+  const h = harness({ failure, withCandidate: true });
+  const report = await executeQuickRun(h.parent, h.client, options, structuredClone(assignments), {
+    controller: h.controller, gh: fakeGh(),
+  });
+  assert.equal(report.complete, !failure);
+  assert.equal(report.executionComplete, true);
+  assert(report.reviewers.every((reviewer) => reviewer.status === "completed"), "Keep specialist evidence on validation failure");
+  assert.equal(report.validation.findings.length, 0);
+  assert.equal(h.client.starts, 1, "Reuse the owned runtime");
+  assert.equal(h.client.stops, 1);
+  if (!failure) {
+    assert.equal(report.validation.rejected.length, 1);
+    assert.equal(report.adjudicator.status, "completed");
+    assert.equal(h.sessions.length, 4);
+    assert(h.messages.some((message) => message.startsWith("Assignment evidence-validator:")));
+  }
+  if (failure === "validator-cancel") {
+    assert.equal(report.cancelled, true);
+    assert.equal(h.client.forces, 1);
+  }
+}
+assert.equal(reviewKey(quickBinding(snapshot, context)), reviewKey(structuredClone(quickBinding(snapshot, context))));
+console.log("PASS isolated adjudication, unsupported-claim rejection, validation failure/cancellation, retained execution and cleanup");
