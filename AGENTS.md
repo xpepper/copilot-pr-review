@@ -46,6 +46,12 @@ the work, not an extra.
   clean tree: push first, then run `/pr-review NUMBER --no-comment` from that
   branch. Balanced is the default mode; name a mode explicitly when you want a
   different one.
+- If your agent cannot type a Copilot CLI slash command, dispatch the same
+  command through the SDK with `node scripts/dogfood-review.mjs NUMBER --all
+  --no-comment`, using the `COPILOT_CLI_PATH` and `COPILOT_SDK_PATH` settings
+  the other runtime probes use. `copilot -p "/pr-review NUMBER"` is not a
+  substitute: prompt mode starts an ambient model turn instead of dispatching
+  the command, as the F1 integration caveats in `ROADMAP.md` record.
 - **This standing workflow authorizes exactly one review per increment pull
   request, and nothing else.** Any further review, any rerun, and any live
   probe that spends Copilot credits still needs a fresh explicit instruction.
