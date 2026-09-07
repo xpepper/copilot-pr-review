@@ -8,6 +8,7 @@ import { executeTargetCapture } from "./target.mjs";
 import { parseQuickArgs, quickAssignments } from "./quick.mjs";
 import { executeRetainedQuick } from "./retained-run.mjs";
 import { inspectRetained } from "./retention.mjs";
+import { publicationSummary } from "./publication.mjs";
 
 const help = [
   "Copilot PR Review - runtime feasibility prototype",
@@ -35,9 +36,10 @@ const help = [
   "Select validated findings in the host UI, or use --all. Selection never authorizes posting.",
   "--comment authorizes the proposal; --no-comment suppresses posting. The flags conflict.",
   "Without either flag, final confirmation is required (autoPostReviews defaults false; saved configuration is not implemented).",
-  "P3 displays a code-built COMMENT payload PREVIEW ONLY. Even --all --comment submits nothing.",
+  "Authorized selections submit a code-built COMMENT review after fresh head/lifecycle/anchor checks.",
+  "Draft/closed/merged PRs cannot receive the current inline payload. Uncertain writes are never retried.",
   "Results are retained only in the originating local session; a new quick run replaces the previous result.",
-  "No publication or safeguards. Validation also uses Copilot credits.",
+  "No safeguards or cached publish-later yet. Validation also uses Copilot credits.",
   "Other review flags are not supported yet.",
 ].join("\n");
 
@@ -52,11 +54,11 @@ const status = [
   "Quick execution is available with --quick, grounded validation and deduplication.",
   "Validated findings can be selected via the host UI or --all, then retained in this local session.",
   "Use /pr-review inspect after extension reload or a CLI-supported same-session resume.",
-  "Posting authority and COMMENT payload previews are implemented; GitHub submission is not.",
+  "Current-run COMMENT publication is implemented with fresh gates and a durable write-ahead journal.",
   "",
   "Status/help start no models or background work. PR capture and source context use",
   "read-only gh requests against the captured revisions, never the local checkout.",
-  "The prototype publishes nothing and runs no project safeguards.",
+  "Only authorized selected findings can publish; no project safeguards are run.",
   "Status is not a review result or a clean-review claim.",
 ].join("\n");
 
@@ -83,7 +85,7 @@ const session = await joinSession({
             if (outcome.cleanupErrors.length) {
               throw new Error(`Cancellation cleanup was not clean: ${outcome.cleanupErrors.join("; ")}`);
             }
-            await session.log("Review cancellation finished; owned runtime stopped. No publication is possible.");
+            await session.log(`Review cancellation finished; owned runtime stopped. ${publicationSummary(outcome.publication)}`);
             return;
           }
           case "":
@@ -162,7 +164,7 @@ function startRun(execute) {
     console.error(`Review run failed: ${String(error)}`);
     try {
       await session.log(`Review/retention failed: ${String(error)}. No settled result is guaranteed; ` +
-        "use /pr-review inspect to examine the retained state. Nothing was published.", { level: "error" });
+        "use /pr-review inspect to examine the retained state. Publication may be uncertain; do not retry blindly.", { level: "error" });
     } catch (logError) { console.error(`Could not report review/retention failure: ${String(logError)}`); }
   });
 }

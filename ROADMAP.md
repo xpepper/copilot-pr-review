@@ -25,7 +25,7 @@ in [AGENTS.md](AGENTS.md); the replaceable next-session prompt lives in
 | P1 | Completed | Invocation-bound validated finding selection via native elicitation or `--all`; subset/none/cancellation, invalid-answer rejection and no-UI behavior demonstrated below. No writes/cache. | Q4; [Selection/publication](SCOPE.md#selection-publication-and-cached-results) |
 | P2 | Completed | Retain the latest settled quick result in its originating local session; inspect without inference/GitHub access. Reload and conversation-backed cold resume demonstrated; command-only resume caveat below. | P1; [Cached results](SCOPE.md#selection-publication-and-cached-results) |
 | P3 | Completed | Independent posting authority, explicit confirmation and code-built COMMENT payload preview; native cancellation/reload/resume and no-submission evidence below. | P1; [Publication controls](SCOPE.md#selection-publication-and-cached-results) |
-| P4 | Pending | Submit only COMMENT reviews with valid anchors and lifecycle/head gates; surface uncertain write outcomes without blind retry. | P3; [Publication gates](SCOPE.md#selection-publication-and-cached-results) |
+| P4 | In progress | Current-run COMMENT publication and durable uncertain-write handling implemented; controlled and real-playground publication demonstrated below. Native controlled failure/reload probes remain before completion. | P3; [Publication gates](SCOPE.md#selection-publication-and-cached-results) |
 | P5 | Pending | Publish retained selected findings without rerunning reviewers; reject changed heads and prevent publication after cancellation. | P2, P4; [Cached publication](SCOPE.md#selection-publication-and-cached-results) |
 | C1 | Pending | Inspect/update personal tier configuration via text commands; validate capabilities, inheritance, and flag precedence; show effective assignments. | F3; [Configuration](SCOPE.md#models-configuration-and-execution) |
 | C2 | Pending | Explicit trust gates project overrides; prove a repository cannot authorize itself. | C1; [Configuration trust](SCOPE.md#models-configuration-and-execution) |
@@ -1566,6 +1566,147 @@ crashes and the full F3 process-loss/SIGSTOP suite were not rerun in P3. P2's
 storage/no-lock/no-power-loss and Q4's semantic/context-window limitations remain.
 No publish-later execution, configuration, additional mode, fallback or safeguard
 was added.
+
+## P4 implementation checkpoint
+
+Continues from P3 `1b6576e` and handoff `0f2a772`. No upstream source was copied.
+The implementation is current-run publication only, not cached publish-later.
+
+### Publication and retention boundary
+
+`publication.mjs` consumes only the current invocation's authorized canonical
+selection and code-built COMMENT request. It revalidates the captured evidence,
+then GETs the explicitly bound repository identity, PR metadata, complete diff
+and PR metadata again. Repository/PR identity, head/base SHAs, diff fingerprint
+and lifecycle must still match. The original capture working directory is used,
+not a later parent-session directory. The final request is a single `gh api
+--hostname HOST --method POST repos/OWNER/REPO/pulls/N/reviews --include --input -`
+with JSON stdin, reviewed `commit_id`, literal `COMMENT` and validated inline
+comments. There is no retry loop or model-built mutation command.
+
+Pinned upstream `lib/pr-review-publish.ts:1993-2005,2259-2275,2324-2343`
+distinguishes explicit non-open permission, rejects drafts and allows inline
+comments only on open PRs. Since all current canonical findings need inline
+anchors and there is no eligible standalone summary finding category, P4
+refuses draft/closed/merged publication even when review capture was overridden.
+It does not introduce stale or non-open body-only fallback.
+
+Version-3 records retain a separate `publication` state:
+`not-attempted`, `in-flight`, `succeeded`, `failed` or `uncertain`.
+The synchronous flushed-file/atomic-rename `in-flight` checkpoint precedes POST.
+A failed checkpoint prevents dispatch; a failed final write leaves the earlier
+uncertainty journal. Only a well-formed matching COMMENTED response produces
+success with a review ID/URL. Explicit rejection statuses including 403/422 are
+definite failures; server errors, transport loss, timeout responses, malformed
+or mismatched acknowledgments and interrupted writes remain uncertain.
+`gh` has no plugin-imposed timeout; cancellation kills the owned subprocess.
+
+After dispatch, cancellation adds `cancelRequested` without clearing historical
+selection/authority or claiming the remote mutation was undone. Before dispatch
+the existing cancellation model still clears IDs and revokes authority.
+Publication is checkpointed before awaited final logging; the final cancellation
+check/atomic retention and same-microtask `activeRun` clearing remain intact.
+An unresolved `in-flight`/`uncertain` result blocks a new quick run from erasing
+the journal. There is no automatic reconciliation/retry command.
+
+Versions 1 and 2 remain inspectable without fabricating authority or a write.
+The proposal's legacy `submitted: false` is unchanged and is not the actual
+write state; version-3 `publication.status` is authoritative. Inspection displays
+the distinction and does not refresh GitHub or rerun inference. User messages
+and README now warn that `--all --comment` can really publish.
+
+### Controlled evidence
+
+`node scripts/smoke-publication.mjs` demonstrates exact endpoint/host/stdin
+requests, captured cwd, atomic write-ahead state visible before dispatch, success
+retention and no second dispatch for the same invocation. It covers suppressed,
+missing/refused/malformed confirmation, explicit acceptance, invalid canonical
+IDs/events/anchors/quotes, repository/PR/head/base/diff drift, draft/non-open
+gates, final-head drift and preflight cancellation.
+
+It distinguishes 403/422 rejection, 503/transport/malformed/mismatched response
+uncertainty, cancellation in flight and success received despite cancellation.
+Storage failures before and after dispatch, inspectable in-flight state,
+overwrite prevention, post-success cancellation and strict schema tampering
+checks pass. `smoke-preview`, `smoke-quick`, `smoke-retention`, `smoke-selection`,
+`smoke-findings`, `smoke-target` and `smoke-context` also passed after the changes.
+These controlled proofs do not by themselves demonstrate remote acceptance or
+native process-loss behavior.
+
+### Real playground publication
+
+On 2026-09-07 the user explicitly approved synthetic branches/commits through
+the GitHub API after confirming there was no existing PR/branch target. No
+`git push`, local checkout switch, main update or merge was performed.
+The original four-line cents fixture lives only on two isolated remote branches:
+
+- Base `playground/p4-base-20260907`:
+  `155ed469b9f098e435435f020b2f4639abf9809a`.
+- Head `playground/p4-regression-20260907`:
+  `a68b6cd97f2bbfdca28bda4e7fb20bcf48205b32`.
+- Synthetic PR [#1](https://github.com/xpepper/copilot-pr-review/pull/1) remains
+  open, unmerged and based on the synthetic base, never main.
+
+Installed CLI 1.0.83 / bundled SDK, Node 26.1.0, macOS arm64, explicit
+`gpt-5.6-terra` / `high` executed three specialists and one validator, stopped
+the owned runtime, retained one deduplicated finding and submitted real review
+[`5130714400`](https://github.com/xpepper/copilot-pr-review/pull/1#pullrequestreview-5130714400)
+as COMMENTED at the reviewed head. The contracts specialist explicitly reported
+missing caller context, so both retained coverage and the published summary say
+INCOMPLETE; useful validated findings survived.
+
+Session `ae279b4d-53e7-4116-9ccd-86248db90b73`, invocation
+`6c220206-b1c6-4075-a245-b0402c134542`, durable digest
+`9d70e24259fa5accaa8da2fbcad87d7b7e6824fcdf0b6e1b4ca947d0292cdcae`.
+Remote comment
+[`3948685115`](https://github.com/xpepper/copilot-pr-review/pull/1#discussion_r3948685115)
+matches the exact retained text at `playground/total.mjs:3`, RIGHT. GraphQL
+confirms unresolved thread `PRRT_kwDOUQilZc6f3tE8`; PR head is unchanged.
+
+The first live harness failed **after successful publication and retention**
+because `/reviews/ID/comments` returns legacy position-only objects without
+line/side fields. The harness now queries PR comments and filters by review ID.
+Read-only verification against the existing durable record and remote review
+passed; no inference or POST was repeated. The failed harness had already
+asserted reviewer count and owned-runtime exit, but did not reach its final
+native reload/local-state assertions. Do not claim those from this live run.
+
+### APIs, reproduction and remaining work
+
+Consulted installed SDK `extension.d.ts` and `docs/extensions.md` for extension
+lifecycle (SIGTERM then SIGKILL), official
+[plugin creation/cache documentation](https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/plugins-creating),
+and the current
+[REST review endpoint documentation](https://docs.github.com/en/rest/pulls/reviews#create-a-review-for-a-pull-request).
+No new SDK integration was chosen. GitHub requests pin API version 2022-11-28.
+
+```sh
+node scripts/smoke-publication.mjs
+node scripts/smoke-preview.mjs
+node scripts/smoke-quick.mjs
+node scripts/smoke-retention.mjs
+copilot plugin install "$(pwd)"
+# The following already published once. Do NOT repeat against PR 1/head below.
+COPILOT_CLI_PATH="$(command -v copilot)" \
+COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
+PR_REVIEW_HEAVY_MODEL=gpt-5.6-terra PR_REVIEW_HEAVY_EFFORT=high \
+node scripts/smoke-publication-live.mjs --publish --pr=1 \
+  --head=a68b6cd97f2bbfdca28bda4e7fb20bcf48205b32
+# Safe read-only verification of the existing live result, no SDK or inference:
+node scripts/smoke-publication-live.mjs --pr=1 \
+  --head=a68b6cd97f2bbfdca28bda4e7fb20bcf48205b32 \
+  --verify-record="$HOME/.copilot/session-state/ae279b4d-53e7-4116-9ccd-86248db90b73/pr-review-result.json"
+```
+
+Native controlled success/failure/cancellation/reload probes remain in progress
+at this implementation checkpoint. Remote RIGHT single-line anchor acceptance
+is demonstrated; real LEFT/multiline/rename/deletion acceptance is not yet
+demonstrated. The final GET/POST is not an atomic compare-and-submit operation:
+a concurrent remote update can still make the explicitly head-bound review
+outdated. No stale fallback is used. P2's command-only cold-resume/no-lock/
+no-power-loss guarantees and Q4 semantic/context-window limits remain. Full F3
+process-loss exercises are not rerun here. No P5, configuration, additional mode,
+fallback or safeguard work is included.
 
 ## Exact next increment
 

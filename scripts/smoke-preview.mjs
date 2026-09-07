@@ -61,14 +61,14 @@ for (const [options, effective, ui, expected] of [
   assert.equal(h.requests.length, expected === "confirmed" ? 1 : 0);
   assert.equal(result.complete, true);
   assert.equal(result.preview.submitted, false);
-  assert.match(h.messages[0], /PREVIEW ONLY/);
-  assert.match(h.messages.at(-1), /Nothing was published/);
+  assert.match(h.messages[0], /payload proposal/);
+  assert.match(h.messages.at(-1), /No write has been attempted yet/);
   const record = retainedRecord(result);
   assert.equal(record.schemaVersion, 2);
   validateRecord(record, h.parent.sessionId);
   if (expected === "confirmed") {
     assert.equal(h.requests[0].requestedSchema.properties.authorize.default, false);
-    assert.match(h.requests[0].message, /PREVIEW ONLY.*will not submit/);
+    assert.match(h.requests[0].message, /Acceptance authorizes publication after fresh/);
   }
 }
 console.log("PASS flag precedence, effective autoPostReviews seam, independent authority, missing UI and explicit confirmation");
@@ -209,7 +209,7 @@ for (const settle of ["accept", "reject"]) {
   await new Promise(setImmediate);
   assert.equal(h.messages.length, count);
 }
-for (const prefix of ["COMMENT review", "Review preview:"]) {
+for (const prefix of ["COMMENT review", "Review proposal:"]) {
   const h = await harness({ options: { comment: true } });
   h.parent.log = async (message) => {
     h.messages.push(message);

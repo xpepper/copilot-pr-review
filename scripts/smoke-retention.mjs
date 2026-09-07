@@ -138,7 +138,7 @@ try {
     if (cancelAt === "before-run") controller.abort(new DOMException("cancel", "AbortError"));
     const h = { ...parent, log: async (message) => {
       messages.push(message);
-      if (cancelAt === "final-log" && message.startsWith("Retaining")) controller.abort(new DOMException("cancel", "AbortError"));
+      if (cancelAt === "final-log" && message.startsWith("Publication:")) controller.abort(new DOMException("cancel", "AbortError"));
     } };
     const history = [];
     let stops = 0;

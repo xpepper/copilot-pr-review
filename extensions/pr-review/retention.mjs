@@ -8,6 +8,7 @@ import { isDeepStrictEqual } from "node:util";
 import { formatFindings, minimumConfidence, reviewKey } from "./findings.mjs";
 import { validatePreview } from "./preview.mjs";
 import { selectionBinding } from "./selection.mjs";
+import { publicationSummary, validatePublication } from "./publication.mjs";
 
 export const retainedFilename = "pr-review-result.json";
 const hash = /^[a-f0-9]{64}$/;
@@ -130,7 +131,7 @@ function validation(value, target) {
 
 const reviewerKeys = ["label", "model", "reasoningEffort", "sessionId", "status", "error", "usage", "startedAt", "completedAt"];
 const outcomeKeys = ["invocation", "binding", "mode", "noComment", "complete", "reviewComplete",
-  "executionComplete", "coverage", "cancelled", "error", "cleanupErrors", "disposition", "reason", "selection", "preview"];
+  "executionComplete", "coverage", "cancelled", "error", "cleanupErrors", "disposition", "reason", "selection", "preview", "publication"];
 
 export function retainedRecord(outcome) {
   const result = pick(outcome, outcomeKeys);
@@ -145,14 +146,14 @@ export function retainedRecord(outcome) {
   // Normalize optional undefined properties in selection/binding before schema checks.
   const clean = JSON.parse(JSON.stringify(result));
   return {
-    schemaVersion: clean.preview ? 2 : 1, state: "settled", invocation: clean.invocation,
+    schemaVersion: clean.publication ? 3 : clean.preview ? 2 : 1, state: "settled", invocation: clean.invocation,
     outcome: clean, digest: reviewKey(clean),
   };
 }
 
 export function validateRecord(record, sessionId) {
   object(record, ["schemaVersion", "state", "invocation"], ["outcome", "digest"]);
-  requireValue([1, 2].includes(record.schemaVersion) && ["pending", "settled"].includes(record.state), "unsupported schema/state");
+  requireValue([1, 2, 3].includes(record.schemaVersion) && ["pending", "settled"].includes(record.state), "unsupported schema/state");
   identity(record.invocation);
   requireValue(record.invocation.sessionId === sessionId, "wrong originating session");
   if (record.state === "pending") {
@@ -162,11 +163,12 @@ export function validateRecord(record, sessionId) {
   const value = record.outcome;
   object(value, ["invocation", "mode", "noComment", "complete", "reviewComplete", "executionComplete",
     "coverage", "cancelled", "cleanupErrors", "selection", "reviewers"],
-  ["binding", "validation", "adjudicator", "error", "disposition", "reason", ...(record.schemaVersion === 2 ? ["preview"] : [])]);
+  ["binding", "validation", "adjudicator", "error", "disposition", "reason",
+    ...(record.schemaVersion >= 2 ? ["preview"] : []), ...(record.schemaVersion === 3 ? ["publication"] : [])]);
   requireValue(record.digest === reviewKey(value) && isDeepStrictEqual(value.invocation, record.invocation),
     "record digest or invocation mismatch");
   requireValue(value.mode === "quick" && typeof value.noComment === "boolean" &&
-    (record.schemaVersion === 2 || value.noComment === true), "unsupported mode/publication state");
+    (record.schemaVersion >= 2 || value.noComment === true), "unsupported mode/publication state");
   for (const key of ["complete", "reviewComplete", "executionComplete", "cancelled"]) {
     requireValue(typeof value[key] === "boolean", "invalid coverage flag");
   }
@@ -221,10 +223,11 @@ export function validateRecord(record, sessionId) {
   requireValue(selection.status !== "cancelled" || value.cancelled, "unrecorded cancellation");
   requireValue(selection.status !== "empty" || (value.validation && !ids.length), "false empty result");
   requireValue(selection.status !== "not-started" || !value.validation, "validation lost from selection state");
-  if (record.schemaVersion === 2) {
+  if (record.schemaVersion >= 2) {
     requireValue(value.preview, "missing preview state");
     validatePreview(value);
   }
+  if (record.schemaVersion === 3) validatePublication(value);
   return record;
 }
 
@@ -285,13 +288,15 @@ export async function inspectRetained(parent) {
   await parent.log([
     `Retained invocation ${record.invocation.invocationId} from session ${record.invocation.sessionId}.`,
     `Coverage: ${value.coverage}. Selection: ${value.selection.status}; IDs: ${value.selection.findingIds.join(", ") || "(none)"}.`,
-    "This is the captured review, not a current-head check. Nothing was rerun or published.",
-    value.preview ? `Preview: ${value.preview.status}; authorized=${value.preview.authorized}; submitted=false. ` +
-      "Historical proposal only; not permission for later publication." : "Legacy P2 record: no posting authority or preview.",
+    "This is the captured review, not a current-head check. This inspection did not rerun reviewers or publish anything.",
+    value.preview ? `Proposal: ${value.preview.status}; historical authorized=${value.preview.authorized}. ` +
+      "Not permission for later publication." : "Legacy P2 record: no posting authority or preview.",
+    publicationSummary(value.publication),
+    ...(value.publication?.cancelRequested ? ["Cancellation was requested after dispatch; it cannot undo a remote write."] : []),
     ...(value.preview?.request ? [JSON.stringify(value.preview.request, null, 2)] : []),
     formatFindings(value),
     ...value.reviewers.map((reviewer) => `${reviewer.label}: ${reviewer.status}${reviewer.error ? `; ${reviewer.error}` : ""}`),
-    ...[value.error, value.reason, value.selection.error, value.preview?.error, ...value.cleanupErrors].filter(Boolean),
+    ...[value.error, value.reason, value.selection.error, value.preview?.error, value.publication?.error, ...value.cleanupErrors].filter(Boolean),
     "No findings or completed execution is not a clean-review claim.",
   ].join("\n\n"), { level: value.complete ? "info" : "error" });
   await parent.log(`P2 inspection: ${JSON.stringify(record)}`);

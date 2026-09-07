@@ -24,7 +24,7 @@ export function parseTargetArgs(args) {
   };
 }
 
-export async function runGh(args, cwd, { signal } = {}) {
+export async function runGh(args, cwd, { signal, input } = {}) {
   signal?.throwIfAborted();
   if (typeof cwd !== "string" || !isAbsolute(cwd)) {
     throw new Error("Target capture requires the session's absolute working directory.");
@@ -33,16 +33,22 @@ export async function runGh(args, cwd, { signal } = {}) {
   // Invocation targets the checkout, never an ambient repository/checkout override.
   for (const key of ["GH_REPO", "GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR"]) delete env[key];
   try {
-    const { stdout } = await execute("gh", args, {
-      cwd, env, signal, encoding: "utf8", maxBuffer: 32 * 1024 * 1024,
+    const pending = execute("gh", args, {
+      cwd, env, signal, killSignal: "SIGKILL", encoding: "utf8", maxBuffer: 32 * 1024 * 1024,
     });
+    // POST payloads are code-built JSON on stdin, never shell interpolation.
+    let inputError;
+    pending.child.stdin.on("error", (error) => { inputError = error; });
+    pending.child.stdin.end(input);
+    const { stdout } = await pending;
+    if (inputError) throw new Error("gh input transport failed.", { cause: inputError });
     return stdout;
   } catch (error) {
     throw new Error(`PR capture failed (${args.slice(0, 2).join(" ")}): ${error.message}`, { cause: error });
   }
 }
 
-function repositoryFrom(raw) {
+export function repositoryFrom(raw) {
   if (typeof raw?.id !== "string" || !raw.id ||
       typeof raw.nameWithOwner !== "string" ||
       !/^[\w.-]+\/[\w.-]+$/.test(raw.nameWithOwner)) {
@@ -56,7 +62,7 @@ function repositoryFrom(raw) {
   return { id: raw.id, nameWithOwner: raw.nameWithOwner, host: url.host, url: url.href };
 }
 
-function pullFrom(raw, repository, number) {
+export function pullFrom(raw, repository, number) {
   if (raw?.number !== number || typeof raw.node_id !== "string" || !raw.node_id ||
       raw.base?.repo?.node_id !== repository.id ||
       raw.base?.repo?.full_name !== repository.nameWithOwner ||
@@ -216,5 +222,5 @@ export async function executeTargetCapture(session, args, { gh = runGh, signal }
   const bound = "Source context comes only from the captured GitHub revisions. " +
     "The local checkout, its branch, and its uncommitted changes are not review evidence.";
   await session.log(`Q2 context: ${JSON.stringify(contextSummary(context))}\n${bound}`);
-  return { ...outcome, context };
+  return { ...outcome, context, workingDirectory: cwd };
 }

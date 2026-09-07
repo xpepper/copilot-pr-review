@@ -2,8 +2,8 @@
 
 An original Copilot CLI plugin prototype. **Quick reviews now include grounded
 candidate validation, deduplication, finding selection, posting-authority controls,
-COMMENT payload previews, and session-bound retention. Publication is not
-implemented.**
+code-controlled COMMENT publication, and session-bound retention with
+uncertain-write protection. Cached publish-later is not implemented.**
 [SCOPE.md](SCOPE.md) is the authoritative product specification;
 [ROADMAP.md](ROADMAP.md) records delivery status and runtime evidence.
 
@@ -128,8 +128,9 @@ runtime's resolved default. Effective settings are displayed before prompts
 and checked against actual usage. The parent model is unchanged.
 
 Use exactly one of `--quick` and `--major-only`. The existing draft/closed
-overrides still apply. P3 accepts `--comment`, `--no-comment`, or neither;
-the posting flags conflict. All runs are still preview-only, as described below.
+overrides still apply to reviewing, not inline publication. Quick accepts
+`--comment`, `--no-comment`, or neither; the posting flags conflict.
+Authorized selections can publish, as described below.
 Other review modes and `--verify` remain unsupported. No personal/project
 configuration or fallback is saved or applied.
 
@@ -141,7 +142,8 @@ paths with source provenance. Each independent reviewer receives the captured
 diff and numbered context as untrusted JSON data, with code-owned system
 instructions to ignore embedded requests and use no other evidence. Reviewers
 have no tools, configuration discovery, or allowed permissions. No checkout
-source, branch switching, source writes, GitHub mutations, or safeguards are used.
+source, branch switching, source writes, GitHub mutations, or safeguards are used
+by the reviewers. Publication is a separate code-controlled step.
 
 Reviewers return strict JSON candidates with severity, confidence, location,
 exact source quotations, concrete triggering conditions, expected/actual behavior,
@@ -301,12 +303,15 @@ The digest is a corruption check, **not authentication against someone who can
 rewrite the session files**; local session storage is not an OS sandbox.
 
 An accepted new quick run supersedes the previous result with a non-actionable
-pending marker before capture. Once inference cleanup, selection and
-preview/confirmation settle, a synchronous, flushed-file/atomic-rename write
-records the final state without an
-intervening await. Cancellation clears selected IDs and marks the result
-incomplete. A process interrupted before settlement leaves an unfinished marker,
-not the previous review's selection. Empty, skipped, failed, unavailable-UI, and
+pending marker before capture, unless an unresolved publication journal blocks
+replacement. Once inference cleanup, selection, confirmation and publication
+settle, a synchronous, flushed-file/atomic-rename write records the final state
+without an intervening await. Before any submission, a separate atomic checkpoint
+records `in-flight` uncertainty. A process interrupted before that checkpoint
+leaves an unfinished marker; after it, inspection warns that GitHub may have
+received a write. Cancellation before dispatch clears selected IDs and marks the
+result incomplete; cancellation after dispatch preserves the historical payload
+and actual/uncertain publication outcome. Empty, skipped, failed, unavailable-UI, and
 degraded outcomes remain distinct; none claims a clean PR. Capture-only and
 fixture commands do not replace the quick-result slot.
 
@@ -354,13 +359,13 @@ review; inspection/reload/resume never rerun reviewers. It uses controlled targe
 12, not GitHub mutations. The existing selection runtime probe now also inspects
 retained results; use `--selection-cases=subset,none,cancel-pending` to cover
 subset selection, no selection, and cancellation with an inert late UI answer.
-No publication or publish-later execution exists yet.
+Cached publish-later execution does not exist yet.
 
-### Posting authority and payload preview (P3)
+### Posting authority and COMMENT publication (P3/P4)
 
-**This version never submits a GitHub review**, including with `--all --comment`.
-After selection it displays a code-built, repository/PR/head-bound COMMENT
-payload and records the posting-authority decision separately from selection.
+After selection the plugin displays a code-built, repository/PR/head-bound
+COMMENT payload and records posting authority separately from selection.
+**`--all --comment` can now publish a real GitHub review without either form.**
 
 ```text
 /pr-review 123 --quick --all --comment
@@ -397,28 +402,60 @@ silently converted into body-only comments.
 
 No GitHub refresh or mutation occurs during preview/confirmation. This is
 **captured-head evidence, not a current-head or publication-lifecycle check**.
-Actual submission, remote anchor acceptance, draft/lifecycle gates and uncertain
-write outcomes belong to P4. There is no separate preview/publish-later command;
+Publication follows with fresh code-controlled checks. There is no separate preview/publish-later command;
 `/pr-review inspect` displays the stored proposal without rerunning anything.
 
-New records use schema version 2 and retain the policy, authority status and
-exact unsubmitted proposal. Inspection reconstructs the expected request to
+New records use schema version 3 and retain the policy, historical authority,
+exact proposal and a separate publication disposition. The proposal's legacy
+`submitted: false` describes the proposal stage, not the final write outcome;
+`publication.status` is authoritative. Inspection reconstructs the expected request to
 reject changed payloads, anchors or authority combinations. It does not reload
-source or prove the head still matches. Valid P2 version-1 records remain
-inspectable without inventing a preview or posting authority; unknown schemas
+source or prove the head still matches. Valid P2 version-1 and P3 version-2 records remain
+inspectable without inventing publication outcomes or new posting authority; unknown schemas
 fail explicitly. **Retained authority is historical, not permission for a later
 run.**
 
-Cancellation remains available through final confirmation and storage, with no
-timeout. It clears selection IDs, revokes authority and removes the actionable
-payload while preserving validated findings and incomplete coverage. A late UI
-answer cannot resume the run. Another review or inspection is refused until the
-run settles. Owned inference has already stopped before either form is shown.
+Immediately before dispatch, code rereads the captured repository's identity,
+PR identity, head/base revisions, lifecycle and full diff, then checks PR metadata
+again. Requests explicitly pin the originating host/repository/PR and captured
+working directory, never a later session directory. Changed head/base/diff,
+invalid anchors or metadata drift stop publication without a POST. The payload
+always specifies the reviewed `commit_id` and literal `COMMENT`: no approvals,
+change requests, body-only fallback or model-created mutation commands.
+
+Drafts cannot publish even with `--include-drafts`. Upstream restricts non-open
+publication to summaries; all current findings require inline anchors, so
+closed/merged PRs cannot receive this payload, including with `--include-closed`
+or `--review-closed`. Those flags authorize review capture only.
+
+The write-ahead journal distinguishes `not-attempted`, `in-flight`, `succeeded`,
+`failed` and `uncertain`. Only a validated COMMENTED acknowledgment tied to the
+reviewed commit yields success with a GitHub review URL. Explicit rejection
+responses such as HTTP 403/422 yield definite failure. Transport loss, interrupted
+writes, server errors and malformed/mismatched acknowledgments remain uncertain.
+No write is retried automatically. An `in-flight` record after process loss is
+also uncertain, not evidence of no publication. A failed final disk write leaves
+that earlier journal intact. Unresolved uncertainty blocks another quick run in
+the session from erasing the record; inspect GitHub before any manual recovery.
+No automated reconciliation/retry command exists yet.
+
+Cancellation remains available without a timeout. Before dispatch it clears
+selection IDs, revokes authority and preserves findings with incomplete coverage.
+After dispatch it records `cancelRequested` without erasing historical selection,
+authority or a confirmed/uncertain outcome: cancellation cannot undo a remote write.
+A late UI answer cannot resume a cancelled run. Another review or inspection is
+refused until the run settles. Owned inference has stopped before either form.
+
+Fresh checks are not an atomic GitHub compare-and-submit transaction: a remote
+head/lifecycle change can race the final GET and POST. The explicit `commit_id`
+prevents silently rebinding comments to another head, but cannot prevent GitHub
+from accepting a review that becomes outdated during that interval.
 
 Reproduce controlled and native probes:
 
 ```sh
 node scripts/smoke-preview.mjs
+node scripts/smoke-publication.mjs
 node scripts/smoke-quick.mjs
 copilot plugin install "$(pwd)"
 COPILOT_CLI_PATH="$(command -v copilot)" \
@@ -434,8 +471,20 @@ positive validated result, without automatic retries. Optional cases
 refusal. Run `--cases=unavailable` alone without `--parent-turn` for a UI-less
 host. The optional parent turn only initializes resumable conversation history
 for the harness; it is not plugin behavior. Reload and conversation-backed cold
-resume preserve the exact version-2 record. These are native SDK-host
+resume preserve the exact version-3 record. These are native SDK-host
 interactions, not a claim about human terminal clicks or other clients.
+
+The permitted playground PR [#1](https://github.com/xpepper/copilot-pr-review/pull/1)
+demonstrates a real COMMENT review and unresolved inline thread on the reviewed
+head, with incomplete coverage explicitly preserved. Both synthetic branches are
+isolated from main and must not be merged. `scripts/smoke-publication-live.mjs`
+requires explicit `--publish --pr=NUMBER --head=SHA` for an authorized isolated
+playground target, refuses an existing plugin review at that head, and spends
+inference credits. Do not rerun it to manufacture another acknowledgment.
+Use `--verify-record=/absolute/path/to/pr-review-result.json` instead of
+`--publish` to compare an existing retained result to GitHub without inference
+or mutation. The per-review comments API returns legacy position-only objects;
+the probe checks line/side fields through the PR comments API.
 
 ### Two-reviewer fixture experiment (F2)
 

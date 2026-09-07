@@ -136,7 +136,7 @@ export async function finishPreview(parent, outcome, options, controller, bounda
     } else {
       const request = buildReviewPreview(outcome, boundary);
       preview = { ...initial, request };
-      await parent.log("COMMENT review payload PREVIEW ONLY - no submission, lifecycle/head refresh, or safeguards.\n" +
+      await parent.log("COMMENT review payload proposal - submission requires authority and fresh publication gates; no safeguards.\n" +
         `Posting authority: ${preview.status}. Review coverage: ${outcome.coverage}.\n` +
         JSON.stringify(request, null, 2));
       guard();
@@ -149,7 +149,7 @@ export async function finishPreview(parent, outcome, options, controller, bounda
             message: `Authorize this exact COMMENT review proposal for ${request.binding.repository.nameWithOwner}` +
               `#${request.binding.number} at head ${request.binding.head}?\n` +
               `${request.payload.comments.length} selected finding(s); ${outcome.complete ? "completed" : "INCOMPLETE"} coverage.\n` +
-              "PREVIEW ONLY: even if authorized, this version will not submit anything. This does not authorize safeguards.",
+              "Acceptance authorizes publication after fresh head/lifecycle/anchor checks. This does not authorize safeguards.",
             requestedSchema: {
               type: "object",
               properties: { authorize: { type: "boolean", title: "Authorize the displayed review proposal", default: false } },
@@ -180,8 +180,8 @@ export async function finishPreview(parent, outcome, options, controller, bounda
   }
   const report = { ...outcome, preview };
   if (outcome.cancelled || controller.signal.aborted) cancelPreview(report);
-  await parent.log(`Review preview: ${report.preview.status}; authorized=${report.preview.authorized}; submitted=false. ` +
-    `Selection: ${report.selection.status}; coverage: ${report.coverage}. Nothing was published. ` +
+  await parent.log(`Review proposal: ${report.preview.status}; authorized=${report.preview.authorized}; submitted=false. ` +
+    `Selection: ${report.selection.status}; coverage: ${report.coverage}. No write has been attempted yet. ` +
     `Retained authority is historical, not permission for a later run.${report.preview.error ? ` ${report.preview.error}` : ""}`,
   { level: ["failed", "unavailable", "cancelled"].includes(report.preview.status) ? "error" : "info" });
   if (outcome.cancelled || controller.signal.aborted) cancelPreview(report);

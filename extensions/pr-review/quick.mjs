@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { reviewAssignments, validateModelAssignment } from "./fixture.mjs";
 import { finishSelection } from "./selection.mjs";
 import { finishPreview, postingAuthority } from "./preview.mjs";
+import { publishCurrent } from "./publication.mjs";
 import { executeOwnedRun } from "./fixture-run.mjs";
 import { executeTargetCapture, parseTargetArgs, runGh } from "./target.mjs";
 import {
@@ -105,7 +106,7 @@ export function quickPrompt(assignment, snapshot, context, binding) {
 }
 
 export async function executeQuickRun(parent, client, options, assignments, {
-  controller, onStopped, gh = runGh,
+  controller, onStopped, gh = runGh, persist,
   invocation = { invocationId: randomUUID(), sessionId: parent.sessionId },
 }) {
   let binding;
@@ -113,6 +114,7 @@ export async function executeQuickRun(parent, client, options, assignments, {
   let validation;
   let adjudicator;
   let boundary;
+  let cwd;
   const outcome = await executeOwnedRun(parent, client, {
     controller, onStopped, subject: "Quick review", evidencePrefix: "Q3",
     details: () => ({
@@ -138,7 +140,8 @@ export async function executeQuickRun(parent, client, options, assignments, {
         return { coverage: "not-started", disposition: target.disposition, reason: target.reason, reviewers: [] };
       }
       binding = quickBinding(target.snapshot, target.context);
-      await parent.log(`Q3 binding: ${JSON.stringify(binding)}\nUnvalidated candidates only; nothing will be published.`);
+      cwd = target.workingDirectory;
+      await parent.log(`Q3 binding: ${JSON.stringify(binding)}\nUnvalidated candidates cannot publish; only final selected, authorized findings can.`);
       await startRuntime();
       const report = await reviewAssignments(parent, client, assignments, {
         signal, systemMessage: { mode: "append", content: quickInstructions },
@@ -185,5 +188,6 @@ export async function executeQuickRun(parent, client, options, assignments, {
   });
   if (outcome.validation) await parent.log(formatFindings(outcome), { level: outcome.complete ? "info" : "error" });
   const selected = await finishSelection(parent, outcome, options, controller);
-  return finishPreview(parent, selected, options, controller, boundary);
+  const proposal = await finishPreview(parent, selected, options, controller, boundary);
+  return publishCurrent(parent, proposal, boundary, { controller, cwd, gh, persist });
 }

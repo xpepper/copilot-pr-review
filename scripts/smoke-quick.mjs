@@ -387,11 +387,11 @@ try {
   });
   h.parent.log = async (message) => {
     h.messages.push(message);
-    if (message.startsWith("Retaining")) h.controller.abort(new DOMException("final-log cancellation", "AbortError"));
+    if (message.startsWith("Publication:")) h.controller.abort(new DOMException("final-log cancellation", "AbortError"));
   };
   const result = await executeRetainedQuick(h.parent, h.client, parseQuickArgs("1 --quick --all --comment"),
     structuredClone(assignments), { controller: h.controller, gh: fakeGh() });
-  assert(h.messages.some((message) => message.startsWith("Review preview: flag-authorized")), "Proposal was authorized before cancellation");
+  assert(h.messages.some((message) => message.startsWith("Review proposal: flag-authorized")), "Proposal was authorized before cancellation");
   assert.equal(result.preview.status, "cancelled");
   assert.equal(result.preview.authorized, false);
   assert.equal(result.preview.request, undefined);

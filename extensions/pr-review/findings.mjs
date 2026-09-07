@@ -295,7 +295,7 @@ export function formatFindings(outcome) {
   const target = outcome.binding
     ? ` ${outcome.binding.repository.nameWithOwner}#${outcome.binding.number} at ${outcome.binding.head}` : "";
   const heading = `Quick review${target}: ${validation.findings.length} validated finding(s); ` +
-    `${outcome.complete ? "completed" : "incomplete"} coverage. Nothing was published.`;
+    `${outcome.complete ? "completed" : "incomplete"} coverage. Findings are not a clean-review claim.`;
   const sections = validation.findings.map((finding) => [
     `[${finding.severity}] ${finding.title}`,
     `${finding.location.path}:${finding.location.startLine}-${finding.location.endLine} (${finding.location.side}, ` +
