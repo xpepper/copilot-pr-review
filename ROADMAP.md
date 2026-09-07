@@ -46,7 +46,8 @@ posting them.
 | C2 | Completed | Explicit per-directory trust gates `.copilot/pr-review/config.json` overrides; untrusted files ignored unparsed, self-trust impossible, precedence and revocation demonstrated below. | C1; [Configuration trust](SCOPE.md#models-configuration-and-execution) |
 | R1 | Completed | Verified-checkout reads and matching-head harnesses demonstrated. One authorized live quick review used unchanged source without denials; prior coverage gaps disappeared, but no additional finding was produced. GPT's `rg` alias is supported without widening the grant. | F4, Q3; [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | M1 | Completed | Balanced is the default with its four heavy specialists, light overview reviewer and three-finding P3/nit cap. `--full` adds a medium conventions/maintainability reviewer and presents every qualifying severity with no minor cap. Demonstrated by controlled probes, no-inference installed dispatch, and live reviews of this repository's own pull requests #3, #4 and #5; #5 ran all three tiers on distinct models. A Claude-family medium model's fenced output is a recorded open defect. | Q4, C1; [Modes](SCOPE.md#review-modes-and-findings) |
-| M2 | Pending | Deep uses one holistic reviewer; reject conflicting mode flags. | M1; [Modes](SCOPE.md#review-modes-and-findings) |
+| F5 | Pending | Decide how reviewer output stops depending on a model family's willingness to emit bare JSON. Establish by demonstration whether the runtime can return parsed structured output for a reviewer, at what cost to the confined tool grant, coverage reporting and credits; recommend adopt or fall back. No reviewer is migrated in F5. | M1, F3; [Technical feasibility](SCOPE.md#technical-uncertainties-and-proposed-sequence) |
+| M2 | Pending | Deep uses one holistic reviewer; reject conflicting mode flags. | F5, M1; [Modes](SCOPE.md#review-modes-and-findings) |
 | C3 | Pending | Explicit optional fallback with at most one eligible retry per failed reviewer; no timers or silent substitutions. | C1, Q3; [Fallbacks/execution](SCOPE.md#models-configuration-and-execution) |
 | C4 | Pending | A tier whose resolved model supports no configurable reasoning effort resolves to no effort instead of inheriting one, so such a model can serve a tier. An explicit effort is still validated and never silently lowered. | C1; [Configuration](SCOPE.md#models-configuration-and-execution) |
 | V1 | Pending | `--verify` enforces matching branch/SHA/cleanliness before reviewers and presents discovered existing commands for approval. | Q1; [Safeguards](SCOPE.md#optional-project-safeguards) |
@@ -3833,54 +3834,92 @@ it afterwards.
 
 ## Exact next increment
 
-**Make the medium tier's output survive.** Pull request #5's review, recorded
-above, showed that `claude-sonnet-5` wraps its candidate JSON in a
-```` ```json ```` fence, so the conventions reviewer's entire output is rejected.
-Full mode is the only mode that assigns the medium tier, so `--full` currently
-spends a sixth reviewer's credits and reliably gets an execution failure back on
-a Claude-family medium model. This outranks starting `M2`: shipping deep on top
-of a mode whose sixth reviewer is systematically discarded makes the tool worse,
-not better.
+**`F5`: settle how reviewer output stops depending on a model family's
+willingness to emit bare JSON.** Pull request #5's review, recorded above,
+showed `claude-sonnet-5` wrapping its candidates in a ```` ```json ```` fence, so
+`envelope` rejected the whole output. Frame the defect correctly before working
+on it: it is **not** specific to full mode or the medium tier. The same parser
+handles specialist candidates and adjudicator decisions, so a Claude-family
+*heavy* tier would lose every reviewer's output and every adjudication decision
+too. Full mode only exposed it first, because the medium tier was the first place
+a Claude model was ever configured for a live run. Three separate instructions
+already tell the reviewer to return plain JSON with no markdown fences, and the
+model ignored all three, so strengthening the prompt is not a fix on its own.
 
-**This needs a product decision before implementation, and the next agent should
-ask for it rather than choose alone.** `SCOPE.md` drops "experimental malformed-
-output finding extraction" from v1, and the strict envelope is a deliberate
-fail-closed gate. Two candidate paths, neither obviously inside the settled
-scope:
+The user chose to research a structural answer before considering a parser
+change. **Do not relax `envelope` in this increment**, and do not migrate any
+reviewer to a new runtime surface in it either. `F5` produces evidence and a
+recommendation, nothing else.
 
-1. A narrowly specified envelope tolerance: strip a single leading
-   ```` ```json ```` / ```` ``` ```` fence and its matching trailing fence when
-   they wrap the entire response, and nothing else. No substring search, no
-   fragment recovery, no repair of invalid JSON. Recommended, because it is a
-   transport-shape allowance rather than the fragment extraction the scope
-   dropped, and because it is small enough to specify exactly.
-2. A stricter output contract instead: change the reviewer instructions so the
-   affected model family stops fencing. Cheaper to write, but unverifiable
-   without spending a live review, and it cannot be proven to hold for a model
-   family the project does not control.
+What is already known, from reading the installed SDK at `1.0.83`, and what still
+has to be demonstrated rather than inferred:
 
-Whichever is chosen, the acceptance criteria are the same shape:
+- `SessionConfig` and `MessageOptions` carry **no** output-schema or
+  response-format option, so the stdio `createSession` path selected at `F3`
+  cannot constrain output today. Confirmed by reading `types.d.ts`.
+- The only structured-output surface is the experimental Agent Factories API:
+  `ctx.agent(prompt, options)` accepts `label`, `schema`, `model`, `agent`,
+  `reasoningEffort` and `contextTier`, and **with `schema` it resolves to the
+  parsed JSON value instead of the subagent's final text**. That would remove
+  the fence problem at its source. `SCOPE.md` permits experimental CLI APIs where
+  they are needed to deliver core behaviour.
+- Four things make that trade unclear, and `F5` exists to settle them:
+  1. **Tool confinement.** Reviewers depend on the `view`/`grep`/`glob` grant
+     confined to the verified checkout by a permission handler. Whether a
+     factory-owned subagent can be given exactly that grant, and nothing more, is
+     unknown. If it cannot, the option is dead: `R1` and `F4` are not negotiable.
+  2. **An implicit retry.** The documentation states a `schema` call retries once
+     on a parse or match failure, so it may spawn twice and both spawns count
+     toward `maxTotalSubagents`. That is an unrequested extra charge, and it sits
+     next to the settled decisions that there are no timeouts and that fallbacks
+     are explicit and bounded. Measure it; do not assume it is free.
+  3. **Failure semantics.** A failing subagent resolves to `null` rather than
+     throwing. Incomplete coverage must stay visible as incomplete; a `null` that
+     silently becomes an empty result would be exactly the clean-review claim this
+     project refuses to make.
+  4. **Code structure.** A factory `run` body is emitted verbatim into a
+     generated module, closes over nothing, and cannot use static imports. The
+     current orchestration spans `review.mjs`, `fixture.mjs`, `findings.mjs` and
+     others. Establish whether they are reachable by dynamic `await import(...)`
+     from that body before assuming a migration is even shaped like the current
+     code.
+- The schema subset is structural, not a validator: it ignores
+  `additionalProperties`, `pattern`, lengths, formats and numeric ranges. Every
+  existing exact-key, citation, quote and changed-line check therefore stays,
+  whatever `F5` concludes. Structured output would replace `JSON.parse`, not the
+  evidence boundary.
 
-- The behaviour is declared once and applies to every mode and both the
-  specialist and adjudicator envelopes, or explicitly to neither.
-- Malformed JSON, truncated output, fragments, and content outside a single
-  wrapping fence stay rejected. The evidence boundary, changed-line anchoring,
-  adjudication, deduplication and the findings policies are untouched.
-- Controlled probes in `smoke-findings.mjs` cover the accepted shape and every
-  neighbouring rejected one, including a fence that does not wrap the whole
-  response and a fenced body that is still invalid JSON.
-- The increment's own pull-request review runs with `--full` and a Claude-family
-  medium tier, so the fix is demonstrated against the model that exposed the
-  defect. That single review is authorized by the workflow; nothing else that
-  spends credits is.
-- Add no deep mode, fallback, timeout, safeguard, reviewer shell tool, gate
-  override, configuration key or interactive menu. Keep `L1` pending, copy no
-  upstream source, and do not alter user checkouts to satisfy the revision gate.
+Acceptance criteria:
 
-After that, `M2` is the declared next roadmap item: deep uses one integrated
-heavy reviewer considering the whole pull request, with all substantiated
-severities, and rejects conflicting mode flags. Deep means holistic review, not a
-larger parallel one and not a fourth effort level.
+- A small, reversible probe under `scripts/` demonstrates the answer to each of
+  the four questions above on this host, against a Claude-family model, because
+  that is the family that exposed the defect. Declarations and documentation are
+  not evidence; `AGENTS.md` requires demonstration.
+- The probe spends inference, so it needs **explicit authorization in that
+  session**. None carries over. Ask before running it, and say what it will cost.
+- `ROADMAP.md` records the outcome and a recommendation: adopt structured output
+  in a named follow-up increment, or fall back to the narrowly specified fence
+  unwrap, which strips one opening fence and its matching closing fence only when
+  they wrap the entire response and changes nothing else. If the recommendation
+  is the fallback, say plainly what it costs against the `SCOPE.md` decision to
+  drop malformed-output extraction, and leave the choice to the user.
+- No shipped behaviour changes in `F5`. `envelope` is untouched, no reviewer
+  moves, no mode changes, no configuration key, no fallback, no timeout, no
+  safeguard, no reviewer shell tool and no gate override. Keep `L1` pending and
+  copy no upstream source.
+- The increment still lands on its own branch and pull request and is reviewed
+  with this plugin once, because it changes `scripts/`. That review is authorized
+  by the workflow; nothing else that spends credits is.
+
+`M2`, deep mode, now depends on `F5`. Deep uses one integrated heavy reviewer
+considering the whole pull request, with all substantiated severities, and
+rejects conflicting mode flags. Deep means holistic review, not a larger parallel
+one and not a fourth effort level. Building it before `F5` would add a fifth mode
+on top of an output path that is known to fail for a whole model family.
+
+Until `F5` lands, `--full` remains usable but wasteful with a Claude-family
+medium tier, and `README.md` says so. Prefer GPT-family models for reviewer
+tiers.
 
 Two older observations remain open and separately authorizable. No review of any
 mode has run against a substantial code diff, so review quality is still
