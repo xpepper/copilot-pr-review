@@ -1,5 +1,6 @@
 import { CopilotClient, RuntimeConnection } from "@github/copilot-sdk";
 import { joinSession } from "@github/copilot-sdk/extension";
+import { describeConfiguration, executeConfiguration, loadConfiguration } from "./config.mjs";
 import {
   parseFixtureArgs, reasoningEfforts, subscriptionModels, validateAssignments,
 } from "./fixture.mjs";
@@ -28,16 +29,19 @@ const help = [
   "inspect      Show this session's latest retained result without inference or GitHub requests.",
   "publish      Explicitly publish this session's retained selected findings without rerunning reviewers.",
   "",
+  "Personal configuration: /pr-review-config [show] | key=value ... | unset key ... | help.",
+  "Saved tiers supply unset assignments; invocation flags override them for that invocation only.",
+  "",
   "NUMBER  Capture PR metadata and diff, then bind source context to the captured",
   "        head/base revisions. No reviewers, no publication, no local source.",
   "Drafts and obvious bots are skipped, as are provably empty changes.",
   "Closed/merged PRs require confirmation or an explicit closed-PR override.",
   "--quick / --major-only  Run three heavy specialists on captured PR content.",
-  "Unset heavy settings inherit the ambient model/effort.",
+  "Unset heavy settings inherit the nearest configured tier, then the ambient model/effort.",
   "Strict evidence checks and an isolated adjudication pass validate/deduplicate candidates.",
   "Select validated findings in the host UI, or use --all. Selection never authorizes posting.",
   "--comment authorizes the proposal; --no-comment suppresses posting. The flags conflict.",
-  "Without either flag, final confirmation is required (autoPostReviews defaults false; saved configuration is not implemented).",
+  "Without either flag, the effective saved autoPostReviews applies; it defaults to false and then requires final confirmation.",
   "Authorized selections submit a code-built COMMENT review after fresh head/lifecycle/anchor checks.",
   "Draft/closed/merged PRs cannot receive the current inline payload. Uncertain writes are never retried.",
   "Results are retained only in the originating local session; a new quick run replaces the previous result.",
@@ -60,6 +64,8 @@ const status = [
   "Use /pr-review inspect after extension reload or a CLI-supported same-session resume.",
   "Current-run COMMENT publication is implemented with fresh gates and a durable write-ahead journal.",
   "Use /pr-review publish to publish the retained selection later, under a new explicit authorization.",
+  "Personal light/medium/heavy tier configuration and autoPostReviews are inspected and updated by",
+  "/pr-review-config. Project-provided configuration is never read; project overrides remain unimplemented.",
   "",
   "Status/help start no models or background work. PR capture and source context use",
   "read-only gh requests against the captured revisions, never the local checkout.",
@@ -125,8 +131,15 @@ const session = await joinSession({
               if (args.trim().split(/\s+/).some((token) => ["--quick", "--major-only"].includes(token))) {
                 const options = parseQuickArgs(args);
                 assertIdle();
-                const assignments = await quickAssignments(session, options.settings);
-                startRun((client, lifecycle) => executeRetainedQuick(session, client, options, assignments, lifecycle));
+                // Saved settings are resolved and displayed before any reviewer starts;
+                // an unusable effective assignment refuses the review instead of substituting.
+                const configuration = await loadConfiguration(session);
+                const assignments = await quickAssignments(session, options.settings, configuration);
+                await session.log(describeConfiguration(configuration, {
+                  flags: options.settings, heading: "Effective PR review configuration for this invocation.",
+                }));
+                startRun((client, lifecycle) => executeRetainedQuick(session, client, options, assignments, lifecycle,
+                  { autoPostReviews: configuration.autoPostReviews }));
                 return;
               }
               await executeTargetCapture(session, args);
@@ -146,6 +159,17 @@ const session = await joinSession({
             throw new Error(message);
           }
         }
+      },
+    },
+    {
+      name: "pr-review-config",
+      description: "Inspect or update personal PR review model tiers and posting settings",
+      handler: async ({ args }) => {
+        if (shuttingDown) throw new Error("Extension is shutting down.");
+        // Configuration is refused while review or publication work holds the run
+        // slot, and it starts no inference, GitHub request or review work itself.
+        assertIdle();
+        await executeConfiguration(session, args);
       },
     },
   ],

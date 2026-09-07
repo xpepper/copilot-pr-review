@@ -3,7 +3,7 @@ import { executeQuickRun } from "./quick.mjs";
 import { retainedRecord, sessionStore } from "./retention.mjs";
 import { cancelPublication, publicationSummary } from "./publication.mjs";
 
-export async function executeRetainedQuick(parent, client, options, assignments, lifecycle) {
+export async function executeRetainedQuick(parent, client, options, assignments, lifecycle, effectiveConfig) {
   const invocation = { invocationId: randomUUID(), sessionId: parent.sessionId };
   const store = await sessionStore(parent);
   const previous = store.read();
@@ -12,7 +12,8 @@ export async function executeRetainedQuick(parent, client, options, assignments,
   }
   store.write({ schemaVersion: 3, state: "pending", invocation });
   const persist = (outcome) => store.write(retainedRecord(outcome));
-  const outcome = await executeQuickRun(parent, client, options, assignments, { ...lifecycle, invocation, persist });
+  const outcome = await executeQuickRun(parent, client, options, assignments,
+    { ...lifecycle, invocation, persist, effectiveConfig });
   await parent.log(`Publication: ${outcome.publication.status}. ${publicationSummary(outcome.publication)}` +
     `${outcome.publication.error ? ` ${outcome.publication.error}` : ""}\nRetaining the settled quick-review result in this session only.`);
   // No await after this cancellation check/atomic write: activeRun clears in the

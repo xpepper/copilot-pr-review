@@ -27,7 +27,7 @@ in [AGENTS.md](AGENTS.md); the replaceable next-session prompt lives in
 | P3 | Completed | Independent posting authority, explicit confirmation and code-built COMMENT payload preview; native cancellation/reload/resume and no-submission evidence below. | P1; [Publication controls](SCOPE.md#selection-publication-and-cached-results) |
 | P4 | Completed | Current-run COMMENT publication with fresh gates and durable uncertainty; nine native cases, reload/cold resume and real playground inline publication demonstrated below. | P3; [Publication gates](SCOPE.md#selection-publication-and-cached-results) |
 | P5 | Completed | Explicit publish-later of the retained selection without rerunning reviewers; refetched evidence, fresh gates, version-4 authority, seven native cases and a real playground publication demonstrated below. | P2, P4; [Cached publication](SCOPE.md#selection-publication-and-cached-results) |
-| C1 | Pending | Inspect/update personal tier configuration via text commands; validate capabilities, inheritance, and flag precedence; show effective assignments. | F3; [Configuration](SCOPE.md#models-configuration-and-execution) |
+| C1 | Completed | Personal light/medium/heavy tier configuration and `autoPostReviews` inspected and updated by `/pr-review-config`; validated capabilities, nearest-tier/ambient inheritance, flag precedence and effective-assignment display demonstrated below. | F3; [Configuration](SCOPE.md#models-configuration-and-execution) |
 | C2 | Pending | Explicit trust gates project overrides; prove a repository cannot authorize itself. | C1; [Configuration trust](SCOPE.md#models-configuration-and-execution) |
 | M1 | Pending | Balanced becomes default with required topology and P3 cap; full adds conventions reviewer and its findings policy. | Q4, C1; [Modes](SCOPE.md#review-modes-and-findings) |
 | M2 | Pending | Deep uses one holistic reviewer; reject conflicting mode flags. | M1; [Modes](SCOPE.md#review-modes-and-findings) |
@@ -1994,43 +1994,221 @@ must be republished deliberately. Q4 semantic and context-window limits and F3
 process-loss limits are unchanged and were not re-exercised here. No
 configuration, additional mode, fallback or safeguard work is included.
 
+## Completed increment: C1
+
+Implementation: new `extensions/pr-review/config.mjs`, a second registered
+command in `extension.mjs`, tier resolution in `quick.mjs`, and the effective
+posting setting threaded through `retained-run.mjs` into the existing
+`finishPreview` parameter. Exercises: `scripts/smoke-config.mjs` and
+`scripts/smoke-config-runtime.mjs`. No upstream source was copied; only the
+upstream README's documented configuration workflow was consulted.
+
+### Configuration boundary
+
+- One plugin extension now registers two slash commands. `/pr-review-config`
+  accepts `show` (also the empty argument), `key=value` assignments, `unset KEY`
+  and `help`. There is no interactive menu and no finding editor.
+- Keys are `lightModel`, `lightEffort`, `mediumModel`, `mediumEffort`,
+  `heavyModel`, `heavyEffort` and `autoPostReviews`. They carry the port's
+  existing invocation-setting spelling rather than upstream's `light` /
+  `heavy_thinking` field names; upstream's other fields are not ported.
+  `autoPostReviews` accepts only `true` or `false` and defaults to false.
+- Unknown keys, malformed arguments, empty values and unsupported models or
+  efforts are explicit errors. Assignments in one invocation apply together or
+  not at all, and a refused command leaves the stored file byte-identical.
+- Every explicit value is validated against the session's actual model list and
+  each model's advertised reasoning efforts, reusing the existing
+  `validateModelAssignment`. An invalid explicit model or effort is refused;
+  nothing is substituted and no effort is lowered. Validation covers the
+  configuration that results from the change, so a value that only becomes
+  unusable through inheritance is refused too. A tier resolved entirely from the
+  ambient session is not validated at update time, because it carries no
+  explicit setting; the review path still validates it.
+- An unset tier field takes the nearest configured tier, preferring the heavier
+  tier when two are equidistant, and otherwise the ambient session model or
+  reasoning effort. Model and effort resolve independently, preserving the
+  recorded Q3 behavior. Quick review still uses the heavy tier only.
+- `show` reports the file location, stored settings, ambient assignment, all
+  three effective tier assignments with the origin of each value, and the
+  effective `autoPostReviews`. A quick invocation logs the same report, with its
+  flags applied, before any reviewer starts.
+- Invocation flags win for that invocation only and never rewrite the file.
+  `heavyModel=`/`heavyEffort=` override saved tiers; `--comment` / `--no-comment`
+  override `autoPostReviews` and still conflict with each other. An effective
+  `autoPostReviews=true` produces the existing `config-authorized` status, so
+  `--all` can publish unattended without a confirmation UI.
+- Personal configuration lives at `<copilot-config-home>/pr-review/config.json`,
+  derived from the session workspace the CLI itself reported, which is a
+  `session-state` sibling. The store refuses a remote session, a missing or
+  wrongly shaped workspace, a symlinked file, and a location inside the session
+  working directory. Records are `{"schemaVersion": 1, "settings": {...}}`,
+  written through a temporary file, `fsync` and rename with mode `0600`.
+- Malformed JSON, an unsupported schema version, an unknown stored key or a
+  wrongly typed stored value is an explicit error that refuses both inspection
+  and review. Nothing is repaired, migrated or silently ignored.
+- **No repository-provided configuration is read.** A repository cannot
+  authorize itself, and explicitly trusted project overrides remain C2.
+- Configuration inspection and updates issue only `metadata.snapshot`,
+  `model.getCurrent` and `model.list`. They start no inference, make no GitHub
+  request, run no review work, and are refused while a review or publication
+  holds the session's active-work slot.
+
+### Controlled evidence
+
+`scripts/smoke-config.mjs` passes with no runtime, no network and no inference.
+It covers argument parsing and every rejected argument shape; stored-record
+schema validation including malformed JSON, an incompatible version, unknown
+keys and wrongly typed values; the atomic `0600` write with no surviving
+temporary file; unsafe symlinked files; remote, missing and misshaped workspaces;
+and a configuration directory inside the working directory.
+
+Resolution is exercised directly: configured, inherited, ambient and unset
+sources; nearest-tier preference over a farther tier; the equidistant tie
+resolving to the heavier tier; independent model and effort inheritance; and
+flag precedence. Refusal cases cover a missing, disabled, compound or `auto`
+model, an unsupported effort, an inherited effort the configured model cannot
+support, and an `unset` that would leave an explicit model unusable.
+
+The probe then drives the real code paths: `quickAssignments` takes its heavy
+assignment from a stored light tier, an invocation flag overrides it without
+rewriting the file, and an unusable stored assignment rejects with
+`No substitution`. A full `executeRetainedQuick` run against the skipped draft
+fixture records `preview.policy.autoPostReviews` for both `true` and `false`,
+proving the effective setting reaches the retained posting policy. The client
+double fails the probe if any reviewer runtime starts. `smoke-quick`,
+`smoke-preview`, `smoke-retention`, `smoke-publication`, `smoke-publish-later`,
+`smoke-selection`, `smoke-findings`, `smoke-context`, `smoke-target` and
+`smoke-fixture` still pass unchanged.
+
+### Installed-plugin evidence
+
+On 2026-09-07, CLI 1.0.83 with its bundled SDK, Node.js 26.1.0, macOS arm64,
+`scripts/smoke-config-runtime.mjs` passed against the **installed** plugin with
+the child-only controlled `gh` fixture. The probe spends no Copilot credits: the
+`gpt-5.6-terra` / `high` pair it passes is session configuration that gives the
+session an ambient assignment, and no prompt is ever sent. Every command was
+asserted to produce no `user.message`, `assistant.*`, `subagent.*` or
+`tool.execution_start` event, and each `/pr-review-config` command was asserted
+to leave the descendant process list unchanged.
+
+- `rpc.commands.list()` reported both `pr-review` and `pr-review-config`, so one
+  extension really registers two slash commands on this runtime.
+- The derived location was `~/.copilot/pr-review/config.json`, the sibling of the
+  CLI's own `session-state` directory holding the reported workspace. No such
+  file existed before the run; the probe snapshots and restores it, and removes
+  the directory it created.
+- `show` before any write reported `not created yet` and the ambient
+  `gpt-5.6-terra` / `high` assignment for the heavy tier, and created nothing.
+- Native refusals that wrote nothing: unknown key, missing `=`, empty value,
+  a non-boolean `autoPostReviews`, an unavailable model, and an unsupported
+  reasoning effort, plus `unset` with no key and `show` with an extra argument.
+- After `lightModel=gpt-5.6-terra lightEffort=<other> autoPostReviews=true`, the
+  on-disk record was exactly the version-1 schema. Reloading the extension and
+  running `show` again reported the heavy tier as `inherited:light`, so the
+  reloaded process read the stored file rather than run memory.
+- A real `/pr-review 2 --quick --no-comment` invocation logged
+  `Effective PR review configuration for this invocation.` with the heavy tier
+  resolved from the stored light tier and `autoPostReviews: true [configured]`.
+  PR 2 is the fixture draft, so it is skipped and no reviewer starts.
+  Repeating with `heavyEffort=<ambient>` reported `[flag]` and left the stored
+  file unchanged.
+- A stored unavailable model made the same quick invocation fail with
+  `Unavailable or disabled Copilot-subscription model`, rather than substituting
+  one. Invalid JSON and schema version 99 refused both the review and `show`,
+  and the refused update did not rewrite the file.
+- With a closed fixture PR whose confirmation was deliberately left unanswered,
+  a quick review held the session's active-work slot. Both `show` and an update
+  were refused with `A review is already running in this session`, and the
+  update wrote nothing. After declining the confirmation and letting the run
+  settle, configuration worked again.
+- The recorded `gh` request trace was byte-identical across the initial
+  inspection, every refusal, and the update-plus-reload sequence, so inspection
+  and updates make no GitHub request. Later assertions run beside real capture
+  requests, so only that configuration-only span is compared. The decoy
+  checkout, its dirty reviewed path and its branch were unchanged.
+
+`scripts/smoke-runtime.mjs`, `scripts/smoke-runtime.mjs --targets` and
+`scripts/smoke-retention-runtime.mjs` also passed after the change, without
+inference.
+
+### APIs, reproduction and remaining limits
+
+No new runtime API was adopted. The command surface, `rpc.metadata.snapshot`,
+`rpc.model.getCurrent` and `rpc.model.list` were already in use; the installed
+SDK's `extension.d.ts` `JoinSessionConfig` was consulted for the second command
+entry, and the upstream configuration README at the pinned revision was read for
+the documented `show` / `key=value` workflow and inheritance wording. The CLI
+resolves its configuration home as `configDir ?? COPILOT_HOME ?? ~/.copilot`, so
+the store derives it from the reported workspace instead of re-deriving it from
+the environment.
+
+```sh
+node scripts/smoke-config.mjs
+node scripts/smoke-quick.mjs
+node scripts/smoke-preview.mjs
+node scripts/smoke-retention.mjs
+copilot plugin install "$(pwd)"
+COPILOT_CLI_PATH="$(command -v copilot)" \
+COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
+PR_REVIEW_HEAVY_MODEL=gpt-5.6-terra PR_REVIEW_HEAVY_EFFORT=high \
+node scripts/smoke-config-runtime.mjs
+```
+
+Remaining limits:
+
+- A configuration-authorized publication was **not** re-exercised natively. The
+  effective `autoPostReviews` is proven to reach the retained posting policy by
+  the controlled retained run, and `config-authorized` is proven by
+  `smoke-preview.mjs`, but no native run has published under it. Doing so needs
+  a real inference review; `smoke-publication-runtime.mjs --cases=comment`
+  covers the flag-authorized native write.
+- Only the heavy tier is consumed today, because quick is the only implemented
+  mode. The light and medium tiers are stored, resolved and displayed, but no
+  reviewer uses them until M1.
+- Validation binds to the models this session reports. A configuration saved
+  while one ambient model is selected can become unusable under another; `show`
+  marks the tier `UNUSABLE` and the review refuses rather than substituting.
+- The store has no cross-process lock. Two sessions writing at once still leave
+  a complete file thanks to the rename, but the last writer wins.
+- No fallback models, additional modes, safeguards, project trust or interactive
+  menu are included. `--verify` remains unimplemented.
+
 ## Exact next increment
 
-**C1 only:** Inspect and update personal tier configuration through text
-commands, with validated capabilities, tier inheritance and flag precedence.
-Do not implement project-override trust (C2), other review modes, fallbacks or
-safeguards, and do not change publication behavior.
+**C2 only:** Let an explicitly trusted project supply configuration overrides,
+and prove that a repository cannot establish its own trust. Do not implement
+other review modes, fallbacks, safeguards or an interactive menu, and do not
+change publication gates.
 
 Acceptance criteria:
 
-- Add a code-owned configuration command following the upstream
-  `show` and `key=value` workflow, with no interactive menu and no finding
-  editor. Unknown keys, malformed assignments and unsupported values must be
-  explicit errors that change nothing.
-- Support light, medium and heavy model and reasoning-effort assignments.
-  Validate every explicit value against the session's actual available models
-  and their supported efforts. Never silently substitute a model or lower an
-  effort; refuse instead.
-- Preserve upstream nearest-configured-tier and ambient-model inheritance for
-  unset tiers, and display the resulting effective assignments before execution.
-  Keep `autoPostReviews` retained and inspectable, defaulting to false.
-- Persist personal configuration outside the reviewed checkout, in a documented
-  location, with a versioned schema and an explicit error for malformed or
-  incompatible stored settings. Do not read or trust any repository-provided
-  configuration file yet: a repository must not authorize itself, and project
-  overrides remain C2.
-- Explicit invocation flags must take precedence over saved settings for that
-  invocation only, without rewriting the saved configuration. `--comment` /
-  `--no-comment` must still conflict, and effective `autoPostReviews=true` with
-  `--all` must remain able to publish unattended, as recorded in `SCOPE.md`.
-- Configuration inspection and updates must start no inference, no GitHub
-  request and no review work, and must be refused while review or publication
-  work is active.
-- Demonstrate through controlled probes and installed-plugin probes that saved
-  settings actually drive quick reviewer assignments, that flags override them,
-  and that invalid explicit settings are refused rather than downgraded. Reuse
-  the existing no-inference runtime probes where possible instead of spending
-  new inference credits for plumbing.
+- Read a project configuration file from the reviewed repository's working
+  directory only when the personal configuration records explicit trust for that
+  exact repository. An untrusted repository's file must be ignored with a visible
+  message, never merged, and never able to mark itself trusted. Nothing inside
+  the repository may grant, widen or refresh trust.
+- Trust must be granted by an explicit personal command, recorded in the personal
+  store, revocable, and bound to an identity the repository cannot forge on its
+  own. Record what the chosen binding does and does not prove.
+- Apply precedence explicitly: invocation flags, then trusted project settings,
+  then personal settings, then ambient. Show the origin of every effective value
+  in `/pr-review-config show` and before execution, and keep saved files
+  unmodified by an invocation.
+- Project overrides may carry the same keys as personal configuration only.
+  Unknown keys, malformed values, an unsupported schema version and unavailable
+  models or efforts must be explicit errors that change nothing and never
+  downgrade an assignment. A project file must not be able to enable project
+  safeguards or bypass any publication gate.
+- Keep `autoPostReviews` overridable by a trusted project, as `SCOPE.md`
+  records, and state plainly in the docs that trusting a repository can let its
+  file authorize unattended posting for `--all` runs.
+- Configuration commands must still start no inference, no GitHub request and no
+  review work, and stay refused while review or publication work is active.
+- Demonstrate with controlled probes and no-inference installed-plugin probes:
+  an ignored untrusted file, a trusted file overriding a personal tier, revoked
+  trust, a repository trying to trust itself, and a malformed project file
+  refusing the review. Reuse the existing probes rather than spending new
+  inference credits for plumbing.
 - Consult the installed SDK and current official documentation before adopting
   new runtime APIs, then record evidence, remaining limits and the next small
   increment. Follow `AGENTS.md` checkpoint and final-file handoff rules in turn.

@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { ambientAssignment, resolveTier, resolvedAssignment } from "./config.mjs";
 import { reviewAssignments, validateModelAssignment } from "./fixture.mjs";
 import { finishSelection } from "./selection.mjs";
 import { finishPreview, postingAuthority } from "./preview.mjs";
@@ -44,13 +45,15 @@ export function parseQuickArgs(args) {
   return { captureArgs, settings, all: seen.has("--all"), comment: policy.comment, noComment: policy.noComment };
 }
 
-export async function quickAssignments(parent, settings) {
-  const current = await parent.rpc.model.getCurrent();
-  const assignment = {
-    model: settings.heavyModel ?? current.modelId,
-    reasoningEffort: settings.heavyEffort ?? current.reasoningEffort,
+// Quick mode runs the heavy tier only. Invocation flags win over saved tiers,
+// which in turn win over the ambient session model and reasoning effort.
+export async function quickAssignments(parent, flags, configuration) {
+  const context = configuration ?? {
+    settings: {}, ambient: await ambientAssignment(parent), models: (await parent.rpc.model.list()).list,
   };
-  validateModelAssignment(assignment, (await parent.rpc.model.list()).list);
+  const resolution = resolveTier("heavy", { settings: context.settings, ambient: context.ambient, flags });
+  const assignment = resolvedAssignment(resolution);
+  validateModelAssignment(assignment, context.models);
   return quickSpecialists.map(({ label }) => ({ label, ...assignment }));
 }
 
@@ -106,7 +109,7 @@ export function quickPrompt(assignment, snapshot, context, binding) {
 }
 
 export async function executeQuickRun(parent, client, options, assignments, {
-  controller, onStopped, gh = runGh, persist,
+  controller, onStopped, gh = runGh, persist, effectiveConfig,
   invocation = { invocationId: randomUUID(), sessionId: parent.sessionId },
 }) {
   let binding;
@@ -188,6 +191,6 @@ export async function executeQuickRun(parent, client, options, assignments, {
   });
   if (outcome.validation) await parent.log(formatFindings(outcome), { level: outcome.complete ? "info" : "error" });
   const selected = await finishSelection(parent, outcome, options, controller);
-  const proposal = await finishPreview(parent, selected, options, controller, boundary);
+  const proposal = await finishPreview(parent, selected, options, controller, boundary, effectiveConfig);
   return publishCurrent(parent, proposal, boundary, { controller, cwd, gh, persist });
 }

@@ -4,7 +4,8 @@ An original Copilot CLI plugin prototype. **Quick reviews now include grounded
 candidate validation, deduplication, finding selection, posting-authority controls,
 code-controlled COMMENT publication, and session-bound retention with
 uncertain-write protection. A retained selection can also be published later by
-an explicit command, without rerunning reviewers.**
+an explicit command, without rerunning reviewers. Personal model tiers and
+`autoPostReviews` are inspected and updated with `/pr-review-config`.**
 [SCOPE.md](SCOPE.md) is the authoritative product specification;
 [ROADMAP.md](ROADMAP.md) records delivery status and runtime evidence.
 
@@ -27,11 +28,13 @@ Wait for plugin/extension loading to finish, then enter:
 /pr-review models
 /pr-review inspect
 /pr-review publish
+/pr-review-config
 ```
 
 These commands are implemented in JavaScript by a plugin-shipped extension, not
 a model prompt. Status/help make no model calls. `models` queries the session's
 available subscription models and reasoning capabilities without inference.
+One extension registers both `/pr-review` and `/pr-review-config`.
 
 ### Read-only PR target capture (Q1)
 
@@ -121,9 +124,10 @@ reviewers consume it when explicitly requested.
 These commands spend Copilot subscription credits. Quick mode runs exactly three
 heavy specialists concurrently: correctness, contracts, and combined
 security/performance/resources. The example model is not a default. All three
-use the same heavy-tier assignment. Until saved configuration is implemented,
-unset `heavyModel` and `heavyEffort` inherit the current parent session's model
-and reasoning effort independently. Explicit settings and inherited assignments
+use the same heavy-tier assignment. Unset `heavyModel` and `heavyEffort`
+independently fall back to the saved personal configuration described below, and
+then to the current parent session's model and reasoning effort.
+Explicit settings and inherited assignments
 must be available and compatible; an unsupported effort is an error, never
 silently lowered when changing models. An unset ambient effort uses the owned
 runtime's resolved default. Effective settings are displayed before prompts
@@ -133,8 +137,8 @@ Use exactly one of `--quick` and `--major-only`. The existing draft/closed
 overrides still apply to reviewing, not inline publication. Quick accepts
 `--comment`, `--no-comment`, or neither; the posting flags conflict.
 Authorized selections can publish, as described below.
-Other review modes and `--verify` remain unsupported. No personal/project
-configuration or fallback is saved or applied.
+Other review modes and `--verify` remain unsupported. Personal configuration is
+applied; project-provided configuration and fallback models are not.
 
 Dispatch returns after acceptance so cancellation remains available during capture
 or reviewer execution. Capture/skip/error messages, assignments, progress, and
@@ -384,9 +388,11 @@ does not ask for final confirmation. `--comment --no-comment` is rejected before
 capture or inference.
 
 Without a posting flag, the authority calculation consumes effective
-`autoPostReviews`, default false. The calculation is ready for future
-configuration, but there is **no saved setting or invocation syntax for
-`autoPostReviews` yet**. No posting flag or authority decision approves project
+`autoPostReviews`, default false. It is now supplied by the saved personal
+configuration below, so `--all` with an effective `autoPostReviews=true`
+publishes unattended, while `--no-comment` still suppresses posting and
+`--comment` still conflicts with it. There is no invocation syntax for
+`autoPostReviews` itself. No posting flag or authority decision approves project
 safeguards. Missing UI, refusal, malformed answers, cancellation and empty
 selection never authorize a proposal. Incomplete coverage remains explicit;
 surviving validated findings may still be selected and authorized.
@@ -572,6 +578,73 @@ that live exercise and refuses a repeat at the same head; use
 `--verify-record=/absolute/path/to/pr-review-result.json` to re-check an existing
 record without inference or mutation.
 
+### Personal tier configuration (C1)
+
+```text
+/pr-review-config
+/pr-review-config show
+/pr-review-config heavyModel=gpt-5.6-terra heavyEffort=high
+/pr-review-config autoPostReviews=true
+/pr-review-config unset heavyModel heavyEffort
+/pr-review-config help
+```
+
+Text commands only: there is no interactive menu and no finding editor. Keys are
+`lightModel`, `lightEffort`, `mediumModel`, `mediumEffort`, `heavyModel`,
+`heavyEffort`, and `autoPostReviews`. They correspond to the upstream `light`,
+`medium`, `heavy`, `*_thinking`, and `autoPostReviews` settings; upstream's other
+fields are not ported. `autoPostReviews` accepts only `true` or `false` and
+defaults to false.
+
+Every assignment in one invocation applies together or not at all. Unknown keys,
+malformed arguments, empty values, and unsupported models or reasoning efforts
+are explicit errors that write nothing. Models must be available and enabled in
+this session's Copilot subscription, and an effort must be supported by the model
+the tier actually resolves to. An invalid explicit value is refused, never
+replaced by a different model or a lower effort. Because clearing one half of a
+tier can leave the other half unusable, clear a tier's model and effort together.
+
+An unset tier field takes the nearest configured tier, preferring the heavier
+tier when two are equidistant, and otherwise the ambient session model or
+reasoning effort. Model and effort resolve independently. `show` prints the file
+location, the stored settings, the ambient assignment, the effective light,
+medium, and heavy assignments with the origin of each value, and the effective
+`autoPostReviews`. Quick review prints the same report, with invocation flags
+applied, before any reviewer starts.
+
+Invocation flags win over saved settings for that invocation only and never
+rewrite the file: `heavyModel=`/`heavyEffort=` on `/pr-review NUMBER --quick`,
+and `--comment`/`--no-comment` over `autoPostReviews`.
+
+Configuration is personal and lives at `<copilot-config-home>/pr-review/config.json`,
+beside the CLI's own `session-state` directory, so it is never inside a reviewed
+checkout. The file is a versioned record, `{"schemaVersion": 1, "settings": {...}}`,
+written atomically with mode `0600`. Malformed JSON, an unsupported schema
+version, an unknown stored key, or a wrongly typed value is an explicit error
+that refuses both inspection and review; nothing is rewritten or repaired.
+**No repository-provided configuration file is read**, so a repository cannot
+authorize itself; explicitly trusted project overrides remain unimplemented.
+
+Inspection and updates start no inference, make no GitHub request, and run no
+review work. They are refused while a review or publication holds the session's
+active-work slot.
+
+Reproduce the controlled and native probes:
+
+```sh
+node scripts/smoke-config.mjs
+copilot plugin install "$(pwd)"
+COPILOT_CLI_PATH="$(command -v copilot)" \
+COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
+PR_REVIEW_HEAVY_MODEL=gpt-5.6-terra PR_REVIEW_HEAVY_EFFORT=high \
+node scripts/smoke-config-runtime.mjs
+```
+
+The native probe spends no inference credits: the model and effort it passes are
+session configuration, and no prompt is ever sent. It snapshots and restores any
+pre-existing personal configuration file, and uses the controlled `gh` fixture
+plus draft and closed fixture PRs so that no reviewer ever starts.
+
 ### Two-reviewer fixture experiment (F2)
 
 After checking `/pr-review models`, supply **all four settings**:
@@ -672,8 +745,9 @@ Signal/parent-EOF handlers force-stop owned work without waiting for parent
 logging. An abruptly lost parent cannot receive a final report; there is no
 clean-review claim or publication. Normal SDK transcripts may persist, and
 forced termination does not guarantee a final transcript flush. The prototype
-can capture PRs, bind source context, run quick specialists, and validate/deduplicate
-findings, but cannot publish to GitHub or execute project safeguards. It does not restrict or change the model of the surrounding Copilot session. The SDK may
+can capture PRs, bind source context, resolve personal tier configuration, run
+quick specialists, and validate/deduplicate findings, but cannot execute project
+safeguards. It does not restrict or change the model of the surrounding Copilot session. The SDK may
 retain its own session transcripts; no plugin review archive is implemented.
 
 No upstream source has been copied. Source reuse/licensing assessment remains
@@ -690,6 +764,7 @@ node scripts/smoke-target.mjs
 node scripts/smoke-context.mjs
 node scripts/smoke-quick.mjs
 node scripts/smoke-findings.mjs
+node scripts/smoke-config.mjs
 COPILOT_CLI_PATH="$(command -v copilot)" \
 COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
 node scripts/smoke-runtime.mjs
