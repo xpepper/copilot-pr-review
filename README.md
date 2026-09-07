@@ -261,7 +261,11 @@ Classification of model-reported limitations is still fallible; structured
 output does not prove that the model chose the right category.
 
 Final summaries, retained inspection, and new publication proposals show these
-categories and their reasons. Retention keeps optional structured `diagnostics`
+categories and their reasons. When multiple specialists report the same blocked
+assessment about the same quoted code identifier, the presentation conservatively
+consolidates those reports, names their reporters, and keeps the full raw
+diagnostics unchanged in retention. Distinct, unstructured, code-owned, and
+legacy gaps remain separate. Retention keeps optional structured `diagnostics`
 alongside the existing blocking `issues`; caveats do not enter that blocking
 list. The publication/authorization record versions remain unchanged. Older
 unclassified issues and version-1 output limitations stay conservatively

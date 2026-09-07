@@ -5,6 +5,7 @@ import { quickBinding } from "../extensions/pr-review/quick.mjs";
 import {
   adjudicateCandidates, collectCandidates, evidenceBoundary, formatFindings, reviewKey,
 } from "../extensions/pr-review/findings.mjs";
+import { formatCoverage, presentationDiagnostics } from "../extensions/pr-review/coverage.mjs";
 import { blobSha, validationBaseSource, validationHeadSource, validationDiff } from "./target-fixture.mjs";
 
 const baseText = validationBaseSource;
@@ -237,6 +238,43 @@ for (const assessment of [
 assert.equal(uncertain.diagnostics[0].kind, "coverage-gap");
 assert.equal(retained.diagnostics[0].kind, "execution-failure");
 console.log("PASS explicit reviewer/adjudicator caveats, consequential gaps, failures, mixed results and conservative legacy output");
+
+const repeatedDependencyGaps = [
+  {
+    kind: "coverage-gap",
+    message: "contracts: Only dependency manifests are available. Blocked assessment: Whether removing `lapin` causes unresolved imports, macro expansions, or feature-gated build failures cannot be determined.",
+  },
+  {
+    kind: "coverage-gap",
+    message: "correctness: Rust source and feature definitions are absent. Blocked assessment: Whether removing the direct `lapin` dependency breaks compilation through imports, macros, or gated builds cannot be determined.",
+  },
+  {
+    kind: "coverage-gap",
+    message: "security-performance-resources: No source or build result is supplied. Blocked assessment: Whether removing `lapin` leaves an import or macro use that causes a compilation failure cannot be determined.",
+  },
+];
+const consolidated = presentationDiagnostics(repeatedDependencyGaps);
+assert.equal(consolidated.length, 1, "Equivalent specialist gaps should collapse only in presentation");
+assert.equal(consolidated[0].reports, 3);
+assert.deepEqual(consolidated[0].reporters,
+  ["contracts", "correctness", "security-performance-resources"]);
+const consolidatedDisplay = formatCoverage({
+  complete: false, coverage: "incomplete",
+  validation: { diagnostics: repeatedDependencyGaps, issues: repeatedDependencyGaps.map((entry) => entry.message) },
+});
+assert.match(consolidatedDisplay, /coverage gaps: 1 \(3 reports\)/);
+assert.match(consolidatedDisplay, /reported by contracts, correctness, security-performance-resources; 3 reports/);
+assert.equal(repeatedDependencyGaps.length, 3, "Raw diagnostics remain unchanged");
+const distinctLapinGap = {
+  kind: "coverage-gap",
+  message: "contracts: Runtime configuration is absent. Blocked assessment: Whether `lapin` reconnect authentication exposes credentials cannot be determined.",
+};
+assert.equal(presentationDiagnostics([...repeatedDependencyGaps, distinctLapinGap]).length, 2,
+  "A shared identifier must not merge substantively different blocked assessments");
+const unstructuredDuplicate = { kind: "coverage-gap", message: "Changed binary content was unavailable." };
+assert.equal(presentationDiagnostics([unstructuredDuplicate, unstructuredDuplicate]).length, 2,
+  "Code-owned and legacy gaps without structured reporter/impact text remain explicit");
+console.log("PASS equivalent coverage-gap presentation consolidation preserves distinct and raw diagnostics");
 
 for (const mutate of [
   (s, _c, _b) => { s.diff += "\n"; },

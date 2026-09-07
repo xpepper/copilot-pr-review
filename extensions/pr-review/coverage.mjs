@@ -25,6 +25,60 @@ export function coverageDiagnostics(outcome) {
   return diagnostics;
 }
 
+const gapPattern = /^([^:]+): (.+) Blocked assessment: (.+)$/;
+const stopWords = new Set([
+  "after", "also", "and", "any", "are", "because", "been", "before", "being", "cannot", "could",
+  "directly", "each", "for", "from", "into", "its", "not", "of", "only", "or", "such", "that", "the",
+  "their", "these", "this", "through", "to", "was", "were", "whether", "with", "without", "would",
+]);
+
+function gapParts(message) {
+  const match = gapPattern.exec(message);
+  return match && { reporter: match[1], reason: match[2], impact: match[3] };
+}
+
+function gapTokens(value) {
+  return new Set(value.toLowerCase()
+    .replaceAll("compilation", "compile").replaceAll("compile-time", "compile")
+    .replaceAll("dependencies", "dependency").replaceAll("failures", "failure")
+    .replaceAll("imports", "import").replaceAll("expansions", "expansion")
+    .match(/[a-z0-9_-]+/g)?.filter((token) => token.length > 2 && !stopWords.has(token)) ?? []);
+}
+
+function overlap(left, right) {
+  const shared = [...left].filter((token) => right.has(token)).length;
+  return (2 * shared) / (left.size + right.size);
+}
+
+function equivalentGaps(left, right) {
+  const leftParts = gapParts(left.message);
+  const rightParts = gapParts(right.message);
+  if (!leftParts || !rightParts) return false;
+  const leftIdentifiers = new Set(left.message.match(/`[^`]+`/g) ?? []);
+  const sharesIdentifier = [...leftIdentifiers].some((identifier) => right.message.includes(identifier));
+  return sharesIdentifier && overlap(gapTokens(leftParts.impact), gapTokens(rightParts.impact)) >= 0.35;
+}
+
+export function presentationDiagnostics(diagnostics) {
+  const presented = [];
+  for (const diagnostic of diagnostics) {
+    if (diagnostic.kind !== "coverage-gap") {
+      presented.push({ ...diagnostic, reports: 1 });
+      continue;
+    }
+    const group = presented.find((entry) => entry.kind === "coverage-gap" && equivalentGaps(entry, diagnostic));
+    if (!group) {
+      const parts = gapParts(diagnostic.message);
+      presented.push({ ...diagnostic, reports: 1, reporters: parts ? [parts.reporter] : [] });
+      continue;
+    }
+    const parts = gapParts(diagnostic.message);
+    group.reports += 1;
+    if (parts && !group.reporters.includes(parts.reporter)) group.reporters.push(parts.reporter);
+  }
+  return presented;
+}
+
 export function formatCoverage(outcome) {
   const labels = {
     "execution-failure": "Execution failure",
@@ -32,11 +86,24 @@ export function formatCoverage(outcome) {
     caveat: "Informational caveat",
   };
   const diagnostics = coverageDiagnostics(outcome);
-  const count = (kind) => diagnostics.filter((entry) => entry.kind === kind).length;
+  const presented = presentationDiagnostics(diagnostics);
+  const count = (kind) => presented.filter((entry) => entry.kind === kind).length;
+  const rawGapCount = diagnostics.filter((entry) => entry.kind === "coverage-gap").length;
+  const gapCount = count("coverage-gap");
+  const lines = presented.map((entry) => {
+    if (entry.kind !== "coverage-gap" || entry.reports === 1) return `${labels[entry.kind]}: ${entry.message}`;
+    const parts = gapParts(entry.message);
+    return `Coverage gap (reported by ${entry.reporters.join(", ")}; ${entry.reports} reports): ` +
+      `${parts.reason} Blocked assessment: ${parts.impact}`;
+  });
+  if (rawGapCount > gapCount) {
+    lines.push("Equivalent specialist coverage gaps are consolidated for presentation; full diagnostics remain retained.");
+  }
   return [
     `Review coverage: ${outcome.complete ? "completed" : outcome.coverage === "not-started" ? "not-started" : "INCOMPLETE"}.`,
-    `Execution failures: ${count("execution-failure")}; coverage gaps: ${count("coverage-gap")}; ` +
+    `Execution failures: ${count("execution-failure")}; coverage gaps: ${gapCount}` +
+      `${rawGapCount > gapCount ? ` (${rawGapCount} reports)` : ""}; ` +
       `informational caveats: ${count("caveat")}.`,
-    ...diagnostics.map((entry) => `${labels[entry.kind]}: ${entry.message}`),
+    ...lines,
   ].join("\n");
 }

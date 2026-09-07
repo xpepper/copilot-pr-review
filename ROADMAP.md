@@ -2565,17 +2565,73 @@ tool executions. Runtime cleanup completed.
   GET/POST, live anchor coverage and configuration-authorized live publication
   limitations recorded above remain.
 
+## Completed manual-feedback fix: consolidate equivalent coverage gaps
+
+Implemented from clean checkpoint `3079726` on 2026-09-07 after read-only
+inspection of user-selected session `138018d8-296b-4c65-9199-ec9d44c6d13a`.
+That quick run against private `primait/starsky#8126` completed all three
+specialists without execution failures, produced no candidates, and returned
+three substantively equivalent coverage gaps: the supplied manifest/lockfile
+context could not establish whether removing direct `lapin` dependencies still
+left source, macro, feature-gated or build-time uses. This was correctly
+incomplete rather than a clean-review claim, but the repeated presentation was
+unclear. No private diff or source payload was copied into repository fixtures.
+
+`coverage.mjs` now conservatively consolidates presentation-only coverage gaps
+when their structured reviewer messages share a quoted code identifier and
+have strongly overlapping blocked-assessment vocabulary. The displayed gap
+names all reporters, shows one representative reason/impact, reports both the
+consolidated count and raw report count, and states that full diagnostics remain
+retained. Raw validation diagnostics, blocking `issues`, completion semantics,
+selection, retention, publication payload identity and authorization are
+unchanged. Gaps without structured reporter/impact text remain explicit, as do
+same-identifier gaps whose blocked assessments are substantively different.
+
+Synthetic regression coverage models the three dependency-removal reports and
+a distinct same-identifier security assessment. It proves three equivalent raw
+diagnostics become one displayed gap with all reporters, while the distinct gap
+and unstructured code-owned gaps remain separate. The seven existing classified
+presentation suites passed:
+
+```sh
+for script in smoke-findings smoke-quick smoke-selection smoke-retention \
+  smoke-preview smoke-publication smoke-publish-later; do
+  node "scripts/$script.mjs" || exit
+done
+```
+
+The plugin was reinstalled successfully. Native no-inference retention and
+startup/target probes passed with CLI 1.0.83 / bundled SDK / Node.js 26.1.0 on
+macOS arm64:
+
+```sh
+copilot plugin install "$(pwd)"
+COPILOT_CLI_PATH="$(command -v copilot)" \
+COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
+node scripts/smoke-retention-runtime.mjs
+COPILOT_CLI_PATH="$(command -v copilot)" \
+COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
+node scripts/smoke-runtime.mjs --targets --startup
+```
+
+The runtime evidence is synthetic/no-inference and does not prove how actual
+model wording will cluster. Consolidation is deliberately conservative: it can
+leave paraphrases separate, and lexical overlap around a shared quoted
+identifier is not formal semantic equivalence. It never changes completeness
+or removes the retained source diagnostics. Existing runtime, configuration,
+publication and context limitations remain.
+
 ## Exact next increment
 
 **More manual testing and feedback, not automatic continuation to M1.**
 
 Use a fresh ordinary interactive runtime with the reinstalled plugin. The user
-chooses and authorizes any review target; do not rerun private reviews merely
-to demonstrate classification. Inspect user-provided results read-only when
-requested, and distinguish actual model behavior from the synthetic evidence
-above. Look for caveat-only completion, visible consequential gaps and
-execution failures, and zero-finding wording that does not imply a clean PR.
-Preserve personal settings, project trust and publication authority.
+chooses and authorizes any review target; the most direct check is another
+user-run quick review of `primait/starsky#8126`, but do not run it, spend
+inference or access private content without authorization. Inspect the supplied
+session read-only and verify whether equivalent dependency-removal gaps are
+shown once with all reporters, distinct gaps remain visible, and zero findings
+still does not imply a clean PR. Preserve genuine uncertainty.
 
 Address only the next concrete feedback item once identified. Do not start
 balanced mode or add investigation tools on the strength of the older feature
