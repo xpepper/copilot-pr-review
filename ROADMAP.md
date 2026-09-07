@@ -41,7 +41,7 @@ posting them.
 | C1 | Completed | Personal light/medium/heavy tier configuration and `autoPostReviews` inspected and updated by `/pr-review-config`; validated capabilities, nearest-tier/ambient inheritance, flag precedence and effective-assignment display demonstrated below. | F3; [Configuration](SCOPE.md#models-configuration-and-execution) |
 | C2 | Completed | Explicit per-directory trust gates `.copilot/pr-review/config.json` overrides; untrusted files ignored unparsed, self-trust impossible, precedence and revocation demonstrated below. | C1; [Configuration trust](SCOPE.md#models-configuration-and-execution) |
 | R1 | Completed | Verified-checkout reads and matching-head harnesses demonstrated. One authorized live quick review used unchanged source without denials; prior coverage gaps disappeared, but no additional finding was produced. GPT's `rg` alias is supported without widening the grant. | F4, Q3; [Modes/findings](SCOPE.md#review-modes-and-findings) |
-| M1 | Balanced half completed | Balanced is the default with its four heavy specialists, light overview reviewer and three-finding P3/nit cap; demonstrated without live inference. Pending until full adds the conventions reviewer and its findings policy. | Q4, C1; [Modes](SCOPE.md#review-modes-and-findings) |
+| M1 | Balanced half completed | Balanced is the default with its four heavy specialists, light overview reviewer and three-finding P3/nit cap. Demonstrated by controlled probes, no-inference installed dispatch and one live review of this repository's own pull request #3. Pending until full adds the conventions reviewer and its findings policy. | Q4, C1; [Modes](SCOPE.md#review-modes-and-findings) |
 | M2 | Pending | Deep uses one holistic reviewer; reject conflicting mode flags. | M1; [Modes](SCOPE.md#review-modes-and-findings) |
 | C3 | Pending | Explicit optional fallback with at most one eligible retry per failed reviewer; no timers or silent substitutions. | C1, Q3; [Fallbacks/execution](SCOPE.md#models-configuration-and-execution) |
 | V1 | Pending | `--verify` enforces matching branch/SHA/cleanliness before reviewers and presents discovered existing commands for approval. | Q1; [Safeguards](SCOPE.md#optional-project-safeguards) |
@@ -3281,14 +3281,85 @@ executions, or of any `Reviewer ` timeline message.
   an empty personal configuration store; the existing personal `config.json` was
   copied aside for the run and restored byte-identically afterwards.
 
-### Live inference
+### Live inference: the dogfood review of pull request #3
 
-**No live balanced review was run in this session.** No new authorization was
-given, and the R1 authorizations are consumed. Balanced reviewer output,
-adjudication of a real minor finding, and the real cost of five reviewers plus
-an adjudicator therefore remain undemonstrated. The controlled and installed
-evidence above covers plumbing, topology, tier resolution, policy and settlement
-only.
+One live balanced review was explicitly authorized and run, against this
+project's own pull request #3 at head `5c05b7c63d44f7f08a1775d4f2d601dd912c9aa1`
+(base `d88774cb3fc3c5631ba1045c3623af3c780b8336`, 27 files, 1381 additions and
+446 deletions). It was dispatched with
+`node scripts/dogfood-review.mjs 3 --all --no-comment`, which sends the command
+through the SDK command RPC from a session rooted at this checkout. Parent
+session `e5845e77-1237-4a88-b0fd-2e438d251778`, invocation
+`453c696d-89b3-43b2-a556-84be490fe3b6`.
+
+Every reviewer ran `gpt-5.6-terra` at `high`, from the saved personal heavy
+tier. The overview reviewer is on the light tier, but no light tier is saved, so
+it inherited the heavy assignment: this run therefore exercised the balanced
+topology, **not** a genuinely lighter model.
+
+| Reviewer | Tier | Status | Requests | Reported credits | Duration | Tool calls |
+| --- | --- | --- | --- | --- | --- | --- |
+| correctness | heavy | completed | 6 | 88.04068 | 85596 ms | 23 |
+| contracts | heavy | completed | 5 | 90.05597 | 87188 ms | 24 |
+| security | heavy | completed | 4 | 82.11749 | 62526 ms | 16 |
+| performance-resources | heavy | completed | 1 | 63.66150 | 17397 ms | 0 |
+| overview | light | completed | 6 | 90.27063 | 76994 ms | 26 |
+
+Five reviewers overlapped for 17397 ms inside an 87234 ms wall time. The runtime
+reported **414.14627 AI credits** in total. That is the runtime's own figure for
+this review, not a billing reconciliation, and it is roughly fifteen times the
+27.89 credits R1 spent with three reviewers on a small diff. A doc-heavy pull
+request is expensive to review this way.
+
+The reviewers made 89 confined read-only calls (69 `view`, 18 `rg`, 2 `glob`)
+with **zero permission or tool denials**, so the read grant worked on a real
+repository checkout. No adjudicator ran, because no reviewer produced a
+candidate. Selection was `empty`, the proposal was `empty`, publication was
+`not-attempted`, and nothing was written to GitHub.
+
+The result was **0 findings with incomplete coverage**: four coverage gaps and
+two informational caveats. Coverage was incomplete for the right reason, and
+zero findings is not a clean-review claim.
+
+**The review found a real defect in its own pull request.** The `contracts` and
+`overview` reviewers independently reported that the rename of
+`scripts/smoke-quick.mjs` left a `README.md` reproduction command pointing at the
+removed script, and that they could not present it as a candidate because the
+stale line is unchanged context rather than a changed line. Verbatim, from
+`contracts`:
+
+```text
+The patch renames the documented smoke suite, but the README reproduction command that still invokes the old filename is unchanged diff context rather than an added or removed source line. The required changed-line-only location schema cannot anchor that user-visible regression.
+```
+
+That gap was verified by hand and was correct: `README.md` had two references to
+the old filename and the increment's edit fixed only the first. The second was
+fixed on the same branch after this review, and the docs now name only scripts
+that exist.
+
+The `security` reviewer recorded that the captured source cannot demonstrate
+runtime enforcement of the light reviewer's read-only boundary, and
+`performance-resources` recorded that no live evidence existed for the
+five-reviewer topology's operational cost. This run partly answers the second
+gap with its own numbers above, and the confinement evidence for the first
+remains the separate no-inference `smoke-reviewer-tools.mjs` probe.
+
+Limitations of this single run: one pull request, one model, one effort level,
+and a change set dominated by documentation. It demonstrates that balanced
+executes end to end on a real pull request with real reads and a real charge. It
+demonstrates nothing about balanced review quality, about minor findings, or
+about the light tier, since no light model ran and no candidate was ever
+adjudicated.
+
+**Recorded tool defect: the changed-line anchoring rule hid a real regression.**
+Two reviewers found a genuine, user-visible consequence of this diff and had no
+compliant way to report it, because the affected line is unchanged context even
+though the rename that broke it is a changed line. The rule exists to stop
+reviewers auditing the repository at large, and it should not simply be relaxed.
+A later increment should decide how a candidate can be anchored on the changed
+line that causes the breakage while citing the unchanged line that it breaks.
+Until then, expect stale-reference regressions to surface as coverage gaps
+rather than findings.
 
 ### Reproduction
 
@@ -3321,8 +3392,10 @@ it afterwards.
 
 ### Remaining limitations
 
-- No live balanced review, so no evidence about balanced review quality, minor
-  finding usefulness, light-model output quality, or five-reviewer cost.
+- One live balanced review exists, on this project's own doc-heavy pull request.
+  It produced no findings and no adjudication, so balanced review quality and
+  minor-finding behavior are still undemonstrated. No light model has ever run,
+  because the light tier inherited the heavy assignment.
 - No light-tier invocation flag, so a per-invocation light override requires
   `/pr-review-config`. Deliberate: no configuration surface was added.
 - `--capture-only` is prototype surface outside `SCOPE.md`, introduced only

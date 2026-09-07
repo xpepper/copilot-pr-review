@@ -275,9 +275,12 @@ reviewer tools, evidence boundary, isolated adjudication, selection, retention
 and publication gates. Cancellation still stops all owned work, no timeout is
 imposed, and incomplete coverage is still reported as incomplete.
 
-Balanced execution is demonstrated by controlled probes and no-inference
-installed dispatch. **No live balanced review has been run**; see
-[ROADMAP.md](ROADMAP.md).
+Balanced execution is demonstrated by controlled probes, no-inference installed
+dispatch, and one live review of this project's own pull request #3: five
+reviewers, 89 confined reads with no denials, zero findings with incomplete
+coverage, and 414.14627 reported AI credits. That run says nothing about review
+quality, and its light reviewer inherited the heavy assignment because no light
+tier was saved. See [ROADMAP.md](ROADMAP.md).
 
 ### Grounded findings and deduplication (Q4)
 
@@ -979,7 +982,7 @@ Node.js 22+ and the SDK bundled with the installed CLI (adjust its path):
 node scripts/smoke-fixture.mjs
 node scripts/smoke-target.mjs
 node scripts/smoke-context.mjs
-node scripts/smoke-quick.mjs
+node scripts/smoke-review.mjs
 node scripts/smoke-findings.mjs
 node scripts/smoke-config.mjs
 COPILOT_CLI_PATH="$(command -v copilot)" \
