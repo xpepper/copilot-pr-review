@@ -7,9 +7,13 @@ if (!trace) throw new Error("This gh test double requires PR_REVIEW_SMOKE_TRACE.
 const args = process.argv.slice(2);
 const cwd = process.cwd();
 const history = readFileSync(trace, "utf8").split("\n").filter(Boolean).map(JSON.parse);
-appendFileSync(trace, `${JSON.stringify({ args, cwd, repoOverride: process.env.GH_REPO ?? null })}\n`);
+const stdin = args.includes("--input") ? readFileSync(0, "utf8") : undefined;
+const input = stdin === undefined ? undefined : JSON.parse(stdin);
+appendFileSync(trace, `${JSON.stringify({
+  args, cwd, repoOverride: process.env.GH_REPO ?? null, ...(input !== undefined ? { input } : {}),
+})}\n`);
 try {
-  process.stdout.write(respond(args, cwd, history));
+  process.stdout.write(respond(args, cwd, history, stdin));
 } catch (error) {
   console.error(error.message);
   process.exitCode = 1;

@@ -474,6 +474,15 @@ for the harness; it is not plugin behavior. Reload and conversation-backed cold
 resume preserve the exact version-3 record. These are native SDK-host
 interactions, not a claim about human terminal clicks or other clients.
 
+Using the same CLI/SDK/model environment, run
+`node scripts/smoke-publication-runtime.mjs --cases=comment,stale,uncertain,cancel,reject,confirmed,declined,suppressed,draft`
+for the P4 publication boundary. The controlled `gh` process holds each response
+until the harness observes the actual `in-flight` record and stopped inference.
+The cancellation case kills that owned POST process and preserves uncertainty.
+Each case has its own session, because unresolved publication journals must not
+be overwritten. The default cases are `comment,stale,uncertain`; all listed cases
+have been demonstrated. These fixture POSTs never contact GitHub.
+
 The permitted playground PR [#1](https://github.com/xpepper/copilot-pr-review/pull/1)
 demonstrates a real COMMENT review and unresolved inline thread on the reviewed
 head, with incomplete coverage explicitly preserved. Both synthetic branches are

@@ -1,4 +1,11 @@
 import { createHash } from "node:crypto";
+import { existsSync, writeFileSync } from "node:fs";
+
+// These targets share the source fixture, not guaranteed model output.
+export const publicationNumbers = {
+  comment: 50, confirmed: 50, declined: 50, suppressed: 50,
+  reject: 51, uncertain: 52, cancel: 53, stale: 54, draft: 55,
+};
 
 export const repository = {
   id: "R_fixture", nameWithOwner: "fixture/repository", url: "https://github.com/fixture/repository",
@@ -100,13 +107,80 @@ export function contentsResponse(path, ref) {
   });
 }
 
-export function respond(args, cwd, history) {
+const publishOptIn = () => process.env.PR_REVIEW_SMOKE_ALLOW_PUBLISH === "1";
+
+function postScenario(number) {
+  if (number === publicationNumbers.reject) return "422";
+  if (number === publicationNumbers.uncertain) return "lost";
+  if (number === publicationNumbers.cancel) return "cancel";
+  return "success";
+}
+
+function httpResponse(status, statusText, body) {
+  return `HTTP/2.0 ${status} ${statusText}\r\nContent-Type: application/json\r\n\r\n${body}`;
+}
+
+function postResponse(args, cwd, stdin) {
+  if (!publishOptIn()) {
+    throw new Error(`Unexpected gh command (native publication opt-in required): ${JSON.stringify(args)} in ${cwd}`);
+  }
+  const endpoint = /^repos\/fixture\/repository\/pulls\/(\d+)\/reviews$/.exec(args[5]);
+  if (JSON.stringify(args.slice(0, 5)) !== JSON.stringify(["api", "--hostname", "github.com", "--method", "POST"]) ||
+      args.length !== 13 || args[6] !== "--include" || args[7] !== "--input" || args[8] !== "-" ||
+      args[9] !== "-H" || args[10] !== "Accept: application/vnd.github+json" ||
+      args[11] !== "-H" || args[12] !== "X-GitHub-Api-Version: 2022-11-28" || !endpoint) {
+    throw new Error(`Unexpected publication POST shape: ${JSON.stringify(args)} in ${cwd}`);
+  }
+  const number = Number(endpoint[1]);
+  const payload = JSON.parse(stdin);
+  if (payload.event !== "COMMENT" || payload.commit_id !== "b".repeat(40) || !payload.comments?.length) {
+    throw new Error("Unexpected publication payload");
+  }
+  const marker = process.env.PR_REVIEW_SMOKE_POST_MARKER;
+  if (marker) {
+    writeFileSync(marker, JSON.stringify({ pid: process.pid }));
+    // Hold the response until the harness observes the durable journal, or
+    // cancellation kills this owned process. This never bounds reviewer work.
+    const deadline = Date.now() + 10000;
+    while (!existsSync(`${marker}.release`)) {
+      if (Date.now() >= deadline) throw new Error("fixture: POST observation was not acknowledged");
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10);
+    }
+  }
+  const scenario = postScenario(number);
+  // Match gh's non-zero exit while retaining HTTP headers in stdout.
+  if (scenario === "422") {
+    process.exitCode = 1;
+    return httpResponse(422, "Unprocessable Entity", JSON.stringify({ message: "Validation Failed" }));
+  }
+  if (scenario === "lost") {
+    process.exitCode = 1;
+    return httpResponse(503, "Service Unavailable", JSON.stringify({ message: "Service Unavailable" }));
+  }
+  if (scenario === "cancel") {
+    throw new Error("fixture: cancellation case must kill the POST process, not release its response");
+  }
+  const id = 900000000 + number;
+  return httpResponse(200, "OK", JSON.stringify({
+    id, state: "COMMENTED", commit_id: payload.commit_id, body: payload.body,
+    html_url: `${repository.url}/pull/${number}#pullrequestreview-${id}`,
+  }));
+}
+
+export function respond(args, cwd, history, stdin) {
   if (JSON.stringify(args) === JSON.stringify(["repo", "view", "--json", "id,nameWithOwner,url"])) {
     return JSON.stringify(repository);
+  }
+  if (args[0] === "api" && args[3] === "--method" && args[4] === "POST") {
+    return postResponse(args, cwd, stdin);
   }
   if (args.length !== 8 || args[6] !== "-H" ||
       JSON.stringify(args.slice(0, 5)) !== JSON.stringify(["api", "--hostname", "github.com", "--method", "GET"])) {
     throw new Error(`Unexpected gh command: ${JSON.stringify(args)} in ${cwd}`);
+  }
+  if (args[5] === "repos/fixture/repository") {
+    if (args[7] !== "Accept: application/vnd.github+json") throw new Error("Unexpected media type");
+    return JSON.stringify({ node_id: repository.id, full_name: repository.nameWithOwner, html_url: repository.url });
   }
   const number = Number(/^repos\/fixture\/repository\/pulls\/(\d+)$/.exec(args[5])?.[1]);
   if (number) return apiResponse(number, args[7], history);
@@ -116,11 +190,14 @@ export function respond(args, cwd, history) {
   return contentsResponse(decodeURIComponent(contents[1]), contents[2]);
 }
 
+const publicationDiffNumbers = new Set(Object.values(publicationNumbers));
+
 function apiResponse(number, accept, history) {
   if (number === 8) throw new Error("fixture: HTTP 404 unavailable PR");
   if (accept === "Accept: application/vnd.github.diff") {
     return number === 13 ? validationDiff + shippingDiff
-      : number === 12 ? validationDiff : number === 10 ? diff.slice(0, -2) : diff;
+      : number === 12 || publicationDiffNumbers.has(number) ? validationDiff
+        : number === 10 ? diff.slice(0, -2) : diff;
   }
   if (accept !== "Accept: application/vnd.github+json") throw new Error("Unexpected media type");
   const result = pull(number);
@@ -133,5 +210,9 @@ function apiResponse(number, accept, history) {
   }
   // PR 11 advances only after a complete capture, never mid-capture.
   if (number === 11 && reads >= 3) result.head.sha = "c".repeat(40);
+  // PR 54/55 stay stable through the quick run's own capture (2 metadata reads
+  // + 1 diff read), then drift exactly as publication re-reads them fresh.
+  if (number === publicationNumbers.stale && reads >= 3) result.head.sha = "d".repeat(40);
+  if (number === publicationNumbers.draft && reads >= 3) result.draft = true;
   return JSON.stringify(result);
 }

@@ -8,7 +8,7 @@ import {
 } from "../extensions/pr-review/quick.mjs";
 import { captureTarget, parseTargetArgs } from "../extensions/pr-review/target.mjs";
 import { assembleContext } from "../extensions/pr-review/context.mjs";
-import { respond } from "./target-fixture.mjs";
+import { repository, respond } from "./target-fixture.mjs";
 import { reviewKey, validationInstructions } from "../extensions/pr-review/findings.mjs";
 import { retainedRecord, sessionStore, validateRecord } from "../extensions/pr-review/retention.mjs";
 import { executeRetainedQuick } from "../extensions/pr-review/retained-run.mjs";
@@ -378,29 +378,62 @@ console.log("PASS quick selection/authority/preview consume final findings after
 
 const directory = mkdtempSync(join(tmpdir(), "pr-review-preview-"));
 try {
-  const h = harness({ withCandidate: true, acceptCandidate: true });
-  h.parent.sessionId = randomUUID();
-  const workspacePath = join(directory, h.parent.sessionId);
-  mkdirSync(workspacePath);
-  h.parent.rpc.metadata.snapshot = async () => ({
-    sessionId: h.parent.sessionId, workspacePath, isRemote: false, workingDirectory: directory,
-  });
-  h.parent.log = async (message) => {
-    h.messages.push(message);
-    if (message.startsWith("Publication:")) h.controller.abort(new DOMException("final-log cancellation", "AbortError"));
-  };
-  const result = await executeRetainedQuick(h.parent, h.client, parseQuickArgs("1 --quick --all --comment"),
-    structuredClone(assignments), { controller: h.controller, gh: fakeGh() });
-  assert(h.messages.some((message) => message.startsWith("Review proposal: flag-authorized")), "Proposal was authorized before cancellation");
-  assert.equal(result.preview.status, "cancelled");
-  assert.equal(result.preview.authorized, false);
-  assert.equal(result.preview.request, undefined);
-  const record = (await sessionStore(h.parent)).read();
-  assert.equal(record.outcome.preview.status, "cancelled");
-  assert.deepEqual(record.outcome.selection.findingIds, []);
-  assert.equal(record.outcome.validation.findings.length, 1);
-  assert.equal(h.sessions.length, 4);
+  for (const publication of ["not-attempted", "succeeded"]) {
+    const h = harness({ withCandidate: true, acceptCandidate: true });
+    h.parent.sessionId = randomUUID();
+    const workspacePath = join(directory, h.parent.sessionId);
+    mkdirSync(workspacePath);
+    h.parent.rpc.metadata.snapshot = async () => ({
+      sessionId: h.parent.sessionId, workspacePath, isRemote: false, workingDirectory: directory,
+    });
+    h.parent.log = async (message) => {
+      h.messages.push(message);
+      if (message.startsWith("Publication:")) h.controller.abort(new DOMException("final-log cancellation", "AbortError"));
+    };
+    const readGh = fakeGh();
+    let posts = 0;
+    const gh = async (args, cwd, options) => {
+      if (publication === "not-attempted") {
+        if (args[5] === "repos/fixture/repository") throw new Error("Controlled preflight failure");
+        return readGh(args, cwd, options);
+      }
+      if (args[5] === "repos/fixture/repository") {
+        return JSON.stringify({ node_id: repository.id, full_name: repository.nameWithOwner, html_url: repository.url });
+      }
+      if (args[4] === "POST") {
+        posts++;
+        assert.equal((await sessionStore(h.parent)).read().outcome.publication.status, "in-flight");
+        const payload = JSON.parse(options.input);
+        return "HTTP/2.0 200 OK\r\n\r\n" + JSON.stringify({
+          id: 42, state: "COMMENTED", commit_id: payload.commit_id, body: payload.body,
+          html_url: "https://github.com/fixture/repository/pull/1#pullrequestreview-42",
+        });
+      }
+      return readGh(args, cwd, options);
+    };
+    const result = await executeRetainedQuick(h.parent, h.client, parseQuickArgs("1 --quick --all --comment"),
+      structuredClone(assignments), { controller: h.controller, gh });
+    assert(h.messages.some((message) => message.startsWith("Review proposal: flag-authorized")), "Proposal was authorized before cancellation");
+    assert.equal(result.publication.status, publication);
+    assert.equal(result.preview.status, publication === "succeeded" ? "flag-authorized" : "cancelled");
+    assert.equal(result.preview.authorized, publication === "succeeded");
+    const record = (await sessionStore(h.parent)).read();
+    assert.deepEqual(record, retainedRecord(result));
+    if (publication === "succeeded") {
+      assert.equal(posts, 1);
+      assert.equal(record.outcome.publication.cancelRequested, true);
+      assert.equal(record.outcome.cancelled, false);
+      assert.equal(record.outcome.selection.findingIds.length, 1);
+      assert(record.outcome.preview.request);
+    } else {
+      assert.equal(posts, 0);
+      assert.equal(result.preview.request, undefined);
+      assert.deepEqual(record.outcome.selection.findingIds, []);
+    }
+    assert.equal(record.outcome.validation.findings.length, 1);
+    assert.equal(h.sessions.length, 4);
+  }
 } finally {
   rmSync(directory, { recursive: true });
 }
-console.log("PASS final retention-log cancellation revokes an authorized proposal before atomic storage");
+console.log("PASS final retention-log cancellation revokes an unsubmitted proposal but preserves a confirmed write and historical selection");

@@ -20,7 +20,7 @@ const parentTurn = process.argv.includes("--parent-turn");
 assert(!modes.includes("unavailable") || (modes.length === 1 && !parentTurn),
   "Run unavailable alone without --parent-turn; it uses a separate UI-less session");
 const { CopilotClient, RuntimeConnection } = await import(pathToFileURL(resolve(sdkPath, "index.js")).href);
-const target = await prepareTargetSmoke();
+const target = await prepareTargetSmoke({ allowPublish: true });
 let client;
 const connect = () => new CopilotClient({ connection: RuntimeConnection.forStdio({ path: resolve(cliPath) }) });
 async function command(session, args) {
@@ -117,7 +117,7 @@ try {
           pending.answer.resolve({ action: "accept", content: { findingIds: [choices[0].const] } });
         } else {
           assert.equal(request.requestedSchema.properties.authorize.default, false);
-          assert.match(request.message, /PREVIEW ONLY/);
+          assert.match(request.message, /Authorize this exact COMMENT review proposal/);
           if (mode === "cancel-pending") cancellation = command(session, "cancel");
           else pending.answer.resolve({ action: "accept", content: { authorize: mode === "confirmed" } });
         }
@@ -148,15 +148,20 @@ try {
         if (mode === "subset-comment") assert.equal(outcome.preview.request.payload.comments.length, 1);
       }
       assert.equal(messages.filter((m) => /^Reviewer [\w-]+: starting$/.test(m)).length, 4, "No hidden inference rerun");
-      assert.equal(messages.filter((m) => m.startsWith("COMMENT review payload PREVIEW ONLY")).length, 1);
+      assert.equal(messages.filter((m) => m.startsWith("COMMENT review payload proposal")).length, 1);
       assert.equal(messages.filter((m) => m.startsWith("P2 evidence: ")).length, 1);
+      if (outcome.preview.authorized) {
+        assert.equal(outcome.publication.status, "succeeded");
+      } else {
+        assert.equal(outcome.publication.status, "not-attempted");
+      }
       await session.rpc.extensions.reload();
       assert.deepEqual(await inspect(session), record);
       await target.quickTarget.check();
       console.log(`PASS P3 native ${mode}: ${JSON.stringify({
         sessionId: session.sessionId, digest: record.digest, ownedPid: owned[0].pid,
         coverage: outcome.coverage, selection: outcome.selection.findingIds,
-        preview: outcome.preview, reloadPreserved: true,
+        preview: outcome.preview, publication: outcome.publication, reloadPreserved: true,
       })}`);
     } finally {
       pending.answer.resolve({ action: "cancel" });

@@ -25,7 +25,7 @@ in [AGENTS.md](AGENTS.md); the replaceable next-session prompt lives in
 | P1 | Completed | Invocation-bound validated finding selection via native elicitation or `--all`; subset/none/cancellation, invalid-answer rejection and no-UI behavior demonstrated below. No writes/cache. | Q4; [Selection/publication](SCOPE.md#selection-publication-and-cached-results) |
 | P2 | Completed | Retain the latest settled quick result in its originating local session; inspect without inference/GitHub access. Reload and conversation-backed cold resume demonstrated; command-only resume caveat below. | P1; [Cached results](SCOPE.md#selection-publication-and-cached-results) |
 | P3 | Completed | Independent posting authority, explicit confirmation and code-built COMMENT payload preview; native cancellation/reload/resume and no-submission evidence below. | P1; [Publication controls](SCOPE.md#selection-publication-and-cached-results) |
-| P4 | In progress | Current-run COMMENT publication and durable uncertain-write handling implemented; controlled and real-playground publication demonstrated below. Native controlled failure/reload probes remain before completion. | P3; [Publication gates](SCOPE.md#selection-publication-and-cached-results) |
+| P4 | Completed | Current-run COMMENT publication with fresh gates and durable uncertainty; nine native cases, reload/cold resume and real playground inline publication demonstrated below. | P3; [Publication gates](SCOPE.md#selection-publication-and-cached-results) |
 | P5 | Pending | Publish retained selected findings without rerunning reviewers; reject changed heads and prevent publication after cancellation. | P2, P4; [Cached publication](SCOPE.md#selection-publication-and-cached-results) |
 | C1 | Pending | Inspect/update personal tier configuration via text commands; validate capabilities, inheritance, and flag precedence; show effective assignments. | F3; [Configuration](SCOPE.md#models-configuration-and-execution) |
 | C2 | Pending | Explicit trust gates project overrides; prove a repository cannot authorize itself. | C1; [Configuration trust](SCOPE.md#models-configuration-and-execution) |
@@ -1567,10 +1567,14 @@ storage/no-lock/no-power-loss and Q4's semantic/context-window limitations remai
 No publish-later execution, configuration, additional mode, fallback or safeguard
 was added.
 
-## P4 implementation checkpoint
+## Completed increment: P4
 
-Continues from P3 `1b6576e` and handoff `0f2a772`. No upstream source was copied.
-The implementation is current-run publication only, not cached publish-later.
+Implementation checkpoint `5df3083` continues from P3 `1b6576e` and handoff
+`0f2a772`. The user subsequently authorized pushing the completed checkpoint;
+`5df3083` was pushed to `origin/main`. The session-ending evidence/handoff
+checkpoint follows it. No synthetic branch was merged and no upstream source
+was copied. The implementation is current-run publication only, not cached
+publish-later.
 
 ### Publication and retention boundary
 
@@ -1698,10 +1702,76 @@ node scripts/smoke-publication-live.mjs --pr=1 \
   --verify-record="$HOME/.copilot/session-state/ae279b4d-53e7-4116-9ccd-86248db90b73/pr-review-result.json"
 ```
 
-Native controlled success/failure/cancellation/reload probes remain in progress
-at this implementation checkpoint. Remote RIGHT single-line anchor acceptance
-is demonstrated; real LEFT/multiline/rename/deletion acceptance is not yet
-demonstrated. The final GET/POST is not an atomic compare-and-submit operation:
+### Final installed-plugin evidence
+
+All nine cases in `scripts/smoke-publication-runtime.mjs` passed against the
+installed plugin with actual `gpt-5.6-terra` / `high` inference and opt-in,
+child-only controlled `gh` responses. Each starts three specialists and one
+validator and requires positive canonical findings. For every POST the fixture
+holds its response until the harness reads the actual version-3 `in-flight`
+record from the host-reported session workspace and confirms owned inference
+already exited. It then releases the response or cancels the run while the
+owned `gh` process is held; the cancellation case also verifies that PID exits.
+Exact posted stdin equals the retained canonical COMMENT payload.
+
+| Case | Session | Owned inference PID | Result | Durable digest |
+| --- | --- | --- | --- | --- |
+| comment | `2759fec3-2f78-4a65-a9c6-1fe72b5ef801` | 64360 | succeeded | `b3d0ae02b2a16ef8305ea002f5c0850c3edac6174592066305f541cc555aceb9` |
+| stale | `5d752a69-4b98-411e-a4a3-3f615dec428b` | 65247 | not-attempted | `5d7c023038cabfff1675c92e87ae251898f34f68550f6e53b83edff58ded51a6` |
+| uncertain | `b71dfecb-7f63-4de0-8d9e-3581afb6dc11` | 66199 | uncertain (HTTP 503) | `8962b425ca4099ac971bae4e27f554781e24a7ce348a38f096cd65d442fcc561` |
+| cancel | `272bb619-4b0e-4aab-8726-c084ed1a9123` | 67112 | uncertain + cancelRequested | `8f524c1197bedc518ed047273b361e7f723b48675c608d1c2295be0e9bc7ff81` |
+| reject | `76d430f2-8a5b-4a20-aaf4-b4cda3be4d09` | 68038 | failed (HTTP 422) | `d7f92ed8692f5b6fface7d05904239dea01f06a88cd71486a12b2c196436284c` |
+| confirmed | `22e460a8-3581-4100-9553-c16d4ce9d0f1` | 69042 | succeeded after final UI acceptance | `483ec6a96d8c662b14aa24132b25d107067fd523d89830b99202d1713a47159c` |
+| declined | `94d6bd55-9b07-4cfa-a5cf-c6a40a32dcf0` | 69914 | not-attempted | `4f65fd17e0dd11bca86e5f87ed9ed46664b842e5f315b3e6cc33ea7ebdb541ab` |
+| suppressed | `3e9edec4-4a79-421f-b278-779b9da4dc8f` | 70819 | not-attempted | `12658f5f48a360f9e88aa03971f75fb2e80d0410d81f7f0e964420a22176e271` |
+| draft | `26794ad8-50fa-4044-88c1-19b3ef7679e9` | 71818 | not-attempted after draft transition | `357b49ecdd2ca6c1888dcd684924aa4518a9d08f3139ca781b9680b86f5ee77c` |
+
+Every case preserved its exact record through native extension reload and
+inspection, with no inference, GitHub requests or source changes during
+inspection. Rejected publication retained incomplete review coverage; the other
+eight completed their review coverage. Post-inference cancellation correctly
+preserved the completed historical review instead of pretending to undo it.
+No case retried its POST. The first controlled native attempt stopped on a
+harness-only source-status assertion because its coordination marker was in
+the untracked checkout. Markers now live inside the fixture's `.git` directory;
+the successful nine-case run followed that correction. No real GitHub mutation
+was repeated by these controlled probes.
+
+The updated `smoke-preview-runtime.mjs` additionally demonstrated one shared
+native session `d994ac73-b839-4c2e-9035-5b0591f2eda3` with authorized all,
+pending-confirmation cancellation/inert late acceptance, and subset selection
+despite `--comment`. The selected subset published only one of multiple validated
+findings, with incomplete coverage preserved. Owned inference PIDs
+73301/74287/75173 exited; each exact record survived reload. With one
+harness-only parent initialization turn, cold resume in a fresh runtime preserved
+the final version-3 record digest
+`e03fe25a27c8b453d8856decd3d71941084a590b12efecb29957d7cdcf803bb4`.
+No plugin-created transcript history or hidden inference was introduced.
+
+`smoke-runtime.mjs --targets` and `smoke-retention-runtime.mjs` also passed
+without inference. Legacy version-1 inspection/reload remained available, while
+command-only cold resume still honestly reported `Session not found`.
+`smoke-quick.mjs` now exercises the actual final-retention-log cancellation
+boundary both before dispatch and after confirmed success, checking the atomic
+record rather than only calling the cancellation helper.
+
+Reproduce with the explicit environment from above:
+
+```sh
+node scripts/smoke-publication-runtime.mjs --cases=comment,stale,uncertain,cancel,reject,confirmed,declined,suppressed,draft
+node scripts/smoke-preview-runtime.mjs --cases=comment,cancel-pending,subset-comment --parent-turn
+```
+
+These native cases deliberately spend inference credits and start no automatic
+positive-output retries. Fixture publication requires an explicit harness opt-in;
+never put the fixture `gh` on ordinary PATH. Reinstall only after extension edits
+and use a fresh runtime. Direct-install deprecation remains a CLI caveat.
+
+### Remaining limitations
+
+Remote RIGHT single-line anchor acceptance is demonstrated; real
+LEFT/multiline/rename/deletion acceptance is not yet demonstrated (controlled
+payload/citation gates cover them). The final GET/POST is not an atomic compare-and-submit operation:
 a concurrent remote update can still make the explicitly head-bound review
 outdated. No stale fallback is used. P2's command-only cold-resume/no-lock/
 no-power-loss guarantees and Q4 semantic/context-window limits remain. Full F3
@@ -1710,43 +1780,47 @@ fallback or safeguard work is included.
 
 ## Exact next increment
 
-**P4 only:** Submit the current run's authorized canonical selection as a
-code-controlled COMMENT review, with lifecycle/head/anchor gates and explicit
-uncertain-write handling. Do not implement retained publish-later (P5).
+**P5 only:** Explicitly publish this originating session's retained selected
+findings without rerunning reviewers. Reuse P4's code-controlled COMMENT gates
+and durable write-state handling; do not implement configuration or other modes.
 
 Acceptance criteria:
 
-- Preserve independent selection and posting authority. Only a nonempty,
-  explicitly selected, authorized, non-cancelled current invocation may reach
-  a write. `--no-comment`, refusal, unavailable UI and cancelled/failed proposal
-  states must not submit. Incomplete coverage must remain visible, not silently
-  become a clean review or an approval.
-- Bind the mutation to the originating repository identity/host, PR and reviewed
-  head, never a later cwd. Recheck head and lifecycle before writing; reject
-  changed heads and invalid anchors. Draft review overrides do not implicitly
-  bypass publication gates. Consult upstream behavior and `SCOPE.md` for exact
-  lifecycle controls; do not infer publishing permission from review capture.
-- Send only the code-built COMMENT payload, not model-created mutation commands
-  or arbitrary JSON. Preserve valid inline anchors and applicable concise-summary
-  behavior, never stale/body-only fallback, APPROVE or REQUEST_CHANGES.
-- Record publication state sufficiently to distinguish no attempt, confirmed
-  success, definite failure and uncertain write outcomes. Do not blindly retry
-  after transport loss or cancellation once a write may have reached GitHub.
-  Cancellation must stop owned work/prevent subsequent writes without falsely
-  claiming an in-flight remote mutation was undone.
-- Keep session-bound retention and schema compatibility explicit; old preview
-  authority is not a future-run capability. Preserve selection, coverage,
-  no-timeout execution and the final cancellation/storage boundary. Do not
-  introduce cached publish-later or a cross-session archive.
-- Demonstrate payload/mutation gates and failure handling through controlled
-  probes and the installed plugin. Use the permitted `xpepper/copilot-pr-review`
-  playground for a suitable live publication exercise if possible without
-  violating no-push/no-merge instructions; report any missing live evidence
-  honestly rather than claiming remote acceptance from request shape alone.
-- Consult installed SDK/current official documentation before new runtime APIs.
-  Update this roadmap with evidence, reproduction, limitations and the next
-  increment, then follow the local checkpoint/final-file handoff rules.
+- Add an explicit publish-later command for the current local originating
+  session only, with no cross-session or different-target argument. Publication
+  is a new explicit user authorization, never reuse of retained historical
+  `--comment`, confirmation or config authority. A prior `--no-comment` run can
+  be published by this later explicit command.
+- Publish only nonempty retained canonical selected IDs with their original
+  repository/PR/reviewed-head binding. Preserve incomplete coverage and finding
+  text. Reject unavailable/malformed/wrong-session/cancelled/unselected records.
+  Do not introduce an editor or new cross-session selection workflow.
+- Reread only GitHub evidence needed to reestablish valid current anchors,
+  source provenance and P4 gates. Retention does not contain the captured
+  `evidenceBoundary`; do not treat `reviewRequest` reconstruction or quotations
+  alone as a fresh source/diff check. Reject changed heads/base/diffs and
+  draft/non-open inline publication, never stale or body-only fallback.
+- Start no reviewer, validator or parent model inference, even on reload/resume.
+  Never read unrelated local source, switch branches or execute safeguards.
+  Host-reported originating session storage and explicit captured remote
+  identity must remain authoritative despite a changed session cwd.
+- Refuse blind repeat publication of confirmed success or unresolved
+  `in-flight`/`uncertain` results. Keep the journal and actual write outcome
+  intact on interruption, cancellation, error and storage failure. Any explicit
+  retry after a definite failure must rerun fresh gates with fresh authority.
+- Keep active-run exclusion and cancellation working for publish-later.
+  Persist uncertainty before dispatch and final outcomes before awaited logging;
+  cancellation after dispatch cannot undo a remote write. Preserve version-1/2
+  inspection compatibility and deliberately version any publication-schema
+  changes rather than manufacturing missing permissions.
+- Demonstrate no-inference publish-later and refusal cases through controlled
+  and installed-plugin probes, including reload and supported same-session
+  resume. Extend the permitted synthetic playground only when explicitly
+  authorized; never merge its branches or blindly repeat #1's existing review.
+- Consult installed SDK/current official documentation before new runtime APIs,
+  then record evidence, remaining limits and the next small increment. Follow
+  `AGENTS.md` checkpoint and final-file handoff rules in turn.
 
-Do not implement P5, configuration, other modes, fallbacks or safeguards. Keep
-L1 pending, copy no upstream source, do not mutate reviewed source/switch branches
-as part of review, and do not push or merge synthetic PRs into main.
+Keep L1 pending, copy no upstream source and implement no configuration, other
+modes, fallbacks or safeguards. The push authorization in this session was
+explicit; do not assume standing authorization to push in future sessions.

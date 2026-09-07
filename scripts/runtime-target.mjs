@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { existsSync, rmSync, writeFileSync } from "node:fs";
 import { mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
@@ -120,13 +121,15 @@ export async function prepareLiveTargetSmoke() {
   };
 }
 
-export async function prepareTargetSmoke() {
+export async function prepareTargetSmoke({ allowPublish = false, coordinatePost = false } = {}) {
   const directory = await realpath(await mkdtemp(join(tmpdir(), "pr-review-runtime-target-")));
   const trace = join(directory, "requests.jsonl");
   const sentinel = join(directory, "source.txt");
   const previousPath = process.env.PATH;
   const previousRepo = process.env.GH_REPO;
   const previousTrace = process.env.PR_REVIEW_SMOKE_TRACE;
+  const previousAllowPublish = process.env.PR_REVIEW_SMOKE_ALLOW_PUBLISH;
+  const previousPostMarker = process.env.PR_REVIEW_SMOKE_POST_MARKER;
   await writeFile(trace, "");
   await writeFile(sentinel, "Unrelated local source remains unchanged.\n");
   // A local checkout on another branch, holding different source at the reviewed path.
@@ -146,6 +149,11 @@ export async function prepareTargetSmoke() {
   process.env.PATH = `${fileURLToPath(new URL("fixtures", import.meta.url))}${delimiter}${previousPath}`;
   process.env.GH_REPO = "wrong/repository";
   process.env.PR_REVIEW_SMOKE_TRACE = trace;
+  const postMarker = coordinatePost ? join(directory, ".git", "pr-review-post-marker") : undefined;
+  if (allowPublish) process.env.PR_REVIEW_SMOKE_ALLOW_PUBLISH = "1";
+  else delete process.env.PR_REVIEW_SMOKE_ALLOW_PUBLISH;
+  if (postMarker) process.env.PR_REVIEW_SMOKE_POST_MARKER = postMarker;
+  else delete process.env.PR_REVIEW_SMOKE_POST_MARKER;
   let confirmation = false;
   const questions = [];
   const calls = async () => (await readFile(trace, "utf8")).split("\n").filter(Boolean).map(JSON.parse);
@@ -153,13 +161,32 @@ export async function prepareTargetSmoke() {
     quickTarget: {
       args: "12", workingDirectory: directory, repository: "fixture/repository", head: "b".repeat(40),
       expectedFinding: { path: "total.js", line: 3 },
+      postMarker,
+      resetPost() {
+        assert(postMarker, "Publication opt-in was not enabled for this fixture");
+        rmSync(postMarker, { force: true });
+        rmSync(`${postMarker}.release`, { force: true });
+      },
+      releasePost() {
+        assert(postMarker, "Publication coordination was not enabled for this fixture");
+        writeFileSync(`${postMarker}.release`, "");
+      },
+      async awaitPost(signal) {
+        assert(postMarker, "Publication opt-in was not enabled for this fixture");
+        while (!existsSync(postMarker)) {
+          signal.throwIfAborted();
+          await new Promise((resolve) => setTimeout(resolve, 25));
+        }
+      },
       async check() {
         assert.equal(localState(), localBefore);
         assert.equal(await readFile(reviewed, "utf8"), dirty);
         assert.equal(await readFile(totalDecoy, "utf8"), "Do not use local source as evidence.\n");
         assert.equal(await readFile(sentinel, "utf8"), "Unrelated local source remains unchanged.\n");
         assert((await calls()).every(({ args }) => args[0] === "repo" ||
-          (args[0] === "api" && args[3] === "--method" && args[4] === "GET")));
+          (args[0] === "api" && args[3] === "--method" && (args[4] === "GET" ||
+            (allowPublish && args[4] === "POST" && /\/reviews$/.test(args[5] ?? "") &&
+              args[6] === "--include" && args[7] === "--input" && args[8] === "-")))));
       },
     },
     sessionOptions: {
@@ -252,6 +279,7 @@ export async function prepareTargetSmoke() {
     async cleanup() {
       for (const [key, value] of [
         ["PATH", previousPath], ["GH_REPO", previousRepo], ["PR_REVIEW_SMOKE_TRACE", previousTrace],
+        ["PR_REVIEW_SMOKE_ALLOW_PUBLISH", previousAllowPublish], ["PR_REVIEW_SMOKE_POST_MARKER", previousPostMarker],
       ]) {
         if (value === undefined) delete process.env[key];
         else process.env[key] = value;
