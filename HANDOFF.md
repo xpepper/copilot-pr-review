@@ -33,7 +33,11 @@ before you start.
 - Pull requests #1 and #2 are synthetic publication playgrounds from P4 and P5.
   **Never merge them**, and never republish to them.
 - Check whether an open pull request already carries unmerged documentation from
-  the previous session before starting new work.
+  the previous session before starting new work. Pull request #4 is that
+  documentation, still open and unmerged. Its review comments were addressed on
+  the same branch: the integration-test commands now derive the SDK path from
+  `copilot --version` instead of pinning a version, and the effort-less tier
+  model question is tracked as increment `C4` rather than sitting in prose.
 
 Read "Completed increment: M1, balanced half" in `ROADMAP.md`. Do not repeat it:
 
@@ -128,7 +132,8 @@ tool; never weaken a gate to make the run pass.
 - Controlled suites (no inference/network): `node scripts/smoke-<name>.mjs` for
   `findings`, `review`, `selection`, `retention`, `preview`, `publication`,
   `publish-later`, `checkout`, `config`, `context`, `fixture`, `target`. All
-  twelve passed in the previous session, as did `git diff --check`.
+  twelve passed on this branch at `c34f352`, as did `git diff --check`. Only
+  documentation changed afterwards.
 - Installed probes require both `COPILOT_CLI_PATH` and `COPILOT_SDK_PATH`, set
   the same derived way as the integration test above rather than pinned to a
   version.
