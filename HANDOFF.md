@@ -93,12 +93,18 @@ Acceptance criteria:
 ## Running the real integration test
 
 ```sh
-copilot plugin install "$(pwd)"
 gh pr checkout NUMBER
+copilot plugin install "$(pwd)"
 COPILOT_CLI_PATH="$(command -v copilot)" \
 COPILOT_SDK_PATH="$(ls -d "$HOME"/.copilot/pkg/*/"$(copilot --version | sed -n 's/.*CLI \([0-9][0-9.]*[0-9]\).*/\1/p')"/copilot-sdk)" \
-node scripts/dogfood-review.mjs NUMBER --all --no-comment
+node scripts/dogfood-review.mjs NUMBER --full --all --no-comment
 ```
+
+Pass `--full`. Your increment is the full half of M1, and the review is what
+demonstrates it. Without a mode flag the runner takes the default, balanced,
+and would spend the increment's one authorized review without ever running
+the medium conventions reviewer or the unrestricted findings policy that
+`--full` is supposed to add.
 
 Derive the SDK path instead of pinning a version. Old packages under
 `~/.copilot/pkg/` are never pruned, so a pinned path keeps resolving after a
@@ -106,6 +112,12 @@ Derive the SDK path instead of pinning a version. Old packages under
 `copilot --version` is the only reliable source of the running version: on the
 development host `command -v copilot` resolves into a Homebrew cask directory
 labelled `1.0.48` while the CLI reports `1.0.83`.
+
+Check out before installing, never the other way round. `copilot plugin
+install` copies the working tree into the plugin cache, so installing first
+installs whatever was checked out at the time. The revision gate only checks
+that the *checkout* is at the pull request head, so a stale installed copy
+would still be reviewed and reported as a passing integration test.
 
 `scripts/dogfood-review.mjs` dispatches the real `/pr-review` command through
 the SDK's command RPC, for agents that cannot type a Copilot CLI slash command.

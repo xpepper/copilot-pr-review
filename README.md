@@ -54,7 +54,7 @@ The no-inference startup regression can be reproduced with:
 ```sh
 node scripts/smoke-cli-runtime.mjs
 COPILOT_CLI_PATH="$(command -v copilot)" \
-COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
+COPILOT_SDK_PATH="$(ls -d "$HOME"/.copilot/pkg/*/"$(copilot --version | sed -n 's/.*CLI \([0-9][0-9.]*[0-9]\).*/\1/p')"/copilot-sdk)" \
 node scripts/smoke-runtime.mjs --targets --startup
 ```
 
@@ -407,7 +407,7 @@ not a claim about visual layout, other hosts or platforms. Reproduce with:
 node scripts/smoke-selection.mjs
 copilot plugin install "$(pwd)"
 COPILOT_CLI_PATH="$(command -v copilot)" \
-COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
+COPILOT_SDK_PATH="$(ls -d "$HOME"/.copilot/pkg/*/"$(copilot --version | sed -n 's/.*CLI \([0-9][0-9.]*[0-9]\).*/\1/p')"/copilot-sdk)" \
 PR_REVIEW_HEAVY_MODEL=gpt-5.6-terra PR_REVIEW_HEAVY_EFFORT=high \
 node scripts/smoke-runtime.mjs --targets --quick --selection
 ```
@@ -483,7 +483,7 @@ Reproduce controlled storage and native lifecycle probes:
 node scripts/smoke-retention.mjs
 copilot plugin install "$(pwd)"
 COPILOT_CLI_PATH="$(command -v copilot)" \
-COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
+COPILOT_SDK_PATH="$(ls -d "$HOME"/.copilot/pkg/*/"$(copilot --version | sed -n 's/.*CLI \([0-9][0-9.]*[0-9]\).*/\1/p')"/copilot-sdk)" \
 node scripts/smoke-retention-runtime.mjs
 ```
 
@@ -494,7 +494,7 @@ For real review retention and cold resume, add explicit settings and
 
 ```sh
 COPILOT_CLI_PATH="$(command -v copilot)" \
-COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
+COPILOT_SDK_PATH="$(ls -d "$HOME"/.copilot/pkg/*/"$(copilot --version | sed -n 's/.*CLI \([0-9][0-9.]*[0-9]\).*/\1/p')"/copilot-sdk)" \
 PR_REVIEW_HEAVY_MODEL=gpt-5.6-terra PR_REVIEW_HEAVY_EFFORT=high \
 node scripts/smoke-retention-runtime.mjs --quick --parent-turn
 ```
@@ -607,7 +607,7 @@ node scripts/smoke-publication.mjs
 node scripts/smoke-review.mjs
 copilot plugin install "$(pwd)"
 COPILOT_CLI_PATH="$(command -v copilot)" \
-COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
+COPILOT_SDK_PATH="$(ls -d "$HOME"/.copilot/pkg/*/"$(copilot --version | sed -n 's/.*CLI \([0-9][0-9.]*[0-9]\).*/\1/p')"/copilot-sdk)" \
 PR_REVIEW_HEAVY_MODEL=gpt-5.6-terra PR_REVIEW_HEAVY_EFFORT=high \
 node scripts/smoke-preview-runtime.mjs --cases=comment,cancel-pending,confirmed --parent-turn
 ```
@@ -693,7 +693,7 @@ Reproduce the controlled and native probes:
 node scripts/smoke-publish-later.mjs
 copilot plugin install "$(pwd)"
 COPILOT_CLI_PATH="$(command -v copilot)" \
-COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
+COPILOT_SDK_PATH="$(ls -d "$HOME"/.copilot/pkg/*/"$(copilot --version | sed -n 's/.*CLI \([0-9][0-9.]*[0-9]\).*/\1/p')"/copilot-sdk)" \
 PR_REVIEW_HEAVY_MODEL=gpt-5.6-terra PR_REVIEW_HEAVY_EFFORT=high \
 node scripts/smoke-publish-later-runtime.mjs --cases=publish,stale,uncertain,cancel,reject,draft
 ```
@@ -802,7 +802,7 @@ Reproduce the controlled and native probes:
 node scripts/smoke-config.mjs
 copilot plugin install "$(pwd)"
 COPILOT_CLI_PATH="$(command -v copilot)" \
-COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
+COPILOT_SDK_PATH="$(ls -d "$HOME"/.copilot/pkg/*/"$(copilot --version | sed -n 's/.*CLI \([0-9][0-9.]*[0-9]\).*/\1/p')"/copilot-sdk)" \
 PR_REVIEW_HEAVY_MODEL=gpt-5.6-terra PR_REVIEW_HEAVY_EFFORT=high \
 node scripts/smoke-config-runtime.mjs
 ```
@@ -874,7 +874,7 @@ Reproduce the controlled and native probes:
 node scripts/smoke-config.mjs
 copilot plugin install "$(pwd)"
 COPILOT_CLI_PATH="$(command -v copilot)" \
-COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
+COPILOT_SDK_PATH="$(ls -d "$HOME"/.copilot/pkg/*/"$(copilot --version | sed -n 's/.*CLI \([0-9][0-9.]*[0-9]\).*/\1/p')"/copilot-sdk)" \
 PR_REVIEW_HEAVY_MODEL=gpt-5.6-terra PR_REVIEW_HEAVY_EFFORT=high \
 node scripts/smoke-config-runtime.mjs
 ```
@@ -1013,7 +1013,7 @@ node scripts/smoke-review.mjs
 node scripts/smoke-findings.mjs
 node scripts/smoke-config.mjs
 COPILOT_CLI_PATH="$(command -v copilot)" \
-COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
+COPILOT_SDK_PATH="$(ls -d "$HOME"/.copilot/pkg/*/"$(copilot --version | sed -n 's/.*CLI \([0-9][0-9.]*[0-9]\).*/\1/p')"/copilot-sdk)" \
 node scripts/smoke-runtime.mjs
 ```
 
@@ -1066,7 +1066,7 @@ To exercise actual concurrent inference as well:
 
 ```sh
 COPILOT_CLI_PATH="$(command -v copilot)" \
-COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
+COPILOT_SDK_PATH="$(ls -d "$HOME"/.copilot/pkg/*/"$(copilot --version | sed -n 's/.*CLI \([0-9][0-9.]*[0-9]\).*/\1/p')"/copilot-sdk)" \
 PR_REVIEW_HEAVY_MODEL=claude-sonnet-5 PR_REVIEW_HEAVY_EFFORT=high \
 node scripts/smoke-runtime.mjs --targets --quick
 ```
@@ -1104,16 +1104,25 @@ effort is the Q4 demonstration assignment, not a product default or fallback.
 
 ### Real integration test: review a real pull request
 
-Everything above runs the code against test doubles. This runs the **installed
-plugin** against a real pull request of the repository you are standing in:
+The probes above stop short of a real end-to-end run: most use test doubles,
+and the ones that do not, the `--target-live` variants and the inference
+probes, still exercise single pieces against a synthetic or borrowed target.
+None of them reviews a real pull request of this repository through the
+installed plugin. This does:
 
 ```sh
-copilot plugin install "$(pwd)"
 gh pr checkout NUMBER
+copilot plugin install "$(pwd)"
 COPILOT_CLI_PATH="$(command -v copilot)" \
 COPILOT_SDK_PATH="$(ls -d "$HOME"/.copilot/pkg/*/"$(copilot --version | sed -n 's/.*CLI \([0-9][0-9.]*[0-9]\).*/\1/p')"/copilot-sdk)" \
 node scripts/dogfood-review.mjs NUMBER --all --no-comment
 ```
+
+Check out before installing, never the other way round. `copilot plugin
+install` copies the working tree into the plugin cache, so installing first
+installs whatever was checked out at the time. The revision gate only checks
+that the *checkout* is at the pull request head, so a stale installed copy
+would still be reviewed and reported as a passing integration test.
 
 It dispatches `/pr-review NUMBER --all --no-comment` through the SDK's command
 RPC, so the real extension, runtime, models, `gh` requests, revision gate and
@@ -1142,7 +1151,7 @@ The original F2 inference probe remains available separately:
 
 ```sh
 COPILOT_CLI_PATH="$(command -v copilot)" \
-COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
+COPILOT_SDK_PATH="$(ls -d "$HOME"/.copilot/pkg/*/"$(copilot --version | sed -n 's/.*CLI \([0-9][0-9.]*[0-9]\).*/\1/p')"/copilot-sdk)" \
 PR_REVIEW_MODEL_1=claude-sonnet-5 PR_REVIEW_EFFORT_1=low \
 PR_REVIEW_MODEL_2=gpt-5.6-terra PR_REVIEW_EFFORT_2=high \
 node scripts/smoke-runtime.mjs --fixture
