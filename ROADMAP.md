@@ -3645,13 +3645,12 @@ executions, or of any `Reviewer ` timeline message.
 
 ### Live inference: the dogfood review of this pull request
 
-Not run yet at this checkpoint. The pull request for this increment has not been
-opened, so the installed plugin has not reviewed it. Under `AGENTS.md` this
-increment is **not demonstrated** until that has happened once and the outcome is
-recorded here, with the mode, the model and effort each reviewer actually used,
-coverage, findings, withheld findings, coverage gaps, tool calls, denials and the
-credits the runtime reported. Everything above runs against test doubles or
-settles before a reviewer starts.
+Not run yet at this checkpoint. Pull request #5 is open, but the installed plugin
+has not reviewed it. Under `AGENTS.md` this increment is **not demonstrated** until
+that has happened once and the outcome is recorded here, with the mode, the model
+and effort each reviewer actually used, coverage, findings, withheld findings,
+coverage gaps, tool calls, denials and the credits the runtime reported.
+Everything above runs against test doubles or settles before a reviewer starts.
 
 ### Reproduction
 
@@ -3706,44 +3705,29 @@ it afterwards.
   is unsupported; the adjudicator receives zero tools; and the changed-line
   anchoring rule can hide a real stale-reference regression as a coverage gap.
 
-## Exact next increment
+## Exact next step
 
-**The full half of M1.** Add `--full`: the balanced reviewer set plus one medium
-conventions/maintainability reviewer, with the full findings policy (all
-qualifying severities). M1 completes when that lands; deep stays with M2.
+The full half of M1 is implemented on branch `m1-full-mode` in pull request #5.
+Do not reimplement it. The only remaining M1 step is the one authorized
+installed-plugin dogfood review of that pull request in `--full` mode; M1 stays
+pending until that review demonstrates the shipped behavior.
 
-Acceptance criteria:
+Run the real integration test from a clean checkout at the pull request head:
 
-- `--full` runs the four heavy specialists, the light overview reviewer and one
-  medium conventions/maintainability reviewer, resolving the medium tier through
-  the existing layering, with every origin shown before execution.
-- The full findings policy presents all qualifying severities, with no minor cap,
-  while evidence validation, deduplication, incomplete-coverage reporting and
-  cancellation stay unchanged.
-- Mode flags stay mutually exclusive; balanced stays the default; quick and its
-  alias are unchanged. Do not add deep, fallbacks, timeouts, safeguards,
-  reviewer shell tools, gate overrides, configuration keys or an interactive
-  menu, and do not alter user checkouts to satisfy the revision gate.
-- Update the M1 row to Completed only when the full mode is demonstrated.
-- Demonstrate with controlled probes and the no-inference installed dispatch
-  first, extending `smoke-review.mjs`, `smoke-findings.mjs`,
-  `smoke-retention.mjs` and the installed draft-skip loop the way balanced did.
-  Any live review, balanced or full, needs new explicit authorization in that
-  session; none is carried over.
-- Consult the installed SDK and current official documentation before adopting
-  new runtime APIs, then record evidence, remaining limits and the next small
-  increment. Follow the `AGENTS.md` checkpoint and final-file handoff rules.
-- Land the increment on its own branch and pull request, and review that pull
-  request with this plugin before asking for a merge, as `AGENTS.md` now
-  requires. That review is the increment's real integration test: dispatch it
-  with `node scripts/dogfood-review.mjs NUMBER --all --no-comment` if you cannot
-  type a slash command, and record its outcome here. That single review is
-  authorized by the workflow; nothing else that spends credits is.
+```sh
+gh pr checkout 5
+copilot plugin install "$(pwd)"
+COPILOT_CLI_PATH="$(command -v copilot)" \
+COPILOT_SDK_PATH="$(ls -d "$HOME"/.copilot/pkg/*/"$(copilot --version \
+  | sed -n 's/.*CLI \([0-9][0-9.]*[0-9]\).*/\1/p')"/copilot-sdk)" \
+node scripts/dogfood-review.mjs 5 --full --all --no-comment
+```
 
-A live balanced review of a real code diff remains an open, separately
-authorizable step. Pull request #4 already showed the light overview reviewer
-earning its place on a documentation diff, but the minor-finding cap is still
-unexercised and no balanced review has ever run against substantial code
-changes; the plumbing itself is demonstrated.
-Keep L1 pending and copy no upstream source. Push the increment branch and open
-its pull request; `main` refuses direct pushes and merging stays the user's call.
+Record the mode, each reviewer's model and effort, coverage, findings, withheld
+findings, coverage gaps, tool calls, denials and the runtime-reported credits.
+If the review finds a real defect, fix it on this branch in a new validated
+checkpoint and leave M1 pending until the authorized review evidence is
+resolved. If it succeeds or refuses, record that outcome honestly; a refusal or
+failure is a defect report, not a reason to weaken a gate. Update the M1 row to
+Completed only after the full mode is demonstrated by this review. Deep remains
+M2, L1 remains pending, and merging remains the user's decision.

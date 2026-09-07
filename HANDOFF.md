@@ -31,9 +31,11 @@ before you start.
   documented how to run that review, added increment `C4`, and fixed the three
   findings its own review returned. Pull request #3, squash-merged as `db8bd69`,
   delivered the balanced half of M1 before it.
-- Both branches are deleted, and their individual commits are not ancestors of
-  `main`, so read `git log` and the pull requests rather than looking for hashes
-  from those branches. Nothing is uncommitted and no pull request is open.
+- This session is on branch `m1-full-mode` with open pull request #5. The
+  implementation checkpoints `665f052` and `e8da43b` are already on that branch;
+  the current documentation checkpoint records the remaining integration step.
+  After committing it, keep the working tree clean and do not merge the pull
+  request.
 - Pull requests #1 and #2 are synthetic publication playgrounds from P4 and P5.
   **Never merge them**, and never republish to them.
 - Pull request #4 was reviewed with the plugin at head `ae2c55c`, on the user's
@@ -76,30 +78,31 @@ Read "Completed increment: M1, balanced half" in `ROADMAP.md`. Do not repeat it:
   were documentation-heavy, so balanced behaviour on a real code diff is still
   undemonstrated, and the minor-finding cap has never been exercised.
 
-## Implement only the exact next increment
+The full half of M1 is already implemented on this branch. `--full` runs the
+balanced five plus the medium `conventions-maintainability` reviewer, presents
+all qualifying severities without a minor cap, and is covered by the controlled
+and no-inference installed probes recorded in `ROADMAP.md`. The max code review
+requested on pull request #5 found stale next-step instructions in this handoff
+and the roadmap; that documentation defect is the current checkpoint. It is not
+the installed-plugin dogfood evidence.
 
-Implement **the full half of M1**, as specified at the end of `ROADMAP.md`, on
-its own branch and pull request. M1 stays Pending until it lands; deep is M2.
+## Complete only the exact remaining step
 
-Acceptance criteria:
+Do not reimplement `--full`. M1 stays Pending only because the installed plugin
+has not reviewed pull request #5 in full mode; deep remains M2.
 
-1. `--full` runs the four heavy specialists, the light overview reviewer and one
-   medium conventions/maintainability reviewer, resolving the medium tier
-   through the existing layering, with every origin shown before execution.
-2. The full findings policy presents all qualifying severities with no minor
-   cap, while evidence validation, deduplication, incomplete-coverage reporting
-   and cancellation stay unchanged.
-3. Mode flags stay mutually exclusive, balanced stays the default, and quick and
-   its alias are unchanged.
-4. Add no deep mode, fallbacks, timeouts, safeguards, reviewer shell tools, gate
-   overrides, configuration keys or interactive menu. Keep L1 pending, copy no
-   upstream source, and do not alter user checkouts to satisfy the revision gate.
-5. Demonstrate with controlled probes and the no-inference installed dispatch
-   first, extending `smoke-review.mjs`, `smoke-findings.mjs`,
-   `smoke-retention.mjs` and the installed draft-skip loop the way balanced did.
-6. Finish by opening the pull request and reviewing it with the plugin, then
-   record that review in `ROADMAP.md`. Update the M1 row to Completed only once
-   the full mode is demonstrated that way.
+1. Ensure the checkout is the clean head of pull request #5 and reinstall the
+   current plugin.
+2. Run `node scripts/dogfood-review.mjs 5 --full --all --no-comment`, or dispatch
+   the equivalent `/pr-review 5 --full --all --no-comment` command.
+3. Record the actual reviewer models and efforts, coverage, findings, withheld
+   findings, coverage gaps, tool calls, denials and runtime-reported credits in
+   `ROADMAP.md`.
+4. Fix any real finding on this branch in a new validated checkpoint; a refusal
+   or failure is evidence about the shipped tool and must remain recorded.
+5. Update the M1 row to Completed only after the full mode is demonstrated by
+   that installed-plugin review. Keep L1 pending, copy no upstream source, and
+   leave merging to the user.
 
 ## Running the real integration test
 
