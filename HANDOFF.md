@@ -92,9 +92,16 @@ Acceptance criteria:
 copilot plugin install "$(pwd)"
 gh pr checkout NUMBER
 COPILOT_CLI_PATH="$(command -v copilot)" \
-COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
+COPILOT_SDK_PATH="$(ls -d "$HOME"/.copilot/pkg/*/"$(copilot --version | sed -n 's/.*CLI \([0-9][0-9.]*[0-9]\).*/\1/p')"/copilot-sdk)" \
 node scripts/dogfood-review.mjs NUMBER --all --no-comment
 ```
+
+Derive the SDK path instead of pinning a version. Old packages under
+`~/.copilot/pkg/` are never pruned, so a pinned path keeps resolving after a
+`copilot update` and silently drives a stale SDK against a newer CLI.
+`copilot --version` is the only reliable source of the running version: on the
+development host `command -v copilot` resolves into a Homebrew cask directory
+labelled `1.0.48` while the CLI reports `1.0.83`.
 
 `scripts/dogfood-review.mjs` dispatches the real `/pr-review` command through
 the SDK's command RPC, for agents that cannot type a Copilot CLI slash command.
@@ -122,8 +129,9 @@ tool; never weaken a gate to make the run pass.
   `findings`, `review`, `selection`, `retention`, `preview`, `publication`,
   `publish-later`, `checkout`, `config`, `context`, `fixture`, `target`. All
   twelve passed in the previous session, as did `git diff --check`.
-- Installed probes require both `COPILOT_CLI_PATH="$(command -v copilot)"` and
-  `COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk"`.
+- Installed probes require both `COPILOT_CLI_PATH` and `COPILOT_SDK_PATH`, set
+  the same derived way as the integration test above rather than pinned to a
+  version.
   No-inference probes: `smoke-runtime.mjs --targets --startup`,
   `smoke-runtime.mjs --targets --matching-checkout --startup`,
   `smoke-retention-runtime.mjs`, `smoke-reviewer-tools.mjs` with

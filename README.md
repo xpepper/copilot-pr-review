@@ -1110,7 +1110,7 @@ plugin** against a real pull request of the repository you are standing in:
 copilot plugin install "$(pwd)"
 gh pr checkout NUMBER
 COPILOT_CLI_PATH="$(command -v copilot)" \
-COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
+COPILOT_SDK_PATH="$(ls -d "$HOME"/.copilot/pkg/*/"$(copilot --version | sed -n 's/.*CLI \([0-9][0-9.]*[0-9]\).*/\1/p')"/copilot-sdk)" \
 node scripts/dogfood-review.mjs NUMBER --all --no-comment
 ```
 
@@ -1119,6 +1119,13 @@ RPC, so the real extension, runtime, models, `gh` requests, revision gate and
 confined read tools all take part. `copilot -p "/pr-review NUMBER"` is **not** a
 substitute: prompt mode starts an ambient model turn instead of dispatching the
 command.
+
+Derive the SDK path instead of pinning a version. Old packages under
+`~/.copilot/pkg/` are never pruned, so a pinned path keeps resolving after a
+`copilot update` and silently drives a stale SDK against a newer CLI.
+`copilot --version` is the only reliable source of the running version: on the
+development host `command -v copilot` resolves into a Homebrew cask directory
+labelled `1.0.48` while the CLI reports `1.0.83`.
 
 The runner refuses to start unless local `HEAD` is the pull request head and no
 tracked file is modified, and it refuses `--comment`, so it can never publish.
