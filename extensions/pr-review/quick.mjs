@@ -104,12 +104,12 @@ export function quickPrompt(assignment, snapshot, context, binding) {
 
 export async function executeQuickRun(parent, client, options, assignments, {
   controller, onStopped, gh = runGh,
+  invocation = { invocationId: randomUUID(), sessionId: parent.sessionId },
 }) {
   let binding;
   let execution;
   let validation;
   let adjudicator;
-  const invocation = { invocationId: randomUUID(), sessionId: parent.sessionId };
   const outcome = await executeOwnedRun(parent, client, {
     controller, onStopped, subject: "Quick review", evidencePrefix: "Q3",
     details: () => ({

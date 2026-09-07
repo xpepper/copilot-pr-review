@@ -23,7 +23,7 @@ in [AGENTS.md](AGENTS.md); the replaceable next-session prompt lives in
 | Q3 | Completed | Three concurrent quick specialists consume bound PR input; explicit/ambient assignments, alias, incomplete coverage, and cancellation demonstrated below. Candidates remain unvalidated. | Q2; [Modes](SCOPE.md#review-modes-and-findings) |
 | Q4 | Completed | Strict evidence/whole-claim gates, isolated adjudication, deduplication and degraded findings; positive controlled and real-PR installed-plugin inference demonstrated below. | Q3; [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | P1 | Completed | Invocation-bound validated finding selection via native elicitation or `--all`; subset/none/cancellation, invalid-answer rejection and no-UI behavior demonstrated below. No writes/cache. | Q4; [Selection/publication](SCOPE.md#selection-publication-and-cached-results) |
-| P2 | Pending | Retain results with session/repository/PR/head binding and reload/resume where supported; inspect without rerunning reviewers. | P1; [Cached results](SCOPE.md#selection-publication-and-cached-results) |
+| P2 | Completed | Retain the latest settled quick result in its originating local session; inspect without inference/GitHub access. Reload and conversation-backed cold resume demonstrated; command-only resume caveat below. | P1; [Cached results](SCOPE.md#selection-publication-and-cached-results) |
 | P3 | Pending | Resolve posting authority and conflicting flags; display a code-built inline review payload without submitting it. | P1; [Publication controls](SCOPE.md#selection-publication-and-cached-results) |
 | P4 | Pending | Submit only COMMENT reviews with valid anchors and lifecycle/head gates; surface uncertain write outcomes without blind retry. | P3; [Publication gates](SCOPE.md#selection-publication-and-cached-results) |
 | P5 | Pending | Publish retained selected findings without rerunning reviewers; reject changed heads and prevent publication after cancellation. | P2, P4; [Cached publication](SCOPE.md#selection-publication-and-cached-results) |
@@ -1236,34 +1236,197 @@ waiters. Cancellation prevents later selection from a late answer, not the host'
 own storage of that UI response. Q2 source-window and provider limits, Q4
 whole-claim requirements and read-only capability-isolation caveats still apply.
 
+## Completed increment: P2
+
+P2 follows implementation `c0d3d16` and handoff `55a3a8a`. No upstream source
+was copied, no GitHub mutation was performed, and nothing was pushed.
+
+### Implementation boundary
+
+- `retention.mjs` owns the versioned record schema, whitelisted projection,
+  local session storage and `/pr-review inspect`. `retained-run.mjs` wraps quick
+  execution with retention; `quick.mjs` accepts the wrapper's invocation identity
+  without changing candidate validation or selection. `extension.mjs` dispatches
+  inspection and reports asynchronous retention failures to the user.
+- Exactly one latest quick-result slot is retained in the originating session's
+  `pr-review-result.json`, outside the checkout. Accepted new quick runs replace
+  the old result with a pending marker before capture. Capture-only and fixture
+  commands do not replace it. There is no list/archive or session-ID selector.
+- Settled records contain canonical validated/deduplicated findings, their exact
+  citations and source provenance, the complete Q4 binding, invocation/session
+  identity, selection disposition/IDs/binding, reviewer/model/usage attribution,
+  rejection/duplicate reasons, and execution/validation/cleanup/error coverage.
+  Raw outputs and duplicate candidate bodies are dropped; full diff/context text
+  is not stored. Duplicate aliases cannot be selected.
+- Storage uses host-reported `metadata.snapshot()` local session workspace
+  identity, not a guessed home path or the working directory. Remote/missing
+  workspaces, mismatched session paths/IDs, and sessions already reported in use
+  are refused. Files are written with mode 0600 through a flushed temporary file
+  and same-directory atomic rename. No storage API fallback exists.
+- The final cancellation check and write are synchronous, with no await before
+  `activeRun` clears in the same microtask checkpoint. No settled selected record
+  is written while waiting on UI/log RPCs. Cancellation clears IDs and marks the
+  result incomplete. Abrupt exit before settlement leaves the pending marker
+  non-actionable; interrupted work is not reconstructed from transcripts.
+- Inspection makes no model or GitHub requests and does not read reviewed local
+  source. It displays the originating target regardless of the current directory,
+  rejects active runs and invalid/stale/binding-inconsistent records, and keeps
+  empty/skipped/failed/degraded/cancelled states visible. It is not a current-head
+  check or publication command.
+- `P2 evidence:` is emitted after successful storage and run settlement.
+  `P2 inspection:` carries the loaded record. P1/Q3 evidence alone does not prove
+  retention. A failed initial replacement can leave the older result; a failed
+  final write leaves a pending marker. Errors explicitly direct the user to
+  inspect state rather than treating the new result as saved.
+
+### Controlled evidence
+
+`node scripts/smoke-retention.mjs` exercises strict schemas, corruption, binding
+changes, malformed/incompatible records, raw/rejected/duplicate/stale IDs,
+selection states, degraded/empty/cancelled coverage, fresh-store reload,
+pending replacement, missing/remote/in-use workspace refusal, unsafe files,
+read/write failures, and retained-run skip/pre-cancel/final-log cancellation.
+The fixture uses Q4's actual deterministic gates with controlled adjudication,
+not native semantic inference. `smoke-quick.mjs` additionally projects/loads its
+completed, failed, missing-usage, startup, tool-denial and cleanup-error outcomes.
+
+Selection, quick, findings and fixture assertion probes passed. The existing
+native selection harness now waits for P2 acknowledgement and compares loaded
+findings/selection/coverage to the actual run, instead of stopping at P1 logs.
+
+### Installed-plugin evidence and lifecycle limitation
+
+CLI 1.0.83, bundled SDK, Node.js 26.1.0, macOS arm64. Explicit
+`gpt-5.6-terra` / `high` was used for native inference, not a default or fallback.
+
+The end-to-end native review used controlled target 12 (child-only read-only `gh`
+responses, no remote PR). Session `802d0a8b-b17b-4fc3-a214-539dc3d958f8`,
+invocation `84452191-cca5-4146-8a6b-84d395020d47` retained one P2 finding at head
+`bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb`, `total.js:3`, confidence 0.99;
+one duplicate was merged and coverage completed. Owned inference PID `68410`
+exited before inspection. Result digest:
+`962847cd1208953e2f224af784186bc98856b3991f8f34e15c1cba00bba8f353`.
+Diff/context hashes remained
+`f4a7078c1142d622d880b65bf864235c11c4c2ddf334e57eb1633c942ea80632` /
+`9a06c36ac953b92decd1d7c5378e75c3b498120928d7ee7e3abbe0998d54854d`.
+
+Reload replaced extension PID `67940` with `69184` and preserved the exact
+record. After explicit native session save/close and owned parent exit, a fresh
+runtime resumed the same session and workspace with the same digest/findings/
+selection. Reloaded resumed extension PID `69479` served inspection. This is
+plugin-file reload/resume evidence, not a claim inferred from transcript storage.
+
+**Important runtime limit:** a command-only SDK session has no resumable event
+history in this CLI. Initial attempts, including explicit `sessions.save` and
+`sessions.close`, failed cold resume with `Session not found`; the retained file
+still existed. The reproducible no-inference controlled run
+`988cada5-a92d-4eb8-87ee-cdac75f6cd07` demonstrated that limitation and successful
+extension reload. The successful end-to-end session above included one ordinary
+parent model turn solely to initialize a resumable conversation. The plugin does
+not add that turn, fabricate history, or create a replacement session.
+
+Final native local/in-use guards and cold resume were also exercised with a
+controlled seeded result plus one real parent turn in session
+`db006474-9cb6-470c-94f4-868af4505e74`; digest
+`be6a0763a422337d93d5f88db4d2c44384671b171b3e9fd0e7f8c2fa087f1b0b`.
+Those findings were fixtures, not a second real review. All lifecycle probes
+asserted no inference/owned processes from inspection, no additional `gh`
+requests, unchanged checkout, new-session isolation, copied wrong-session and
+incompatible-record rejection, and non-actionable pending-marker inspection.
+
+Real native selection/retention used controlled target 13 in session
+`1d52c498-2826-4cb2-a63c-52cabb0bc60d`:
+
+| Case | Invocation | Retained result | Owned inference PID |
+| --- | --- | --- | --- |
+| Subset | `9ce6cfc2-daf3-4a1b-829f-696452b3502a` | 1 of 2 selected, completed coverage | `71580`, exited before UI |
+| None | `e463e751-d2c6-4758-bd9f-f6c7fd8a04c8` | 0 of 2 selected, completed coverage | `72462`, exited before UI |
+| Pending-form cancellation | `c1a5c933-b881-4be8-97cf-2715262f829f` | 2 validated findings retained, zero selected, cancelled/incomplete; two validation issues already made review coverage incomplete | `73367`, exited before UI |
+
+Their result digests respectively were
+`442af0426a828b4bb944a2e5ac383a3d25ba706f9d4f5ebfe6e86b5da4f88540`,
+`8d89df2889fa69f7ba3d251fd37ff103205611bdf59ea55843aa498eb4bfc256`,
+and `bc7c2465c79eee8d6cb8ae6460e57bbe32071da2ca236f5a8b84b53b0af4c162`.
+Late acceptance after cancellation was inert; reload/inspection does not turn
+the retained cancelled findings into selected ones. Cleanup errors were empty.
+
+### APIs, reproduction and remaining boundaries
+
+Consulted the current official
+[plugin creation docs](https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/plugins-creating)
+and [session lifecycle docs](https://docs.github.com/en/copilot/how-tos/copilot-cli/use-copilot-cli/work-with-multiple-sessions),
+plus installed SDK `docs/extensions.md`, `extension.d.ts`, `session.d.ts`,
+`client.d.ts` and `generated/rpc.d.ts` (`SessionMetadataSnapshot`,
+`extensions.reload`, `sessions.save`/`close`, `resumeSession`). SDK/API declarations
+were treated as candidates; actual native behavior above determines support.
+
+```sh
+node scripts/smoke-retention.mjs
+node scripts/smoke-selection.mjs
+node scripts/smoke-quick.mjs
+node scripts/smoke-findings.mjs
+node scripts/smoke-fixture.mjs
+copilot plugin install "$(pwd)"
+COPILOT_CLI_PATH="$(command -v copilot)" \
+COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
+node scripts/smoke-retention-runtime.mjs
+COPILOT_CLI_PATH="$(command -v copilot)" \
+COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
+PR_REVIEW_HEAVY_MODEL=gpt-5.6-terra PR_REVIEW_HEAVY_EFFORT=high \
+node scripts/smoke-retention-runtime.mjs --quick --parent-turn
+COPILOT_CLI_PATH="$(command -v copilot)" \
+COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
+PR_REVIEW_HEAVY_MODEL=gpt-5.6-terra PR_REVIEW_HEAVY_EFFORT=high \
+node scripts/smoke-runtime.mjs --targets --quick --selection --selection-cases=subset,none,cancel-pending
+```
+
+`--parent-turn` without `--quick` uses a seeded fixture plus one parent turn for
+cheap native cold-resume evidence; no flags spends no credits. The real quick
+probe deliberately requires a positive validated result and never auto-retries
+fallible model output. No fixture `gh` enters the ordinary shell PATH.
+
+The record digest detects corruption/inconsistency, not deliberate tampering by
+someone able to rewrite local session files and recompute it. There is no OS
+sandbox, malicious-local-writer protection, cross-process locking, remote storage
+support, or power-loss atomicity claim. Known already-in-use sessions are refused;
+the host flag is not a lock acquired by this plugin. Human terminal `/resume`
+clicks, session forks, other OS/clients, and the full F3 loss/SIGSTOP suite were not
+exercised in P2. Interrupted-marker handling was controlled, not a new native
+mid-write crash test. Existing permission/cancellation/Q4 limitations remain.
+No posting authority, payload, publication, publish-later execution, saved
+configuration, other modes, fallbacks or safeguards were added. L1 remains pending.
+
 ## Exact next increment
 
-**P2 only:** Retain results with originating-session/repository/PR/head binding
-and inspect them without rerunning reviewers. Demonstrate session-scoped
-extension reload/resume behavior where the installed runtime supports it.
+**P3 only:** Resolve posting authority and conflicting flags, then display a
+code-built inline review payload without submitting it.
 
 Acceptance criteria:
 
-- Retain the validated/deduplicated review result, selection disposition and IDs,
-  reviewed head and complete binding, attribution and coverage/error state.
-  Raw/rejected candidates must not become selectable findings through retention.
-  Cancellation must not leave an actionable selected result.
-- Provide a minimal code-owned inspection command; document its syntax. Inspection
-  must not start inference, fetch a replacement head, change source or write GitHub.
-  Preserve visible degraded/empty/cancelled states without clean-review claims.
-- Consult current official documentation and installed SDK before choosing storage
-  and lifecycle APIs. Demonstrate extension reload and same-session resume as
-  supported; explicitly record unsupported lifecycle behavior instead of inferring
-  persistence from transcripts or exposing a cross-session archive.
-- Bind retained data to its originating session, repository, PR and reviewed
-  commit. Reject wrong-session/binding, stale selection IDs, malformed or
-  incompatible records rather than silently reinterpreting them. Do not substitute
-  the current checkout or a new head for the reviewed snapshot.
-- Make retention/inspection failures explicit; preserve no-timeout, cleanup,
-  cancellation and `--no-comment` guarantees. Extend the existing assertion
-  probes and record native behavior separately from controlled storage tests.
+- Apply `SCOPE.md`'s independent selection and authority controls: `--all` selects
+  only validated findings; `--comment` bypasses final confirmation, not selection;
+  `--no-comment` suppresses posting; both posting flags conflict. With neither
+  flag, use effective `autoPostReviews` (default false). Do not add saved
+  configuration in P3; design the authority calculation to consume that effective
+  setting when C1/C2 eventually provide it.
+- Without automatic authority, require explicit final confirmation before
+  treating a proposed payload as authorized. Missing UI, decline, cancellation,
+  zero selected findings, and incomplete coverage must remain explicit. No flag
+  authorizes safeguard execution or a non-COMMENT review event.
+- Build and display a preview in code from canonical selected findings with the
+  originating repository/PR/head binding and validated diff anchors. Preserve
+  concise summary behavior for applicable non-inline findings; never turn raw,
+  rejected or duplicate candidates into comments. The preview must be visibly
+  non-submitting, even with `--all --comment`.
+- Keep cancellation and head/binding safeguards fail-closed; preserve P1/P2
+  selection, retention, reload and no-timeout behavior. Extend assertion probes
+  for authority combinations, unsupported UI, invalid selections/bindings, and
+  exact payload shape. Demonstrate the code-owned preview through the installed
+  plugin without any GitHub mutation or rerun hidden in a preview action.
+- Consult installed SDK/current official docs before choosing new runtime APIs.
+  Record new evidence/limits and the next small increment in this roadmap.
 
-Do not implement posting authority or payloads (P3), GitHub publication (P4),
-publish-later execution (P5), saved configuration, other modes, fallbacks or
-safeguards. Respect `SCOPE.md`; keep L1 pending and copy no upstream source.
-Follow the checkpoint-commit and final-file handoff workflow in `AGENTS.md`.
+Do not submit GitHub reviews (P4), implement retained publish-later execution
+(P5), or add configuration, modes, fallbacks or safeguards. Respect `SCOPE.md`;
+keep L1 pending and copy no upstream source. Follow the checkpoint-commit and
+final-file handoff workflow in `AGENTS.md`; do not push.

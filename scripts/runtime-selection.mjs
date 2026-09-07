@@ -20,6 +20,7 @@ export function selectionProbe() {
         for (const mode of noUi ? ["unavailable"] : cases ?? modes) {
           pending = { request: Promise.withResolvers(), answer: Promise.withResolvers() };
           const finished = Promise.withResolvers();
+          const retained = Promise.withResolvers();
           const active = Promise.withResolvers();
           const activeLabels = new Set();
           const messages = [];
@@ -37,6 +38,8 @@ export function selectionProbe() {
               console.log(`P1 ${mode} review evidence: ${JSON.stringify(review)}`);
             }
             if (message.startsWith("P1 evidence: ")) finished.resolve(JSON.parse(message.slice("P1 evidence: ".length)));
+            if (message.startsWith("P2 evidence: ")) retained.resolve(JSON.parse(message.slice("P2 evidence: ".length)));
+            if (message.startsWith("Review/retention failed:")) retained.reject(new Error(message));
           });
           try {
             const args = `${target.args} --quick --no-comment${mode === "all" ? " --all" : ""}` +
@@ -76,6 +79,7 @@ export function selectionProbe() {
               }
             }
             const result = await finished.promise;
+            const retention = await retained.promise;
             if (cancelDispatch) {
               assert.equal((await cancelDispatch).error, undefined);
               pending.answer.resolve({ action: "accept", content: {
@@ -108,7 +112,18 @@ export function selectionProbe() {
             assert.equal(messages.filter((m) => /^Reviewer [\w-]+: starting$/.test(m)).length, 4,
               "Selection must not rerun specialists or adjudication");
             assert(messages.some((m) => m.startsWith("Finding selection:")));
+            assert.equal(retention.invocation.invocationId, result.invocation.invocationId);
+            const beforeInspection = messages.length;
+            assert.equal((await session.rpc.commands.execute({ commandName: "pr-review", args: "inspect" })).error, undefined);
+            const stored = JSON.parse(messages.slice(beforeInspection)
+              .find((message) => message.startsWith("P2 inspection: ")).slice("P2 inspection: ".length));
+            assert.equal(stored.digest, retention.digest);
+            assert.deepEqual(stored.outcome.selection, result.selection);
+            assert.equal(stored.outcome.complete, result.complete);
+            assert.equal(stored.outcome.cancelled, result.cancelled);
+            assert.deepEqual(stored.outcome.validation.findings, review.validation.findings);
             console.log(`P1 ${mode} runtime evidence: ${JSON.stringify({ ...result, findings: review.validation.findings, issues: review.validation.issues })}`);
+            console.log(`PASS P2 ${mode}: settled selection retained/inspected; session=${session.sessionId}; digest=${retention.digest}`);
             console.log(`PASS P1 ${mode}: ${expected.length}/${review.validation.findings.length} selected; runtime ${owned[0].pid} exited${["all", "unavailable"].includes(mode) ? "" : " before UI"}`);
           } finally {
             pending.answer.resolve({ action: "cancel" });

@@ -88,7 +88,7 @@ export async function finishSelection(parent, outcome, options, controller) {
   };
   applyCancellation();
   await parent.log(`Finding selection: ${report.selection.status}; ${report.selection.findingIds.length} selected. ` +
-    `Review coverage: ${report.coverage}. Nothing was published; no result cache is retained. ` +
+    `Review coverage: ${report.coverage}. Nothing was published. ` +
     `This is not a clean-review claim.${selection.error ? ` ${selection.error}` : ""}`,
   { level: ["failed", "unavailable", "cancelled"].includes(selection.status) ? "error" : "info" });
   applyCancellation();

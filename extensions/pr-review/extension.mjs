@@ -5,7 +5,9 @@ import {
 } from "./fixture.mjs";
 import { executeFixtureRun } from "./fixture-run.mjs";
 import { executeTargetCapture } from "./target.mjs";
-import { executeQuickRun, parseQuickArgs, quickAssignments } from "./quick.mjs";
+import { parseQuickArgs, quickAssignments } from "./quick.mjs";
+import { executeRetainedQuick } from "./retained-run.mjs";
+import { inspectRetained } from "./retention.mjs";
 
 const help = [
   "Copilot PR Review - runtime feasibility prototype",
@@ -21,6 +23,7 @@ const help = [
   "adversarial  Same settings; exercise forbidden tools and untrusted fixture text.",
   "failure      Same settings; inject a failure in the first active reviewer.",
   "cancel       Cancel active review work and stop its owned runtime.",
+  "inspect      Show this session's latest retained result without inference or GitHub requests.",
   "",
   "NUMBER  Capture PR metadata and diff, then bind source context to the captured",
   "        head/base revisions. No reviewers, no publication, no local source.",
@@ -30,7 +33,8 @@ const help = [
   "Requires --no-comment. Unset heavy settings inherit the ambient model/effort.",
   "Strict evidence checks and an isolated adjudication pass validate/deduplicate candidates.",
   "Select validated findings in the host UI, or use --all. Selection never authorizes posting.",
-  "No publication, caching, or safeguards. Validation also uses Copilot credits.",
+  "Results are retained only in the originating local session; a new quick run replaces the previous result.",
+  "No publication or safeguards. Validation also uses Copilot credits.",
   "Other review flags are not supported yet.",
 ].join("\n");
 
@@ -43,7 +47,8 @@ const status = [
   "The fixture requires explicit distinct models and reasoning efforts.",
   "F3 experiments: adversarial read-only probes, failure injection, and manual cancellation.",
   "Quick execution is available with --quick --no-comment, grounded validation and deduplication.",
-  "Validated findings can be selected via the host UI or --all, without posting or caching.",
+  "Validated findings can be selected via the host UI or --all, then retained in this local session.",
+  "Use /pr-review inspect after extension reload or a CLI-supported same-session resume.",
   "",
   "Status/help start no models or background work. PR capture and source context use",
   "read-only gh requests against the captured revisions, never the local checkout.",
@@ -94,13 +99,17 @@ const session = await joinSession({
             ).join("\n"));
             return;
           }
+          case "inspect":
+            assertIdle();
+            await inspectRetained(session);
+            return;
           default: {
             if (/^\d/.test(args.trim())) {
               if (args.trim().split(/\s+/).some((token) => ["--quick", "--major-only"].includes(token))) {
                 const options = parseQuickArgs(args);
                 assertIdle();
                 const assignments = await quickAssignments(session, options.settings);
-                startRun((client, lifecycle) => executeQuickRun(session, client, options, assignments, lifecycle));
+                startRun((client, lifecycle) => executeRetainedQuick(session, client, options, assignments, lifecycle));
                 return;
               }
               await executeTargetCapture(session, args);
@@ -143,7 +152,15 @@ function startRun(execute) {
     controller, onStopped: (outcome) => { run.runtimeStopped = outcome.cleanupErrors.length === 0; },
   }).finally(clearRun);
   // Return dispatch so cancel remains available. Parent transport loss can prevent timeline delivery.
-  void run.done.catch((error) => console.error(`Review run failed: ${String(error)}`));
+  void run.done.then(async (outcome) => {
+    if (outcome.retention) await session.log(`P2 evidence: ${JSON.stringify(outcome.retention)}`);
+  }).catch(async (error) => {
+    console.error(`Review run failed: ${String(error)}`);
+    try {
+      await session.log(`Review/retention failed: ${String(error)}. No settled result is guaranteed; ` +
+        "use /pr-review inspect to examine the retained state. Nothing was published.", { level: "error" });
+    } catch (logError) { console.error(`Could not report review/retention failure: ${String(logError)}`); }
+  });
 }
 
 async function shutdown(reason) {

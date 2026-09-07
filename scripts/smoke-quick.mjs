@@ -6,6 +6,7 @@ import { captureTarget, parseTargetArgs } from "../extensions/pr-review/target.m
 import { assembleContext } from "../extensions/pr-review/context.mjs";
 import { respond } from "./target-fixture.mjs";
 import { reviewKey, validationInstructions } from "../extensions/pr-review/findings.mjs";
+import { retainedRecord, validateRecord } from "../extensions/pr-review/retention.mjs";
 
 const catalog = [
   { id: "heavy", capabilities: { supports: { reasoning_effort: ["low", "high"] } } },
@@ -194,6 +195,7 @@ for (const failure of [undefined, "reviewer", "tool-call", "usage", "missing-usa
   const report = await executeQuickRun(h.parent, h.client, options, structuredClone(assignments), {
     controller: h.controller, gh: fakeGh(), onStopped() { stopped = true; },
   });
+  validateRecord(retainedRecord(report), h.parent.sessionId);
   assert.equal(report.complete, !failure, failure);
   if (report.validation) assert.equal(report.validation.findings.length, 0);
   assert.equal(report.noComment, true);

@@ -1,7 +1,8 @@
 # Copilot PR Review
 
 An original Copilot CLI plugin prototype. **Quick reviews now include grounded
-candidate validation, deduplication, and finding selection. Publication is not implemented.**
+candidate validation, deduplication, finding selection, and session-bound retention.
+Publication is not implemented.**
 [SCOPE.md](SCOPE.md) is the authoritative product specification;
 [ROADMAP.md](ROADMAP.md) records delivery status and runtime evidence.
 
@@ -22,6 +23,7 @@ Wait for plugin/extension loading to finish, then enter:
 /pr-review status
 /pr-review help
 /pr-review models
+/pr-review inspect
 ```
 
 These commands are implemented in JavaScript by a plugin-shipped extension, not
@@ -154,7 +156,7 @@ is correct. Failed reviewers retain partial output alongside successful reviewer
 and report incomplete coverage.
 Skipped/declined/unconfirmed targets report `coverage: "not-started"` and start
 no reviewer runtime. Setup/capture failures and cancellation never become a
-clean-review result. Results are invocation-local, not a publish-later cache.
+clean-review result. P2 retains the settled quick result in its originating session.
 Manual cancellation stops owned work without a review timeout; a pending host
 confirmation UI may remain visible, but a late answer cannot resume cancelled
 capture.
@@ -215,8 +217,8 @@ completed execution, and skipped targets never claim a clean PR.
 
 Validation uses the existing tool-denial, progress, cancellation, no-timeout,
 usage-accounting, and cleanup machinery. Cancellation during validation stops the
-owned work. Everything remains invocation-local: no cache, GitHub
-publication, or safeguards are added.
+owned work. P2 retains the validated findings and their source provenance, not raw
+reviewer/adjudicator output. No GitHub publication or safeguards are added.
 
 ### Finding selection (P1)
 
@@ -247,7 +249,7 @@ IDs with their binding; `Q3 evidence:` remains the post-inference/cleanup review
 record. `reviewComplete` preserves that earlier coverage state, while cancellation
 marks the final run incomplete and clears selected IDs. Selection failure and
 coverage are separate: `complete` describes review coverage, not selection or
-posting success. Nothing is retained as a plugin cache after the invocation.
+posting success. P2 retention follows selection, as described below.
 
 The installed CLI's native elicitation transport is exercised with a scripted
 SDK host in `scripts/runtime-selection.mjs`, not a mock extension API. This is
@@ -269,6 +271,87 @@ an unsupported host. `--selection-cases=none,cancel-ui,cancel-pending,invalid`
 limits the UI probe to named cases without repeating successful inference.
 Model output is fallible: no validated findings stops a positive UI probe, not
 the plugin's fail-closed behavior. See the roadmap for recorded evidence.
+
+### Retained result inspection (P2)
+
+```text
+/pr-review inspect
+```
+
+Quick runs now retain **one latest result per originating local session**. This
+command displays the retained findings, canonical selection IDs/disposition,
+reviewer coverage and errors, and repository/PR/reviewed-head identity. It performs
+no inference, GitHub requests, current-head refresh, local source reads, or
+publication. It always refers to the originating repository shown in the result,
+even if the session's current directory has since changed. It accepts no target
+or session-ID argument; it is not a cross-session archive or publish command.
+Inspection is refused while review work is active.
+
+The plugin uses the installed SDK's local session workspace metadata and writes
+`pr-review-result.json` directly in that session-state directory, never in the
+checkout. Raw candidate/adjudicator output and duplicate candidate bodies are
+excluded. Validated findings retain their quotations, revision/blob provenance,
+attribution, deduplication IDs, and full review binding; rejection/duplicate reasons
+and coverage/error state remain visible. Full captured diff/context text is not
+stored. A versioned schema and digest detect incompatible/malformed records,
+cross-session or inconsistent bindings, and stale/noncanonical selected IDs.
+The digest is a corruption check, **not authentication against someone who can
+rewrite the session files**; local session storage is not an OS sandbox.
+
+An accepted new quick run supersedes the previous result with a non-actionable
+pending marker before capture. Once inference cleanup and selection settle, a
+synchronous, flushed-file/atomic-rename write records the final state without an
+intervening await. Cancellation clears selected IDs and marks the result
+incomplete. A process interrupted before settlement leaves an unfinished marker,
+not the previous review's selection. Empty, skipped, failed, unavailable-UI, and
+degraded outcomes remain distinct; none claims a clean PR. Capture-only and
+fixture commands do not replace the quick-result slot.
+
+`P2 evidence:` acknowledges a successful retained write after the run settles;
+`P2 inspection:` describes the loaded record. `P1 evidence:` alone is not a
+retention acknowledgement. Storage failures are explicit and never fall back to
+transcripts or another session's result. Remote/missing workspaces and sessions
+reported as already in use are refused. A failed replacement can leave an earlier
+record or a pending marker; inspect the reported state rather than treating the
+failed run as saved.
+
+Extension reload preserves the result. **Cold resume was demonstrated for the
+same session after a real parent conversation turn**, using a fresh CLI runtime.
+Command-only SDK sessions in CLI 1.0.83 lack resumable event history: save/close
+still leads to `Session not found`, although the retained file survives. The plugin
+does not manufacture history or spend credits to make those sessions resumable.
+Forked/new sessions cannot inspect the original result, even if its record was
+copied into their workspace. Same-session interactive `/resume` uses the host's
+session lifecycle; human UI, remote hosts, and other platforms are not demonstrated.
+
+Reproduce controlled storage and native lifecycle probes:
+
+```sh
+node scripts/smoke-retention.mjs
+copilot plugin install "$(pwd)"
+COPILOT_CLI_PATH="$(command -v copilot)" \
+COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
+node scripts/smoke-retention-runtime.mjs
+```
+
+The default runtime probe seeds controlled validated fixtures, then exercises real
+inspection/reload and records the command-only resume limitation without inference.
+For real review retention and cold resume, add explicit settings and
+`--quick --parent-turn`:
+
+```sh
+COPILOT_CLI_PATH="$(command -v copilot)" \
+COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
+PR_REVIEW_HEAVY_MODEL=gpt-5.6-terra PR_REVIEW_HEAVY_EFFORT=high \
+node scripts/smoke-retention-runtime.mjs --quick --parent-turn
+```
+
+This spends credits for one parent-session initialization turn and the quick
+review; inspection/reload/resume never rerun reviewers. It uses controlled target
+12, not GitHub mutations. The existing selection runtime probe now also inspects
+retained results; use `--selection-cases=subset,none,cancel-pending` to cover
+subset selection, no selection, and cancellation with an inert late UI answer.
+No publication or publish-later execution exists yet.
 
 ### Two-reviewer fixture experiment (F2)
 
