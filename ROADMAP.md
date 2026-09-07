@@ -5,9 +5,19 @@ first implementation increment; the scope's earlier authorization statement is
 historical. Items below target roughly 1-3 hours each, not review runtime limits.
 An item is complete only with repository evidence. Later items may be split
 further when their implementation context is known, without changing scope.
-The standing checkpoint-commit and fresh-session handoff workflow is recorded
-in [AGENTS.md](AGENTS.md); the replaceable next-session prompt lives in
-[HANDOFF.md](HANDOFF.md).
+The standing checkpoint-commit, pull-request and fresh-session handoff workflow
+is recorded in [AGENTS.md](AGENTS.md); the replaceable next-session prompt lives
+in [HANDOFF.md](HANDOFF.md).
+
+**Since 2026-09-07, every increment lands on a branch and a pull request that is
+reviewed with this plugin.** `main` carries a repository ruleset requiring a pull
+request with zero approving reviews and no bypass actors, so nobody pushes to it
+directly. Each increment's entry below must record its pull request and the
+outcome of reviewing it with the tool: mode, model and effort actually used,
+coverage, findings and withheld findings, reported credit cost, and what changed
+in response. The tool emits only `COMMENT` reviews, so its review never satisfies
+an approval requirement, and findings stay local unless the user authorizes
+posting them.
 
 ## Increments
 
@@ -3353,8 +3363,13 @@ Acceptance criteria:
 - Consult the installed SDK and current official documentation before adopting
   new runtime APIs, then record evidence, remaining limits and the next small
   increment. Follow the `AGENTS.md` checkpoint and final-file handoff rules.
+- Land the increment on its own branch and pull request, and review that pull
+  request with this plugin before asking for a merge, as `AGENTS.md` now
+  requires. Record the review outcome here. That single review is authorized by
+  the workflow; nothing else that spends credits is.
 
 A live balanced review remains an open, separately authorizable step. It is the
 only way to learn whether the light overview reviewer and the minor-finding
 policy produce useful output; the plumbing itself is already demonstrated.
-Keep L1 pending and copy no upstream source. No push authorization exists.
+Keep L1 pending and copy no upstream source. Push the increment branch and open
+its pull request; `main` refuses direct pushes and merging stays the user's call.

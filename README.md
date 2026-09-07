@@ -9,6 +9,11 @@ an explicit command, without rerunning reviewers. Personal model tiers and
 [SCOPE.md](SCOPE.md) is the authoritative product specification;
 [ROADMAP.md](ROADMAP.md) records delivery status and runtime evidence.
 
+Development happens on branches: every increment lands through a pull request
+that is reviewed with this plugin before it merges, and `main` is protected by a
+repository ruleset that requires it. [AGENTS.md](AGENTS.md) records that
+workflow for humans and agents alike.
+
 ## Install and invoke
 
 From this checkout:
