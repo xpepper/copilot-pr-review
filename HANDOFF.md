@@ -1,150 +1,97 @@
-# Next-session handoff prompt
+# Next session prompt
 
-Read `AGENTS.md`, then `SCOPE.md` as the authoritative product specification,
-and `ROADMAP.md` for evidence, runtime caveats and the exact next increment.
-Inspect the working tree, recent commits and relevant implementation before
-editing; reconcile stale notes against git state. Implement only the next agreed
-increment, respect scope constraints, and distinguish demonstrated behavior from
-assumptions. Follow the same checkpoint-commit and final-file handoff rules in
-turn; do not depend on any prior conversation.
+Copy everything below into a fresh session.
 
-## Current priority: R1, first half
+---
 
-This handoff follows checkpoint `4477e2e`, which added presentation-only
-consolidation of equivalent coverage gaps. That fix was manually tested this
-session and **did not work**; see the ROADMAP section "Manual-feedback finding:
-consolidation did not fire on real reviewer wording" for the measurements.
+Read `AGENTS.md`, `SCOPE.md` and `ROADMAP.md` in this repository, then inspect
+the working tree and recent commits before editing anything. `SCOPE.md` is the
+authoritative product specification; `ROADMAP.md` records demonstrated evidence,
+runtime caveats and the exact next increment. Do not rely on any previous
+conversation and do not reopen settled product decisions.
 
-The current checkpoint adds `scripts/smoke-reviewer-tools.mjs`, the F4
-capability probe, plus the ROADMAP evidence. Inspect git history for its
-containing commit; do not infer or embed that future hash. A follow-up checkpoint
-records the agreed hard revision-identity gate. At handoff creation
-all uncommitted files belong to this checkpoint, no background work remains,
-and nothing was pushed.
+## Where the work stands
 
-The next action is the **first half of R1**: grant quick reviewers confined
-read-only access to the local checkout, gated on revision identity. The exact
-acceptance criteria are in ROADMAP's "Exact next increment"; implement from
-there, not from memory of this text.
+The last checkpoint is `340ab77` "feat: let quick reviewers read the verified
+checkout". The working tree was clean at that commit apart from this handoff.
 
-## Why the direction changed
+That checkpoint completed the **first half of R1**: quick reviewers now receive
+`view`, `grep` and `glob` confined to the local checkout, but only after a hard
+revision-identity gate (`extensions/pr-review/checkout.mjs`) proves the checkout
+is exactly the reviewed revision. Read the "Completed increment: R1, first half"
+section of `ROADMAP.md` for the full demonstrated evidence and limitations; do
+not re-derive them.
 
-Manual testing of `primait/starsky#8126` showed the pipeline works but produces
-nothing useful for that PR class. Reviewer input is the diff plus hunk-window
-context for **changed files only**, so for a dependency-removal PR the reviewers
-saw only `Cargo.lock` and three `Cargo.toml` files. The decisive fact — whether
-any crate source still imports `lapin` — lives in unchanged files that are never
-fetched, and both `quickInstructions` and `reviewerPolicy` forbid looking. All
-three specialists correctly reported the same blocked assessment. Any PR whose
-risk lives in unchanged callers is currently unreviewable.
+No inference has been spent on reviewer reads yet. Nothing proves a reviewer
+*model* uses the read tools well.
 
-Upstream at pinned commit `457e18e` tells reviewers to open surrounding files
-and callers, and runs its heavy passes with repository-context tools. `SCOPE.md`
-already permits reading surrounding code to establish context and confirm
-impact, and F3 required enforceable **read-only** permissions, not zero tools.
-So relaxing the zero-tool policy needs no scope change.
+## Your increment
 
-The user directed that reviewers must not be limited in what they can read, and
-chose the **local checkout** as the read source. Running tests or linters is
-explicitly a later increment, not this one.
+Implement only the "Exact next increment" section of `ROADMAP.md`: **R1, second
+half.** In short:
 
-## What F4 demonstrated, and what it did not
+1. Give `scripts/runtime-target.mjs` a fixture mode whose PR head is a real
+   commit in the temporary checkout, so fixture-driven `--quick` runtime probes
+   can satisfy the gate again. Today `prepareTargetSmoke` builds a deliberately
+   dirty checkout on `not-the-pr-branch` with the synthetic head `"b" * 40`,
+   which can never pass; keep that existing mismatched-checkout refusal
+   demonstration working under its own fixture.
+2. Bump the `reads >= 3` drift thresholds in `scripts/target-fixture.mjs` to `4`
+   (fixture PRs 11, 54 and 55), because the gate adds a third metadata read.
+3. Make `preparePublicCheckout` fetch and detach the reviewed head for live
+   public targets, without touching any repository the user cares about.
+4. Only with the user's explicit authorization, run **one** live quick review on
+   a PR whose real risk lives in code the diff does not contain, and record
+   verbatim what happened: which read tools were actually called, what was read,
+   whether any read was denied, whether findings improved over the diff-only
+   baseline, and the credit cost. An honest negative result is a valid outcome.
 
-Demonstrated natively on macOS arm64 / CLI 1.0.83 / bundled SDK / Node.js 26.1.0:
-the built-in catalog's real names; that `ToolSet().addBuiltIn(["view","grep",
-"glob"])` grants exactly those three; that `bash`, `create`, `edit`, `task`,
-`sql`, `web_fetch` and `write_agent` remain natively refused inside that session;
-that a granted `view` executes against a directory set with
-`metadata.setWorkingDirectory`; that the permission handler receives
-`{ kind: "read", path }` and confines reads to a chosen root, rejecting an
-outside path without leaking content; and that the grant does not leak into a
-later zero-tool session. No inference was spent.
+Respect the increment's exclusions: no `--verify`, no test or lint execution, no
+`bash`, no custom revision-bound tools, no balanced/full/deep, no fallbacks or
+timeouts, and **no override flag for the gate**. Do not change personal
+configuration, project trust, selection, binding, lifecycle, publication or
+authorization gates. Keep L1 pending and copy no upstream source. Never switch
+branches, stash, clean or pull to satisfy the gate.
 
-Not demonstrated: that a reviewer model uses read tools well or stays in PR
-scope while reading; anything about revision identity; and custom plugin-owned
-tools, which were read in the SDK but never exercised.
+## Runtime caveats that will bite you
 
-**Act on this before granting any tool:** the runtime accepts only
-`approve-once`, `approve-for-session`, `approve-for-location`, `reject`,
-`user-not-available` and `approved`, and refuses `approved` at orchestration
-time. `read-only.mjs` returns `{ kind: "denied-no-approval-rule" }`, which the
-runtime rejects as an unknown variant, turning a denial into a transport
-failure. It is unreachable today only because reviewers hold no tools. Correct
-it to `reject` as part of R1.
+- Consult the installed SDK (`~/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk`)
+  and current official documentation before adopting any runtime API. Demonstrate
+  capabilities; never infer them from type declarations.
+- Reinstall the plugin with `copilot plugin install "$(pwd)"` after **every**
+  change under `extensions/`, before running any installed-runtime probe. The
+  deprecation warning is expected.
+- Controlled suites (no inference, no network):
+  `node scripts/smoke-<name>.mjs` for `findings`, `quick`, `selection`,
+  `retention`, `preview`, `publication`, `publish-later`, `checkout`, `config`,
+  `context`, `fixture`, `target`. All twelve pass today. Also run
+  `git diff --check`.
+- Installed-runtime probes need both variables:
+  `COPILOT_CLI_PATH="$(command -v copilot)"` and
+  `COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk"`.
+  `scripts/smoke-reviewer-tools.mjs`,
+  `scripts/smoke-runtime.mjs --targets --startup` and
+  `scripts/smoke-retention-runtime.mjs` all pass today without spending
+  inference.
+- `--quick` runtime probes spend credits. Never run one without explicit
+  authorization in the current session, and never publish a review comment
+  without the authorization the code already requires.
+- Cold `session.resume` of a retained record is unsupported by the runtime; do
+  not invent transcript recovery.
 
-**The central risk to design against:** a checkout parked on a different branch
-would give reviewers evidence about code that is not the reviewed head. That is
-exactly the failure Q2 was built to prevent. The user's decision is a **hard
-stop before any reviewer starts**, not a degraded fallback: local `HEAD` must
-equal the captured PR head SHA, the remote PR head must still equal the captured
-head at review start, and no tracked file may be modified or staged. On any
-mismatch, refuse and name the failed condition plus the exact fixing command
-such as `gh pr checkout <number>`. There is no override flag and no context-only
-fallback. A moved remote head means the snapshot is stale: stop and let the user
-re-run. Non-ignored untracked files warn only. Never switch branches, stash,
-pull or clean to satisfy the gate. Accept the usability cost: `/pr-review` will
-refuse on an unrelated branch, and `README.md` must say so.
+## Working rules
 
-## Validation and reproduction
+Distinguish demonstrated behavior from assumptions in everything you write. If a
+claim is not backed by a probe you ran in your session, say so.
 
-```sh
-for script in smoke-findings smoke-quick smoke-selection smoke-retention \
-  smoke-preview smoke-publication smoke-publish-later; do
-  node "scripts/$script.mjs" || exit
-done
-copilot plugin install "$(pwd)"
-COPILOT_CLI_PATH="$(command -v copilot)" \
-COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
-node scripts/smoke-reviewer-tools.mjs
-COPILOT_CLI_PATH="$(command -v copilot)" \
-COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
-node scripts/smoke-retention-runtime.mjs
-COPILOT_CLI_PATH="$(command -v copilot)" \
-COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
-node scripts/smoke-runtime.mjs --targets --startup
-```
+Commit locally at each meaningful checkpoint with the trailer
+`Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>`. Stage
+only the files belonging to that checkpoint, do not amend or rewrite history,
+and **do not push**.
 
-All seven controlled suites, the new probe, both native no-inference probes and
-`git diff --check` passed. The plugin was reinstalled at the start of the
-session; no extension file changed afterwards. Direct local plugin installation
-still emits its deprecation warning. Command-only cold resume remains
-unsupported.
-
-## Boundaries and deferred work
-
-Do not add `--verify`, test or lint execution, `bash`, revision-bound custom
-tools, balanced/full/deep, fallbacks or timeouts in this increment. Balanced M1
-is deferred behind R1; its plan remains in ROADMAP. Bare `/pr-review NUMBER`
-stays capture-only.
-
-Do not alter personal configuration, project trust, selection, binding/head,
-lifecycle, publication or authorization gates. Do not run
-`smoke-config-runtime.mjs` assuming an empty personal store; any authorized
-real-store probe must snapshot and restore both personal config and
-trusted-project files. Keep fixture `gh` in child-only PATH.
-
-Leave the presentation consolidation alone for now; it is cosmetic relative to
-the real cause, and reviewer reads may remove the repeated gap entirely. Keep L1
-pending and copy no upstream source. Existing command-only cold-resume, locking,
-non-atomic final GET/POST, live anchor, semantic/context and process-loss
-limitations remain recorded in `ROADMAP.md`. Existing playground publication
-evidence must not be repeated or its synthetic branches merged. Do not rerun a
-private review, spend inference, publish anything or access private review
-content without explicit authorization.
-
-If a future increment needs a new runtime API, consult the installed SDK and
-current official documentation and demonstrate the capability rather than
-inferring it from type declarations, as F4 did.
-
-## Commit and hand off in turn
-
-Follow `AGENTS.md`: validate applicable changes, inspect diffs, update
-`ROADMAP.md` with evidence and remaining limits, and commit coherent checkpoints.
-Preserve unrelated work; do not amend, rewrite history or push without explicit
-authorization. Reinstall the plugin after any extension change.
-
-After all other implementation, validation and documentation edits, replace
-`HANDOFF.md` as the final repository file edit before the session-ending commit.
-If another edit becomes necessary, refresh it last again. Include it in that
-commit, reference an existing checkpoint rather than its future hash, and report
-the commit outcome with a pointer to this file.
+Before ending your session, update `ROADMAP.md` with the outcome, reproduction
+commands, remaining limitations and the exact next small increment, update
+`README.md` if user-visible behavior changed, and then rewrite this `HANDOFF.md`
+as the final repository file edit before your session-ending commit. This file
+is a replaceable handoff, not a history; overwrite it completely. Pass these same
+commit and handoff rules on to the next agent.
