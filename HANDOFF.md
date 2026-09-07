@@ -3,82 +3,92 @@
 Read `AGENTS.md`, then `SCOPE.md` as the authoritative product specification,
 and `ROADMAP.md` for evidence, runtime caveats and the exact next increment.
 Inspect the working tree, recent commits and relevant implementation before
-editing; reconcile stale notes against git state. Implement only the next
-agreed increment, respect scope constraints, and distinguish demonstrated
-behavior from assumptions. Follow the same checkpoint-commit and final-file
-handoff rules in turn; do not depend on any prior conversation.
+editing; reconcile stale notes against git state. Implement only the next agreed
+increment, respect scope constraints, and distinguish demonstrated behavior from
+assumptions. Follow the same checkpoint-commit and final-file handoff rules in
+turn; do not depend on any prior conversation.
 
-## Current priority: manual testing and feedback, not M1
+## Current priority: R1, first half
 
-This handoff follows checkpoint `3079726`, which implemented explicit coverage
-classification and presentation after startup fix `ff78dcb`. The current
-checkpoint adds presentation-only consolidation of equivalent coverage gaps in
-response to user feedback. Inspect git history for its containing commit; do
-not infer or embed that future hash.
+This handoff follows checkpoint `4477e2e`, which added presentation-only
+consolidation of equivalent coverage gaps. That fix was manually tested this
+session and **did not work**; see the ROADMAP section "Manual-feedback finding:
+consolidation did not fire on real reviewer wording" for the measurements.
 
-At handoff creation, all uncommitted files belong to this consolidation change,
-its regression coverage and documentation. They are intended for the
-session-ending checkpoint containing this prompt. No unrelated or unfinished
-work is carried forward, no background work remains, and nothing was pushed.
+The current checkpoint adds `scripts/smoke-reviewer-tools.mjs`, the F4
+capability probe, plus the ROADMAP evidence. Inspect git history for its
+containing commit; do not infer or embed that future hash. At handoff creation
+all uncommitted files belong to this checkpoint, no background work remains,
+and nothing was pushed.
 
-The next action remains **more user-run manual testing and feedback** with the
-reinstalled plugin. Do not automatically continue to balanced mode/M1, rerun a
-private review, spend inference, publish anything, or access private review
-content without explicit authorization. The user chooses the target and may
-provide a session ID; local session discovery is available when asked.
+The next action is the **first half of R1**: grant quick reviewers confined
+read-only access to the local checkout, gated on revision identity. The exact
+acceptance criteria are in ROADMAP's "Exact next increment"; implement from
+there, not from memory of this text.
 
-## Feedback and implementation in this checkpoint
+## Why the direction changed
 
-The user authorized read-only inspection of session
-`138018d8-296b-4c65-9199-ec9d44c6d13a`, a quick review of private
-`primait/starsky#8126`. The parent session had no stored turns, but its three
-specialist child sessions were identifiable by time/repository. All three
-specialists completed successfully with valid schema-v2 output, no candidates,
-and no execution failures. Each reported a substantive coverage gap: supplied
-manifest/lockfile context could not establish whether removing direct `lapin`
-dependencies left source, macro, feature-gated or build-time uses. This was
-correctly incomplete rather than a clean-review claim, but three near-identical
-gaps made behavior unclear. No private diff/source payload was copied into
-fixtures or repository documentation.
+Manual testing of `primait/starsky#8126` showed the pipeline works but produces
+nothing useful for that PR class. Reviewer input is the diff plus hunk-window
+context for **changed files only**, so for a dependency-removal PR the reviewers
+saw only `Cargo.lock` and three `Cargo.toml` files. The decisive fact — whether
+any crate source still imports `lapin` — lives in unchanged files that are never
+fetched, and both `quickInstructions` and `reviewerPolicy` forbid looking. All
+three specialists correctly reported the same blocked assessment. Any PR whose
+risk lives in unchanged callers is currently unreviewable.
 
-`extensions/pr-review/coverage.mjs` now consolidates only the displayed form of
-structured reviewer coverage gaps when they share a quoted code identifier and
-have strongly overlapping blocked-assessment vocabulary. The output names all
-reporters, displays one representative reason/impact, reports one consolidated
-gap plus its raw report count, and says full diagnostics remain retained.
+Upstream at pinned commit `457e18e` tells reviewers to open surrounding files
+and callers, and runs its heavy passes with repository-context tools. `SCOPE.md`
+already permits reading surrounding code to establish context and confirm
+impact, and F3 required enforceable **read-only** permissions, not zero tools.
+So relaxing the zero-tool policy needs no scope change.
 
-The implementation deliberately leaves raw `validation.diagnostics`, blocking
-`issues`, completeness, selection, retention, publication payload identity and
-authorization unchanged. Distinct same-identifier assessments remain separate.
-Unstructured, code-owned and legacy gaps are never clustered. The heuristic is
-conservative and fallible: paraphrases can remain separate, and lexical overlap
-is not proof of semantic identity. It must never turn incomplete coverage into
-completed coverage or imply that zero findings means a clean PR.
+The user directed that reviewers must not be limited in what they can read, and
+chose the **local checkout** as the read source. Running tests or linters is
+explicitly a later increment, not this one.
 
-`README.md` documents this presentation behavior. `ROADMAP.md` records the
-manual evidence, implementation boundary, validation and remaining uncertainty.
-`scripts/smoke-findings.mjs` covers three equivalent dependency-removal gaps, a
-distinct same-identifier security gap, and unstructured diagnostics.
+## What F4 demonstrated, and what it did not
+
+Demonstrated natively on macOS arm64 / CLI 1.0.83 / bundled SDK / Node.js 26.1.0:
+the built-in catalog's real names; that `ToolSet().addBuiltIn(["view","grep",
+"glob"])` grants exactly those three; that `bash`, `create`, `edit`, `task`,
+`sql`, `web_fetch` and `write_agent` remain natively refused inside that session;
+that a granted `view` executes against a directory set with
+`metadata.setWorkingDirectory`; that the permission handler receives
+`{ kind: "read", path }` and confines reads to a chosen root, rejecting an
+outside path without leaking content; and that the grant does not leak into a
+later zero-tool session. No inference was spent.
+
+Not demonstrated: that a reviewer model uses read tools well or stays in PR
+scope while reading; anything about revision identity; and custom plugin-owned
+tools, which were read in the SDK but never exercised.
+
+**Act on this before granting any tool:** the runtime accepts only
+`approve-once`, `approve-for-session`, `approve-for-location`, `reject`,
+`user-not-available` and `approved`, and refuses `approved` at orchestration
+time. `read-only.mjs` returns `{ kind: "denied-no-approval-rule" }`, which the
+runtime rejects as an unknown variant, turning a denial into a transport
+failure. It is unreachable today only because reviewers hold no tools. Correct
+it to `reject` as part of R1.
+
+**The central risk to design against:** a checkout parked on a different branch
+would give reviewers evidence about code that is not the reviewed head. That is
+exactly the failure Q2 was built to prevent. Require local `HEAD` equal to the
+captured PR head SHA and a clean working tree before enabling reads; otherwise
+fall back to today's supplied-context-only behavior with an explicit coverage
+caveat. Never switch branches, stash, pull or clean.
 
 ## Validation and reproduction
-
-All seven controlled suites passed:
 
 ```sh
 for script in smoke-findings smoke-quick smoke-selection smoke-retention \
   smoke-preview smoke-publication smoke-publish-later; do
   node "scripts/$script.mjs" || exit
 done
-```
-
-After the final defensive adjustment, `node scripts/smoke-findings.mjs` and
-`git diff --check` passed again.
-
-The plugin was reinstalled successfully. Native no-inference retention and
-startup/target probes passed:
-
-```sh
 copilot plugin install "$(pwd)"
+COPILOT_CLI_PATH="$(command -v copilot)" \
+COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
+node scripts/smoke-reviewer-tools.mjs
 COPILOT_CLI_PATH="$(command -v copilot)" \
 COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
 node scripts/smoke-retention-runtime.mjs
@@ -87,53 +97,44 @@ COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
 node scripts/smoke-runtime.mjs --targets --startup
 ```
 
-Native evidence remains macOS arm64 / CLI 1.0.83 / Node.js 26.1.0. Direct local
-plugin installation still emits its deprecation warning. Runtime cleanup
-completed. These probes are synthetic/no-inference and do not demonstrate
-actual model wording or live consolidation.
-
-## Exact next increment
-
-Wait for a user-selected manual review result. The most direct verification is
-a fresh user-run quick review of `primait/starsky#8126`, but do not initiate it.
-When authorized, inspect the selected session read-only and determine whether:
-
-- equivalent dependency-removal gaps appear once with all reporters and the raw
-  report count;
-- distinct coverage gaps, execution failures and informational caveats remain
-  separately visible;
-- the review remains incomplete when a consequential assessment is blocked;
-- zero findings is not presented as evidence that the PR is clean.
-
-Distinguish actual model behavior from synthetic evidence and preserve genuine
-uncertainty. Address only the next concrete feedback item once identified.
+All seven controlled suites, the new probe, both native no-inference probes and
+`git diff --check` passed. The plugin was reinstalled at the start of the
+session; no extension file changed afterwards. Direct local plugin installation
+still emits its deprecation warning. Command-only cold resume remains
+unsupported.
 
 ## Boundaries and deferred work
 
-Reviewers still have no tools and only supplied revision-bound context.
-Read-only investigation tools remain a separate undecided discussion. Do not
-add shell access, execute mise/gh-aw, implement `--verify`, balanced/full/deep,
-fallbacks or timeouts. Bare `/pr-review NUMBER` remains capture-only.
+Do not add `--verify`, test or lint execution, `bash`, revision-bound custom
+tools, balanced/full/deep, fallbacks or timeouts in this increment. Balanced M1
+is deferred behind R1; its plan remains in ROADMAP. Bare `/pr-review NUMBER`
+stays capture-only.
 
 Do not alter personal configuration, project trust, selection, binding/head,
 lifecycle, publication or authorization gates. Do not run
-`smoke-config-runtime.mjs` assuming an empty personal store. Any future
-authorized real-store probe must snapshot and restore both personal config and
+`smoke-config-runtime.mjs` assuming an empty personal store; any authorized
+real-store probe must snapshot and restore both personal config and
 trusted-project files. Keep fixture `gh` in child-only PATH.
 
-No runtime API changed. If future work needs one, consult the installed SDK and
-current official documentation and demonstrate capability rather than inferring
-it. Existing command-only cold-resume, locking, non-atomic final GET/POST, live
-anchor, semantic/context and process-loss limitations remain recorded in
-`ROADMAP.md`. Existing playground publication evidence must not be repeated or
-its synthetic branches merged. Keep L1 pending and copy no upstream source.
+Leave the presentation consolidation alone for now; it is cosmetic relative to
+the real cause, and reviewer reads may remove the repeated gap entirely. Keep L1
+pending and copy no upstream source. Existing command-only cold-resume, locking,
+non-atomic final GET/POST, live anchor, semantic/context and process-loss
+limitations remain recorded in `ROADMAP.md`. Existing playground publication
+evidence must not be repeated or its synthetic branches merged. Do not rerun a
+private review, spend inference, publish anything or access private review
+content without explicit authorization.
+
+If a future increment needs a new runtime API, consult the installed SDK and
+current official documentation and demonstrate the capability rather than
+inferring it from type declarations, as F4 did.
 
 ## Commit and hand off in turn
 
 Follow `AGENTS.md`: validate applicable changes, inspect diffs, update
 `ROADMAP.md` with evidence and remaining limits, and commit coherent checkpoints.
 Preserve unrelated work; do not amend, rewrite history or push without explicit
-authorization.
+authorization. Reinstall the plugin after any extension change.
 
 After all other implementation, validation and documentation edits, replace
 `HANDOFF.md` as the final repository file edit before the session-ending commit.

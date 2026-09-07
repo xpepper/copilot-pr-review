@@ -18,6 +18,7 @@ in [AGENTS.md](AGENTS.md); the replaceable next-session prompt lives in
 | F1 | Completed | Locally installable plugin with a code-owned, usable status/help entry point; runtime evidence and reproduction below. | [Technical feasibility](SCOPE.md#technical-uncertainties-and-proposed-sequence) |
 | F2 | Completed | Two concurrent reviewers over a tiny original local fixture; distinct explicitly configured subscription models and reasoning levels; display assignments, per-reviewer progress, and results. | F1; [Models/execution](SCOPE.md#models-configuration-and-execution) |
 | F3 | Completed | Native forbidden-tool denials plus an adversarial fixture; retained incomplete coverage; startup/active/unresponsive cancellation and owned-runtime/extension/parent loss exercised with process-exit evidence. Stdio integration selected; limits below. | F2; [Models/execution](SCOPE.md#models-configuration-and-execution) |
+| F4 | Completed | A reviewer child session can be granted an exact read-only built-in subset (`view`, `grep`, `glob`) while write/exec tools stay natively refused, reads are confined to a chosen directory by the permission handler, and the grant does not leak. Evidence below. | F3; [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | Q1 | Completed | Read-only code-owned PR capture with repository/head-bound snapshot, skip/override/confirmation gates, consistency guards, and installed-plugin controlled/live evidence below. | F3; [Targets](SCOPE.md#targets-and-local-behavior) |
 | Q2 | Completed | Source context bound to the captured head/base revisions with blob-verified provenance; local-checkout, moved-head, and inconsistent source refused. Evidence below. | Q1; [Targets](SCOPE.md#targets-and-local-behavior) |
 | Q3 | Completed | Three concurrent quick specialists consume bound PR input; explicit/ambient assignments, alias, incomplete coverage, and cancellation demonstrated below. Candidates remain unvalidated. | Q2; [Modes](SCOPE.md#review-modes-and-findings) |
@@ -29,6 +30,7 @@ in [AGENTS.md](AGENTS.md); the replaceable next-session prompt lives in
 | P5 | Completed | Explicit publish-later of the retained selection without rerunning reviewers; refetched evidence, fresh gates, version-4 authority, seven native cases and a real playground publication demonstrated below. | P2, P4; [Cached publication](SCOPE.md#selection-publication-and-cached-results) |
 | C1 | Completed | Personal light/medium/heavy tier configuration and `autoPostReviews` inspected and updated by `/pr-review-config`; validated capabilities, nearest-tier/ambient inheritance, flag precedence and effective-assignment display demonstrated below. | F3; [Configuration](SCOPE.md#models-configuration-and-execution) |
 | C2 | Completed | Explicit per-directory trust gates `.copilot/pr-review/config.json` overrides; untrusted files ignored unparsed, self-trust impossible, precedence and revocation demonstrated below. | C1; [Configuration trust](SCOPE.md#models-configuration-and-execution) |
+| R1 | Pending | Quick reviewers read the surrounding repository read-only instead of only hunk windows, so findings that depend on unchanged callers become reachable. Requires a revision-identity gate and a corrected permission-denial kind. | F4, Q3; [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | M1 | Pending | Balanced becomes default with required topology and P3 cap; full adds conventions reviewer and its findings policy. | Q4, C1; [Modes](SCOPE.md#review-modes-and-findings) |
 | M2 | Pending | Deep uses one holistic reviewer; reject conflicting mode flags. | M1; [Modes](SCOPE.md#review-modes-and-findings) |
 | C3 | Pending | Explicit optional fallback with at most one eligible retry per failed reviewer; no timers or silent substitutions. | C1, Q3; [Fallbacks/execution](SCOPE.md#models-configuration-and-execution) |
@@ -2621,28 +2623,175 @@ identifier is not formal semantic equivalence. It never changes completeness
 or removes the retained source diagnostics. Existing runtime, configuration,
 publication and context limitations remain.
 
+## Manual-feedback finding: consolidation did not fire on real reviewer wording
+
+On 2026-09-07 the user ran `/pr-review 8126 --quick --no-comment --all` against
+private `primait/starsky#8126` in session `281d7f76-1f51-4b0c-9aaf-eb02a6e16c3f`
+with the reinstalled plugin. Read-only inspection of the retained result and
+event log confirmed the pipeline works and confirmed the previous checkpoint's
+recorded uncertainty was justified.
+
+Working as intended: capture bound the repository, head `06155b5e`, base
+`0547cc5c`, four changed paths and both content hashes; all three specialists
+ran on `gpt-5.6-terra` at high effort, completed in about four to five seconds
+with zero permission or tool denials and valid schema-v2 output; coverage was
+classified `incomplete` with zero execution failures, three coverage gaps and
+zero caveats; every surface repeated that this was not a clean-review claim;
+`--all` over zero findings produced selection `empty`; `--no-comment` held and
+no write was attempted.
+
+Not working: the `4477e2e` presentation consolidation **did not fire**. The
+installed `coverage.mjs` was byte-identical to the repository copy, so the fix
+was live. Replaying the three real gap messages through `presentationDiagnostics`
+returns three separate gaps. Measured Dice overlap of the blocked-assessment
+clauses is 0.323, 0.207 and 0.188, all below the 0.35 threshold; shared tokens
+reduce to `lapin`, `import` and `compile`, plus `target` and `determined` for one
+pair. Three reviewers paraphrase one shared missing fact three different ways,
+and one names crates where another names mechanisms. Raising the threshold is
+not a fix; the lexical premise is what fails.
+
+Underlying cause, established by reading the implementation and the reviewer
+prompt actually sent: reviewer input is the diff plus revision-bound context
+windows for **changed files only**. `context.mjs` fetches the head side of each
+changed file, the base side where lines were removed, and keeps hunk windows of
+radius 40. The correctness reviewer's prompt was 62 KB containing 24 context
+blocks, every one of them `Cargo.lock` or one of the three `Cargo.toml` files.
+The decisive fact for a dependency removal — whether any crate source still
+imports `lapin` — lives in unchanged files that are never fetched, and
+`quickInstructions` plus `reviewerPolicy` forbid the reviewer from looking. The
+three gaps were correct and unavoidable; zero findings was a context-supply
+consequence, not a model failure. This generalizes: any PR whose risk lives in
+unchanged callers or consumers is currently unreviewable.
+
+The upstream prompt at the pinned commit `457e18e` does not work this way. It
+instructs reviewers to "open surrounding files, callers, and convention files
+whenever it improves the review or lets you confirm a finding", and runs its
+correctness, security and performance passes with `tool_policy: configured`,
+while keeping in-scope and never-disturb-the-working-tree guardrails. `SCOPE.md`
+likewise already permits reading surrounding code to establish context and
+confirm impact, and F3's requirement was enforceable **read-only** reviewer
+permissions, not a zero-tool reviewer. The zero-tool policy is therefore
+stricter than both upstream and this project's own scope; relaxing it to
+read-only needs no scope change. Copilot's built-in reviewer was not inspected
+and no claim is made about it.
+
+The user directed that reviewers must not be limited in what they can read, and
+chose the local checkout as the read source. Running tests or linters remains a
+separate later increment.
+
+## Completed increment: F4
+
+Implementation: `scripts/smoke-reviewer-tools.mjs`, a capability probe only. No
+extension module changed, no reviewer prompt changed, no review ran and no
+inference was spent. The probe answers whether the runtime can grant a reviewer
+read access at all, before any reviewer behavior is built on the assumption.
+
+### Demonstrated outcome
+
+On 2026-09-07 with Copilot CLI 1.0.83, its bundled SDK, Node.js 26.1.0 and
+macOS arm64:
+
+- The runtime's built-in catalog is exactly `bash`, `create`, `edit`, `glob`,
+  `grep`, `list_agents`, `list_bash`, `read_agent`, `read_bash`, `sql`,
+  `stop_bash`, `task`, `view`, `web_fetch`, `write_agent`. These are observed
+  names, not names inferred from documentation.
+- The current `reviewerPolicy` still offers zero tools, unchanged.
+- `availableTools: new ToolSet().addBuiltIn(["view", "grep", "glob"])` yields
+  exactly those three tools and nothing else.
+- `bash`, `create`, `edit`, `task`, `sql`, `web_fetch` and `write_agent` are
+  refused inside that session through the native pipeline as nonexistent tools,
+  not merely omitted from a list.
+- A granted `view` executed against a directory set with
+  `metadata.setWorkingDirectory` and returned real file content.
+- The permission handler receives `{ kind: "read", path }` and is the effective
+  confinement point: approving only paths inside the reviewed root let the
+  in-root read succeed while a read of an outside file returned `rejected` and
+  leaked no content.
+- The grant is per-session; a subsequently created zero-tool policy session
+  still offered nothing.
+- No `user.message` or `assistant.*` event was produced.
+
+```sh
+COPILOT_CLI_PATH="$(command -v copilot)" \
+COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
+node scripts/smoke-reviewer-tools.mjs
+```
+
+The seven controlled suites and `git diff --check` were rerun and passed. The
+plugin was reinstalled at the start of the session; no extension file changed
+afterwards, so no further reinstall was required.
+
+### Latent defect found by the probe
+
+The runtime accepts only `approve-once`, `approve-for-session`,
+`approve-for-location`, `reject`, `user-not-available` and `approved` as
+permission decisions, and it rejects `approved` at orchestration time with
+`unexpected user permission response`. `read-only.mjs` currently returns
+`{ kind: "denied-no-approval-rule" }`, which the runtime refuses as an unknown
+variant. The probe demonstrates that a session using that value turns a read
+into a transport failure rather than a clean denial. This is unreachable today
+only because reviewers hold no tools and therefore never raise a permission
+request. It must be corrected to `reject` as part of R1, before any tool is
+granted. It was deliberately left unchanged here to keep this increment a probe.
+
+### Remaining limitations
+
+- Feasibility is demonstrated for a granted subset, confinement and refusal.
+  Nothing yet proves that a reviewer *model* uses read tools well, stays in PR
+  scope while reading, or produces better findings. That needs live inference.
+- The probe reads a temporary directory, not a real checkout, and does not
+  address revision identity. Reading a checkout parked on a different branch
+  would produce evidence about code that is not the reviewed head, which is the
+  precise failure `Q2` was built to prevent.
+- Custom plugin-owned tools (`Tool<>` with a handler, session `tools`,
+  `ToolSet().addCustom`) were read in the SDK but not exercised. Revision-bound
+  reads served from the captured SHAs remain undemonstrated.
+- No reviewer prompt, policy module, configuration, trust, selection, retention,
+  publication or authorization behavior changed in this increment.
+
 ## Exact next increment
 
-**More manual testing and feedback, not automatic continuation to M1.**
+**R1, first half: grant quick reviewers confined read-only access to the local
+checkout, gated on revision identity.**
 
-Use a fresh ordinary interactive runtime with the reinstalled plugin. The user
-chooses and authorizes any review target; the most direct check is another
-user-run quick review of `primait/starsky#8126`, but do not run it, spend
-inference or access private content without authorization. Inspect the supplied
-session read-only and verify whether equivalent dependency-removal gaps are
-shown once with all reporters, distinct gaps remain visible, and zero findings
-still does not imply a clean PR. Preserve genuine uncertainty.
+Acceptance criteria:
 
-Address only the next concrete feedback item once identified. Do not start
-balanced mode or add investigation tools on the strength of the older feature
-plan below. Discuss read-only investigation separately if the user returns to
-it; no tool set, permission design or priority relative to M1 is agreed.
+- `read-only.mjs` gains a read-only reviewer policy that offers exactly `view`,
+  `grep` and `glob`, keeps every other built-in natively refused, and returns
+  `reject` rather than the malformed `denied-no-approval-rule` for anything it
+  declines. The existing zero-tool policy and its F3 evidence stay intact.
+- The permission handler approves only `kind: "read"` requests whose real path
+  resolves inside the reviewed checkout root, and rejects everything else.
+- Reviewer sessions are pointed at the checkout with `metadata.setWorkingDirectory`.
+- Reads are refused unless the checkout demonstrably matches the reviewed
+  revision: local `HEAD` equals the captured PR head SHA and the working tree is
+  clean. Otherwise the run proceeds with today's supplied-context-only behavior
+  and records an explicit coverage caveat naming the reason. Never switch
+  branches, stash, pull or clean; never silently review the wrong revision.
+- `quickInstructions` is updated to permit reading surrounding files, callers
+  and tests to establish context and confirm impact, while keeping the upstream
+  in-scope rule: report only defects introduced by this diff, never a
+  whole-repository audit, and never modify anything.
+- Evidence citations and the existing validation gates keep working; a citation
+  must still resolve against the captured revision.
+- Demonstrate with a controlled probe first, then one authorized live quick
+  review of a PR whose risk lives in unchanged callers, and record whether the
+  reviewers actually consulted surrounding source.
 
-## Feature-plan increment after manual feedback
+Do not add `--verify`, test or lint execution, `bash`, revision-bound custom
+tools, balanced/full/deep, fallbacks or timeouts in this increment. Do not
+change personal configuration, project trust, selection, binding, lifecycle,
+publication or authorization gates. Keep L1 pending and copy no upstream source.
 
-**The balanced half of M1 only.** Add the balanced review mode with its upstream
-reviewer assignment, so a mode other than quick runs and the light tier is
-actually consumed. M1 stays Pending until the full mode's conventions reviewer
+Presentation consolidation stays as it is for now. It is cosmetic relative to
+this cause, and once reviewers can read surrounding code the repeated identical
+gap may simply stop occurring.
+
+## Deferred feature-plan increment: the balanced half of M1
+
+**The balanced half of M1 only, after R1.** Add the balanced review mode with its
+upstream reviewer assignment, so a mode other than quick runs and the light tier
+is actually consumed. M1 stays Pending until the full mode's conventions reviewer
 and findings policy also land, which is the increment after this one. Do not add
 full or deep now, nor fallbacks, safeguards or an interactive menu, and do not
 change publication gates or the configuration surface.
