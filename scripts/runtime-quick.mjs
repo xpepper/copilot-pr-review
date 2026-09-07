@@ -11,6 +11,7 @@ export async function exerciseQuick(session, target, settings) {
       const completion = Promise.withResolvers();
       const active = Promise.withResolvers();
       const validationActive = Promise.withResolvers();
+      const selectionFinished = Promise.withResolvers();
       const messages = [];
       const labels = new Set();
       const unsubscribe = session.on((event) => {
@@ -24,9 +25,12 @@ export async function exerciseQuick(session, target, settings) {
         if (message.startsWith("Q3 evidence: ")) {
           completion.resolve(JSON.parse(message.slice("Q3 evidence: ".length)));
         }
+        if (message.startsWith("P1 evidence: ")) {
+          selectionFinished.resolve(JSON.parse(message.slice("P1 evidence: ".length)));
+        }
       });
       try {
-        const args = `${target.args} ${mode === "ambient-alias" ? "--major-only" : "--quick"} --no-comment` +
+        const args = `${target.args} ${mode === "ambient-alias" ? "--major-only" : "--quick"} --no-comment --all` +
           (mode === "ambient-alias" ? "" : ` heavyModel=${settings.model} heavyEffort=${settings.reasoningEffort}`);
         const result = await session.rpc.commands.execute({ commandName: "pr-review", args });
         assert.equal(result.error, undefined);
@@ -50,6 +54,9 @@ export async function exerciseQuick(session, target, settings) {
           assert.equal(cancelled.error, undefined);
         }
         const report = await completion.promise;
+        const selected = await selectionFinished.promise;
+        assert.deepEqual(selected.selection.findingIds, selected.cancelled ? [] :
+          (report.validation?.findings ?? []).map((finding) => finding.id));
         console.log(`Q3 ${mode} runtime evidence: ${JSON.stringify(report)}`);
         await assertExited(owned);
         assert.equal(report.mode, "quick");

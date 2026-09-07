@@ -1,4 +1,6 @@
+import { randomUUID } from "node:crypto";
 import { reviewAssignments, validateModelAssignment } from "./fixture.mjs";
+import { finishSelection } from "./selection.mjs";
 import { executeOwnedRun } from "./fixture-run.mjs";
 import { executeTargetCapture, parseTargetArgs, runGh } from "./target.mjs";
 import {
@@ -20,7 +22,7 @@ export function parseQuickArgs(args) {
   for (const token of tokens) {
     if (seen.has(token)) throw new Error(`Duplicate quick argument: ${token}`);
     seen.add(token);
-    if (["--quick", "--major-only", "--no-comment"].includes(token)) continue;
+    if (["--quick", "--major-only", "--no-comment", "--all"].includes(token)) continue;
     if (token.includes("=")) {
       const [key, value, extra] = token.split("=");
       if (!["heavyModel", "heavyEffort"].includes(key) || !value || extra !== undefined || key in settings) {
@@ -36,7 +38,7 @@ export function parseQuickArgs(args) {
   }
   const captureArgs = [number, ...targetFlags].join(" ");
   parseTargetArgs(captureArgs);
-  return { captureArgs, settings };
+  return { captureArgs, settings, all: seen.has("--all") };
 }
 
 export async function quickAssignments(parent, settings) {
@@ -107,10 +109,11 @@ export async function executeQuickRun(parent, client, options, assignments, {
   let execution;
   let validation;
   let adjudicator;
+  const invocation = { invocationId: randomUUID(), sessionId: parent.sessionId };
   const outcome = await executeOwnedRun(parent, client, {
     controller, onStopped, subject: "Quick review", evidencePrefix: "Q3",
     details: () => ({
-      mode: "quick", noComment: true, binding, validation, adjudicator,
+      mode: "quick", noComment: true, invocation, binding, validation, adjudicator,
       executionComplete: execution?.complete ?? false,
       reviewers: assignments.map((assignment) => ({
         ...assignment, status: "incomplete", error: "Review did not reach specialist execution.",
@@ -178,5 +181,5 @@ export async function executeQuickRun(parent, client, options, assignments, {
     },
   });
   if (outcome.validation) await parent.log(formatFindings(outcome), { level: outcome.complete ? "info" : "error" });
-  return outcome;
+  return finishSelection(parent, outcome, options, controller);
 }

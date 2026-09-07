@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { isAbsolute } from "node:path";
 import { promisify } from "node:util";
 import { assembleContext } from "./context.mjs";
+import { waitForInteraction } from "./interaction.mjs";
 
 const execute = promisify(execFile);
 const shaPattern = /^[0-9a-f]{40}$/;
@@ -184,19 +185,6 @@ export function contextSummary(context, limit = 20) {
   };
 }
 
-async function confirmTarget(session, message, signal) {
-  if (!signal) return session.ui.confirm(message);
-  signal.throwIfAborted();
-  const cancellation = Promise.withResolvers();
-  const cancel = () => cancellation.reject(signal.reason);
-  signal.addEventListener("abort", cancel, { once: true });
-  try {
-    return await Promise.race([session.ui.confirm(message), cancellation.promise]);
-  } finally {
-    signal.removeEventListener("abort", cancel);
-  }
-}
-
 export async function executeTargetCapture(session, args, { gh = runGh, signal } = {}) {
   const options = parseTargetArgs(args);
   signal?.throwIfAborted();
@@ -207,7 +195,7 @@ export async function executeTargetCapture(session, args, { gh = runGh, signal }
   const outcome = await captureTarget(options, {
     cwd, gh,
     confirm: session.capabilities.ui?.elicitation
-      ? (message) => confirmTarget(session, message, signal) : undefined,
+      ? (message) => waitForInteraction(signal, () => session.ui.confirm(message)) : undefined,
   });
   signal?.throwIfAborted();
   // Keep PR-controlled text and the complete diff out of the parent timeline.

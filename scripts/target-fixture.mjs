@@ -36,6 +36,21 @@ export const validationDiff = [
   " export function total(cents, quantity) {",
   "-  return cents * quantity;", "+  return cents + quantity;", " }", "",
 ].join("\n");
+const shippingBaseSource = [
+  "// Orders of at least 5000 cents ship free; smaller orders cost 500 cents.",
+  "export function shipping(subtotal) {",
+  "  return subtotal >= 5000 ? 0 : 500;",
+  "}", "",
+].join("\n");
+const shippingHeadSource = shippingBaseSource.replace("subtotal >= 5000", "subtotal <= 5000");
+const shippingDiff = [
+  "diff --git a/shipping.js b/shipping.js",
+  `index ${blobSha(shippingBaseSource)}..${blobSha(shippingHeadSource)} 100644`,
+  "--- a/shipping.js", "+++ b/shipping.js", "@@ -1,4 +1,4 @@",
+  " // Orders of at least 5000 cents ship free; smaller orders cost 500 cents.",
+  " export function shipping(subtotal) {",
+  "-  return subtotal >= 5000 ? 0 : 500;", "+  return subtotal <= 5000 ? 0 : 500;", " }", "",
+].join("\n");
 
 const sources = new Map([
   ["a".repeat(40), baseSource],
@@ -63,15 +78,17 @@ export function pull(number = 1) {
     user: { login: number === 3 ? "automation" : "human", type: number === 3 ? "Bot" : "User" },
     base: { repo: { node_id: repository.id, full_name: repository.nameWithOwner }, sha: "a".repeat(40), ref: "main" },
     head: { sha: "b".repeat(40), ref: "feature" },
-    changed_files: number === 4 ? 0 : 1,
-    additions: number === 4 ? 0 : 1,
-    deletions: number === 4 ? 0 : 1,
+    changed_files: number === 4 ? 0 : number === 13 ? 2 : 1,
+    additions: number === 4 ? 0 : number === 13 ? 2 : 1,
+    deletions: number === 4 ? 0 : number === 13 ? 2 : 1,
   };
 }
 
 export function contentsResponse(path, ref) {
   const text = path === "total.js"
     ? ref === "a".repeat(40) ? validationBaseSource : ref === "b".repeat(40) ? validationHeadSource : undefined
+    : path === "shipping.js"
+      ? ref === "a".repeat(40) ? shippingBaseSource : ref === "b".repeat(40) ? shippingHeadSource : undefined
     : path === "example.js" ? sources.get(ref) : undefined;
   if (!text) {
     throw new Error(`fixture: HTTP 404 no content for ${path} at ${ref}`);
@@ -102,7 +119,8 @@ export function respond(args, cwd, history) {
 function apiResponse(number, accept, history) {
   if (number === 8) throw new Error("fixture: HTTP 404 unavailable PR");
   if (accept === "Accept: application/vnd.github.diff") {
-    return number === 12 ? validationDiff : number === 10 ? diff.slice(0, -2) : diff;
+    return number === 13 ? validationDiff + shippingDiff
+      : number === 12 ? validationDiff : number === 10 ? diff.slice(0, -2) : diff;
   }
   if (accept !== "Accept: application/vnd.github+json") throw new Error("Unexpected media type");
   const result = pull(number);

@@ -12,7 +12,7 @@ const help = [
   "",
   "Usage: /pr-review [status|help|models|fixture model1=ID effort1=LEVEL model2=ID effort2=LEVEL]",
   "       /pr-review NUMBER [--include-drafts] [--include-closed|--review-closed]",
-  "       /pr-review NUMBER --quick|--major-only --no-comment [heavyModel=ID] [heavyEffort=LEVEL]",
+  "       /pr-review NUMBER --quick|--major-only --no-comment [--all] [heavyModel=ID] [heavyEffort=LEVEL]",
   "",
   "status  Show the implemented capability boundary (default).",
   "help    Show this usage information.",
@@ -29,7 +29,8 @@ const help = [
   "--quick / --major-only  Run three heavy specialists on captured PR content.",
   "Requires --no-comment. Unset heavy settings inherit the ambient model/effort.",
   "Strict evidence checks and an isolated adjudication pass validate/deduplicate candidates.",
-  "No selection, publication, caching, or safeguards. Validation also uses Copilot credits.",
+  "Select validated findings in the host UI, or use --all. Selection never authorizes posting.",
+  "No publication, caching, or safeguards. Validation also uses Copilot credits.",
   "Other review flags are not supported yet.",
 ].join("\n");
 
@@ -42,6 +43,7 @@ const status = [
   "The fixture requires explicit distinct models and reasoning efforts.",
   "F3 experiments: adversarial read-only probes, failure injection, and manual cancellation.",
   "Quick execution is available with --quick --no-comment, grounded validation and deduplication.",
+  "Validated findings can be selected via the host UI or --all, without posting or caching.",
   "",
   "Status/help start no models or background work. PR capture and source context use",
   "read-only gh requests against the captured revisions, never the local checkout.",
@@ -67,7 +69,7 @@ const session = await joinSession({
             }
             run.controller.abort(new DOMException("Manually cancelled; incomplete coverage.", "AbortError"));
             // Cancellation must work even when the runtime cannot acknowledge an abort RPC.
-            await run.client.forceStop();
+            if (!run.runtimeStopped) await run.client.forceStop();
             const outcome = await run.done;
             if (outcome.cleanupErrors.length) {
               throw new Error(`Cancellation cleanup was not clean: ${outcome.cleanupErrors.join("; ")}`);
@@ -132,12 +134,14 @@ function startRun(execute) {
   assertIdle();
   const client = new CopilotClient({ connection: RuntimeConnection.forStdio() });
   const controller = new AbortController();
-  const run = { client, controller };
+  const run = { client, controller, runtimeStopped: false };
   activeRun = run;
   const clearRun = () => {
     if (activeRun === run) activeRun = undefined;
   };
-  run.done = execute(client, { controller, onStopped: clearRun }).finally(clearRun);
+  run.done = execute(client, {
+    controller, onStopped: (outcome) => { run.runtimeStopped = outcome.cleanupErrors.length === 0; },
+  }).finally(clearRun);
   // Return dispatch so cancel remains available. Parent transport loss can prevent timeline delivery.
   void run.done.catch((error) => console.error(`Review run failed: ${String(error)}`));
 }
@@ -149,7 +153,7 @@ async function shutdown(reason) {
     if (activeRun) {
       activeRun.controller.abort(new Error(`Extension shutdown: ${reason}; incomplete coverage.`));
       // The host allows only 5s before SIGKILL. Do not wait on reviewer or parent RPCs here.
-      await activeRun.client.forceStop();
+      if (!activeRun.runtimeStopped) await activeRun.client.forceStop();
     }
     process.exitCode = 0;
   } catch (error) {

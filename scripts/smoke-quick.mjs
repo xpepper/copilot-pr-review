@@ -21,12 +21,13 @@ const parentModels = { rpc: { model: {
 const options = parseQuickArgs("1 --quick --no-comment");
 assert.deepEqual(parseQuickArgs("  1 --major-only --no-comment  "), options);
 assert.deepEqual(parseQuickArgs("2 --quick --no-comment --include-drafts heavyModel=other heavyEffort=low"),
-  { captureArgs: "2 --include-drafts", settings: { heavyModel: "other", heavyEffort: "low" } });
+  { captureArgs: "2 --include-drafts", settings: { heavyModel: "other", heavyEffort: "low" }, all: false });
+assert.deepEqual(parseQuickArgs("1 --major-only --all --no-comment"), { ...options, all: true });
 for (const args of [
   "1 --quick", "1 --no-comment", "1 --quick --major-only --no-comment",
   "1 --quick --quick --no-comment", "1 --quick --no-comment --no-comment",
   "1 --quick --no-comment --comment", "1 --quick --no-comment --balanced",
-  "1 --quick --no-comment --verify", "1 --quick --no-comment --all",
+  "1 --quick --no-comment --verify", "1 --quick --no-comment --all --all",
   "1 --quick --no-comment heavyModel=", "1 --quick --no-comment heavyEffort=low=high",
   "1 --quick --no-comment heavyModel=heavy heavyModel=other",
   "1 --quick --no-comment lightModel=other", "0 --quick --no-comment",
@@ -52,7 +53,7 @@ function fakeGh() {
   };
 }
 
-function harness({ failure, controller = new AbortController(), withCandidate = false } = {}) {
+function harness({ failure, controller = new AbortController(), withCandidate = false, acceptCandidate = false } = {}) {
   const messages = [];
   const sessions = [];
   let sends = 0;
@@ -112,9 +113,14 @@ function harness({ failure, controller = new AbortController(), withCandidate = 
             this.emit("assistant.message", { content: failure === "validator-malformed" ? "{}" : JSON.stringify({
               schemaVersion: 1, reviewKey: input.reviewKey, limitations: [],
               decisions: input.candidates.map((candidate) => ({
-                candidateId: candidate.id, verdict: "reject", allClaimsSupported: false,
-                reason: "No source contract says the exported value must remain 1; an intentional value update is not a defect.",
-                evidence: [], duplicateOf: null,
+                candidateId: candidate.id, verdict: acceptCandidate ? "accept" : "reject", allClaimsSupported: acceptCandidate,
+                reason: acceptCandidate ? "Controlled acceptance for selection plumbing, not a real semantic judgment." :
+                  "No source contract says the exported value must remain 1; an intentional value update is not a defect.",
+                evidence: acceptCandidate ? [{
+                  path: candidate.location.path, side: candidate.location.side,
+                  startLine: candidate.location.startLine, endLine: candidate.location.endLine,
+                  quote: candidate.location.quote,
+                }] : [], duplicateOf: null,
               })),
             }) });
             this.emit("assistant.usage", {
@@ -173,6 +179,7 @@ function harness({ failure, controller = new AbortController(), withCandidate = 
     },
   };
   const parent = {
+    sessionId: "parent-session",
     ...parentModels,
     rpc: { ...parentModels.rpc, metadata: { async snapshot() { return { workingDirectory: "/synthetic-checkout" }; } } },
     capabilities: {},
@@ -325,3 +332,31 @@ for (const failure of [undefined, "validator-setup", "validator-malformed", "val
 }
 assert.equal(reviewKey(quickBinding(snapshot, context)), reviewKey(structuredClone(quickBinding(snapshot, context))));
 console.log("PASS isolated adjudication, unsupported-claim rejection, validation failure/cancellation, retained execution and cleanup");
+
+for (const all of [true, false]) {
+  const h = harness({ withCandidate: true, acceptCandidate: true });
+  let runtimeStopped = false;
+  h.parent.capabilities = { ui: { elicitation: true } };
+  h.parent.ui = {
+    async elicitation(request) {
+      assert.equal(runtimeStopped, true);
+      assert.equal(h.client.stops, 1, "Stop inference before waiting for selection");
+      assert(h.sessions.every((session) => session.listenerCount === 0));
+      return { action: "accept", content: { findingIds: [request.requestedSchema.properties.findingIds.items.anyOf[0].const] } };
+    },
+  };
+  const report = await executeQuickRun(h.parent, h.client, { ...options, all }, structuredClone(assignments), {
+    controller: h.controller, gh: fakeGh(), onStopped() { runtimeStopped = true; },
+  });
+  assert.equal(report.selection.status, "selected");
+  assert.deepEqual(report.selection.findingIds, report.validation.findings.map((finding) => finding.id));
+  assert.equal(report.selection.findingIds.length, 1);
+  assert.equal(h.sessions.length, 4, "Selection starts no new reviewer sessions");
+  assert.equal(h.client.starts, 1);
+  assert.equal(h.client.stops, 1);
+  assert.equal(report.selection.binding.sessionId, h.parent.sessionId);
+  assert.equal(report.selection.binding.reviewKey, reviewKey(report.binding));
+  assert(h.messages.findIndex((m) => m.startsWith("P1 evidence:")) >
+    h.messages.findIndex((m) => m.startsWith("Q3 evidence:")));
+}
+console.log("PASS quick selection consumes final findings after runtime cleanup, without rerunning inference");

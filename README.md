@@ -1,7 +1,7 @@
 # Copilot PR Review
 
 An original Copilot CLI plugin prototype. **Quick reviews now include grounded
-candidate validation and deduplication. Selection and publication are not implemented.**
+candidate validation, deduplication, and finding selection. Publication is not implemented.**
 [SCOPE.md](SCOPE.md) is the authoritative product specification;
 [ROADMAP.md](ROADMAP.md) records delivery status and runtime evidence.
 
@@ -108,6 +108,7 @@ reviewers consume it when explicitly requested.
 ```text
 /pr-review 123 --quick --no-comment
 /pr-review 123 --major-only --no-comment
+/pr-review 123 --quick --no-comment --all
 /pr-review 123 --quick --no-comment heavyModel=claude-sonnet-5 heavyEffort=high
 /pr-review cancel
 ```
@@ -125,7 +126,7 @@ and checked against actual usage. The parent model is unchanged.
 
 Use exactly one of `--quick` and `--major-only`, together with `--no-comment`.
 The existing draft/closed overrides still apply. `--comment`, other review modes,
-`--all`, and `--verify` remain unsupported. No personal/project configuration or
+and `--verify` remain unsupported. No personal/project configuration or
 fallback is saved or applied by Q3.
 
 Dispatch returns after acceptance so cancellation remains available during capture
@@ -214,8 +215,60 @@ completed execution, and skipped targets never claim a clean PR.
 
 Validation uses the existing tool-denial, progress, cancellation, no-timeout,
 usage-accounting, and cleanup machinery. Cancellation during validation stops the
-owned work. Everything remains invocation-local: no selection, cache, GitHub
+owned work. Everything remains invocation-local: no cache, GitHub
 publication, or safeguards are added.
+
+### Finding selection (P1)
+
+After displaying validated, deduplicated findings, the plugin stops its owned
+inference runtime before asking for selection. Without `--all`, a host
+elicitation form lists each finding's severity, title, location/side, and
+confidence. Select a subset, accept with no choices (or decline) to select none,
+or cancel the run. Nothing is preselected. The reviewed head and coverage status
+remain visible; incomplete runs can still have useful selectable findings.
+An empty result skips the form and is never a clean-review claim.
+
+`--all` selects every final validated finding without a form. It never selects
+raw/rejected candidates or duplicate aliases and **does not authorize posting**.
+`--no-comment` remains required. An unsupported host reports selection
+`unavailable` explicitly and selects nothing; rerunning with `--all` is an
+explicit new review, not a hidden select-all fallback or cached-result action.
+
+Answers are bound to a unique invocation, the originating session, repository,
+PR and reviewed head, plus the full Q4 review-binding digest. Unknown, duplicate,
+malformed or stale choice values fail closed instead of choosing other findings.
+Selection does not reread GitHub, execute PR code, or rerun reviewers.
+
+`/pr-review cancel` remains available while the form is pending, and another
+review cannot start in that session until selection ends. There is no selection
+timeout. A host dialog may outlive a cancelled local waiter, but late answers
+cannot revive it. `P1 evidence:` records the final selection disposition and
+IDs with their binding; `Q3 evidence:` remains the post-inference/cleanup review
+record. `reviewComplete` preserves that earlier coverage state, while cancellation
+marks the final run incomplete and clears selected IDs. Selection failure and
+coverage are separate: `complete` describes review coverage, not selection or
+posting success. Nothing is retained as a plugin cache after the invocation.
+
+The installed CLI's native elicitation transport is exercised with a scripted
+SDK host in `scripts/runtime-selection.mjs`, not a mock extension API. This is
+not a claim about visual layout, other hosts or platforms. Reproduce with:
+
+```sh
+node scripts/smoke-selection.mjs
+copilot plugin install "$(pwd)"
+COPILOT_CLI_PATH="$(command -v copilot)" \
+COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
+PR_REVIEW_HEAVY_MODEL=gpt-5.6-terra PR_REVIEW_HEAVY_EFFORT=high \
+node scripts/smoke-runtime.mjs --targets --quick --selection
+```
+
+This spends subscription credits using child-only controlled `gh` input for
+synthetic target 13 (independent arithmetic and shipping regressions), not real
+GitHub mutations. Use `--selection-no-ui` instead of `--selection` to demonstrate
+an unsupported host. `--selection-cases=none,cancel-ui,cancel-pending,invalid`
+limits the UI probe to named cases without repeating successful inference.
+Model output is fallible: no validated findings stops a positive UI probe, not
+the plugin's fail-closed behavior. See the roadmap for recorded evidence.
 
 ### Two-reviewer fixture experiment (F2)
 

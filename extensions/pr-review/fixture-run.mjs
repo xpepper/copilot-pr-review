@@ -75,7 +75,7 @@ export async function executeOwnedRun(parent, client, {
     error,
     cleanupErrors,
   };
-  onStopped();
+  onStopped(outcome);
   if (!outcome.complete && !(outcome.coverage === "not-started" && !error && !controller.signal.aborted && !cleanupErrors.length)) {
     outcome.coverage = "incomplete";
     await parent.log(`${subject} has incomplete coverage. This is not a clean-review result. ${error ?? ""} ${cleanupErrors.join("; ")}`,

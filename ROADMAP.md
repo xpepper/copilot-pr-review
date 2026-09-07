@@ -22,7 +22,7 @@ in [AGENTS.md](AGENTS.md); the replaceable next-session prompt lives in
 | Q2 | Completed | Source context bound to the captured head/base revisions with blob-verified provenance; local-checkout, moved-head, and inconsistent source refused. Evidence below. | Q1; [Targets](SCOPE.md#targets-and-local-behavior) |
 | Q3 | Completed | Three concurrent quick specialists consume bound PR input; explicit/ambient assignments, alias, incomplete coverage, and cancellation demonstrated below. Candidates remain unvalidated. | Q2; [Modes](SCOPE.md#review-modes-and-findings) |
 | Q4 | Completed | Strict evidence/whole-claim gates, isolated adjudication, deduplication and degraded findings; positive controlled and real-PR installed-plugin inference demonstrated below. | Q3; [Modes/findings](SCOPE.md#review-modes-and-findings) |
-| P1 | Pending | Select validated findings with a minimal UI and `--all`; no writes yet. | Q4; [Selection/publication](SCOPE.md#selection-publication-and-cached-results) |
+| P1 | Completed | Invocation-bound validated finding selection via native elicitation or `--all`; subset/none/cancellation, invalid-answer rejection and no-UI behavior demonstrated below. No writes/cache. | Q4; [Selection/publication](SCOPE.md#selection-publication-and-cached-results) |
 | P2 | Pending | Retain results with session/repository/PR/head binding and reload/resume where supported; inspect without rerunning reviewers. | P1; [Cached results](SCOPE.md#selection-publication-and-cached-results) |
 | P3 | Pending | Resolve posting authority and conflicting flags; display a code-built inline review payload without submitting it. | P1; [Publication controls](SCOPE.md#selection-publication-and-cached-results) |
 | P4 | Pending | Submit only COMMENT reviews with valid anchors and lifecycle/head gates; surface uncertain write outcomes without blind retry. | P3; [Publication gates](SCOPE.md#selection-publication-and-cached-results) |
@@ -1074,35 +1074,195 @@ not plugin-cached. Q2 context/window and GitHub path-to-blob trust caveats remai
 The complete native F3 adversarial/loss/SIGSTOP suite was not rerun; existing pure
 F3 checks and new native quick/validation cancellation are separate evidence.
 
+## Completed increment: P1
+
+Continues Q4's `d794b71`. Implements selection only, not publication or retention.
+No upstream source, new dependency, review mode, fallback or safeguard was added.
+
+### Implementation and boundaries
+
+- `selection.mjs` consumes only `validation.findings`, after Q4's validation and
+  deduplication. `--all` is accepted with either quick spelling and selects exactly
+  those final IDs. `--no-comment` is still required; `--comment` is still rejected.
+- Otherwise `session.ui.elicitation()` presents a labeled multi-select array,
+  initially empty. Accepting an empty array or declining selects none. Cancelling
+  the form cancels the run. Empty validated results skip the form without a
+  clean-review claim. Missing host elicitation capability reports `unavailable`,
+  never an implicit select-all.
+- A UUID created at invocation start and `parent.sessionId` accompany the Q3
+  record. Selection binds them to repository/PR identity, reviewed head and the
+  digest of the full review binding. Each UI value includes the invocation UUID;
+  reused candidate IDs cannot make a stale answer valid in another invocation.
+  Unknown IDs, duplicates, malformed content and changed bindings fail closed.
+  IDs remain invocation-local, not archive IDs.
+- Full human-readable Q4 findings remain in the timeline; selection labels show
+  severity/title, location/side and confidence. The form shows the captured head
+  and completed/incomplete coverage. Useful findings from degraded runs remain
+  selectable. Selection never rereads GitHub or starts more inference.
+- `executeOwnedRun` stops the inference runtime and calls `onStopped(outcome)`
+  before any selection UI. The extension now retains `activeRun` until the whole
+  quick run finishes instead of clearing it at cleanup. Cancellation is still
+  dispatchable during a pending form; a competing review is rejected. A cleanly
+  stopped runtime is not force-stopped again. Failed cleanup does not mark it
+  cleanly stopped or suppress a later cancellation force-stop attempt.
+- `interaction.mjs` extracts Q1's cancellation-aware UI wait for reuse by both
+  confirmation and selection. Cancellation settles the local waiter without
+  waiting for a host answer; a later acceptance/rejection cannot resume it.
+  No elapsed-time cancellation or timeout was added.
+- `Q3 evidence:` remains the post-inference/cleanup review report. Final
+  `P1 evidence:` contains invocation/binding, selection status and IDs,
+  `reviewComplete`, final `complete`/`coverage`/`cancelled`, and cleanup errors.
+  Selection failure and coverage are independent; `complete` is not a claim
+  that selection or posting succeeded. Cancellation invalidates selected IDs
+  and marks final coverage incomplete without erasing earlier review evidence.
+- No result cache exists. SDK timeline/transcripts may persist, but the extension
+  retains no selectable result after the invocation. No GitHub mutation occurs.
+
+### Controlled evidence
+
+`node scripts/smoke-selection.mjs` uses controlled final-result objects, not
+semantic evidence. It covers all/subset/none/decline/cancel, empty/skipped results,
+degraded coverage, absent UI, missing/malformed/duplicate/unknown values, raw and
+rejected IDs, stale values from a prior invocation, repository/PR/head/session
+binding changes, UI transport failure, pre-cancellation, pending cancellation,
+late acceptance/rejection, and cancellation while completion is being logged.
+
+`node scripts/smoke-quick.mjs` adds parsing and complete orchestration coverage:
+selection consumes accepted final findings only after runtime cleanup and
+listener removal; exactly three specialists plus one validator are started,
+with no new inference during selection. Its positive semantic decision is
+deliberately mocked and is not evidence that the constant-change fixture is a bug.
+The existing target, context, findings, fixture and quick assertion probes pass.
+
+### Installed-plugin evidence
+
+On 2026-09-07 with CLI 1.0.83, bundled SDK, Node.js 26.1.0 and macOS arm64, the
+locally installed plugin ran actual subscription inference with explicit
+`gpt-5.6-terra` / `high`, not a product default or automatic fallback.
+The SDK host handled actual native elicitation requests; the extension's
+`session.ui` was not mocked. This demonstrates the form schema/transport and
+command lifecycle, not terminal visual layout or portability to other hosts.
+
+`scripts/target-fixture.mjs` adds controlled target 13 with two independent
+original regressions: `total.js:3` changes multiplication to addition, and
+`shipping.js:3` reverses the free-shipping threshold. Fixture `gh` is child-only;
+these are not real GitHub PRs and no synthetic remote PR was created or merged.
+Both sides have exact blob checks. The captured head/base are `b`/`a` repeated
+40 times, with:
+
+- Diff SHA-256: `5261fde91f3fa84d3a16e17a7de202c4d0ddb8e3b930cb4bbec33231dd172128`
+- Context SHA-256: `98f09c437b92d61c97f7be6ded9cb3c46e4213bf39cc5eca9d9c9be1a1192ec0`
+- Full review key: `3181ca216e5017a1ad57d19f565007a70a627520677272fb4e1b906149cbf018`
+
+| Native case | Selection | Coverage/result | Owned PID observed exited |
+| --- | --- | --- | --- |
+| `--all` | 2 of 2 | Incomplete; two invalid reject-plus-duplicate decisions stayed visible | 76562 |
+| Subset | 1 of 2 | Completed coverage, no clean-review claim | 77449 |
+| Accept empty array | 0 of 2, `none` | Completed review coverage preserved | 81730 |
+| UI cancel | 0 of 2, `cancelled` | Incomplete; existing invalid decisions preserved | 82706 |
+| `/pr-review cancel` during pending UI | 0 of 2, `cancelled` | Earlier completed review became a cancelled/incomplete run; late acceptance inert | 83644 |
+| Unknown choice | 0 of 2, `failed` | Missing caller/test context remained visible | 84494 |
+| No UI capability | 0 of 2, `unavailable` | Completed review coverage, explicit selection refusal | 81053 |
+
+Interactive cases observed owned-runtime exit **before answering the form**,
+rejected a competing invocation while the form was pending, and started only
+three specialists plus the validator. Every successful case reported empty
+cleanup errors. The controlled checkout's branch, local HEAD, dirty decoy source
+and sentinel stayed unchanged; traced `gh` commands were repository lookup or GET.
+
+The all/subset host session was `00f8a7dc-6978-4362-9d83-0585bb3a7029`;
+the remaining UI cases used `224512ed-4271-46f5-bf08-c099929738f9`;
+the no-UI host used `8765c214-cd1f-46af-bf1c-7c1a762ab6c2`.
+After the final cancellation-at-completion guard and cleanup callback adjustment,
+reinstallation and subset/pending-cancel probes passed again in host session
+`7a7de5f5-d234-4647-a670-0ad361798dbb`, invocation IDs
+`1f7e90e1-6aba-4d4d-bcfe-3db839ce9004` and
+`58e81aaa-d477-4499-bc0a-c8230e11e301`. The latter retained a missing-context issue
+while clearing selections on cancellation. The existing native target-12 quick
+probe also passed explicit, ambient alias, active-specialist cancellation and
+active-validator cancellation, now awaiting final P1 evidence and using `--all`.
+The full F3 adversarial/loss/SIGSTOP suite was not rerun for P1.
+
+Two initial probe attempts are not successful UI evidence: observing processes
+after only the first specialist became active caught transient startup children
+and failed the harness's one-process assertion; the harness now waits for all
+three active specialists, matching the existing Q3 probe. A later inference run
+produced an empty, incomplete validated result and correctly did not open a form.
+That positive-case harness stopped; the remaining named cases were explicitly
+rerun. No gates were weakened, malformed output repaired or automatic retry added.
+
+Local session artifacts hold the detailed native transcripts:
+`files/p1-runtime-selection.log`, `files/p1-runtime-remaining.log`,
+`files/p1-runtime-no-ui.log`, `files/p1-runtime-final.log`, and
+`files/p1-quick-regression.log` under session
+`989399ba-92b8-4f98-86e6-fe3f3833da16`. These artifacts are not a plugin cache
+or required for subsequent work; reproduce from the committed harness.
+
+### Reproduction and remaining caveats
+
+```sh
+node scripts/smoke-selection.mjs
+node scripts/smoke-quick.mjs
+node scripts/smoke-target.mjs
+node scripts/smoke-context.mjs
+node scripts/smoke-findings.mjs
+node scripts/smoke-fixture.mjs
+copilot plugin install "$(pwd)"
+COPILOT_CLI_PATH="$(command -v copilot)" \
+COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
+PR_REVIEW_HEAVY_MODEL=gpt-5.6-terra PR_REVIEW_HEAVY_EFFORT=high \
+node scripts/smoke-runtime.mjs --targets --quick --selection
+```
+
+Use `--selection-no-ui` instead of `--selection` for native unsupported-host
+evidence; append `--selection-cases=subset,cancel-pending` to run selected UI cases.
+Omit both selection options to run the existing explicit/alias/reviewer-cancel/
+validator-cancel Q3/Q4 probe with `--all`. These quick probes spend credits;
+omitting `--quick` from ordinary target probes remains no-inference.
+
+Consulted current official plugin-creation documentation and the extension
+author guide, installed SDK `docs/extensions.md`, `session.d.ts` and
+`types.d.ts` (`ElicitationSchemaField`, `ElicitationResult`, `SessionUi` and
+`sessionId`) before choosing the API. No SDK declaration was treated as
+runtime proof. Reinstall after extension edits and use a fresh runtime; prompt
+mode is not slash-command dispatch. No terminal visual-layout, other-OS, remote
+host, Enterprise, token-only authentication or cross-client claim is added.
+
+Model adjudication remains fallible and sometimes yields no eligible findings
+or degraded coverage. Native UI answers here were scripted through the real
+transport, not human clicks. Pending host dialogs may outlive cancelled local
+waiters. Cancellation prevents later selection from a late answer, not the host's
+own storage of that UI response. Q2 source-window and provider limits, Q4
+whole-claim requirements and read-only capability-isolation caveats still apply.
+
 ## Exact next increment
 
-**P1 only:** Select validated findings using a minimal UI and `--all`; no writes
-or retained-result cache yet.
+**P2 only:** Retain results with originating-session/repository/PR/head binding
+and inspect them without rerunning reviewers. Demonstrate session-scoped
+extension reload/resume behavior where the installed runtime supports it.
 
 Acceptance criteria:
 
-- Extend quick/alias parsing with `--all` to select every final validated,
-  deduplicated finding. It never selects rejected/raw candidates and does not
-  authorize publication. Keep `--no-comment` required until posting authority
-  is implemented in P3.
-- Without `--all`, present an explicit minimal selection interface over the
-  validated findings. Support choosing a subset, choosing none, and cancellation.
-  An unsupported host UI must be reported explicitly, never silently interpreted
-  as select-all. Consult the installed SDK and demonstrate the chosen UI API.
-- Keep the selection bound to the same invocation, session, repository, PR and
-  reviewed head. Reject invalid/unknown selections; do not silently select
-  different findings. Do not add the P2 cache or reload/resume behavior yet.
-- Preserve per-finding human-readable severity/location/confidence and visible
-  incomplete coverage. Useful findings in degraded runs remain selectable.
-  Empty results, skips and cancellations are not clean-review claims.
-- Keep all Q3/Q4 model assignment, read-only isolation, progress, cancellation,
-  no-timeout, whole-claim validation, deduplication and cleanup guarantees.
-  Selection or cancellation must not start new reviewer work or any GitHub write.
-- Extend the existing Node.js/assert exercises and record installed-plugin
-  evidence separately from deterministic probes and SDK assumptions.
+- Retain the validated/deduplicated review result, selection disposition and IDs,
+  reviewed head and complete binding, attribution and coverage/error state.
+  Raw/rejected candidates must not become selectable findings through retention.
+  Cancellation must not leave an actionable selected result.
+- Provide a minimal code-owned inspection command; document its syntax. Inspection
+  must not start inference, fetch a replacement head, change source or write GitHub.
+  Preserve visible degraded/empty/cancelled states without clean-review claims.
+- Consult current official documentation and installed SDK before choosing storage
+  and lifecycle APIs. Demonstrate extension reload and same-session resume as
+  supported; explicitly record unsupported lifecycle behavior instead of inferring
+  persistence from transcripts or exposing a cross-session archive.
+- Bind retained data to its originating session, repository, PR and reviewed
+  commit. Reject wrong-session/binding, stale selection IDs, malformed or
+  incompatible records rather than silently reinterpreting them. Do not substitute
+  the current checkout or a new head for the reviewed snapshot.
+- Make retention/inspection failures explicit; preserve no-timeout, cleanup,
+  cancellation and `--no-comment` guarantees. Extend the existing assertion
+  probes and record native behavior separately from controlled storage tests.
 
-Do not implement publication, cached publish-later, saved configuration, other
-modes, fallbacks or safeguards. Respect `SCOPE.md`, keep L1 pending, copy no
-upstream source, and do not modify reviewed source or switch/fetch/reset the
-checkout. Follow the checkpoint-commit and final-file handoff workflow in
-`AGENTS.md`.
+Do not implement posting authority or payloads (P3), GitHub publication (P4),
+publish-later execution (P5), saved configuration, other modes, fallbacks or
+safeguards. Respect `SCOPE.md`; keep L1 pending and copy no upstream source.
+Follow the checkpoint-commit and final-file handoff workflow in `AGENTS.md`.

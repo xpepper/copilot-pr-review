@@ -4,6 +4,7 @@ import { pathToFileURL } from "node:url";
 import { exerciseF3, startFixture } from "./runtime-fixture.mjs";
 import { prepareLiveTargetSmoke, prepareRegressionTargetSmoke, prepareTargetSmoke } from "./runtime-target.mjs";
 import { exerciseQuick } from "./runtime-quick.mjs";
+import { selectionProbe } from "./runtime-selection.mjs";
 
 function fixtureSettings() {
   const settings = {
@@ -46,6 +47,12 @@ if (quickSettings) {
 const targetSmoke = process.argv.includes("--targets") ? await prepareTargetSmoke()
   : process.argv.includes("--target-live") ? await prepareLiveTargetSmoke()
     : process.argv.includes("--regression-live") ? await prepareRegressionTargetSmoke() : undefined;
+const selection = process.argv.includes("--selection") ? selectionProbe() : undefined;
+const selectionNoUi = process.argv.includes("--selection-no-ui");
+const selectionCases = process.argv.find((arg) => arg.startsWith("--selection-cases="))?.split("=")[1].split(",");
+if (selection || selectionNoUi) {
+  assert(quickSettings && process.argv.includes("--targets"), "Selection probes require --targets --quick");
+}
 const client = new CopilotClient({
   connection: RuntimeConnection.forStdio({ path: resolve(cliPath) }),
 });
@@ -59,6 +66,9 @@ try {
     availableTools: [],
     onPermissionRequest: async () => ({ kind: "denied-no-approval-rule" }),
     ...targetSmoke?.sessionOptions,
+    ...(selection ? { onElicitationRequest: (request) => request.requestedSchema?.properties.findingIds
+      ? selection.answer(request) : targetSmoke.sessionOptions.onElicitationRequest(request) } : {}),
+    ...(selectionNoUi ? { onElicitationRequest: undefined } : {}),
     ...quickSettings,
   });
 
@@ -129,7 +139,7 @@ try {
     console.log(`PASS rejected /pr-review ${args}`);
   }
 
-  if (targetSmoke) await targetSmoke.exercise(session);
+  if (targetSmoke && !selectionNoUi) await targetSmoke.exercise(session);
 
   const events = await session.getEvents();
   assert(!events.some((event) =>
@@ -140,7 +150,10 @@ try {
   ), "The entry point must not start model turns, agents, or tools");
   console.log("PASS no model turns, subagents, or tool executions");
 
-  if (quickSettings) await exerciseQuick(session, targetSmoke.quickTarget, quickSettings);
+  if (selection || selectionNoUi) {
+    await (selection ?? selectionProbe()).exercise(session, { ...targetSmoke.quickTarget, args: "13" },
+      quickSettings, { noUi: selectionNoUi, cases: selectionCases });
+  } else if (quickSettings) await exerciseQuick(session, targetSmoke.quickTarget, quickSettings);
 
   if (process.argv.includes("--fixture") || process.argv.includes("--f3")) {
     const settings = fixtureSettings();
