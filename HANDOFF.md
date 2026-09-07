@@ -10,159 +10,169 @@ product decisions.
 
 ## Recorded state
 
-Implementation checkpoint **`083684a`** completes P2 after P1's `c0d3d16` and
-handoff `55a3a8a`. The session-ending documentation commit containing this prompt
-adds that checkpoint reference to the roadmap and replaces this handoff; inspect
-git log for its hash. At handoff creation, only `ROADMAP.md` and `HANDOFF.md` are
-uncommitted, both belonging to that final commit. No unfinished/unrelated work
-is carried forward. No GitHub mutation, push, or merge was performed.
+Implementation checkpoint **`1b6576e`** completes P3 after P2 `083684a` and
+handoff `cf2db2f`. The session-ending documentation commit containing this
+prompt records that checkpoint in the roadmap; inspect git log for its hash.
+At handoff creation only `ROADMAP.md` and `HANDOFF.md` are uncommitted, both for
+that final documentation commit. No unfinished or unrelated work is carried
+forward. No GitHub mutation, push or merge was performed.
 
-Quick review still requires exactly one of `--quick` / `--major-only` and
-`--no-comment`. It runs three heavy specialists, validates and deduplicates,
-stops inference, selects through native elicitation or `--all`, and now retains
-the settled result. A bare PR number remains capture-only. No posting authority,
-payload, GitHub publication, publish-later execution, saved configuration, other
-mode, fallback or safeguards exist.
+Quick review accepts exactly one of `--quick` / `--major-only`, optional
+`--comment` or `--no-comment` (conflicting), and optional `--all`. A bare PR
+number remains capture-only. Quick runs three heavy specialists, validates and
+deduplicates, stops inference, selects findings, displays a code-built COMMENT
+proposal, resolves posting authority and retains the settled result. **Even
+`--all --comment` submits nothing in the current implementation.**
 
 Relevant implementation:
 
-- `quick.mjs` owns parsing, assignments, captured input and review orchestration.
-  It accepts an optional invocation identity from the retention wrapper.
-- `findings.mjs` owns strict candidate/adjudication schemas, `reviewKey`, exact
-  evidence checks, whole-claim support, deduplication and formatting. Only
-  `validation.findings` is selectable; raw/rejected/duplicate aliases are not.
-- `selection.mjs` owns invocation/session/repository/PR/head-bound choice values
-  and canonical selected IDs. `interaction.mjs` makes late cancelled UI answers
-  inert. `reviewComplete` and final `complete` describe coverage, not publication.
-- `retained-run.mjs` creates a pending record before capture, then executes quick
-  review and selection. After the last awaited log, cancellation is checked and
-  the final record is synchronously written with no intervening await.
-- `retention.mjs` owns strict version-1 record projection/validation and storage.
-  It uses the SDK's host-reported local session workspace, not a guessed home
-  path. `pr-review-result.json` is one latest-result slot per originating session.
-  Files are mode 0600, flushed and atomically renamed. New accepted quick runs
-  supersede old results; capture-only/fixture commands do not.
-- `extension.mjs` keeps `activeRun` until the entire run, selection and retention
-  settle; its `.finally(clearRun)` runs in the same microtask checkpoint as the
-  final synchronous write. Keep this cancellation boundary intact. Only then is
-  `P2 evidence:` logged. Retention failures are explicit timeline errors.
-- `/pr-review inspect` reads the latest record without inference, GitHub calls,
-  head refresh or source reads. It accepts no PR/session argument, refuses active
-  review work and displays the originating target even if cwd changed. It is not
-  a current-head check or a publish command.
+- `quick.mjs` owns parsing, assignments, captured binding and orchestration.
+  Its captured `evidenceBoundary` survives through selection into preview.
+- `findings.mjs` owns strict candidates/adjudication, whole-claim support,
+  exact source checks, deduplication and formatting. Only canonical
+  `validation.findings` may be selected or turned into comments.
+- `selection.mjs` exports the shared `selectionBinding` and owns
+  invocation/session/repository/PR/head-bound selection. `interaction.mjs`
+  makes late cancelled UI answers inert.
+- `preview.mjs` owns `postingAuthority`, `buildReviewPreview`, `finishPreview`,
+  `reviewRequest`, `validatePreview` and `cancelPreview`. Effective
+  `autoPostReviews` is a boolean calculation seam, default false, not a saved
+  setting or accepted command argument yet. Selection and authority are separate.
+- `buildReviewPreview` rechecks quotations, provenance, changed-line inclusion
+  and same-hunk ranges against captured evidence. `reviewRequest` reconstructs
+  the expected REST-shaped request for retention validation; it is NOT a
+  current-head/diff check and must not substitute for P4 publication gates.
+- The request envelope contains the full selection binding plus
+  `payload: { commit_id, event: "COMMENT", body, comments }`. Head/base anchors
+  use RIGHT/LEFT and optional `start_line`/`start_side`. Renamed-file base
+  citations map to the current diff path; deleted files keep the old path.
+  Every current finding requires an inline anchor. There is no eligible
+  non-inline category; invalid anchors must not become body-only fallback.
+- `retention.mjs` stores strict version-2 unsubmitted previews and still
+  inspects legacy version-1 P2 records without fabricating authority. New
+  records retain policy/status/authority/request plus findings and coverage.
+  All preview schemas currently require `submitted: false`.
+- `retained-run.mjs` writes a pending marker before capture, then the final
+  record synchronously after its last awaited log and cancellation check.
+  `extension.mjs` clears `activeRun` in the same microtask checkpoint.
+  Keep this boundary intact; `P2 evidence:` acknowledges the settled write.
+- `/pr-review inspect` accepts no target/session argument, refuses active work,
+  and reads the originating session's result without inference, GitHub calls,
+  local source reads or head refresh. Retained authority is explicitly
+  historical, not permission for a future run.
 
-Retention keeps canonical findings with quotations/source provenance, complete
-Q4 binding, selection status/IDs/binding, reviewer/model/usage attribution,
-rejection/duplicate reasons and coverage/error state. It drops raw outputs and
-duplicate candidate bodies; full captured diff/context is not stored. Pending
-records from interruption have no actionable selection. Cancellation clears IDs.
-Remote/missing/mismatched workspaces and sessions reported already in use fail
-explicitly. The host's in-use flag is not a lock acquired by this plugin.
+Cancellation currently clears selected IDs, revokes authority, drops the
+actionable request and marks coverage incomplete while preserving findings.
+P4 must NOT blindly apply this pre-submission model after a remote write:
+cancellation cannot undo a mutation already received by GitHub.
 
-P3 will need to update the parser's required `--no-comment` rule and coordinate
-with the strict retention schema (`noComment` currently must be true); do not
-silently reinterpret incompatible records or pretend a preview was submitted.
+## Implement P4 only
 
-## Implement P3 only
+Implement the exact P4 increment and acceptance criteria at the end of
+`ROADMAP.md`: code-controlled COMMENT publication for the **current run**,
+with lifecycle/head/anchor gates and explicit uncertain-write handling.
 
-Resolve posting authority/conflicting flags and display a code-built inline
-review payload **without submitting it**. Follow the exact next increment in
-`ROADMAP.md` and the settled controls in `SCOPE.md`.
-
-- Keep selection separate from authority: `--all` selects validated findings,
-  `--comment` bypasses final confirmation but not selection, `--no-comment`
-  suppresses posting, and the two posting flags conflict. With neither flag,
-  consume effective `autoPostReviews`, default false. Do not implement saved
-  configuration yet; leave the authority calculation ready for C1/C2.
-- Without automatic authority, require explicit final confirmation before
-  treating a proposed payload as authorized. Missing UI, decline, cancellation,
-  empty selection and incomplete coverage must remain visible. Posting flags
-  never authorize project safeguards.
-- Build the preview in code from canonical selected findings and their exact
-  repository/PR/head binding and validated diff anchors. Preserve applicable
-  concise-summary behavior for non-inline findings. Only COMMENT is allowed;
-  never APPROVE or REQUEST_CHANGES. Make non-submission explicit even for
-  `--all --comment`.
-- Preserve P1/P2 cancellation, no-timeout, coverage, selection, storage and
-  reload/resume behavior. Extend probes for authority combinations, UI refusal,
-  invalid selections/bindings and exact payload shape. Demonstrate native
-  code-owned preview without GitHub mutation or hidden reviewer reruns.
+- Only nonempty canonical selection plus current-invocation posting authority
+  may reach a write. Preserve `--all` versus `--comment`, `--no-comment`
+  suppression, missing/declined/invalid UI states and visible incomplete coverage.
+- Bind the mutation to the originating repository identity/host, PR and
+  reviewed head, not a later cwd. Recheck head and lifecycle before submission,
+  reject changed heads and invalid anchors, and do not mistake a draft review
+  override for publication permission. Consult the scope/upstream for exact
+  lifecycle rules rather than assuming review capture authorizes publication.
+- Send only code-built COMMENT payloads. Never APPROVE/REQUEST_CHANGES,
+  model-created mutation commands, stale publication or body-only fallback.
+- Distinguish no attempt, definite failure, confirmed success and uncertain
+  outcome. Record write state sufficiently to avoid blind retries after
+  transport loss/interruption. After a write may have reached GitHub,
+  cancellation must not falsely claim nothing was published.
+- Extend strict retention/publication schemas deliberately. Do not reinterpret
+  old unsubmitted previews or reuse historical authority. Update affected
+  preview-only user messaging when submission becomes real.
+- Demonstrate positive and negative gates, exact requests and ambiguous failures
+  through controlled and installed-plugin probes. A preview is not evidence that
+  GitHub accepts its anchors. Record any remaining live-evidence gap honestly.
 - Consult installed SDK and current official docs before choosing runtime APIs.
-  Record evidence and limitations rather than inferring support from declarations.
+  Preserve no-timeout execution, cleanup, selection and session-bound storage.
 
-Do not implement GitHub submission (P4), retained publish-later execution (P5),
-configuration, additional modes, fallbacks or safeguards. Keep L1 pending; copy
-no upstream source. Do not modify reviewed source, switch branches, or fetch/reset
-the checkout as part of review. The user permits `xpepper/copilot-pr-review` as a
-synthetic PR playground, but never merge synthetic PRs into main. That permission
-does not override the current no-push instruction; P3 needs no remote PR.
+Do not implement cached publish-later execution (P5), configuration, other modes,
+fallbacks, safeguards or a cross-session archive. Keep L1 pending and copy no
+upstream source. Do not modify reviewed source, switch branches, or fetch/reset
+the checkout as part of review.
+
+The user permits `xpepper/copilot-pr-review` as a synthetic PR playground,
+including creating synthetic PRs and running reviews, but **never merge those
+PRs into main**. Do not push. Use a suitable existing target if remote setup
+would require conflicting permissions; clarify instead of working around the
+no-push instruction.
 
 ## Demonstrated behavior and caveats
 
-CLI 1.0.83, bundled SDK, Node.js 26.1.0 and macOS arm64. Native P2 inference used
-explicit `gpt-5.6-terra` / `high`, not a product default or fallback.
+CLI 1.0.83, bundled SDK, Node.js 26.1.0, macOS arm64. P3 native inference used
+explicit `gpt-5.6-terra` / `high`, not a product default or fallback. Native
+SDK-host forms are real RPC interactions, not human terminal click evidence.
 
-Real quick target 12 retained one validated P2 finding, merged a duplicate, and
-completed coverage. Extension reload and **same-session cold resume in a fresh
-runtime preserved the exact record** for session
-`802d0a8b-b17b-4fc3-a214-539dc3d958f8`. This session included one ordinary parent
-model turn solely to initialize a resumable conversation.
+`scripts/smoke-preview-runtime.mjs` demonstrated six native cases: all plus
+comment authority, pending-confirmation cancellation with inert late acceptance,
+final confirmation acceptance, subset selection despite `--comment`, final false
+answer, and missing confirmation UI. Every case produced positive validated
+findings, used exactly three specialists plus one validator, exited owned
+inference before UI, and preserved the exact record after reload. The UI-less
+case retained useful findings with explicitly incomplete coverage because a
+specialist reported missing caller context.
 
-**Command-only SDK sessions cannot cold-resume in this CLI:** they lack resumable
-event history and return `Session not found`, even after native save/close.
-The retained file survives and extension reload works. The plugin does not
-fabricate history, bootstrap a model turn, or substitute another session.
-`--parent-turn` is a harness-only option; it is not plugin behavior.
+Session `0c15e99d-3e02-45b2-8aca-1b2a4ca65733` also demonstrated exact version-2
+record preservation through cold resume in a fresh runtime after one harness-only
+parent initialization turn. Its final digest was
+`1ba86e9186d97479b1ceeaa80e942bb0f58338c80c808c4a8451b55ddf7dcc94`.
+All IDs, digests, PIDs and reproduction commands are in the P3 roadmap section.
 
-Native target 13 probes retained and inspected subset (1/2), none (0/2), and
-pending-form cancellation (zero selected; findings and incomplete coverage
-preserved). Owned inference PIDs exited before UI; duplicate invocations were
-refused; late acceptance after cancellation was inert. Native lifecycle probes
-also demonstrated new-session isolation, copied wrong-session record rejection,
-incompatible schemas, and controlled pending-marker inspection. Exact IDs,
-digests, PIDs and commands are in the P2 roadmap section.
+**Command-only SDK sessions still cannot cold-resume in this CLI:** they lack
+resumable event history and return `Session not found` even after save/close.
+The retained file survives and reload works. Do not fabricate transcript
+history, initialize a model turn in plugin code or substitute another session.
+`--parent-turn` is harness-only.
 
-Controlled storage probes cover malformed records, changed binding/selection IDs,
-raw/rejected/duplicate exclusion, degraded/empty/cancelled states, write/read
-failure, unavailable/remote/in-use workspaces, and interrupted replacement.
-Positive controlled adjudication is fixture plumbing, not semantic inference.
-The digest detects corruption, not a malicious local writer who can recompute it.
-No OS sandbox, plugin-acquired cross-process lock, or power-loss guarantee exists.
+Controlled probes cover exact request fields, multiline/head/base anchors,
+rename/deletion path mapping, invalid IDs/bindings, policy precedence,
+degraded/empty/cancelled results, strict schemas and legacy compatibility.
+An integrated probe cancels an already authorized proposal at the final
+retention log and checks the actual atomic record has no authority/request/IDs.
+No GitHub review endpoint was invoked; remote anchor acceptance and in-flight
+write handling remain P4 work. No safeguard execution exists.
 
-Human terminal resume interactions, native mid-write crashes, real forks,
-remote/other-OS/other-client behavior, and the full F3 loss/SIGSTOP suite were not
-retested in P2. The SDK-host lifecycle evidence is real RPC/process behavior, not
-human clicks. Existing Q4 semantic fallibility/context-window limits remain.
-Useful validated findings may survive incomplete peers; no accepted findings
-never means a clean PR. No elapsed time triggers cancellation or fallback.
+The digest detects corruption, not a local writer who can recompute it. Storage
+uses host-reported local session metadata, not a guessed path. Remote/missing/
+already-in-use workspaces fail explicitly; the host's in-use flag is not a
+plugin-acquired cross-process lock. No OS sandbox or power-loss guarantee exists.
+P2 storage and Q4 semantic/context-window limitations remain. Full F3 process
+loss/SIGSTOP, native mid-write crashes, human resume clicks, real forks and
+remote/other-platform clients were not re-exercised in P3.
 
-Reinstall after extension changes and use a fresh runtime:
+Reinstall after extension edits and use a fresh runtime:
 
 ```sh
+node scripts/smoke-preview.mjs
+node scripts/smoke-quick.mjs
 node scripts/smoke-retention.mjs
 node scripts/smoke-selection.mjs
-node scripts/smoke-quick.mjs
 node scripts/smoke-findings.mjs
 node scripts/smoke-fixture.mjs
 copilot plugin install "$(pwd)"
 COPILOT_CLI_PATH="$(command -v copilot)" \
 COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
-node scripts/smoke-retention-runtime.mjs
-COPILOT_CLI_PATH="$(command -v copilot)" \
-COPILOT_SDK_PATH="$HOME/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk" \
 PR_REVIEW_HEAVY_MODEL=gpt-5.6-terra PR_REVIEW_HEAVY_EFFORT=high \
-node scripts/smoke-retention-runtime.mjs --quick --parent-turn
+node scripts/smoke-preview-runtime.mjs --cases=comment,cancel-pending,confirmed --parent-turn
 ```
 
-The no-flag lifecycle probe seeds controlled findings without inference and
-records command-only resume as unsupported. `--parent-turn` without `--quick`
-uses seeded findings plus one parent turn for cheaper native resume evidence.
-The quick form spends credits on actual specialists/validation as well.
-`scripts/smoke-runtime.mjs --targets --quick --selection
---selection-cases=subset,none,cancel-pending` additionally covers native UI
-selection and retained inspection using the same environment settings.
-Never put fixture `gh` in the normal PATH. Do not use `copilot -p '/pr-review ...'`
-as deterministic command dispatch. A harness kill is not plugin-cleanup evidence.
+Using the same environment, run `--cases=subset-comment,declined`, or separately
+`--cases=unavailable` without `--parent-turn`. Each native case explicitly
+spends inference credits; missing positive output is not auto-retried.
+`scripts/smoke-runtime.mjs --targets` and `scripts/smoke-retention-runtime.mjs`
+only need CLI/SDK paths and use no inference. Never put fixture `gh` in ordinary
+PATH or use `copilot -p '/pr-review ...'` for deterministic command dispatch.
+Local plugin install works but now emits a direct-install deprecation warning;
+marketplace migration is not this increment.
 
 ## Commit and hand off
 

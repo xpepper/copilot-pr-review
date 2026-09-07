@@ -1399,9 +1399,9 @@ configuration, other modes, fallbacks or safeguards were added. L1 remains pendi
 
 ## Completed increment: P3
 
-Implemented after P2 checkpoint `083684a` and handoff `cf2db2f`. No upstream
-source was copied; L1 remains pending. No GitHub mutation, push or merge was
-performed. P3 authorizes proposals, not actual submission.
+Implementation checkpoint `1b6576e`, after P2 checkpoint `083684a` and handoff
+`cf2db2f`. No upstream source was copied; L1 remains pending. No GitHub mutation,
+push or merge was performed. P3 authorizes proposals, not actual submission.
 
 ### Implementation boundary
 
