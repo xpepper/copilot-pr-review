@@ -10,7 +10,11 @@ is recorded in [AGENTS.md](AGENTS.md); the replaceable next-session prompt lives
 in [HANDOFF.md](HANDOFF.md).
 
 **Since 2026-09-07, every increment lands on a branch and a pull request that is
-reviewed with this plugin.** `main` carries a repository ruleset requiring a pull
+reviewed with this plugin, and that review is the increment's real integration
+test.** Controlled suites use test doubles and prove logic only; the pull-request
+review exercises the installed plugin, the real runtime, real models, real `gh`
+requests, the real revision gate and real confined reads. An increment is not
+demonstrated until that has run once and its evidence is recorded here. `main` carries a repository ruleset requiring a pull
 request with zero approving reviews and no bypass actors, so nobody pushes to it
 directly. Each increment's entry below must record its pull request and the
 outcome of reviewing it with the tool: mode, model and effort actually used,
@@ -44,6 +48,7 @@ posting them.
 | M1 | Balanced half completed | Balanced is the default with its four heavy specialists, light overview reviewer and three-finding P3/nit cap. Demonstrated by controlled probes, no-inference installed dispatch and one live review of this repository's own pull request #3. Pending until full adds the conventions reviewer and its findings policy. | Q4, C1; [Modes](SCOPE.md#review-modes-and-findings) |
 | M2 | Pending | Deep uses one holistic reviewer; reject conflicting mode flags. | M1; [Modes](SCOPE.md#review-modes-and-findings) |
 | C3 | Pending | Explicit optional fallback with at most one eligible retry per failed reviewer; no timers or silent substitutions. | C1, Q3; [Fallbacks/execution](SCOPE.md#models-configuration-and-execution) |
+| C4 | Pending | A tier whose resolved model supports no configurable reasoning effort resolves to no effort instead of inheriting one, so such a model can serve a tier. An explicit effort is still validated and never silently lowered. | C1; [Configuration](SCOPE.md#models-configuration-and-execution) |
 | V1 | Pending | `--verify` enforces matching branch/SHA/cleanliness before reviewers and presents discovered existing commands for approval. | Q1; [Safeguards](SCOPE.md#optional-project-safeguards) |
 | V2 | Pending | Execute only approved existing safeguards with installed dependencies; show evidence and artifacts without autofix or checkout manipulation. | V1; [Safeguards](SCOPE.md#optional-project-safeguards) |
 | D1 | Pending | Document configuration, modes, incomplete coverage, cancellation, publication, cache, and safeguards with reproducible end-to-end examples. | Remaining v1 items; [Release boundary](SCOPE.md#priority-and-release-boundary) |
@@ -3400,6 +3405,16 @@ it afterwards.
   `/pr-review-config`. Deliberate: no configuration surface was added.
 - `--capture-only` is prototype surface outside `SCOPE.md`, introduced only
   because balanced became the default. Revisit at D1.
+- Tier inheritance can produce an assignment the user never asked for and then
+  refuse it. A model with no configurable reasoning effort, such as
+  `claude-haiku-4.5`, cannot serve a tier while any other tier has an effort
+  set: an unset `lightEffort` inherits `heavyEffort`, the resolved pair is
+  validated against the light model, and the review is refused. Verified against
+  the live model catalogue on 2026-09-07. Refusing beats silently lowering the
+  effort, but there is no way to express "this tier takes no effort" today.
+  Tracked as increment `C4`: an unset effort should stay unset when the resolved
+  model supports none, while an explicit effort is still validated and never
+  silently lowered.
 - The minor-finding cap keeps the strongest three by declared severity then
   confidence. It does not spread minor findings across reviewers or files, and
   a light reviewer's minor finding can be displaced by a heavy one's.
@@ -3408,6 +3423,100 @@ it afterwards.
 - Everything R1 recorded still holds: cold command-only resume is unsupported,
   the adjudicator receives zero tools, confinement limits for untracked and
   ignored files are unchanged, and the matching fixture's base is synthetic.
+
+## Documentation checkpoint: pull request #4 and its review
+
+Pull request #4 carries no behaviour change. It records the working agreement
+that the increment's pull-request review is its real integration test, documents
+how to run that review, tracks the effort-less tier model question as `C4`, and
+rewrites the handoff. `SCOPE.md` is unchanged.
+
+### Review of record
+
+On 2026-09-07, at head `ae2c55c`, the installed plugin reviewed this pull
+request, dispatched with `node scripts/dogfood-review.mjs 4 --all --no-comment`.
+Authorized explicitly by the user; a documentation-only pull request does not
+earn a review by default.
+
+- Mode: balanced, five reviewers, default findings policy (P0-P2 plus at most
+  three P3/nit findings anchored on changed lines).
+- Models actually used: `correctness`, `contracts`, `security` and
+  `performance-resources` on `gpt-5.6-terra` at `high`, all `[configured:heavy]`;
+  `overview` on `gpt-5.6-luna` at `high`, `[configured:light]`. The adjudicator
+  `evidence-validator` also ran on `gpt-5.6-terra` at `high`.
+- **This is the first run in which a light model actually ran.** Every earlier
+  balanced run inherited the heavy assignment for the light tier. The light
+  reviewer was not decorative: `overview` produced the only finding about the
+  README's remaining pinned probe commands, which no heavy reviewer raised.
+- Project trust: NOT TRUSTED. Assignments came from personal configuration only.
+- Diff reviewed: 205 additions, 77 deletions, 4 files.
+- Coverage: **INCOMPLETE**. Three execution failures, zero coverage gaps, one
+  informational caveat. Not a clean-review result.
+- Credit cost: **79.82605 AI credits**, as reported by the runtime. For scale,
+  the five-reviewer balanced review of the 27-file pull request #3 cost
+  414.14627.
+- Publication: none. `autoPostReviews` is false, the runner refuses `--comment`,
+  and posting authority was suppressed because coverage was incomplete. The
+  payload was built and shown as a proposal only.
+
+### Findings, and what changed
+
+Seven candidates were raised. The evidence gate admitted four; the adjudicator
+accepted all four; deduplication merged two into one. Three validated findings
+resulted, all real, all fixed in `b115b36`:
+
+1. **P2, confidence 0.96, reported by `correctness` and `contracts`.** The
+   documented integration test installed the plugin before `gh pr checkout`.
+   Installation copies the working tree into the plugin cache while the revision
+   gate only checks the checkout, so the run could review a stale installed copy
+   and still report a passing integration test. Order swapped, reason recorded.
+2. **P2, confidence 0.96, reported by `overview`.** The handoff directed every
+   installed probe to derive the SDK path while the README still pinned
+   `1.0.83` in eleven probe commands. All eleven swept. Prose recording which
+   version was actually tested stays pinned, because it is evidence.
+3. **P3, confidence 0.98, reported by `contracts`.** "Everything above runs the
+   code against test doubles" was false: the `--target-live` variants make real
+   GitHub requests and the inference probes spend real inference. Reworded.
+
+### Rejected at the evidence boundary, and what that cost
+
+Three candidates never reached adjudication. This is the gate working, and also
+its price:
+
+- `contracts:2` claimed the derived SDK path passed `/copilot-sdk` to `ls` as a
+  separate operand, at confidence 0.99. **A false positive**: the reviewer
+  introduced a space into its own quote. Neither file contains it, and the line
+  extracted verbatim from the README executes and resolves under bash and zsh.
+  The gate rejected it for a citation that did not match source, which is
+  exactly the outcome the gate exists for. A 0.99-confidence fabrication was
+  stopped by an exact-match check rather than by judgement.
+- `performance-resources:1` observed that the handoff hands off the full half of
+  M1 while documenting a command with no mode flag, which would spend the
+  increment's one authorized review on balanced and never exercise `--full`.
+  Rejected because its introduction citation and location named different hunks.
+  **The point was substantively right**, so it was acted on anyway in `b115b36`;
+  the command now passes `--full`. Recording it as a rejection that should have
+  landed: the gate's citation rule discards true findings whose evidence is
+  merely mis-anchored.
+- `overview:1` asked that documentation-only reviews stay explicitly optional in
+  the roadmap. Rejected for a citation not matching a supplied context window.
+  Not acted on: `AGENTS.md` already says a documentation-only pull request's
+  review is the user's call.
+
+The informational caveat from `security` is fair and unresolved: the review could
+not exercise the installed CLI, the SDK package resolution or the GitHub
+authentication behind the new command, because the changed content is
+documentation.
+
+### Remaining limitations
+
+- The medium tier still has never run. `claude-sonnet-5` at `medium` is
+  configured, but only full mode assigns a medium reviewer, and full does not
+  exist yet.
+- Balanced's minor-finding cap was still not exercised: only one P3 was
+  validated, well under the cap of three.
+- One review, on a documentation pull request. Balanced behaviour on a real code
+  diff remains undemonstrated.
 
 ## Exact next increment
 
@@ -3438,8 +3547,10 @@ Acceptance criteria:
   increment. Follow the `AGENTS.md` checkpoint and final-file handoff rules.
 - Land the increment on its own branch and pull request, and review that pull
   request with this plugin before asking for a merge, as `AGENTS.md` now
-  requires. Record the review outcome here. That single review is authorized by
-  the workflow; nothing else that spends credits is.
+  requires. That review is the increment's real integration test: dispatch it
+  with `node scripts/dogfood-review.mjs NUMBER --all --no-comment` if you cannot
+  type a slash command, and record its outcome here. That single review is
+  authorized by the workflow; nothing else that spends credits is.
 
 A live balanced review remains an open, separately authorizable step. It is the
 only way to learn whether the light overview reviewer and the minor-finding

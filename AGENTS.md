@@ -52,6 +52,33 @@ the work, not an extra.
   the other runtime probes use. `copilot -p "/pr-review NUMBER"` is not a
   substitute: prompt mode starts an ambient model turn instead of dispatching
   the command, as the F1 integration caveats in `ROADMAP.md` record.
+
+### That review is the increment's real integration test
+
+The controlled suites run the code with test doubles: fake `gh` responses, a
+synthetic checkout, scripted reviewer output. They prove logic, not delivery.
+The pull-request review runs the **installed plugin** end to end: the real
+Copilot runtime, real models, real `gh` requests against a real pull request,
+the real revision gate against a real checkout, real confined read tools, and a
+real charge. Nothing else in this repository demonstrates that the thing we ship
+actually works.
+
+- Treat it as the increment's verification of record. An increment that changes
+  behaviour, meaning anything under `extensions/` or `scripts/`, is not
+  demonstrated until the installed plugin has reviewed its own pull request at
+  least once, and the roadmap entry says so with evidence.
+- A documentation-only pull request still needs the pull request, but its review
+  is the user's call rather than a requirement, because reviewing costs real
+  credits. Ask; do not spend by default.
+- Record what only a real run can tell you: which model and effort each reviewer
+  actually used, reviewer coverage, tool calls and denials, findings, withheld
+  findings, coverage gaps, and the credit cost the runtime reported.
+- Expect it to find things. On pull request #3 the reviewers caught a stale
+  documentation command left by a rename, which every controlled suite had
+  passed over. That is the point of ending an increment this way.
+- A failure or refusal here is a real defect report about the shipped tool, and
+  outranks a green controlled suite. Record it; never weaken a gate to make the
+  run succeed.
 - **This standing workflow authorizes exactly one review per increment pull
   request, and nothing else.** Any further review, any rerun, and any live
   probe that spends Copilot credits still needs a fresh explicit instruction.
