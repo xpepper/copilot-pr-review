@@ -424,6 +424,25 @@ const mixed = adjudicateCandidates(mixedCollected,
 assert.deepEqual(mixed.findings.map((finding) => finding.severity), ["P1", "P3", "P3", "nit"]);
 assert.deepEqual(mixed.capped, []);
 console.log("PASS balanced minor severities, declared severity order, the three-finding cap and its withheld record");
+// The full mode admits the same minor severities and presents every accepted
+// one, so nothing is withheld and a duplicate stays an ordinary alias.
+const fullPolicy = reviewModes.full.policy;
+const fullCollected = collectCandidates(minorReports, boundary, fullPolicy);
+assert.equal(fullCollected.candidates.length, 5);
+assert.equal(fullCollected.issues.length, 0);
+const fullResult = adjudicateCandidates(fullCollected, validator(minorDecisions), boundary, fullPolicy);
+assert.deepEqual(fullResult.findings.map((finding) => finding.id),
+  ["correctness:1", "contracts:1", "security:1", "overview:1"]);
+assert.deepEqual(fullResult.findings.map((finding) => finding.severity), ["P3", "P3", "P3", "nit"]);
+assert.deepEqual(fullResult.capped, [], "The full findings policy withholds no minor finding");
+assert.deepEqual(fullResult.duplicates.map((entry) => entry.id), ["performance-resources:1"],
+  "A duplicate of a presented finding stays an alias instead of being withheld with it");
+assert.deepEqual(fullResult.findings.at(-1).reportedBy, ["overview", "performance-resources"]);
+assert.equal(fullResult.complete, true);
+const fullReport = { mode: "full", validation: fullResult, complete: true };
+assert.match(formatFindings(fullReport), /^Full review: 4 validated finding\(s\)/);
+assert(!formatFindings(fullReport).includes("withheld"), "Full reports no withheld minor finding");
+console.log("PASS the full findings policy admits every minor severity, caps nothing and withholds nothing");
 console.log("PASS strict candidates, exact provenance/changed lines, confidence/severity, and fail-closed malformed output");
 console.log("PASS mocked semantic rejection/uncertainty, explicit same-defect deduplication, distinct same-line issues and degraded retention");
 console.log("PASS renamed/added/deleted files, insertion/deletion context, and shared-cause cross-file deduplication");

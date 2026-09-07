@@ -29,6 +29,7 @@ const parentModels = { rpc: { model: {
 } } };
 const quickMode = reviewModes.quick;
 const balancedMode = reviewModes.balanced;
+const fullMode = reviewModes.full;
 const options = parseReviewArgs("1 --quick --no-comment");
 assert.deepEqual(options, { mode: "quick", captureOnly: false, captureArgs: "1", settings: {},
   all: false, comment: false, noComment: true });
@@ -46,6 +47,11 @@ assert.deepEqual(parseReviewArgs("1 --balanced --no-comment"), balancedOptions);
 assert.deepEqual(parseReviewArgs("1"), { ...balancedOptions, noComment: false });
 assert.deepEqual(parseReviewArgs("1 --balanced --all --comment"),
   { ...balancedOptions, all: true, comment: true, noComment: false });
+// Full is a third explicit mode; it never becomes the default.
+assert.deepEqual(parseReviewArgs("1 --full --no-comment"), { ...options, mode: "full" });
+assert.deepEqual(parseReviewArgs("1 --full --all --comment"),
+  { ...options, mode: "full", all: true, comment: true, noComment: false });
+assert.equal(parseReviewArgs("2 --full --no-comment --include-drafts").captureArgs, "2 --include-drafts");
 // Capture-only keeps the diagnostic capture path reachable without a reviewer.
 assert.deepEqual(parseReviewArgs("1 --capture-only"), { mode: undefined, captureOnly: true, captureArgs: "1",
   settings: {}, all: false, comment: false, noComment: false });
@@ -58,8 +64,11 @@ for (const args of [
   "1 --quick --no-comment heavyModel=", "1 --quick --no-comment heavyEffort=low=high",
   "1 --quick --no-comment heavyModel=heavy heavyModel=other",
   "1 --quick --no-comment lightModel=other", "0 --quick --no-comment",
-  "1 --full --no-comment", "1 --deep --no-comment",
-  "1 --capture-only --quick", "1 --capture-only --balanced", "1 --capture-only --all",
+  "1 --full --no-comment mediumModel=other", "1 --full --no-comment mediumEffort=low",
+  "1 --quick --full --no-comment", "1 --balanced --full --no-comment", "1 --full --major-only",
+  "1 --full --full --no-comment", "1 --full --no-comment --comment", "1 --deep --no-comment",
+  "1 --capture-only --quick", "1 --capture-only --balanced", "1 --capture-only --full",
+  "1 --capture-only --all",
   "1 --capture-only --no-comment", "1 --capture-only heavyModel=heavy", "1 --capture-only --capture-only",
 ]) assert.throws(() => parseReviewArgs(args),
   /mutually exclusive|Duplicate|Invalid|Unsupported|integer|Conflicting|cannot be combined/, args);
@@ -106,7 +115,52 @@ await assert.rejects(reviewerAssignments(parentModels, balancedMode, {}, {
   ...layered,
   effective: { settings: { ...layered.effective.settings, lightModel: "missing" }, origins: layered.effective.origins },
 }), /No substitution/, "An unusable light assignment refuses the balanced review");
-console.log("PASS mode parsing/defaulting, capture-only, both topologies, tier resolution and origin reporting");
+// Full adds one medium conventions/maintainability reviewer to the balanced set.
+const ambientFull = await reviewerAssignments(parentModels, fullMode, {});
+assert.deepEqual(ambientFull.map(({ label }) => label),
+  ["correctness", "contracts", "security", "performance-resources", "overview", "conventions-maintainability"]);
+assert.deepEqual(ambientFull.map(({ tier }) => tier),
+  ["heavy", "heavy", "heavy", "heavy", "light", "medium"]);
+assert(ambientFull.every(({ model, origin }) => model === "heavy" && origin.model === "ambient"),
+  "An unconfigured medium tier still falls back to the ambient session assignment");
+// An unset medium tier is equidistant from light and heavy, so it inherits the
+// heavier one rather than silently downgrading.
+const layeredFull = await reviewerAssignments(parentModels, fullMode, {}, layered);
+assert.deepEqual(layeredFull.at(-1), {
+  label: "conventions-maintainability", tier: "medium", model: "heavy", reasoningEffort: "high",
+  origin: { model: "inherited:heavy", reasoningEffort: "inherited:heavy",
+    tier: "medium: model=heavy [inherited:heavy] reasoning=high [inherited:heavy]" },
+});
+const configuredMedium = {
+  ...layered,
+  effective: {
+    settings: { ...layered.effective.settings, mediumModel: "other", mediumEffort: "low" },
+    origins: { ...layered.effective.origins, mediumModel: "personal", mediumEffort: "personal" },
+  },
+};
+const mediumFull = await reviewerAssignments(parentModels, fullMode, {}, configuredMedium);
+assert.deepEqual(mediumFull.at(-1), {
+  label: "conventions-maintainability", tier: "medium", model: "other", reasoningEffort: "low",
+  origin: { model: "configured:medium", reasoningEffort: "configured:medium",
+    tier: "medium: model=other [configured:medium] reasoning=low [configured:medium]" },
+});
+assert(mediumFull.slice(0, 4).every(({ model, origin }) => model === "heavy" && origin.model === "configured:heavy"),
+  "A configured medium tier does not disturb the heavy specialists");
+const fullDescription = describeAssignments(fullMode, mediumFull);
+assert.match(fullDescription, /^Effective reviewer assignments: full mode, 6 reviewer\(s\)/);
+assert.match(fullDescription,
+  /findings policy: P0-P2 findings, plus every substantiated P3\/nit finding anchored on this diff's changed lines/);
+assert.match(fullDescription,
+  /\n {2}conventions-maintainability \[medium\]: model=other \[configured:medium\] reasoning=low \[configured:medium\]/);
+assert.match(fullDescription, /\n {2}overview \[light\]: model=other \[project:light\] reasoning=low \[project:light\]/);
+await assert.rejects(reviewerAssignments(parentModels, fullMode, {}, {
+  ...configuredMedium,
+  effective: {
+    settings: { ...configuredMedium.effective.settings, mediumModel: "missing" },
+    origins: configuredMedium.effective.origins,
+  },
+}), /No substitution/, "An unusable medium assignment refuses the full review");
+console.log("PASS mode parsing/defaulting, capture-only, all three topologies, tier resolution and origin reporting");
 
 function fakeGh() {
   const history = [];
@@ -723,5 +777,62 @@ console.log("PASS final retention-log cancellation revokes an unsubmitted propos
   assert.throws(() => validateRecord(minorInQuick, h.parent.sessionId), /outside this mode's findings policy/);
 }
 console.log("PASS a settled balanced run: five tiered reviewers, the minor cap, retention and the proposed body");
+
+
+// A settled full run: the balanced five plus the medium conventions reviewer,
+// with every accepted minor finding presented instead of capped.
+{
+  const h = harness({
+    mode: fullMode, withCandidate: true, acceptCandidate: true, severity: "P3",
+    candidateFrom: [0, 1, 2, 3, 4, 5],
+  });
+  const fullRun = { ...parseReviewArgs("1 --full --no-comment"), all: true };
+  const report = await executeReviewRun(h.parent, h.client, fullRun, structuredClone(mediumFull), {
+    controller: h.controller, gh: fakeGh(), git: checkoutGit,
+  });
+  assert.equal(report.mode, "full");
+  assert.equal(report.complete, true);
+  assert.deepEqual(report.reviewers.map(({ label }) => label),
+    ["correctness", "contracts", "security", "performance-resources", "overview", "conventions-maintainability"]);
+  assert(report.reviewers.every((reviewer) => reviewer.status === "completed"));
+  assert.equal(h.sessions.length, 7, "Six concurrent specialists plus one adjudicator");
+  assert.deepEqual(h.sessions.map((session) => session.model),
+    ["heavy", "heavy", "heavy", "heavy", "other", "other", "heavy"],
+  "The overview and conventions reviewers run their own tiers; the adjudicator stays on the heavy tier");
+  assert(h.messages.some((message) =>
+    message.startsWith("Assignment conventions-maintainability: model=other reasoning=low")));
+  assert(h.messages.some((message) => message.startsWith("M1 binding: ")));
+  assert.deepEqual(report.validation.findings.map((finding) => finding.id), [
+    "correctness:1", "contracts:1", "security:1",
+    "performance-resources:1", "overview:1", "conventions-maintainability:1",
+  ], "Full presents every accepted minor finding");
+  assert(report.validation.findings.every((finding) => finding.severity === "P3"));
+  assert.deepEqual(report.validation.capped, [], "Full withholds no minor finding");
+  assert.equal(report.validation.complete, true);
+  assert.equal(report.selection.findingIds.length, 6);
+  assert.equal(report.preview.status, "suppressed");
+  assert.match(report.preview.request.payload.body, /^Full review: 6 selected validated finding\(s\)/);
+  assert.equal(report.publication.attempted, false);
+  const record = retainedRecord(report);
+  validateRecord(record, h.parent.sessionId);
+  assert.equal(record.outcome.mode, "full");
+  assert.deepEqual(record.outcome.validation.capped, []);
+  assert(!formatFindings(record.outcome).includes("withheld"), "Nothing is withheld under the full policy");
+  assert.match(formatFindings(record.outcome), /^Full review .*: 6 validated finding\(s\)/);
+  // The retained schema still holds the record to its own mode.
+  const asBalanced = structuredClone(record);
+  asBalanced.outcome.mode = "balanced";
+  asBalanced.digest = reviewKey(asBalanced.outcome);
+  assert.throws(() => validateRecord(asBalanced, h.parent.sessionId), /exceed this mode's findings policy/);
+  const asQuick = structuredClone(record);
+  asQuick.outcome.mode = "quick";
+  asQuick.digest = reviewKey(asQuick.outcome);
+  assert.throws(() => validateRecord(asQuick, h.parent.sessionId), /outside this mode's findings policy/);
+  const missingConventions = structuredClone(record);
+  missingConventions.outcome.reviewers.pop();
+  missingConventions.digest = reviewKey(missingConventions.outcome);
+  assert.throws(() => validateRecord(missingConventions, h.parent.sessionId), /incomplete reviewer coverage/);
+}
+console.log("PASS a settled full run: six tiered reviewers, an uncapped minor policy, retention and the proposed body");
 
 rmSync(checkout, { recursive: true, force: true });

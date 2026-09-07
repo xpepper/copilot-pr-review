@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
 import { formatContext, parseDiffFiles } from "./context.mjs";
 import { blockingIssues, formatCoverage } from "./coverage.mjs";
-import { isMinor, reviewModes, severityRank } from "./modes.mjs";
+import { admitsMinor, capsMinor, isMinor, reviewModes, severityRank } from "./modes.mjs";
 
 export const minimumConfidence = 0.8;
 export const reviewKey = (binding) => createHash("sha256").update(JSON.stringify(binding)).digest("hex");
@@ -20,10 +20,12 @@ const limitationFormat = [
 // findings policy, so a reviewer is never asked for a severity the mode cannot
 // present, select or publish.
 function severityGuide(policy) {
-  const minor = policy.minorCap ? [
+  const minor = admitsMinor(policy) ? [
     "P3 is a minor real defect; nit is a small, correctness-neutral flaw.",
     `A ${policy.minorSeverities.join("/")} candidate must be a concrete issue anchored on a line this diff changed;`,
-    `at most ${policy.minorCap} survive presentation, so only the strongest few qualify.`,
+    capsMinor(policy)
+      ? `at most ${policy.minorCap} survive presentation, so only the strongest few qualify.`
+      : "every substantiated one is presented, so each must stand on its own evidence.",
     "A style preference, a rewrite suggestion, or speculation is never one of them.",
   ].join(" ") : "Omit P3, nits, and speculation entirely.";
   return "P0 is unconditional widespread critical failure; P1 is high impact; P2 is normal actionable impact. " + minor;

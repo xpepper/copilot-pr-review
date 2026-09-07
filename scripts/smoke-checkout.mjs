@@ -136,7 +136,7 @@ try {
   console.log("PASS cancellation and non-absolute working directories are refused");
 
   // 9. The refusal text always names the failed condition, the mode and the fix.
-  for (const mode of [reviewModes.quick, reviewModes.balanced]) {
+  for (const mode of [reviewModes.quick, reviewModes.balanced, reviewModes.full]) {
     for (const condition of ["local-head", "working-tree", "remote-head", "not-a-git-checkout"]) {
       const message = refuseCheckout(condition, "detail", 7, mode);
       assert.match(message, new RegExp(`Failed condition: ${condition}`));
@@ -146,16 +146,21 @@ try {
       assert.match(message, /no local file was touched/);
     }
   }
-  // The balanced gate refuses on exactly the same evidence, naming its own mode.
-  await assert.rejects(
-    assertReviewableCheckout(snapshotFor("c".repeat(40)),
-      { cwd: matching.directory, gh: fakeGh("c".repeat(40)), mode: reviewModes.balanced }),
-    (error) => {
-      assert.match(error.message, /^Balanced review refused before any reviewer started/);
-      assert.match(error.message, /Failed condition: local-head/);
-      assert.match(error.message, /rerun \/pr-review 12 --balanced/);
-      return true;
-    });
+  // The balanced and full gates refuse on exactly the same evidence, each
+  // naming its own mode; no mode gets an override or a degraded fallback.
+  for (const [mode, label, flag] of [
+    [reviewModes.balanced, "Balanced review", "--balanced"], [reviewModes.full, "Full review", "--full"],
+  ]) {
+    await assert.rejects(
+      assertReviewableCheckout(snapshotFor("c".repeat(40)),
+        { cwd: matching.directory, gh: fakeGh("c".repeat(40)), mode }),
+      (error) => {
+        assert.match(error.message, new RegExp(`^${label} refused before any reviewer started`));
+        assert.match(error.message, /Failed condition: local-head/);
+        assert.match(error.message, new RegExp(`rerun /pr-review 12 ${flag}`));
+        return true;
+      });
+  }
   console.log("PASS every refusal names its mode, its failed condition and the exact fixing command");
 } finally {
   for (const directory of temporary) rmSync(directory, { recursive: true, force: true });

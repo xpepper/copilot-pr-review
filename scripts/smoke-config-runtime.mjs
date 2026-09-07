@@ -228,6 +228,31 @@ try {
   `The heavy specialists still inherit the nearest configured tier: ${balanced}`);
   console.log("PASS the saved light tier drives the balanced overview reviewer without inference");
 
+  // Full adds the medium conventions reviewer, so a saved medium tier must be
+  // the one it resolves, distinct from the saved light tier beside it.
+  const setMedium = await run(session, `mediumModel=${current.modelId} mediumEffort=${current.reasoningEffort}`);
+  assert.equal(setMedium.error, undefined, `set failed: ${setMedium.error}`);
+  const full = (await quickRun(session, "2 --full --no-comment")).find((message) =>
+    message.startsWith("Effective reviewer assignments:"));
+  assert(full, "A full review displays its per-reviewer assignments before execution");
+  assert.match(full, /full mode, 6 reviewer\(s\)/);
+  assert.match(full, /findings policy: P0-P2 findings, plus every substantiated P3\/nit finding/);
+  assert(full.includes(`conventions-maintainability [medium]: model=${current.modelId} ` +
+    `[configured:medium] reasoning=${current.reasoningEffort} [configured:medium]`),
+  `The saved medium tier drives the full conventions reviewer: ${full}`);
+  assert(full.includes(
+    `overview [light]: model=${current.modelId} [configured:light] reasoning=${other} [configured:light]`),
+  `The light overview reviewer keeps its own saved tier: ${full}`);
+  assert(full.includes(`correctness [heavy]: model=${current.modelId} ` +
+    `[inherited:medium] reasoning=${current.reasoningEffort} [inherited:medium]`),
+  `An unset heavy tier now inherits the nearer medium tier: ${full}`);
+  const unsetMedium = await run(session, "unset mediumModel mediumEffort");
+  assert.equal(unsetMedium.error, undefined, `unset failed: ${unsetMedium.error}`);
+  assert.deepEqual(JSON.parse(readFileSync(filename, "utf8")).settings,
+    { lightModel: current.modelId, lightEffort: other, autoPostReviews: true },
+    "Unsetting the medium tier leaves the rest of the saved configuration untouched");
+  console.log("PASS the saved medium tier drives the full conventions reviewer without inference");
+
   writeFileSync(filename, JSON.stringify({ schemaVersion: configSchemaVersion,
     settings: { heavyModel: "definitely-not-a-model" } }), { mode: 0o600 });
   const refused = await run(session, "2 --quick --no-comment", "pr-review");

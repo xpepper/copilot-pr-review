@@ -1,7 +1,7 @@
 # Copilot PR Review
 
-An original Copilot CLI plugin prototype. **Balanced (the default) and quick
-reviews include grounded candidate validation, deduplication, finding selection,
+An original Copilot CLI plugin prototype. **Balanced (the default), full and
+quick reviews include grounded candidate validation, deduplication, finding selection,
 posting-authority controls, code-controlled COMMENT publication, and session-bound
 retention with uncertain-write protection. A retained selection can also be published later by
 an explicit command, without rerunning reviewers. Personal model tiers and
@@ -167,7 +167,7 @@ and checked against actual usage. The parent model is unchanged.
 exclusive. The existing draft/closed overrides still apply to reviewing, not
 inline publication. Every mode accepts `--comment`, `--no-comment`, or neither;
 the posting flags conflict. Authorized selections can publish, as described
-below. `--full`, `--deep` and `--verify` remain unsupported. Personal and
+below. `--deep` and `--verify` remain unsupported. Personal and
 explicitly trusted project configuration are applied; fallback models are not.
 
 Dispatch returns after acceptance so cancellation remains available during capture
@@ -219,7 +219,7 @@ only findings surviving the Q4 boundary below appear in the final findings view.
 Candidate output may quote PR source; full captured input is not dumped into the
 parent timeline.
 
-`Q3 evidence:` (`M1 evidence:` for balanced) is emitted after owned-runtime cleanup and now includes Q4
+`Q3 evidence:` (`M1 evidence:` for balanced and full) is emitted after owned-runtime cleanup and now includes Q4
 `validation` and optional `adjudicator` records. `executionComplete` reports
 specialist execution separately. `complete: true` additionally requires finished
 validation without unresolved evidence or cleanup errors; it never means the PR
@@ -276,11 +276,42 @@ and publication gates. Cancellation still stops all owned work, no timeout is
 imposed, and incomplete coverage is still reported as incomplete.
 
 Balanced execution is demonstrated by controlled probes, no-inference installed
-dispatch, and one live review of this project's own pull request #3: five
-reviewers, 89 confined reads with no denials, zero findings with incomplete
-coverage, and 414.14627 reported AI credits. That run says nothing about review
-quality, and its light reviewer inherited the heavy assignment because no light
-tier was saved. See [ROADMAP.md](ROADMAP.md).
+dispatch, and two live reviews of this project's own pull requests. #3 ran five
+reviewers, made 89 confined reads with no denials, returned zero findings with
+incomplete coverage, and cost 414.14627 reported AI credits; its light reviewer
+inherited the heavy assignment because no light tier was saved. #4 did run a
+light model, and that light reviewer produced a finding no heavy reviewer
+raised. Both pull requests were documentation-heavy, so neither says much about
+review quality on a code diff. See [ROADMAP.md](ROADMAP.md).
+
+### Full review mode (M1)
+
+```text
+/pr-review 123 --full --no-comment
+/pr-review 123 --full --no-comment --all
+```
+
+Full runs the balanced five plus one **medium conventions/maintainability
+reviewer**, which looks at project conventions, naming, structure, error
+handling, tests, documentation and maintainability of the changed code, judged
+against the surrounding codebase. Six reviewers run concurrently, so a full
+review costs more than a balanced one on the same diff.
+
+The medium tier resolves through exactly the same layering as the others, and
+the `Effective reviewer assignments:` block names its model, effort and origin
+before any reviewer starts. There is no medium invocation flag; set it with
+`/pr-review-config mediumModel=... mediumEffort=...`. An unset medium tier sits
+equidistant between light and heavy, so it inherits the heavy tier rather than
+downgrading to the light one.
+
+The full findings policy presents **every qualifying severity with no minor
+cap**: accepted P3 and nit findings are all presented, so nothing is withheld
+and `capped` stays empty. Minor findings still have to anchor on a line this
+diff changed and pass the same evidence gate, adjudication and deduplication.
+Everything else is unchanged from balanced: the same revision gate, confined
+read-only reviewer tools, incomplete-coverage reporting, selection, retention,
+publication gates and cancellation. Mode flags remain mutually exclusive, and
+balanced remains the default.
 
 ### Grounded findings and deduplication (Q4)
 
@@ -289,8 +320,8 @@ rejects malformed output rather than extracting fragments or removing markdown
 fences. Candidates must echo a digest of the code-owned review binding and use
 exactly the defined schema. Candidates must carry numeric confidence **0.8
 through 1** and a severity the mode's findings policy admits: P0-P2 for quick,
-P0-P2 plus P3/nit for balanced. This is a conservative admission threshold, not
-calibrated certainty.
+P0-P2 plus P3/nit for balanced and full. This is a conservative admission
+threshold, not calibrated certainty.
 
 Code checks every cited path, side, line range and verbatim quotation against Q2's
 captured context windows and blob/revision provenance. The primary location must
@@ -763,11 +794,12 @@ A worked example. List what your subscription actually offers with
 
 `show` prints the effective assignment for every tier with the origin of each
 value, so you can see which tier a review will actually use. Quick uses the
-heavy tier only. Balanced adds the light tier for its overview reviewer, and the
-medium tier is reserved for full mode's conventions reviewer. **If you leave the
+heavy tier only. Balanced adds the light tier for its overview reviewer, and
+full adds the medium tier for its conventions reviewer. **If you leave the
 light tier unset, it inherits the nearest configured tier**, so a balanced
 review runs its "light" reviewer on your heavy model at heavy effort, which is
-what makes a balanced review expensive.
+what makes a balanced review expensive. An unset medium tier inherits the heavy
+tier for the same reason.
 
 One trap worth knowing: a model that supports no configurable reasoning effort,
 such as `claude-haiku-4.5`, cannot be used in a tier while any effort reaches
@@ -779,9 +811,9 @@ model that supports an effort, such as `gemini-3.8-flash`, `gpt-5-mini` or
 
 Invocation flags win over saved settings for that invocation only and never
 rewrite the file: `heavyModel=`/`heavyEffort=` on `/pr-review NUMBER`, and
-`--comment`/`--no-comment` over `autoPostReviews`. There is no light-tier
-invocation flag; balanced takes its light assignment from saved configuration
-or the ambient session.
+`--comment`/`--no-comment` over `autoPostReviews`. There is no light-tier or
+medium-tier invocation flag; balanced and full take those assignments from saved
+configuration or the ambient session.
 
 Configuration is personal and lives at `<copilot-config-home>/pr-review/config.json`,
 beside the CLI's own `session-state` directory, so it is never inside a reviewed
@@ -993,7 +1025,7 @@ logging. An abruptly lost parent cannot receive a final report; there is no
 clean-review claim or publication. Normal SDK transcripts may persist, and
 forced termination does not guarantee a final transcript flush. The prototype
 can capture PRs, bind source context, resolve personal and explicitly trusted
-project configuration, run the quick and balanced specialists, and
+project configuration, run the quick, balanced and full specialists, and
 validate/deduplicate findings, but cannot execute project safeguards. It does not restrict or change the model of the surrounding Copilot session. The SDK may
 retain its own session transcripts; no plugin review archive is implemented.
 
@@ -1018,9 +1050,9 @@ node scripts/smoke-runtime.mjs
 ```
 
 The pure probes exercise fixture guards/lifecycle, PR capture/gates,
-revision-bound context assembly, and quick/balanced orchestration without a
-runtime, including mode parsing, both reviewer topologies, tier resolution and
-the balanced minor-finding cap. The findings probe exercises strict
+revision-bound context assembly, and quick/balanced/full orchestration without a
+runtime, including mode parsing, all three reviewer topologies, tier resolution,
+the balanced minor-finding cap and full's uncapped policy. The findings probe exercises strict
 schema/provenance gates, changed-line anchors, renamed/added/deleted files,
 pure insertion/deletion context, cross-file deduplication, and degraded coverage. Its semantic
 accept/reject decisions are explicit test doubles, not live-model evidence.
@@ -1042,7 +1074,7 @@ that the bound context carries the served blob identities instead. It also
 captures a fixture PR that then advances, and asserts the next capture stops
 explicitly rather than reviewing the moved head against the captured diff.
 Its capture dispatches all use `--capture-only`. With `--startup` it also
-dispatches a skipped draft in both quick and balanced modes, asserting the
+dispatches a skipped draft in quick, balanced and full modes, asserting the
 displayed per-reviewer assignments, that no reviewer starts, and a settled
 `coverage: "not-started"` result without inference.
 The harness asserts read-only requests, no model turns, and no source changes.
@@ -1078,10 +1110,11 @@ before dispatch, target binding, duplicate-run rejection, incomplete cancellatio
 owned-process exit, and an unchanged checkout. Replace `--targets` with
 `--target-live` to use the pinned public PR through real GitHub GETs. Do not
 combine the stub and live variants. Adding `--quick` is inference-spending;
-the probe variants without it still start no reviewers. There is no balanced
-harness probe: balanced execution is demonstrated by the controlled suites and
-the no-inference installed dispatch above, and a live balanced review needs its
-own explicit authorization.
+the probe variants without it still start no reviewers. There is no balanced or
+full harness probe: their execution is demonstrated by the controlled suites,
+the no-inference installed dispatch above, and the review each increment's own
+pull request receives. Any further live review needs its own explicit
+authorization.
 
 The controlled quick target is now synthetic PR 12, an original four-line
 `total.js` multiplication-to-addition regression with an unchanged contract.
@@ -1128,7 +1161,8 @@ It dispatches `/pr-review NUMBER --all --no-comment` through the SDK's command
 RPC, so the real extension, runtime, models, `gh` requests, revision gate and
 confined read tools all take part. `copilot -p "/pr-review NUMBER"` is **not** a
 substitute: prompt mode starts an ambient model turn instead of dispatching the
-command.
+command. Every argument after the number is passed through, so add a mode flag
+when you want one: without it the runner takes the default, balanced.
 
 Derive the SDK path instead of pinning a version. Old packages under
 `~/.copilot/pkg/` are never pruned, so a pinned path keeps resolving after a
@@ -1144,8 +1178,10 @@ cost the runtime reported.
 
 **It spends real credits, and doc-heavy pull requests are expensive.** Reviewing
 this project's own 27-file pull request #3 with five balanced reviewers on
-`gpt-5.6-terra` at `high` cost 414.14627 reported AI credits. Choose the mode
-and the tier assignments deliberately before dispatching.
+`gpt-5.6-terra` at `high` cost 414.14627 reported AI credits; the 4-file pull
+request #4 cost 79.82605. Full adds a sixth reviewer, so it costs more again on
+the same diff. Choose the mode and the tier assignments deliberately before
+dispatching.
 
 The original F2 inference probe remains available separately:
 
