@@ -19,6 +19,8 @@ export const candidateFormat = [
   "Unchanged hunk context does not count as an addition/removal; null after is valid for a deletion-only change.",
   "Evidence must cite the actual contract, caller, or control/data flow establishing the trigger and impact.",
   "Do not mistake an assertion, a hypothetical caller, or the PR description for independent source evidence.",
+  "Check language-operator semantics and the complete expression/control flow before claiming an effect.",
+  "Every assertion must be supported; omit speculative consequences or embellishments even when the core defect is real.",
   `Omit candidates below confidence ${minimumConfidence}. P0 is unconditional widespread critical failure; P1 is high impact; P2 is normal actionable impact.`,
   "If evidence is missing, put that limitation in limitations rather than inventing a candidate.",
   "limitations is ONLY for missing evidence or incomplete coverage, not a summary of a successful review or an empty result.",
@@ -36,13 +38,16 @@ export const validationInstructions = [
   "Reject false positives, pre-existing issues, speculative impact, inappropriate P0-P2 severity, and inflated confidence.",
   "Use uncertain when the supplied context cannot settle a claim. Never accept on the candidate's assertions alone.",
   "For accept, cite independent source evidence establishing the causal argument and explain it in reason.",
+  "Accept ONLY if EVERY assertion in the candidate's title, trigger, expected, actual, introduction, severity and confidence is supported.",
+  "If the core defect is real but any detail is false or overstated, reject the ENTIRE candidate and set allClaimsSupported=false.",
+  "Do not accept with a caveat/correction in reason: the original candidate text is displayed unchanged. Finding editing is not implemented.",
   "P0 needs unconditional widespread critical impact; P1 high impact; P2 normal actionable impact.",
   "Only mark a duplicate when root cause, triggering condition, and resulting failure are the SAME defect.",
   "Sharing a location or fix is not enough. Distinct defects at the same line must remain separate.",
   "Return ONLY JSON, no fences, no extra fields:",
   '{"schemaVersion":1,"reviewKey":"<supplied key>","decisions":[{"candidateId":"<supplied id>",',
   '"verdict":"accept|reject|uncertain","reason":"source-grounded explanation or missing evidence",',
-  '"evidence":[CITATION],"duplicateOf":null}],"limitations":[]}.',
+  '"allClaimsSupported":true,"evidence":[CITATION],"duplicateOf":null}],"limitations":[]}.',
   "Use the supplied CITATION format. Accept requires at least one exact citation. Other verdicts may use [].",
   citationFormat,
   "Give exactly one decision per candidate, in supplied order. Do not rewrite titles, severity, confidence, or evidence.",
@@ -226,9 +231,10 @@ export function adjudicateCandidates(collected, reviewer, boundary) {
   for (const [index, decision] of output.decisions.entries()) {
     const entry = collected.candidates[index];
     try {
-      object(decision, ["candidateId", "verdict", "reason", "evidence", "duplicateOf"], "Decision");
+      object(decision, ["candidateId", "verdict", "reason", "allClaimsSupported", "evidence", "duplicateOf"], "Decision");
       text(decision.reason, "Decision reason");
-      if (!["accept", "reject", "uncertain"].includes(decision.verdict) || !Array.isArray(decision.evidence) ||
+      if (!["accept", "reject", "uncertain"].includes(decision.verdict) ||
+          typeof decision.allClaimsSupported !== "boolean" || !Array.isArray(decision.evidence) ||
           !(decision.duplicateOf === null || typeof decision.duplicateOf === "string")) {
         throw new Error("Invalid adjudication verdict, evidence, or duplicate reference.");
       }
@@ -239,6 +245,7 @@ export function adjudicateCandidates(collected, reviewer, boundary) {
         if (decision.verdict === "uncertain") issues.push(`${entry.id}: unresolved evidence: ${decision.reason}`);
         continue;
       }
+      if (!decision.allClaimsSupported) throw new Error("Acceptance requires support for the entire candidate, not a partially true claim.");
       if (!evidence.length) throw new Error("Acceptance requires independently checked source citations.");
       if (decision.duplicateOf !== null) {
         const previous = accepted.get(decision.duplicateOf);
@@ -268,7 +275,9 @@ export function adjudicateCandidates(collected, reviewer, boundary) {
       }
       const finding = {
         ...entry, reportedBy: [entry.reviewer], candidateIds: [entry.id],
-        validation: { kind: "source-grounded-model-adjudication", reason: decision.reason, evidence },
+        validation: {
+          kind: "source-grounded-model-adjudication", allClaimsSupported: true, reason: decision.reason, evidence,
+        },
       };
       findings.push(finding);
       accepted.set(entry.id, finding);

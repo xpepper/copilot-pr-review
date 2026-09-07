@@ -92,6 +92,7 @@ export async function exerciseQuick(session, target, settings) {
             assert(finding.confidence >= 0.8 && finding.confidence <= 1);
             assert.equal(finding.location.ref, report.binding[finding.location.side]);
             assert.equal(finding.validation.kind, "source-grounded-model-adjudication");
+            assert.equal(finding.validation.allClaimsSupported, true);
             assert(finding.validation.evidence.length);
           }
           if (target.expectedFinding) {

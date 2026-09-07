@@ -21,7 +21,7 @@ in [AGENTS.md](AGENTS.md); the replaceable next-session prompt lives in
 | Q1 | Completed | Read-only code-owned PR capture with repository/head-bound snapshot, skip/override/confirmation gates, consistency guards, and installed-plugin controlled/live evidence below. | F3; [Targets](SCOPE.md#targets-and-local-behavior) |
 | Q2 | Completed | Source context bound to the captured head/base revisions with blob-verified provenance; local-checkout, moved-head, and inconsistent source refused. Evidence below. | Q1; [Targets](SCOPE.md#targets-and-local-behavior) |
 | Q3 | Completed | Three concurrent quick specialists consume bound PR input; explicit/ambient assignments, alias, incomplete coverage, and cancellation demonstrated below. Candidates remain unvalidated. | Q2; [Modes](SCOPE.md#review-modes-and-findings) |
-| Q4 | In progress | Strict candidate/evidence boundary, isolated adjudication, deduplication, degraded findings and positive installed-plugin controlled inference implemented; real positive PR demonstration pending. | Q3; [Modes/findings](SCOPE.md#review-modes-and-findings) |
+| Q4 | Completed | Strict evidence/whole-claim gates, isolated adjudication, deduplication and degraded findings; positive controlled and real-PR installed-plugin inference demonstrated below. | Q3; [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | P1 | Pending | Select validated findings with a minimal UI and `--all`; no writes yet. | Q4; [Selection/publication](SCOPE.md#selection-publication-and-cached-results) |
 | P2 | Pending | Retain results with session/repository/PR/head binding and reload/resume where supported; inspect without rerunning reviewers. | P1; [Cached results](SCOPE.md#selection-publication-and-cached-results) |
 | P3 | Pending | Resolve posting authority and conflicting flags; display a code-built inline review payload without submitting it. | P1; [Publication controls](SCOPE.md#selection-publication-and-cached-results) |
@@ -793,7 +793,7 @@ or timeout was added. Remote/Enterprise/other-OS support and robust handling of
 all provider behaviors have not been demonstrated. SDK transcripts may persist;
 the plugin still has no cross-command or cross-session cache. L1 remains pending.
 
-## Exact next increment
+## Q4 acceptance criteria recorded at the Q3 checkpoint
 
 **Q4 only:** Validate evidence, severity/location/confidence, and deduplicate
 quick specialist candidates; demonstrate a real `--quick --no-comment` result
@@ -826,10 +826,12 @@ configuration, other modes, fallback, or safeguards. Do not modify reviewed
 source, switch branches, or fetch/reset the checkout. Respect `SCOPE.md`,
 keep L1 pending unless separately authorized, and copy no upstream source.
 
-## Q4 implementation checkpoint
+## Completed increment: Q4
 
 Starting checkpoint: `de4f00a` (Q3); the working tree was clean. The Q4 code is
-original; L1 remains pending and no upstream source was copied.
+original; L1 remains pending and no upstream source was copied. Implementation
+checkpoint `a4d3b35` records the initial boundary and native evidence. The
+session-ending commit adds the whole-claim correction, final evidence, and handoff.
 
 ### Implemented boundary
 
@@ -854,7 +856,10 @@ original; L1 remains pending and no upstream source was copied.
   The validator's effective model/effort is displayed and actual subscription
   usage checked. It is instructed to challenge reachability, guards, contracts,
   pre-existing behavior, causal impact, severity and confidence. Its acceptance
-  citations are checked again by code.
+  citations are checked again by code. Acceptance requires explicit boolean
+  `allClaimsSupported: true`: partly true reports must be rejected, not
+  displayed with a correction buried in the validator's reason. The original
+  candidate text is not silently edited.
 - Deterministic grounding is distinct from fallible model judgment. Neither a
   matching quotation nor a second model's assertion is standalone proof of a
   defect. The final result explicitly says that no code execution/formal proof
@@ -920,7 +925,7 @@ On 2026-09-07, with the same CLI 1.0.83 / bundled SDK / macOS arm64 runtime:
   completion. All actual usage was the explicitly assigned subscription model
   and high effort, `isByok: false`.
 
-### Real-positive target and remaining acceptance
+### Real-positive target and implementation corrections
 
 Read-only investigation identified public merged `ptitSeb/box64#3902`, a small
 six-file change with a later regression fix in `ptitSeb/box64#3963`. No source
@@ -959,8 +964,81 @@ lines. The strict JSON schema and no-repair policy are unchanged. This also
 motivated shared changed-source evidence for duplicate reports anchored in
 different files. Deterministic probes cover both cases.
 
-Final native inference after these corrections is still pending at this
-implementation checkpoint; **Q4 is not yet marked complete**.
+Those corrections were exercised through the installed plugin. Independent
+inspection then caught a second problem despite passing harness assertions:
+the validator accepted reports containing false details while acknowledging
+the errors in its rationale. One report incorrectly treated C's `&&` as if it
+preserved integer 2, and another claimed that all AVX bits disappeared despite
+overlapping OR contributions. A true BMI1/XSAVE defect does not validate those
+extra claims.
+
+The final correction adds the required whole-claim support assessment and
+explicitly rejects partial truth rather than rewriting the candidate. Pure
+probes cover contradictory acceptance, missing/nonboolean assessment, and
+retention of fully supported peers. Model judgment remains fallible; the flag
+enforces the decision contract, not an independent semantic proof.
+
+### Final Q4 installed-plugin evidence
+
+The final implementation was reinstalled and exercised in fresh runtimes with
+explicit `gpt-5.6-terra` / `high` assignments and the alias inheriting those
+parent settings. All completed specialist/validator usage matched that
+subscription model and effort (`isByok: false`), with independent session IDs.
+The parent assignment, checkout state, and read-only request invariant held.
+
+| Final exercise | Specialist overlap | Accepted findings | Duplicate reports merged | Coverage |
+| --- | --- | --- | --- | --- |
+| Controlled PR 12, explicit | 2359 ms | One P2, confidence 0.99 | 0 | Incomplete: an invalid reject-plus-duplicate decision was refused; the valid peer survived |
+| Controlled PR 12, ambient alias | 3897 ms | One P2, confidence 0.99 | 0 | Completed; one overstated candidate was rejected |
+| Public `ptitSeb/box64#3902`, explicit | 22502 ms | One P2, confidence 0.99 | 2 | Incomplete: unshown environment parsing/consumers remain uncovered |
+| Public `ptitSeb/box64#3902`, ambient alias | 25582 ms | One P2, confidence 0.99 | 2 | Incomplete: the same source-window limitation remains visible |
+
+The controlled alias explicitly rejected a claim that *every* numeric call
+fails: `total(2, 2)` has equal sum and product. The retained correctness report
+excluded those coincidental inputs and accurately described `total(100, 2)`
+returning 102 instead of 200. The explicit run also demonstrated native
+invalid-adjudication containment without losing the supported finding.
+
+Both final public findings anchor the deleted normalization at
+`src/tools/env.c`, **base lines 270-273**, blob
+`500368b2305812b654f4f72d73fe8ab1de9b13d4`. They describe AVX mode 2 reaching
+the unchanged raw CPUID shifts, omitting XSAVE and BMI1 at their documented
+positions and setting the next bit instead. These accepted texts were assessed
+against the captured before/after source, including the full OR expressions:
+the aggregate leaf-1 mask loses XSAVE, not every adjacent AVX-related flag.
+The later public fix `ptitSeb/box64#3963` booleanizes precisely the four leaf-1
+shifts and the BMI1 shift. It corroborates the regression independently but was
+never supplied to the model reviewers or validator. No fetched PR code,
+project safeguard, or dependency installation was executed.
+
+| Final public explicit role | Independent session | Turn start (epoch ms) | Idle (epoch ms) |
+| --- | --- | --- | --- |
+| correctness | `21e87b2d-cfde-4760-9c71-6079a002050c` | 1788765728716 | 1788765763548 |
+| contracts | `5b46d6f7-a5a1-4ddd-af24-edd101356f6b` | 1788765728682 | 1788765752627 |
+| security/performance/resources | `0a94af67-af80-4799-99fb-c290ca22719a` | 1788765728747 | 1788765751249 |
+| evidence validator | `c5ceb76b-83c4-4018-b7f4-76db10229d98` | 1788765764657 | 1788765779622 |
+
+Public alias sessions in that order:
+`6219f694-c122-4056-947a-26be2a986bda`,
+`62b6ae86-07ef-4b09-a063-fd0c6806983b`,
+`521e2789-6323-4429-bb5c-2ce8b5d11016`,
+`f45fe773-c589-4877-b3a8-7583f9bb580c`.
+
+Final controlled owned-runtime PIDs **38284**, **39748**, **40619**, **41093**
+exited after explicit completion, alias completion, active-specialist
+cancellation, and active-validator cancellation. Final public PIDs **39409**,
+**42658**, **44494**, **45295** exited for the same four cases. No harness kill
+was needed; cleanup errors were empty. Validation cancellation retained three
+completed specialist reports and a cancelled validator, with no accepted
+findings. The public cancelled validator was
+`9f121831-bc7d-4ec7-a928-d7bb59be7786`. Disposed-connection abort errors after
+force-stop remain visible, as in F3/Q3.
+
+This completes Q4's real `--quick --no-comment` demonstration with grounded,
+deduplicated findings and explicit degraded coverage. It is not a clean-PR,
+perfect-model, universal-recall, or full-repository-coverage claim. Model
+noncompliance can still produce incomplete runs; no gate was relaxed to hide
+those failures.
 
 ### Q4 reproduction and runtime limits
 
@@ -996,10 +1074,35 @@ not plugin-cached. Q2 context/window and GitHub path-to-blob trust caveats remai
 The complete native F3 adversarial/loss/SIGSTOP suite was not rerun; existing pure
 F3 checks and new native quick/validation cancellation are separate evidence.
 
-## Next work after the Q4 implementation checkpoint
+## Exact next increment
 
-Finish **Q4 only**: inspect the real-positive installed-plugin inference,
-independently assess its accepted claims against the pinned source and known
-regression, and record actual evidence and remaining caveats. Do not mark Q4
-complete merely because the harness captures a target or models agree.
-Only after Q4 acceptance is demonstrated does P1 finding selection become next.
+**P1 only:** Select validated findings using a minimal UI and `--all`; no writes
+or retained-result cache yet.
+
+Acceptance criteria:
+
+- Extend quick/alias parsing with `--all` to select every final validated,
+  deduplicated finding. It never selects rejected/raw candidates and does not
+  authorize publication. Keep `--no-comment` required until posting authority
+  is implemented in P3.
+- Without `--all`, present an explicit minimal selection interface over the
+  validated findings. Support choosing a subset, choosing none, and cancellation.
+  An unsupported host UI must be reported explicitly, never silently interpreted
+  as select-all. Consult the installed SDK and demonstrate the chosen UI API.
+- Keep the selection bound to the same invocation, session, repository, PR and
+  reviewed head. Reject invalid/unknown selections; do not silently select
+  different findings. Do not add the P2 cache or reload/resume behavior yet.
+- Preserve per-finding human-readable severity/location/confidence and visible
+  incomplete coverage. Useful findings in degraded runs remain selectable.
+  Empty results, skips and cancellations are not clean-review claims.
+- Keep all Q3/Q4 model assignment, read-only isolation, progress, cancellation,
+  no-timeout, whole-claim validation, deduplication and cleanup guarantees.
+  Selection or cancellation must not start new reviewer work or any GitHub write.
+- Extend the existing Node.js/assert exercises and record installed-plugin
+  evidence separately from deterministic probes and SDK assumptions.
+
+Do not implement publication, cached publish-later, saved configuration, other
+modes, fallbacks or safeguards. Respect `SCOPE.md`, keep L1 pending, copy no
+upstream source, and do not modify reviewed source or switch/fetch/reset the
+checkout. Follow the checkpoint-commit and final-file handoff workflow in
+`AGENTS.md`.

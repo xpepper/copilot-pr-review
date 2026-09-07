@@ -1,161 +1,164 @@
 # Next-session handoff prompt
 
-Continue this project from its recorded repository state.
+Continue from the recorded repository state, not from prior conversations.
 
-Read `AGENTS.md`, then `SCOPE.md` as the authoritative product specification,
-and `ROADMAP.md` for progress, demonstrated runtime evidence, caveats, and the
-exact next increment. Inspect git status, recent commits, and implementation
-before editing. Do not depend on prior conversations or reopen settled scope
-decisions. Reconcile this handoff with git state if necessary.
+Read `AGENTS.md`, then `SCOPE.md` as the authoritative product specification
+and `ROADMAP.md` as the progress/evidence record. Inspect git status, recent
+commits and implementation before editing. Reconcile this prompt against git
+and those documents if necessary. Do not reopen settled product decisions.
 
 ## Recorded state
 
-The preceding checkpoint is `ac3599d` (Q2). The session-ending commit containing
-this handoff completes Q3; inspect git log for its hash. All Q3 implementation,
-exercises, README/roadmap updates, and this handoff belong in that commit.
-There was no unrelated or unfinished work when this handoff was written.
+Implementation checkpoint **`a4d3b35`** adds Q4 after Q3's `de4f00a`.
+The session-ending commit containing this handoff adds the whole-claim support
+guard and final native evidence, completing Q4; inspect git log for its hash.
+All remaining changes at handoff creation belong to that session-ending commit.
+There is no unrelated or unfinished work to carry forward.
 
-`/pr-review NUMBER --quick --no-comment` now captures and binds PR input, then
-dispatches three concurrent heavy specialists: correctness, contracts, and
-combined security/performance/resources. `--major-only` is the alias; exactly
-one quick spelling is required. A bare number still captures context without
-reviewers. Existing draft/bot/empty/closed gates remain in place.
+`/pr-review NUMBER --quick --no-comment` (or `--major-only`) now runs the
+three heavy specialists, validates their evidence, adjudicates candidates,
+deduplicates accepted defects and presents a human-readable findings result.
+Exactly one quick spelling and `--no-comment` remain required. `--all` and
+selection are not implemented. A bare number remains capture-only.
 
-`extensions/pr-review/quick.mjs` owns argument parsing, assignments, prompts,
-target binding, and quick orchestration. The F2/F3 machinery is shared rather
-than duplicated: `reviewAssignments` and `validateModelAssignment` live in
-`fixture.mjs`, while `executeOwnedRun` lives in `fixture-run.mjs`. The extension
-owns one active review at a time, with independent reviewer sessions inside a
-plugin-owned stdio runtime. Command dispatch returns after acceptance so
-cancellation remains available.
+Relevant implementation:
 
-Optional `heavyModel=ID` and `heavyEffort=LEVEL` are invocation-local. Unset
-fields independently inherit the parent session's current model/effort; all
-three specialists share the heavy-tier assignment. Invalid/unavailable models
-or incompatible effort fail without substitution. No saved configuration,
-fallback, nearest-saved-tier logic, or project trust was added. An unset ambient
-effort uses the owned runtime's resolved default, displayed before prompts;
-that branch is demonstrated by pure tests only. Explicit and ambient high
-effort with `claude-sonnet-5` were demonstrated through real inference.
+- `quick.mjs` owns parsing, assignments, bound input and orchestration.
+- `findings.mjs` owns strict candidate/decision schemas, `reviewKey`, evidence
+  gates, adjudication processing, deduplication and findings formatting.
+- `context.mjs` retains actual added/removed line numbers separately from hunk
+  context. Q2 source remains blob-verified and revision-bound.
+- `reviewAssignments` in `fixture.mjs` runs the three specialists concurrently,
+  then a separate `evidence-validator` session when eligible candidates exist.
+  The validator uses the effective heavy assignment in the same owned runtime;
+  it is not a fourth specialist. Isolation, actual usage checks and progress
+  are shared, not duplicated.
+- `executeOwnedRun` in `fixture-run.mjs` still owns cleanup/error reporting.
+  The extension's `activeRun` currently clears after runtime cleanup, before
+  the final findings log. Inspect that lifecycle when wiring selection and
+  cancellation; do not keep inference alive just to wait for selection.
 
-The prompts supply captured diff and Q2 context as untrusted JSON data, with
-appended system instructions to ignore embedded requests, use no local evidence
-or tools, and report only substantiated P0-P2 candidates with evidence and
-severity/confidence/location. The code-owned binding records repository/PR,
-head/base SHAs, diff/context hashes, and paths with source provenance, and is
-attached to each reviewer output.
+`Q3 evidence:` is now the diagnostic envelope for both Q3/Q4. It includes
+`binding`, `executionComplete`, `validation`, optional `adjudicator`, original
+reviewer records, and post-cleanup `complete`/`cancelled`/`coverage`.
+`validation.findings` is the only eligible selection input. It is code-built,
+deduplicated, severity/confidence sorted and bound to the same invocation.
+`validation.rejected`, `duplicates`, `issues` and raw reviewer output are not
+additional selectable findings. IDs are invocation-local, not archive IDs.
 
-**The prose and its citations remain untrusted and unvalidated.** Binding an
-output envelope does not make its claims correct. The live exercise produced
-low-confidence candidates (including 0.4) and potential duplicate/pre-existing
-claims; these are not accepted findings. Q4 is required before presenting
-validated review findings.
+Do not confuse execution completion with validated or complete coverage.
+Valid findings survive failed peers, malformed siblings and unresolved context.
+Final `complete: false` can therefore coexist with useful findings. Empty
+findings never imply a clean PR. No cache, selection, publication, saved
+configuration, other modes, fallback or safeguards were added.
 
-`Q3 evidence:` follows cleanup. `complete: true` means successful specialist
-execution with matching subscription usage and clean cleanup, not a clean PR.
-Partial/failed reviewers retain their output without discarding successful
-peers. Capture skips/declines/unconfirmed closed PRs have `coverage: "not-started"`
-and start no reviewer runtime. Errors and cancellation show incomplete coverage.
-No result cache, selection, publication, or safeguards exist.
+## Q4 boundaries to preserve
 
-## Implement Q4 only
+- Exact versioned JSON only: no fence stripping, fragment recovery or malformed
+  finding extraction. Wrong keys/binding/types and invalid evidence stay visible.
+- Candidate admission requires P0-P2 and numeric confidence 0.8-1. Every source
+  quote must match the delivered window exactly with path/side/lines/ref/blob
+  provenance. Primary locations span at most ten lines inside a hunk and
+  intersect an actual changed line.
+- Introduction compares the same hunk's before/after evidence. A null side is
+  allowed when that side has no actual removals/additions, even if unchanged
+  context lines remain. Do not regress to requiring a zero-length hunk.
+- Exact grounding is deterministic; causal/severity assessment is model-based
+  and fallible. The validator must explicitly report `allClaimsSupported: true`
+  before acceptance. A real core defect does not excuse a false detail or
+  overstated trigger; reject the whole candidate rather than accepting it
+  with a correction buried in the rationale. No finding editing is implemented.
+- Duplicates require an explicit same-cause/trigger/impact decision plus shared
+  changed-source evidence. Supporting citations may establish that shared cause
+  across different primary anchors/files. Sharing a location alone never merges
+  distinct issues. Original accepted reports and reviewer attribution survive.
 
-Validate evidence, severity/location/confidence, and deduplicate quick
-specialist candidates; demonstrate a real `--quick --no-comment` result with
-validated findings.
+## Implement P1 only
+
+Select validated findings with a minimal UI and `--all`; no GitHub writes or
+retained-result cache yet. The exact next increment is also in `ROADMAP.md`.
 
 Acceptance criteria:
 
-- Define a strict candidate/result boundary for Q3 output. Malformed,
-  incomplete, unsupported, or out-of-binding claims cannot silently become
-  findings or clean coverage. Do not introduce the dropped experimental
-  malformed-output extraction behavior.
-- Validate accepted candidates against the captured diff and Q2 evidence:
-  repository/head/path/side/lines, concrete impact, confidence/severity, and
-  whether the diff introduced the defect. Quick results contain substantiated
-  P0-P2 only. Model assertions are not independent validation.
-- Deduplicate reports of the same defect across specialists without merging
-  distinct issues merely because they share a file or location. Preserve the
-  human-readable severity, location, confidence, and review structure.
-- Preserve useful validated findings from degraded runs, with incomplete
-  coverage visible. Neither completed execution nor zero accepted candidates
-  justifies an unsupported clean-review claim.
-- Extend the existing Node.js/assert exercises for accepted/rejected candidates,
-  false positives/pre-existing claims, provenance, deduplication, malformed
-  output, and incomplete coverage. Record real installed-plugin PR inference
-  evidence separately from deterministic probes and assumptions.
+- `--all` selects every final validated/deduplicated finding, never raw/rejected
+  candidates. It does not authorize posting. Keep `--no-comment` required;
+  publication flags/authority remain P3.
+- Without `--all`, provide explicit subset/none/cancel selection. Consult the
+  installed SDK and demonstrate the chosen interface through the real installed
+  plugin. Unsupported host UI must be explicit, not a silent select-all.
+- Bind selections to the same invocation, session, repository, PR and reviewed
+  head. Reject invalid/unknown selections rather than silently choosing other
+  findings. Do not implement P2 caching/reload/resume to support this increment.
+- Preserve human-readable severity/location/confidence and visible degraded
+  coverage. Supported findings from incomplete runs remain selectable; skips,
+  empty results and cancellation do not imply clean coverage.
+- Preserve cancellation and no-timeout/cleanup guarantees through the selection
+  lifecycle. Selection must not rerun reviewers or perform any GitHub write.
+- Extend the existing Node.js/assert probes and record installed-plugin behavior
+  separately from controlled tests, model judgments and SDK declarations.
 
-Keep Q3 assignment, isolation, progress, cancellation, no-timeout, and cleanup
-guarantees. Do not implement selection, retained-result caching, publication,
-saved configuration, other modes, fallback, or safeguards. Do not switch
-branches, fetch/reset the checkout, or modify reviewed source. Respect
-`SCOPE.md`; keep L1 pending unless separately authorized and copy no upstream
-source.
+Do not implement publication, cached publish-later, configuration, other modes,
+fallbacks or safeguards. Respect `SCOPE.md`; keep L1 pending and copy no upstream
+source. Do not modify reviewed source or switch/fetch/reset the checkout.
 
-## Evidence and runtime caveats
+## Demonstrated behavior and runtime caveats
 
-- CLI 1.0.83 / bundled SDK / Node.js 26.1.0 / macOS arm64 is the demonstrated
-  environment, not a portability claim. Consult the installed SDK and current
-  official docs before choosing new runtime APIs.
-- Final controlled Q3 runs showed three-way overlap of 2006 ms (explicit) and
-  2445 ms (ambient alias). Live public `github/copilot-sdk#2543` showed 87406 ms
-  and 74162 ms, respectively, on the immutable Q2 target. Both normal completion
-  and cancellation have identified owned-process exit evidence. All pinned
-  identities, reviewer sessions, timings, and commands are in `ROADMAP.md`.
-- Pure Q3 exercises cover partial failures, wrong/missing usage, tool attempts,
-  setup/capture/cleanup failures, cancellation, and a late closed-PR
-  confirmation. The refactored F2 inference run passed with distinct models and
-  1970 ms overlap. The full native F3 adversarial/loss/SIGSTOP suite was not
-  rerun for Q3; do not claim it was.
-- Reviewer configuration discovery is disabled, initialized tool sets must be
-  empty, pre-tool hooks deny all invocation, and permissions are denied. F3's
-  native denial evidence hits the hook, not the permission callback. This is
-  capability isolation, not an OS sandbox or proof of prompt-injection immunity.
-- `/pr-review cancel` aborts local waiters and force-stops the owned runtime;
-  retain force-stop for unresponsive runtimes because abort RPCs can hang.
-  Disposed-connection abort errors after force-stop remain visible. Normal
-  completion uses `client.stop()`. SIGTERM/SIGINT/parent EOF stop owned work.
-  A lost parent cannot receive a completion report.
-- Quick capture passes an AbortSignal into `gh` and its confirmation waiter.
-  Cancelling a pending host dialog may leave that UI visible, but a late answer
-  cannot resume capture. Native UI cancellation was not demonstrated; the
-  cancellation/late-answer check is a pure controlled exercise.
-- No review timeouts or elapsed-time fallbacks. A single-in-flight connection
-  probe interrupts only on actual RPC failure. A connected hung reviewer waits
-  indefinitely until manual cancellation. Real Q3 inference took minutes.
-- Q2 provenance, hunk/blob checks, and GitHub path-to-blob trust remain as
-  recorded. Local checkout source is never evidence. No prompt-size budget,
-  context truncation strategy, capture retry, or rate-limit handling was added.
-  Inputs too large for the runtime/provider must remain visible failures.
-- `gh` must already be authenticated. Local stored authentication is
-  demonstrated; token-only environment forwarding is not. Remote sessions are
-  rejected; Enterprise and other operating systems remain unproven.
-- Context and results are invocation-local, not P2 caching. SDK transcripts may
-  persist; there is no plugin cross-command/cross-session archive.
-- Reinstall with an absolute path after extension edits and use a fresh runtime.
-  Do not use `copilot -p '/pr-review ...'` as command dispatch.
-- Pure commands: `node scripts/smoke-fixture.mjs`,
-  `node scripts/smoke-target.mjs`, `node scripts/smoke-context.mjs`, and
-  `node scripts/smoke-quick.mjs`.
-- Runtime `--targets` uses a child-only `gh` fixture; `--target-live` uses
-  pinned public GitHub evidence. Run them separately. Adding `--quick` spends
-  subscription credits and requires the two explicit heavy environment
-  settings documented in `README.md`. Without `--quick`, these variants remain
-  no-inference. Do not put `scripts/fixtures` in the normal PATH.
-- Runtime `--fixture` / `--f3` spend credits and use the four explicit F2
-  settings in `README.md`. Process probes identify only their own descendants.
-  A harness cleanup intervention is not successful plugin-cleanup evidence.
+- CLI 1.0.83, bundled SDK, Node.js 26.1.0, macOS arm64 is the demonstrated
+  environment, not a portability claim. Consult current official documentation
+  and installed SDK before choosing new runtime APIs.
+- Final Q4 native runs used explicitly configured `gpt-5.6-terra` / `high`,
+  not a product default or automatic fallback. Both explicit and ambient-alias
+  public `ptitSeb/box64#3902` runs accepted one P2 CPUID finding, confidence 0.99,
+  merging all three specialist reports. Both kept one missing-context coverage
+  issue visible. The precise revisions, fingerprints, sessions, timings, and
+  source/known-fix assessment are in `ROADMAP.md`.
+- Earlier real outputs included fenced JSON and partially correct claims.
+  These exposed fail-closed behavior and the need for the whole-claim guard.
+  Do not loosen gates just to make a native probe report completed coverage.
+- Final controlled arithmetic inference retained supported findings while
+  refusing an invalid reject-plus-duplicate decision and an overstated trigger.
+  Pure semantic judgments are mocks; native inference is separate evidence.
+- Normal completion and active-specialist/active-validator cancellation have
+  owned-PID exit evidence, empty cleanup errors and unchanged checkout evidence.
+  The complete native F3 adversarial/loss/SIGSTOP suite was not rerun for Q4.
+- Reviewer configuration discovery is disabled, tool sets are asserted empty,
+  hooks deny invocation, and permissions are denied. This is capability
+  isolation, not an OS sandbox or proof of prompt-injection immunity.
+- Force-stop is necessary for unresponsive runtimes because abort RPCs can hang.
+  Disposed-connection abort errors after force-stop remain visible. No elapsed
+  time triggers cancellation/fallback; connection probes react only to RPC failure.
+- Q1's native confirmation UI exists, but its late-answer cancellation guard
+  was demonstrated by controlled tests, not native UI cancellation. A pending
+  host dialog can outlive a cancelled local waiter. P1 must handle late answers.
+- Context windows and provider/input-size limits remain as recorded in Q2.
+  There is no prompt truncation, automatic capture retry or rate-limit handling.
+  Missing evidence is not replaced by local checkout evidence.
+- Local stored `gh` authentication is demonstrated; token-only forwarding,
+  Enterprise, other operating systems and remote sessions remain unproven or
+  rejected. SDK transcripts may persist, but there is no plugin archive/cache.
+- Reinstall with `copilot plugin install "$(pwd)"` after extension edits and
+  use a fresh runtime. Do not use `copilot -p '/pr-review ...'` as command dispatch.
+- Pure probes: `node scripts/smoke-fixture.mjs`, `node scripts/smoke-target.mjs`,
+  `node scripts/smoke-context.mjs`, `node scripts/smoke-quick.mjs`, and
+  `node scripts/smoke-findings.mjs`.
+- Runtime `--targets` uses child-only controlled `gh` responses; quick target 12
+  is the original multiplication regression. `--regression-live` uses pinned
+  public `ptitSeb/box64#3902`; `--target-live` retains the older SDK workflow
+  target. Run variants separately. Adding `--quick` spends subscription credits
+  and uses the explicit environment settings in `README.md`/`ROADMAP.md`.
+  Without `--quick`, target variants are no-inference. Do not put fixture `gh`
+  in the normal PATH. A harness kill is not successful plugin-cleanup evidence.
 
 ## Commit and hand off
 
-Follow `AGENTS.md`: validate coherent progress, inspect diffs, update
-`ROADMAP.md` with evidence, limitations, reproduction, and the exact next
-increment, then commit relevant checkpoints. Preserve unrelated work.
-Do not amend, rewrite history, or push.
+Follow `AGENTS.md`: inspect diffs, validate coherent progress, update
+`ROADMAP.md` with evidence, limitations, reproduction and the exact next
+increment, and commit relevant checkpoints. Preserve unrelated changes.
+Do not amend, rewrite history or push.
 
-After implementation, validation, and all other documentation updates, replace
+After implementation, validation and every other documentation update, replace
 `HANDOFF.md` with the next agent's ready-to-use prompt as the final repository
 file edit before the session-ending commit. Include it in that commit. Carry
-these rules forward, reference an existing checkpoint rather than the commit
-being written, and identify remaining uncommitted work honestly. Report the
-commit outcome and point to `HANDOFF.md` without duplicating its prompt.
+these rules forward, reference an existing checkpoint rather than that future
+commit, and identify uncommitted work honestly. Report the commit outcome and
+point to `HANDOFF.md` without duplicating its prompt.

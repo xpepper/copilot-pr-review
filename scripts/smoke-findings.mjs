@@ -44,7 +44,7 @@ const reviewer = (candidates = [candidate], changes = {}) => ({
   result: JSON.stringify({ schemaVersion: 1, reviewKey: key, candidates, limitations: [] }), ...changes,
 });
 const decision = (id = "correctness:1", changes = {}) => ({
-  candidateId: id, verdict: "accept",
+  candidateId: id, verdict: "accept", allClaimsSupported: true,
   reason: "The unchanged contract requires multiplication; 100 * 3 was 300, while the changed expression yields 103.",
   evidence: [citation("head", 1), citation("base"), citation("head")], duplicateOf: null, ...changes,
 });
@@ -57,6 +57,7 @@ assert.equal(collected.issues.length, 0);
 const result = adjudicateCandidates(collected, validator(), boundary);
 assert.equal(result.complete, true);
 assert.equal(result.findings.length, 1);
+assert.equal(result.findings[0].validation.allClaimsSupported, true);
 assert.equal(result.findings[0].location.ref, binding.head);
 assert.equal(result.findings[0].before.blobSha, blobSha(baseText));
 assert.match(formatFindings({ validation: result, complete: true }), /\[P2\].*Multiply/);
@@ -97,14 +98,14 @@ for (const reason of [
   "Pre-existing: the cited edge case already fails on the captured base; the changed operator is irrelevant.",
 ]) {
   const rejected = adjudicateCandidates(collected, validator([decision(undefined, {
-    verdict: "reject", reason, evidence: [],
+    verdict: "reject", reason, evidence: [], allClaimsSupported: false,
   })]), boundary);
   assert.equal(rejected.findings.length, 0);
   assert.equal(rejected.rejected[0].reason, reason);
   assert.equal(rejected.complete, true, "A resolved false positive is not a validation failure");
 }
 const uncertain = adjudicateCandidates(collected, validator([decision(undefined, {
-  verdict: "uncertain", reason: "The claimed caller is absent from supplied context.", evidence: [],
+  verdict: "uncertain", reason: "The claimed caller is absent from supplied context.", evidence: [], allClaimsSupported: false,
 })]), boundary);
 assert.equal(uncertain.complete, false);
 assert.equal(uncertain.findings.length, 0);
@@ -137,11 +138,21 @@ for (const changes of [
   { evidence: [] }, { evidence: [{ ...citation("head"), quote: "invented" }] },
   { duplicateOf: "not-a-candidate" }, { verdict: "APPROVE" },
   { extra: true }, { reason: "" }, { duplicateOf: "correctness:1" },
+  { allClaimsSupported: false, reason: "The main defect exists but the candidate also asserts a false effect." },
+  { allClaimsSupported: "true" },
+  { allClaimsSupported: undefined },
 ]) {
   const invalid = adjudicateCandidates(collected, validator([decision(undefined, changes)]), boundary);
   assert.equal(invalid.findings.length, 0);
   assert.equal(invalid.complete, false);
 }
+const partlyTrue = adjudicateCandidates(peers, validator([
+  decision(undefined, { allClaimsSupported: false, reason: "Only the core claim is true, not all its stated effects." }),
+  decision("contracts:1"), decision("security-performance-resources:1", { verdict: "reject", allClaimsSupported: false }),
+]), boundary);
+assert.equal(partlyTrue.findings.length, 1, "Keep the fully supported peer, not the partially true report");
+assert.equal(partlyTrue.findings[0].id, "contracts:1");
+assert.equal(partlyTrue.complete, false, "Contradictory acceptance is not completed validation");
 for (const decisions of [[], [decision(), decision()], [decision("wrong-id")]]) {
   assert.equal(adjudicateCandidates(collected, validator(decisions), boundary).complete, false);
 }

@@ -112,7 +112,7 @@ function harness({ failure, controller = new AbortController(), withCandidate = 
             this.emit("assistant.message", { content: failure === "validator-malformed" ? "{}" : JSON.stringify({
               schemaVersion: 1, reviewKey: input.reviewKey, limitations: [],
               decisions: input.candidates.map((candidate) => ({
-                candidateId: candidate.id, verdict: "reject",
+                candidateId: candidate.id, verdict: "reject", allClaimsSupported: false,
                 reason: "No source contract says the exported value must remain 1; an intentional value update is not a defect.",
                 evidence: [], duplicateOf: null,
               })),

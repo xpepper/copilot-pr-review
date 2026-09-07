@@ -186,6 +186,12 @@ severity/confidence, and causal impact. Acceptance requires a reason and
 source citations that code checks again. A failed, malformed, incomplete, or
 wrong-usage validator cannot authorize findings.
 
+Acceptance also requires an explicit `allClaimsSupported: true` assessment.
+A partly correct candidate must be rejected if any assertion is false or
+overstated: a correction in the validator's rationale does not repair the
+original finding text. This is an enforced decision boundary, not a guarantee
+that the model's assessment is infallible.
+
 **Exact source checks are deterministic; causal and severity adjudication is
 model-based and fallible.** A matching quotation alone is not proof of a defect,
 and a second model's agreement is not an executable reproduction. No PR code is
