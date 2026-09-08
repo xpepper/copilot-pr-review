@@ -203,10 +203,40 @@ code.
 The read grant is per reviewer session and confined by a permission handler that
 resolves real paths and denies anything outside the verified checkout root; a
 pre-tool-use hook denies every other tool, and no other tool is even offered.
+Paths are resolved with the operating system resolver, so the path the handler
+approves is the file the read tool then opens. Node's own `fs.realpathSync`
+collapses `..` textually before it resolves symlinks, which let a checkout
+containing a symlink to a directory, plus a decoy of the same relative name
+inside the root, have a read approved for one path and performed on another
+outside it. The checkout is the pull request head, so a pull request could
+supply both halves.
 The Q4 adjudicator keeps zero tools and decides only on captured evidence, so
 every published citation still resolves against the captured revision. Branch
 switching, source writes, GitHub mutations, and safeguards remain unavailable to
 reviewers. Publication is a separate code-controlled step.
+
+### An absent path is refused as absent (Q7)
+
+A reviewer that asks for a path which does not exist inside the checkout is
+still refused, and still reads nothing, but it is now told which refusal it
+got. It used to receive the same silent rejection as an attempt to read outside
+the checkout, so a reviewer that guessed at a plausible module name could not
+tell that the file was simply absent, and had no reason to look for the right
+path. The refusal names the requested path relative to the root and points at
+`glob` and `grep`.
+
+That reason is given only for a request that would have been inside the root
+had it existed: an absolute path lexically under the root whose nearest
+existing ancestor still resolves inside it. Everything else keeps exactly the
+refusal it had before, message included, because telling a reviewer that a path
+outside the root does not exist would report on the host filesystem, which is
+what confinement is for. A path that only looks contained, and one that reaches
+outside through a symlink in the checkout, are both refused as escapes. The
+run's evidence records the two apart; the retained record does not carry read
+denials, so its schema is unchanged.
+
+This is a message change, not a confinement change: no reviewer gains a read it
+did not have.
 
 One authorized live quick review demonstrated all three read tools being used
 on unchanged source, with no read denials. It removed the earlier missing-source
@@ -1312,8 +1342,10 @@ The Q4 adjudicator and every fixture reviewer session assert an empty
 initialized tool set and deny all permission requests. PR reviewers offer
 only `builtin:view`, `builtin:grep`, and `builtin:glob`; their hook denies every
 other tool, and their permission handler rejects reads whose real path escapes
-the verified checkout root, so the handler — not a model promise — is the
-confinement point. Actual hook denials, native exclusion of unoffered tools,
+the verified checkout root, resolved as the operating system resolves it, so the
+handler — not a model promise — is the confinement point. A read refused because
+the path does not exist inside the checkout says so, and every other refusal is
+unchanged. Actual hook denials, native exclusion of unoffered tools,
 out-of-root read rejection, explicit failure handling, cancellation (including a
 suspended runtime), extension reload, and abrupt runtime/extension/parent loss
 have been demonstrated on the recorded CLI/macOS environment.
