@@ -314,30 +314,37 @@ read-only reviewer tools, incomplete-coverage reporting, selection, retention,
 publication gates and cancellation. Mode flags remain mutually exclusive, and
 balanced remains the default.
 
-**Known defect: pick your medium model carefully.** Full mode was demonstrated by
+**Wrapped reviewer output, and how it is handled.** Full mode was demonstrated by
 the live review of this project's own pull request #5, which ran all three tiers
 on distinct models for the first time: four heavy specialists on `gpt-5.6-terra`,
 the light overview reviewer on `gpt-5.6-luna`, and the conventions reviewer on
 `claude-sonnet-5`. That run made 95 confined reads with no denials and cost
 276.266849 reported AI credits. It also found that `claude-sonnet-5` wraps its
-candidate JSON in a ```` ```json ```` fence, and the parser performs no fence
-stripping by design, so the conventions reviewer's whole output was discarded as
-an execution failure. Until that is resolved, a Claude-family medium model spends
-a sixth reviewer's credits and contributes nothing. Prefer a GPT-family medium
-model.
-
-The strictness is not specific to fences or to one model family: any wrapper
-around the envelope discards the whole output. The review of pull request #6
+candidate JSON in a ```` ```json ```` fence, so the conventions reviewer's whole
+output was discarded as an execution failure. The review of pull request #6 then
 discarded a `gpt-5.6-terra` specialist that emitted a sentence of prose before
-its JSON, the same way. `F5` investigated whether the runtime could return
-parsed structured output instead and found it unusable on Copilot CLI 1.0.83;
-the evidence and the open decision are in [ROADMAP.md](ROADMAP.md).
+its JSON, the same way, so this was never specific to one model family.
+
+`F6` addresses both. Reviewers and the adjudicator are asked to put the JSON
+object between the markers `<<<PR_REVIEW_JSON>>>` and `<<<END_PR_REVIEW_JSON>>>`,
+the technique the CLI runtime's own structured output uses, and code then unwraps
+exactly that delimiter pair, plus one fence that wraps the whole response. Prose
+outside the markers is discarded unread instead of discarding the review.
+
+Nothing else is recovered. A repeated or missing marker, a fence with prose after
+it, two fenced blocks, a truncated object, and a bare object preceded by prose
+with no markers each still discard the whole output, and every check after the
+parse is unchanged. `F5` investigated whether the runtime could return parsed
+structured output instead and found it unusable on Copilot CLI 1.0.83; that
+evidence, this increment's boundary, and the exact list of what still fails whole
+are in [ROADMAP.md](ROADMAP.md).
 
 ### Grounded findings and deduplication (Q4)
 
 No extra flag is required. After the selected mode's specialists finish, code
-rejects malformed output rather than extracting fragments or removing markdown
-fences. Candidates must echo a digest of the code-owned review binding and use
+unwraps the marker pair described above, and one fence that wraps the whole
+response, then rejects anything else malformed rather than extracting fragments
+from it. Candidates must echo a digest of the code-owned review binding and use
 exactly the defined schema. Candidates must carry numeric confidence **0.8
 through 1** and a severity the mode's findings policy admits: P0-P2 for quick,
 P0-P2 plus P3/nit for balanced and full. This is a conservative admission

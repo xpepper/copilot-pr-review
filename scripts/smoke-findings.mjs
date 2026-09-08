@@ -3,7 +3,8 @@ import { createHash } from "node:crypto";
 import { assembleContext } from "../extensions/pr-review/context.mjs";
 import { reviewBinding } from "../extensions/pr-review/review.mjs";
 import {
-  adjudicateCandidates, collectCandidates, evidenceBoundary, formatFindings, reviewKey,
+  adjudicateCandidates, candidateFormat, collectCandidates, evidenceBoundary, formatFindings,
+  outputEnd, outputStart, reviewKey, validationInstructions,
 } from "../extensions/pr-review/findings.mjs";
 import { formatCoverage, presentationDiagnostics } from "../extensions/pr-review/coverage.mjs";
 import { reviewModes } from "../extensions/pr-review/modes.mjs";
@@ -443,6 +444,71 @@ const fullReport = { mode: "full", validation: fullResult, complete: true };
 assert.match(formatFindings(fullReport), /^Full review: 4 validated finding\(s\)/);
 assert(!formatFindings(fullReport).includes("withheld"), "Full reports no withheld minor finding");
 console.log("PASS the full findings policy admits every minor severity, caps nothing and withholds nothing");
+// F6: reviewers are asked for the envelope between two explicit markers, and
+// code unwraps exactly that delimiter pair, plus one fence that wraps the whole
+// response. Nothing else is recovered: prose without markers, an unmatched or
+// repeated marker, two fenced blocks and a truncated object all fail whole, and
+// every gate after the parse is untouched.
+const envelopeText = (candidates = [candidate]) =>
+  JSON.stringify({ schemaVersion: 2, reviewKey: key, candidates, limitations: [] });
+const decisionsText = (decisions = [decision()]) =>
+  JSON.stringify({ schemaVersion: 2, reviewKey: key, decisions, limitations: [] });
+const delimit = (body) => `${outputStart}\n${body}\n${outputEnd}`;
+for (const format of [
+  candidateFormat(policy), validationInstructions(policy),
+]) {
+  assert(format.includes(outputStart) && format.includes(outputEnd),
+    "Both output contracts name the exact markers reviewers must emit");
+  assert.match(format, /raw JSON|no fences/i, "The contract still forbids a wrapper inside the markers");
+}
+for (const raw of [
+  delimit(envelopeText()),
+  `I'll trace the changed expression first.\n${delimit(envelopeText())}\nThat is my whole assessment.`,
+  delimit("```json\n" + envelopeText() + "\n```"),
+  "```json\n" + envelopeText() + "\n```",
+  "```\n" + envelopeText() + "\n```",
+  `  ${delimit(envelopeText())}  `,
+  envelopeText(),
+]) {
+  const unwrapped = collectCandidates([reviewer([], { result: raw })], boundary, policy);
+  assert.deepEqual(unwrapped.diagnostics, [], `Unwrap the delimited envelope: ${raw.slice(0, 40)}`);
+  assert.equal(unwrapped.candidates.length, 1);
+  assert.equal(adjudicateCandidates(unwrapped, validator(), boundary, policy).findings.length, 1);
+}
+for (const raw of [
+  `I'll trace the changed expression first.\n${envelopeText()}`,
+  "```json\n" + envelopeText() + "\n```\n```json\n" + envelopeText() + "\n```",
+  `${outputStart}\n${envelopeText()}`,
+  `${outputEnd}\n${envelopeText()}\n${outputStart}`,
+  `${delimit(envelopeText())}\n${delimit(envelopeText())}`,
+  delimit(envelopeText().slice(0, -1)),
+  delimit(""),
+  "```json\n" + envelopeText() + "\n```\nThat is my whole assessment.",
+  "`" + envelopeText() + "`",
+]) {
+  const rejected = collectCandidates([reviewer([], { result: raw })], boundary, policy);
+  assert.equal(rejected.candidates.length, 0, `Fail whole rather than search for JSON: ${raw.slice(0, 40)}`);
+  assert.match(rejected.diagnostics[0].message, /invalid candidate output/);
+  assert.equal(adjudicateCandidates(rejected, undefined, boundary, policy).complete, false);
+}
+// The unwrap feeds the same parser: a delimited envelope that fails any gate
+// after the parse is rejected exactly as an undelimited one is.
+for (const body of [
+  JSON.stringify({ schemaVersion: 2, reviewKey: "wrong", candidates: [], limitations: [] }),
+  JSON.stringify({ schemaVersion: 2, reviewKey: key, candidates: [], limitations: [], clean: true }),
+  "null",
+]) {
+  const gated = collectCandidates([reviewer([], { result: delimit(body) })], boundary, policy);
+  assert.equal(gated.candidates.length, 0, "The evidence boundary is unchanged by the unwrap");
+  assert.equal(adjudicateCandidates(gated, undefined, boundary, policy).complete, false);
+}
+// The adjudicator's output travels the same path.
+const delimitedAdjudication = adjudicateCandidates(
+  collectCandidates([reviewer()], boundary, policy),
+  validator(undefined, { result: delimit("```json\n" + decisionsText() + "\n```") }), boundary, policy);
+assert.equal(delimitedAdjudication.findings.length, 1, "Unwrap the adjudicator's envelope the same way");
+assert.equal(delimitedAdjudication.complete, true);
+console.log("PASS the delimited output contract, its deterministic unwrap, and fail-whole for everything else");
 console.log("PASS strict candidates, exact provenance/changed lines, confidence/severity, and fail-closed malformed output");
 console.log("PASS mocked semantic rejection/uncertainty, explicit same-defect deduplication, distinct same-line issues and degraded retention");
 console.log("PASS renamed/added/deleted files, insertion/deletion context, and shared-cause cross-file deduplication");

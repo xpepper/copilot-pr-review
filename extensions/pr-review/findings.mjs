@@ -31,8 +31,22 @@ function severityGuide(policy) {
   return "P0 is unconditional widespread critical failure; P1 is high impact; P2 is normal actionable impact. " + minor;
 }
 
+// Reviewers are asked for the envelope between two explicit markers, the
+// technique the CLI runtime's own structured output uses. Code then unwraps
+// exactly that: a known, exactly delimited wrapper is removed and the payload is
+// parsed as strictly as before.
+export const outputStart = "<<<PR_REVIEW_JSON>>>";
+export const outputEnd = "<<<END_PR_REVIEW_JSON>>>";
+
+const delimitedFormat = [
+  `Put the JSON object between the markers ${outputStart} and ${outputEnd}, each alone on its own line.`,
+  "Between the markers emit raw JSON only: no code fences, no comments, no prose, and nothing after the object.",
+  "Emit each marker exactly once. Text outside them is discarded unread, and a repeated or missing marker discards your whole output.",
+].join("\n");
+
 export const candidateFormat = (policy) => [
-  'Return ONLY a JSON object, without markdown fences: {"schemaVersion":2,"reviewKey":"<supplied key>",',
+  delimitedFormat,
+  'The object is: {"schemaVersion":2,"reviewKey":"<supplied key>",',
   `"candidates":[{"title":"concise defect","severity":"${policy.severities.join("|")}","confidence":0.9,`,
   '"location":CITATION,"trigger":"concrete reachable condition","expected":"required behavior",',
   '"actual":"failing behavior and impact","introduction":"why this diff newly causes that failure",',
@@ -70,7 +84,8 @@ export const validationInstructions = (policy) => [
   severityGuide(policy),
   "Only mark a duplicate when root cause, triggering condition, and resulting failure are the SAME defect.",
   "Sharing a location or fix is not enough. Distinct defects at the same line must remain separate.",
-  "Return ONLY JSON, no fences, no extra fields:",
+  delimitedFormat,
+  "No extra fields. The object is:",
   '{"schemaVersion":2,"reviewKey":"<supplied key>","decisions":[{"candidateId":"<supplied id>",',
   '"verdict":"accept|reject|uncertain","reason":"source-grounded explanation or missing evidence",',
   '"allClaimsSupported":true,"evidence":[CITATION],"duplicateOf":null}],"limitations":[]}.',
@@ -94,9 +109,33 @@ function text(value, label) {
   if (typeof value !== "string" || !value.trim()) throw new Error(`${label}: expected nonempty text.`);
 }
 
+// The delimited payload, when the response carries the contract's marker pair
+// exactly once in order. Everything else is returned unchanged.
+function delimited(raw) {
+  if (raw.split(outputStart).length !== 2 || raw.split(outputEnd).length !== 2) return raw;
+  const start = raw.indexOf(outputStart) + outputStart.length;
+  const end = raw.indexOf(outputEnd);
+  return end < start ? raw : raw.slice(start, end);
+}
+
+// One opening fence and its matching closing fence, only when the pair wraps the
+// entire text and the opening fence carries at most a bare language label. A
+// second fence inside is not one wrapper, so it is left alone.
+function unfenced(raw) {
+  const trimmed = raw.trim();
+  if (!trimmed.startsWith("```") || !trimmed.endsWith("```")) return raw;
+  const label = trimmed.indexOf("\n");
+  if (label < 0 || /[\s`]/.test(trimmed.slice(3, label).trim())) return raw;
+  const body = trimmed.slice(label + 1, -3);
+  return body.includes("```") ? raw : body;
+}
+
 function envelope(raw, key, field) {
-  // Deliberately no fence stripping, substring recovery, or malformed-output extraction.
-  const parsed = JSON.parse(raw);
+  // Removing those two known wrappers is the whole tolerance. No prose stripping,
+  // substring recovery, brace matching, repair or malformed-output extraction:
+  // anything else is parsed unchanged and fails whole, and every check below is
+  // applied to the unwrapped payload exactly as it was to a bare response.
+  const parsed = JSON.parse(typeof raw === "string" ? unfenced(delimited(raw)) : raw);
   object(parsed, ["schemaVersion", "reviewKey", field, "limitations"], "Review output");
   if (![1, 2].includes(parsed.schemaVersion) || parsed.reviewKey !== key) throw new Error("Wrong schema version or review binding.");
   if (!Array.isArray(parsed[field]) || !Array.isArray(parsed.limitations)) throw new Error("Expected result arrays.");
