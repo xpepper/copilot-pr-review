@@ -208,19 +208,22 @@ const noEffortSource = "model";
 // Origins nobody chose. A review resolves and validates them again for itself,
 // so a configuration update is not refused on their account.
 const implicitSources = ["ambient", "unset", noEffortSource];
-// Origins that hand this tier an effort chosen somewhere else: the session, a
-// neighbouring tier, or the tier a fallback belongs to. Only those are dropped.
-// An effort set for this tier is explicit, and an explicit setting is refused by
-// validation rather than silently dropped, substituted or lowered.
-const inheritedEffort = (source) =>
-  ["ambient", "primary", "inherited", "project-inherited"].includes(source.split(":")[0]);
+// An effort chosen for this tier itself: by an invocation flag, by personal
+// settings, or by a trusted project's file. Those are explicit, and an explicit
+// setting is refused by validation rather than dropped, substituted or lowered.
+// Every other origin holds an effort chosen elsewhere or none at all, and the
+// resolved model may answer for it instead.
+const chosenForThisTier = (source) => ["flag", "configured", "project"].includes(source.split(":")[0]);
 
 // A model that advertises no configurable reasoning effort cannot hold one, so a
 // tier resolving to such a model resolves to no effort rather than to the effort
 // a neighbouring tier, a trusted project or the ambient session would supply.
 // Without this a model like claude-haiku-4.5 could not serve a tier at all.
+// The origin is the model whenever the model is the reason, including when no
+// layer offered an effort to drop: otherwise one session would report
+// (not configurable) [model] and another (unset) [unset] for the same model.
 function effortForModel(model, reasoningEffort, models) {
-  if (reasoningEffort.value === undefined || !inheritedEffort(reasoningEffort.source)) return reasoningEffort;
+  if (chosenForThisTier(reasoningEffort.source)) return reasoningEffort;
   return advertisesNoReasoningEffort(model, models) ? { value: undefined, source: noEffortSource } : reasoningEffort;
 }
 
