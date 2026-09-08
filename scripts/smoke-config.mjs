@@ -134,7 +134,7 @@ console.log("PASS configuration argument parsing, unknown keys, malformed assign
 // --- inheritance and precedence --------------------------------------------
 {
   const ambient = { model: "heavy", reasoningEffort: "high" };
-  const resolve = (settings, tier, flags) => resolveTier(tier, { settings, ambient, flags });
+  const resolve = (settings, tier, flags) => resolveTier(tier, { settings, ambient, flags, models: catalog });
   assert.deepEqual(resolve({}, "heavy").model, { value: "heavy", source: "ambient" });
   assert.deepEqual(resolve({}, "light").reasoningEffort, { value: "high", source: "ambient" });
   assert.deepEqual(resolve({ heavyModel: "other" }, "heavy").model, { value: "other", source: "configured:heavy" });
@@ -150,16 +150,63 @@ console.log("PASS configuration argument parsing, unknown keys, malformed assign
     "Model and effort inherit independently");
   assert.deepEqual(resolve({ heavyModel: "other" }, "heavy", { heavyModel: "heavy" }).model,
     { value: "heavy", source: "flag" }, "Invocation flags win over saved settings");
-  assert.deepEqual(resolveTier("heavy", { settings: {}, ambient: {} }),
+  assert.deepEqual(resolveTier("heavy", { settings: {}, ambient: {}, models: catalog }),
     { tier: "heavy", model: { value: undefined, source: "unset" }, reasoningEffort: { value: undefined, source: "unset" } });
-  assert.throws(() => resolveTier("giant", {}), /unknown model tier/);
+  assert.throws(() => resolveTier("giant", { models: catalog }), /unknown model tier/);
+  assert.throws(() => resolveTier("heavy", { settings: {}, ambient }), /model catalog/,
+    "Resolving a tier needs the catalog that says whether its model takes a configurable effort");
+
+  // C4: a model advertising no configurable reasoning effort resolves to none
+  // rather than inheriting one it cannot hold, so such a model can serve a tier.
+  assert.deepEqual(resolve({ heavyModel: "plain" }, "heavy"), {
+    tier: "heavy",
+    model: { value: "plain", source: "configured:heavy" },
+    reasoningEffort: { value: undefined, source: "model" },
+  }, "An ambient effort is not inherited by a model that advertises none");
+  assert.deepEqual(resolve({ heavyModel: "plain", lightEffort: "low" }, "heavy").reasoningEffort,
+    { value: undefined, source: "model" }, "Nor is one inherited from another tier");
+  assert.deepEqual(resolveTier("heavy", {
+    settings: { heavyModel: "plain", lightEffort: "low" }, origins: { lightEffort: "project" }, ambient, models: catalog,
+  }).reasoningEffort, { value: undefined, source: "model" }, "Nor is one a trusted project set on another tier");
+  assert.deepEqual(resolveTier("heavy", { settings: {}, ambient: { model: "plain", reasoningEffort: "high" }, models: catalog }),
+    { tier: "heavy", model: { value: "plain", source: "ambient" }, reasoningEffort: { value: undefined, source: "model" } },
+    "An entirely ambient tier drops the effort too");
+  // The origin reports the model whenever the model is the reason, including
+  // when no layer offered an effort to drop in the first place. Otherwise the
+  // same tier would report (unset) [unset] or (unset) [ambient] on one session
+  // and (not configurable) [model] on another, for the same resolved model.
+  assert.deepEqual(resolveTier("heavy", { settings: {}, ambient: { model: "plain" }, models: catalog }).reasoningEffort,
+    { value: undefined, source: "model" }, "An ambient session with no effort of its own still reports the model");
+  assert.deepEqual(resolveTier("heavy", { settings: { heavyModel: "plain" }, ambient: {}, models: catalog }).reasoningEffort,
+    { value: undefined, source: "model" }, "So does a configured model with nothing to inherit from");
+  assert.deepEqual(resolveTier("heavy", { settings: {}, ambient: {}, models: catalog }).reasoningEffort,
+    { value: undefined, source: "unset" }, "An unresolved model reports nothing about efforts");
+  // An effort set for this tier is explicit: it stays, and validation refuses it
+  // below rather than silently dropping or lowering it.
+  assert.deepEqual(resolve({ heavyModel: "plain", heavyEffort: "low" }, "heavy").reasoningEffort,
+    { value: "low", source: "configured:heavy" }, "An explicitly configured effort is never dropped");
+  assert.deepEqual(resolve({ heavyModel: "plain" }, "heavy", { heavyEffort: "low" }).reasoningEffort,
+    { value: "low", source: "flag" }, "Nor is one an invocation flag sets");
+  // A model that does advertise efforts still inherits one, and is still refused
+  // when the inherited value is not one it supports.
+  assert.deepEqual(resolve({ heavyModel: "other" }, "heavy").reasoningEffort,
+    { value: "high", source: "ambient" }, "A capable model still inherits an effort it cannot support");
+  assert.deepEqual(resolve({ heavyModel: "missing" }, "heavy").reasoningEffort,
+    { value: "high", source: "ambient" }, "A model the catalog does not offer is refused on the model, not the effort");
 
   validateConfiguredTiers({}, { model: "auto" }, catalog);
   validateConfiguredTiers({ heavyModel: "heavy", heavyEffort: "high" }, ambient, catalog);
+  // C4: a model with no configurable effort serves its own tier and every tier
+  // that inherits it, because none of them inherits an effort onto it.
+  validateConfiguredTiers({ heavyModel: "plain" }, ambient, catalog);
+  validateConfiguredTiers({ lightModel: "plain" }, ambient, catalog);
   for (const settings of [
     { heavyModel: "missing" }, { heavyModel: "disabled" }, { heavyModel: "auto" },
     { heavyModel: "provider/model" }, { heavyEffort: "max" }, { heavyModel: "other" },
-    { heavyModel: "plain", heavyEffort: "low" }, { lightModel: "other" },
+    // An effort explicitly set for the tier is validated against the model the
+    // tier resolves to, whether that model was configured here or inherited.
+    { heavyModel: "plain", heavyEffort: "low" }, { lightModel: "plain", heavyEffort: "low" },
+    { lightModel: "other" },
   ]) assert.throws(() => validateConfiguredTiers(settings, ambient, catalog), /Refused .*-tier configuration/, JSON.stringify(settings));
   validateConfiguredTiers({ heavyModel: "other", heavyEffort: "low" }, ambient, catalog);
   console.log("PASS nearest-tier and ambient inheritance, flag precedence, and refusal without substitution");
@@ -169,7 +216,8 @@ console.log("PASS configuration argument parsing, unknown keys, malformed assign
 {
   const ambient = { model: "heavy", reasoningEffort: "high" };
   const fallbackOf = (settings, tier, flags, origins) =>
-    resolveFallback(resolveTier(tier, { settings, origins, ambient, flags }), { settings, origins });
+    resolveFallback(resolveTier(tier, { settings, origins, ambient, flags, models: catalog }),
+      { settings, origins, models: catalog });
   // Fallbacks are optional and start unset: nothing else configures one.
   assert.equal(fallbackOf({}, "heavy"), undefined, "Fallbacks start unset");
   assert.equal(fallbackOf({ heavyModel: "heavy", heavyEffort: "high" }, "heavy"), undefined,
@@ -199,27 +247,78 @@ console.log("PASS configuration argument parsing, unknown keys, malformed assign
     true, "An invocation flag can make a configured fallback identical to the primary");
   // An effort with no model configures no fallback at all, and is never treated
   // as one; storing that pair is refused below.
+  // C4: the tier's own effort does not carry over to a fallback model that
+  // advertises none, so such a model can be a fallback at all.
+  assert.deepEqual(fallbackOf({ heavyFallbackModel: "plain" }, "heavy"), {
+    tier: "heavy", identical: false,
+    model: { value: "plain", source: "configured:heavy" },
+    reasoningEffort: { value: undefined, source: "model" },
+  }, "The tier's own effort is not carried over to a fallback model that has none");
+  assert.deepEqual(fallbackOf({ heavyFallbackModel: "plain", heavyFallbackEffort: "low" }, "heavy").reasoningEffort,
+    { value: "low", source: "configured:heavy" }, "An explicit fallback effort is never dropped");
+  assert.equal(fallbackOf({ heavyModel: "plain", heavyFallbackModel: "plain" }, "heavy").identical, true,
+    "A fallback on the same effortless model as its tier is still not offered");
+  assert.deepEqual(fallbackOf({ heavyModel: "plain", heavyFallbackModel: "other", heavyFallbackEffort: "low" }, "heavy")
+    .reasoningEffort, { value: "low", source: "configured:heavy" });
+  assert.deepEqual(fallbackOf({ heavyModel: "other", heavyEffort: "low", heavyFallbackModel: "plain" }, "heavy")
+    .reasoningEffort, { value: undefined, source: "model" });
+  // A tier that already has no effort passes none to its fallback, and the
+  // fallback still names the model rather than the tier it took nothing from.
+  assert.deepEqual(fallbackOf({ heavyModel: "plain", heavyFallbackModel: "plain" }, "heavy").reasoningEffort,
+    { value: undefined, source: "model" }, "An empty primary effort does not leave the fallback reporting [primary]");
+  assert.throws(() => resolveFallback(resolveTier("heavy", { settings: {}, ambient, models: catalog }),
+    { settings: { heavyFallbackModel: "plain" } }), /model catalog/,
+  "Resolving a fallback needs the catalog too");
   assert.equal(fallbackOf({ heavyFallbackEffort: "low" }, "heavy"), undefined);
   assert.deepEqual(orphanFallbackEfforts({ heavyFallbackEffort: "low", lightFallbackEffort: "low" }), ["light", "heavy"]);
   assert.deepEqual(orphanFallbackEfforts({ heavyFallbackEffort: "low", heavyFallbackModel: "other" }), []);
 
   validateConfiguredTiers({ heavyFallbackModel: "other", heavyFallbackEffort: "low" }, ambient, catalog);
   validateConfiguredTiers({ heavyModel: "other", heavyEffort: "low", heavyFallbackModel: "heavy" }, ambient, catalog);
+  // C4 on the second surface: a fallback model advertising no configurable
+  // effort no longer inherits the tier's own effort, so it is usable.
+  validateConfiguredTiers({ heavyFallbackModel: "plain" }, ambient, catalog);
   for (const settings of [
     { heavyFallbackModel: "missing" }, { heavyFallbackModel: "disabled" }, { heavyFallbackModel: "auto" },
     { heavyFallbackModel: "provider/model" }, { heavyFallbackModel: "other", heavyFallbackEffort: "max" },
     // "other" supports only low, so the tier's own high effort cannot carry over
     // to it; that is refused rather than quietly lowered.
     { heavyFallbackModel: "other" },
-    // "plain" advertises no configurable effort at all, so it cannot serve a
-    // tier that has one. C4 is the increment that lets such a model qualify.
-    { heavyFallbackModel: "plain" },
+    // An explicit fallback effort is still validated against the fallback model,
+    // and "plain" advertises none, so this pair is still refused rather than
+    // quietly dropped.
+    { heavyFallbackModel: "plain", heavyFallbackEffort: "low" },
     { heavyFallbackEffort: "low" },
     // Every tier validates its own fallback, not just the heavy one.
     { lightFallbackModel: "plain", lightFallbackEffort: "low" },
   ]) assert.throws(() => validateConfiguredTiers(settings, ambient, catalog),
     /Refused .*-tier fallback configuration/, JSON.stringify(settings));
   console.log("PASS optional fallbacks: explicit only, no cross-tier inheritance, and refusal without substitution");
+}
+
+// --- a model with no configurable effort is visible as such -----------------
+{
+  const h = harness({ home: "home-c4", work: "c4" });
+  const store = await configurationStore(h.parent);
+  store.write({ heavyModel: "plain" });
+  const dropped = describeConfiguration(await loadConfiguration(h.parent));
+  assert.match(dropped, /heavy: model=plain \[configured:heavy\] reasoning=\(not configurable\) \[model\]/);
+  assert(!/heavy: .*UNUSABLE/.test(dropped), "A tier on such a model is usable, not refused");
+  assert.equal(dropped.split("\n").filter((line) => line.includes("reasoning=(not configurable) [model]")).length,
+    tiers.length, "Every tier inheriting that model reports the same origin, with nothing left as (unset)");
+  store.write({ heavyModel: "other", heavyEffort: "low", heavyFallbackModel: "plain" });
+  const fallbackDropped = describeConfiguration(await loadConfiguration(h.parent));
+  assert.match(fallbackDropped, /heavy: model=other \[configured:heavy\] reasoning=low \[configured:heavy\]/);
+  assert.match(fallbackDropped, /fallback: model=plain \[configured:heavy\] reasoning=\(not configurable\) \[model\]/);
+  assert(!/fallback: model=plain.*(UNUSABLE|NOT OFFERED)/.test(fallbackDropped),
+    "Such a fallback is offered, not refused");
+  // The rule is stated where it is applied, so a user who sees the origin can
+  // find out what produced it.
+  assert.match(dropped, /supports no configurable reasoning effort takes none, reported \[model\], rather than/);
+  assert.match(dropped, /unless the fallback model supports no configurable effort, in which case it takes none too/);
+  assert.match(configHelp, /A model that supports no configurable reasoning effort takes none, whether it serves a tier/);
+  assert.match(configHelp, /an explicit value is never dropped or lowered to fit/);
+  console.log("PASS a tier and a fallback on a model with no configurable effort report it and stay usable");
 }
 
 // --- command behaviour ------------------------------------------------------
@@ -348,6 +447,11 @@ console.log("PASS configuration argument parsing, unknown keys, malformed assign
 
   configuration.store.write({ heavyModel: "plain", heavyEffort: "low" });
   await assert.rejects(reviewerAssignments(h.parent, reviewModes.quick, {}, await loadConfiguration(h.parent)), /No substitution/);
+  configuration.store.write({ heavyModel: "plain" });
+  const effortless = await reviewerAssignments(h.parent, reviewModes.quick, {}, await loadConfiguration(h.parent));
+  assert(effortless.every((a) => a.model === "plain" && a.reasoningEffort === undefined &&
+    a.origin.reasoningEffort === "model"),
+  "A model advertising no configurable effort serves the tier with none, rather than refusing the review");
   configuration.store.write({ heavyModel: "other" });
   await assert.rejects(reviewerAssignments(h.parent, reviewModes.quick, {}, await loadConfiguration(h.parent)), /No substitution/,
     "An inherited ambient effort the configured model cannot support is refused, never lowered");
@@ -642,7 +746,7 @@ console.log("PASS a trusted project's autoPostReviews reaches the retained posti
     { settings: { autoPostReviews: false }, origins: { autoPostReviews: "project" } },
     "A project may override a personal true with an explicit false");
   const layered = layerSettings({ lightModel: "other" }, { heavyModel: "heavy" });
-  assert.deepEqual(resolveTier("medium", { ...layered, ambient: { model: "heavy", reasoningEffort: "high" } }).model,
+  assert.deepEqual(resolveTier("medium", { ...layered, ambient: { model: "heavy", reasoningEffort: "high" }, models: catalog }).model,
     { value: "heavy", source: "project-inherited:heavy" }, "Inheritance keeps the origin of the value it inherits");
   console.log("PASS per-key layering and origin reporting through tier inheritance");
 }

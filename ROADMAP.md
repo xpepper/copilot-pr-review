@@ -50,8 +50,10 @@ posting them.
 | F6 | Completed | Reviewer output survives a model that wraps it. Reviewers and the adjudicator are asked for the envelope between two explicit markers, and code unwraps that delimiter pair, then one fence that wraps the whole response; markers and fences count only when they are the whole line, so payload text is never a wrapper. Everything after the parse is unchanged, and a table below pins what is still discarded whole. Demonstrated by the full-mode review of pull request #7, which discarded four reviewers on a substring-counting defect it also reported; that defect is fixed and the captured outputs replayed. | F5; [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | M2 | Completed | `--deep` runs one integrated heavy reviewer over the whole pull request and presents every substantiated severity; a second mode flag is refused. Demonstrated by the twelve controlled suites, the installed no-inference dispatch, and the live deep review of pull request #8, which reached completed coverage on 68.27393 credits and found two real defects in its own documentation. | F6, M1; [Modes](SCOPE.md#review-modes-and-findings) |
 | C3 | Completed | A tier may carry one optional fallback assignment, used for one extra attempt for the one reviewer whose own execution failed. No timer, no whole-review restart, no silent substitution, and no cross-tier inheritance. Demonstrated by the twelve controlled suites, two installed no-inference probes, and the live balanced review of pull request #10, which cost 233.19659 credits, completed all six sessions and found one real documentation defect. No fallback attempt has run live. | C1, Q3; [Fallbacks/execution](SCOPE.md#models-configuration-and-execution) |
-| C4 | Pending | A tier whose resolved model supports no configurable reasoning effort resolves to no effort instead of inheriting one, so such a model can serve a tier. An explicit effort is still validated and never silently lowered. Since C3 the same defect blocks a fallback model that advertises no effort. | C1; [Configuration](SCOPE.md#models-configuration-and-execution) |
-| C5 | Pending | A completed reviewer whose output the evidence boundary discards becomes eligible for its tier's one fallback attempt, as an empty response already is. Found by pull request #10's overview reviewer and discarded by the changed-line anchoring rule. | C3, Q4; [Fallbacks/execution](SCOPE.md#models-configuration-and-execution) |
+| C4 | Completed | A tier whose resolved model supports no configurable reasoning effort resolves to no effort instead of inheriting one, so such a model can serve a tier; the same rule covers a tier's fallback model. An explicit effort is still validated and never silently lowered, and a capable model still inherits and is still refused. Demonstrated by the twelve controlled suites, two installed no-inference probes, and the live full review of pull request #11, which cost 269.135657 credits, reported incomplete coverage on three execution failures, and found one real defect in this increment's own display. | C1; [Configuration](SCOPE.md#models-configuration-and-execution) |
+| Q5 | Pending | A candidate anchored on a changed line may cite the code that change breaks, including unchanged code and another hunk, instead of being refused for naming a different hunk from its introduction citations. Three true findings have been lost to that one rule, on pull requests #4, #5 and #10. Every refusal that stops an unbound or fabricated citation must still fire. | Q4; [Modes/findings](SCOPE.md#review-modes-and-findings) |
+| Q6 | Pending | A citation that differs from its bound source only by leading or trailing whitespace stops silently discarding the whole finding. Pull request #11's only true finding was lost to two spaces of indentation. Weighed against pull request #4, where the same exact-match check stopped a 0.99-confidence fabrication whose claim was itself about whitespace. | Q5; [Modes/findings](SCOPE.md#review-modes-and-findings) |
+| C5 | Pending | A completed reviewer whose output the evidence boundary discards becomes eligible for its tier's one fallback attempt, as an empty response already is. Found by pull request #10's overview reviewer and discarded by the evidence boundary's same-hunk rule. Needs the user's go-ahead: it moves the retry decision across the evidence boundary. | C3, Q4; [Fallbacks/execution](SCOPE.md#models-configuration-and-execution) |
 | V1 | Pending | `--verify` enforces matching branch/SHA/cleanliness before reviewers and presents discovered existing commands for approval. | Q1; [Safeguards](SCOPE.md#optional-project-safeguards) |
 | V2 | Pending | Execute only approved existing safeguards with installed dependencies; show evidence and artifacts without autofix or checkout manipulation. | V1; [Safeguards](SCOPE.md#optional-project-safeguards) |
 | D1 | Pending | Document configuration, modes, incomplete coverage, cancellation, publication, cache, and safeguards with reproducible end-to-end examples. | Remaining v1 items; [Release boundary](SCOPE.md#priority-and-release-boundary) |
@@ -2234,8 +2236,9 @@ resolution in `extension.mjs`. Exercises: `scripts/smoke-config.mjs` and
   then personal settings, then the ambient session assignment. Tier inheritance
   runs over the merged result, and the origin travels with the value:
   `flag`, `project:heavy`, `project-inherited:light`, `configured:heavy`,
-  `inherited:light`, `ambient`, `unset`. `autoPostReviews` reports
-  `[project]`, `[configured]` or `[default]`.
+  `inherited:light`, `ambient`, `unset`, and since `C4` `model`, for a tier whose
+  resolved model supports no configurable reasoning effort. `autoPostReviews`
+  reports `[project]`, `[configured]` or `[default]`.
 - An invocation rewrites no saved file: not the personal settings, not the trust
   record, and never the project file, which is only ever read.
 - A trusted project file that is malformed JSON, carries an unsupported schema
@@ -3423,7 +3426,8 @@ it afterwards.
   effort, but there is no way to express "this tier takes no effort" today.
   Tracked as increment `C4`: an unset effort should stay unset when the resolved
   model supports none, while an explicit effort is still validated and never
-  silently lowered.
+  silently lowered. **Fixed by `C4`**, recorded below; an inherited effort now
+  drops for such a model, and only for such a model.
 - The minor-finding cap keeps the strongest three by declared severity then
   confidence. It does not spread minor findings across reviewers or files, and
   a light reviewer's minor finding can be displaced by a heavy one's.
@@ -4679,8 +4683,10 @@ corrected rather than the code.
 - Refusals that change nothing: an unavailable, disabled, `auto` or compound
   fallback model; an unsupported explicit fallback effort; a tier effort the
   fallback model cannot support; a fallback model advertising no configurable
-  effort at all (the case `C4` exists to allow); an orphan fallback effort; and
-  the same check on a non-heavy tier.
+  effort at all (the case `C4` existed to allow, and **that one assertion is
+  inverted below**: such a fallback is now accepted, while an explicit effort on
+  it is still refused); an orphan fallback effort; and the same check on a
+  non-heavy tier.
 - The display shows one `fallback:` line per tier, the configured line with its
   origins, `NOT OFFERED`, `UNUSABLE`, and the orphan note, plus the attempt
   policy prose; the help text carries the same policy.
@@ -4936,45 +4942,429 @@ wrong:
 - The fallback effort inherits the tier's own effort when unset, so a fallback
   model advertising no configurable effort at all cannot serve a tier that has
   one. That is the same defect `C4` exists to fix, now on a second surface.
+  **Fixed by `C4` below**, on both surfaces at once.
 - One run is one sample. That this review reached completed execution on all six
   sessions says nothing about how often a reviewer fails in general, and
   therefore nothing about how often a fallback would fire.
 
 
+## Completed increment: C4
+
+Implementation: tier and fallback resolution in
+`extensions/pr-review/config.mjs`, one catalog reading in `fixture.mjs`, and the
+model catalog threaded through `review.mjs`. Probes: `scripts/smoke-config.mjs`,
+`smoke-review.mjs`, `smoke-fixture.mjs` and `smoke-config-runtime.mjs`. No
+upstream source was copied. No configuration key, invocation flag, timeout,
+safeguard, reviewer tool, gate override or mode was added, the evidence boundary
+was not touched, and no user checkout was altered. `L1` remains pending.
+
+### Resolution boundary
+
+- **A tier whose resolved model advertises no configurable reasoning effort
+  resolves to no effort.** It no longer takes the effort a neighbouring tier, a
+  trusted project or the ambient session would supply, because that effort is
+  not one the model can hold. Before this, a model like `claude-haiku-4.5` could
+  not serve a tier at all whenever any effort reached it, which in practice meant
+  whenever any other tier was configured.
+- The dropped effort reports origin `model`, one more label beside `flag`,
+  `project:`, `project-inherited:`, `configured:`, `inherited:`, `ambient` and
+  `unset`. It renders as `reasoning=(not configurable) [model]`, so the display
+  says the model decided it rather than a configuration layer, and it counts as
+  an implicit origin like `ambient` and `unset`: a purely ambient tier is still
+  not validated at configuration time on its account.
+- **Only an inherited effort drops.** An effort set for this tier, by
+  configuration, by a trusted project's file or by an invocation flag, stays and
+  is validated, so it is refused rather than dropped, substituted or lowered.
+  `SCOPE.md` requires exactly that of an explicit setting.
+- **A model that does advertise efforts is unchanged.** An inherited effort such
+  a model cannot support still refuses the review. Nothing about inheritance,
+  nearest-tier preference or flag precedence changed.
+- **A model the catalog does not offer drops nothing.** That case is refused on
+  the model itself, so no conclusion is drawn about its effort, and a tier whose
+  model is unavailable still fails on the model.
+- `C3` left the same defect on a second surface, and both are fixed together: an
+  unset `<tier>FallbackEffort` follows the tier's own effective effort, and that
+  is an inherited origin like any other, so a fallback model advertising no
+  configurable effort no longer receives it. An explicit `<tier>FallbackEffort`
+  on such a model is still refused. A fallback that resolves to the tier's own
+  model with both efforts absent is still identical, so still `NOT OFFERED`.
+- **The model catalog is now a required argument** of `resolveTier` and
+  `resolveFallback`. Resolution cannot be completed without knowing which case a
+  tier is in, and a caller that omits it is refused rather than silently given
+  the old behaviour.
+- `validateModelAssignment` now distinguishes the two refusals: a model that
+  advertises some efforts but not this one still reports `Unsupported reasoning
+  effort X for M`, while one that advertises none reports that it supports no
+  configurable reasoning effort at all, which is the case a user fixes by
+  unsetting rather than by choosing another value.
+
+### Controlled evidence
+
+Test-first: the assertions were written first and failed on the real defect,
+`Unsupported reasoning effort high for plain` raised from `reviewerAssignments`,
+and on the missing catalog argument. Two `C3` assertions that pinned the old
+refusals were inverted deliberately, and one `F5`-era fixture assertion was split
+because the two refusals now carry different messages.
+
+All twelve controlled suites pass, and `git diff --check` is clean:
+
+```sh
+for s in findings review selection retention preview publication publish-later \
+         checkout config context fixture target; do node scripts/smoke-$s.mjs; done
+git diff --check
+```
+
+New demonstrations, none of which start inference or touch the network:
+
+- Resolution: a tier on such a model reports `{ value: undefined, source: "model" }`
+  whether the effort came from the ambient session, a neighbouring tier or a
+  trusted project's file on a neighbouring tier; an entirely ambient tier drops
+  it too; an effort configured on this tier or set by an invocation flag is kept
+  verbatim; a capable model still inherits an effort it cannot support; and an
+  unknown model keeps its inherited effort so the model is what gets refused.
+- Configuration: `heavyModel=plain` and `lightModel=plain` are accepted, the
+  second proving that every tier inheriting that model also drops its effort.
+  `heavyModel=plain heavyEffort=low` and `lightModel=plain heavyEffort=low` are
+  still refused, the second proving the check follows the model a tier resolves
+  to rather than where the model was configured.
+- Fallbacks: `heavyFallbackModel=plain` resolves with no effort and is accepted;
+  `heavyFallbackModel=plain heavyFallbackEffort=low` is still refused; a fallback
+  on the same effortless model as its tier is still `NOT OFFERED`; and
+  `heavyFallbackModel=other`, whose model does advertise efforts, is still
+  refused for the tier effort it cannot support.
+- Assignment: the saved configuration reaches every quick reviewer with
+  `reasoningEffort === undefined` and origin `model`, and the pre-execution
+  display renders `reasoning=(not configurable) [model]` for both the reviewer
+  and its fallback.
+- Display and help: `show` renders the tier and the fallback line without
+  `UNUSABLE`, and the policy prose that explains the origin is asserted in both
+  the configuration report and `/pr-review-config help`.
+- Catalog reading: `advertisesNoReasoningEffort` answers true only for a model
+  the session offers that advertises none, and false for a disabled, compound,
+  `auto` or absent one.
+
+### Installed-plugin evidence
+
+The extension was reinstalled with `copilot plugin install "$(pwd)"` at the
+branch head before each probe. Neither probe sent a model prompt, so neither
+spent Copilot credits. CLI 1.0.83 with its bundled SDK, Node.js 26.1.0,
+macOS arm64.
+
+The subscription catalog was read directly before any code changed, to establish
+that the case exists and what the runtime reports for it. Of the fourteen usable
+models this subscription listed on 2026-09-08, **exactly one advertises no
+configurable reasoning effort**: `claude-haiku-4.5`. Every other model reports a
+non-empty
+`capabilities.supports.reasoning_effort`, and the three `gpt-5.6` models include
+`none` as one of their supported values, which is a configurable effort called
+none rather than the absence of one.
+
+That reading also answered the open question this increment inherited. A session
+created on `claude-haiku-4.5` reports `{"modelId":"claude-haiku-4.5"}` from
+`model.getCurrent()`, **with no `reasoningEffort` field at all**. That matters
+because `reviewAssignments` adopts the runtime's own resolved effort for an
+assignment carrying none and revalidates it against the catalog; had the runtime
+reported an effort here, the reviewer would have been refused after the
+configuration surface allowed it. It does not, so `undefined` survives and no
+execution-path change was needed. `smoke-config-runtime.mjs` now asserts this
+against a real session rather than leaving it to a one-off reading.
+
+`smoke-runtime.mjs --targets --startup` passed unchanged. It dispatches all four
+modes against a skipped draft and asserts their assignment displays; no tier in
+that probe resolves to a model without efforts, so its expectations are the same.
+
+`smoke-config-runtime.mjs` was extended with the C4 surface and passed against
+the **installed** plugin with the child-only controlled `gh` fixture:
+
+- `heavyModel=claude-haiku-4.5` stored beside a saved light tier that carries an
+  effort. Before this increment that update was refused, because the light
+  tier's effort inherited onto the heavy tier's model.
+- After an extension reload, `show` reported
+  `heavy: model=claude-haiku-4.5 [configured:heavy] reasoning=(not configurable) [model]`
+  with no `UNUSABLE` marker, so the reloaded process read the stored file rather
+  than run memory.
+- A real `/pr-review 2 --deep --no-comment` invocation displayed
+  `integrated [heavy]: model=claude-haiku-4.5 [configured:heavy] reasoning=(not configurable) [model]`.
+  PR 2 is the fixture draft, so it is skipped and no reviewer ever starts.
+- `heavyEffort=<supported-elsewhere>` on that tier was refused with the new
+  message and left the stored file byte-identical.
+- The same pair on the fallback surface: `heavyFallbackModel=claude-haiku-4.5`
+  accepted and displayed with `reasoning=(not configurable) [model]` and no
+  `UNUSABLE` or `NOT OFFERED`, while
+  `heavyFallbackModel=claude-haiku-4.5 heavyFallbackEffort=<effort>` was refused
+  and wrote nothing.
+- Every C1, C2 and C3 assertion in that probe still passed, and clearing the C4
+  settings restored the saved configuration byte for byte.
+
+The probe now needs a subscription model that advertises no configurable
+reasoning effort, alongside the second effort-capable model `C3` added. It still
+fails its first assertion rather than refusing when a personal
+`<copilot-config-home>/pr-review/config.json` exists, so that file was moved
+aside for each run and restored afterwards; the restore was verified with
+`shasum -a 256` both times, digest
+`30794150a3db740f7dcf6f9d7a5a827d3729c5599f7456f582af735d3f297ea9`, mode `0600`,
+unchanged before and after.
+
+The other installed probes were last rerun on pull requests #5 and #7.
+`smoke-reviewer-tools.mjs` and `smoke-retention-runtime.mjs` exercise reviewer
+tool confinement and retained-record reload, neither of which this increment
+changes.
+
+### User-visible documentation
+
+`README.md` gains a "Models with no configurable reasoning effort (C4)" section
+stating the whole rule: which models it applies to, that the tier and its
+fallback both take none, that the origin is reported `[model]`, that an explicit
+effort is still refused, and what it unblocks. The C1 trap paragraph that told
+users to avoid such a model is replaced, the C1 validation paragraph points at
+the new section, the C2 origin vocabulary gains `model`, and the C3 fallback
+paragraph records the exception. The extension's own `help` and `status` text and
+`/pr-review-config help` carry the rule in short form.
+
+### Live inference: the full review of pull request #11
+
+`C4` landed on branch `c4-no-configurable-effort` and pull request #11. The
+installed plugin reviewed it once, in **full** mode, named explicitly rather than
+taken as the default. Balanced would have been the safe default for an increment
+that adds no mode, but this increment changes the shared tier-resolution seam
+every mode goes through, and full is the only mode that resolves all three tiers,
+so it is the only topology whose live run puts the changed resolver on the medium
+tier. It also spread the review across three model families in one run.
+
+```sh
+gh pr checkout 11
+copilot plugin install "$(pwd)"
+COPILOT_CLI_PATH="$(command -v copilot)" \
+COPILOT_SDK_PATH="$(ls -d "$HOME"/.copilot/pkg/*/"$(copilot --version | sed -n 's/.*CLI \([0-9][0-9.]*[0-9]\).*/\1/p')"/copilot-sdk)" \
+node scripts/dogfood-review.mjs 11 --full --all --no-comment
+```
+
+Reviewed head `03b7463`, base `75c5d89`, ten files, 563 additions and 82
+deletions. Six reviewers plus one adjudicator, all from saved personal
+configuration:
+
+| Reviewer | Tier | Model | Effort | Calls | Reads | Denials | Outcome | Credits |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| correctness | heavy | `gpt-5.6-terra` | high | 4 | 3 | 1 read | completed, output discarded | 30.41800 |
+| contracts | heavy | `gpt-5.6-terra` | high | 9 | 8 | 1 read | incomplete | 39.76305 |
+| security | heavy | `gpt-5.6-terra` | high | 4 | 4 | 0 | completed | 36.72990 |
+| performance-resources | heavy | `gpt-5.6-terra` | high | 4 | 4 | 0 | completed | 33.95377 |
+| overview | light | `gpt-5.6-luna` | high | 12 | 12 | 0 | completed | 5.49294 |
+| conventions-maintainability | medium | `claude-sonnet-5` | medium | 7 | 7 | 0 | completed | 92.93905 |
+| evidence-validator | heavy | `gpt-5.6-terra` | high | 0 | 0 | 0 | completed | 29.83895 |
+
+Forty tool calls, thirty-eight reads, **two permission denials and no tool
+denial**. Cost: **269.135657 credits**, which is the sum of the per-reviewer
+figures above. Nothing was published.
+
+Coverage was **incomplete**, on three execution failures and four informational
+caveats, with zero coverage gaps. No finding was validated or selected, one
+candidate was rejected by the adjudicator, and one was rejected at the evidence
+boundary.
+
+**The one real defect it found was rejected at the evidence boundary, and is
+fixed.** `overview:1`, P3 at confidence 0.93: `effortForModel` returned early
+when there was no effort value to drop, so a tier on a model with no configurable
+effort reported `(unset) [unset]` or `(unset) [ambient]` when no layer had
+offered one, and a fallback whose tier already had none reported `[primary]`. The
+same resolved model therefore described itself differently depending on what the
+other tiers happened to hold, and `README.md` promised the `[model]` origin
+unconditionally. The origin now names the model for every origin except one
+chosen for this tier itself.
+
+It was refused for a citation that did not exactly match a supplied context
+window: its quote of `config.mjs` lines 223-224 was correct except that it
+dropped the two leading spaces of the first line. **This is the fourth pull
+request on which the evidence boundary has discarded a true finding, and the
+second in a row on which the discarded finding was the overview reviewer's.** It
+is increment `Q6`; the same-hunk rule that cost the other three is `Q5`, and
+`Q5` is next.
+
+**Rejected by the adjudicator, and correctly.** `security:1`, P2 at confidence
+0.94, argued that `advertisesNoReasoningEffort` should treat absent or malformed
+`capabilities.supports.reasoning_effort` metadata as unknown rather than as an
+affirmative "no efforts", preserving the inherited effort so validation refuses
+it. The adjudicator rejected it because the supplied source establishes no
+contract distinguishing an explicitly empty array from absent metadata, and
+`reasoningEfforts` has always normalized both to `[]`. A direct reading of the
+installed catalog settles it further: `claude-haiku-4.5` carries a
+`capabilities.supports` object that simply **omits** `reasoning_effort`, listing
+`max_thinking_budget`, `min_thinking_budget`, `parallel_tool_calls`, `streaming`,
+`tool_calls`, `vision` and `adaptive_thinking`. Absent metadata is the only shape
+this runtime uses for a model with no configurable effort, so the candidate's
+expected behaviour would make `C4` fail for the one model it exists for. The
+malformed case it also names is real but hypothetical: no observed model produces
+it, and answering it would need a second notion of the catalog beside
+`reasoningEfforts`. Rejected, and recorded here rather than silently dropped.
+
+**Three things this run demonstrated that no previous review had.**
+
+- **A reviewer settled `completed` and emitted no envelope at all.**
+  `correctness` returned one sentence of thinking-style prose, "I'm tracing the
+  new resolution paths through their callers and execution handoff to distinguish
+  a user-visible defect from the documented behavior", and nothing else. The
+  evidence boundary discarded it with `SyntaxError: Unexpected token 'I'`. This
+  is **not** an `F6` unwrap failure: there was no envelope to unwrap, wrapped or
+  otherwise, so the marker contract is not implicated. It is the clearest live
+  instance yet of the `C5` asymmetry: the coverage report calls it an execution
+  failure, while the reviewer record says `completed`, so it could never become
+  eligible for a fallback attempt.
+- **A reviewer failed in exactly the way `C3` covers.** `contracts` settled
+  `incomplete` with "Reviewer produced no usable output", which is an explicit
+  execution failure and therefore fallback-eligible. No fallback was configured,
+  so none was attempted. This is the first live occasion on which a configured
+  fallback would actually have fired, which sharpens `C3`'s standing limitation
+  from "never observed" to "would have fired here".
+- **The medium tier's Claude-family model parsed cleanly.** `M1` recorded a
+  Claude-family medium model fencing its JSON as an open defect, and `F6` answered
+  it. Here `claude-sonnet-5` wrote several paragraphs of prose and then the
+  marker-delimited envelope, and the unwrap took it. That is a fourth run of live
+  evidence for the marker contract, and the first on the medium tier since `F6`.
+
+**The read denials landed on the two reviewers that then failed, for the third
+time, and this run shows the mechanism.** `correctness` and `contracts` each took
+exactly one permission denial, and they are exactly the two reviewers whose
+output was lost; the other four took none. Their tool calls say why.
+`correctness` asked to `view` `extensions/pr-review/quick.mjs`, which does not
+exist in this repository, and `contracts` asked `rg` for the literal path
+`scripts/smoke-{config,review}.mjs`, an unexpanded brace pattern. `insideRoot` in
+`read-only.mjs` calls `realpathSync` and returns `undefined` when it throws, so a
+**nonexistent path inside the checkout is rejected exactly like an escape
+attempt**, and the reviewer is told it may only read inside the reviewed
+checkout. That is a plausible mechanism for the correlation pull request #6 first
+recorded, and it is not something `C4` introduced. It is deliberately **not**
+fixed here: distinguishing "absent" from "outside the root" changes a
+confinement boundary and needs its own increment, its own tests and its own
+review. It is recorded below as the next candidate after `C5`.
+
+### Remaining limitations
+
+- **No reviewer has actually run on a model with no configurable effort.** The
+  configuration, display and assignment surfaces are demonstrated end to end on
+  the installed plugin, and the runtime is on record reporting no effort for such
+  a session, but no live review has assigned one to a tier and executed it. That
+  would cost credits and needs its own authorization.
+- The rule keys off what the catalog advertises at resolution time. A model whose
+  advertised efforts change between a configuration update and a review would be
+  resolved differently by each, which is the same latent inconsistency every
+  capability check in this tool has.
+- A tier that drops its inherited effort runs at whatever effort the runtime
+  itself chooses for that model, which the plugin neither sets nor displays as a
+  value. `(not configurable)` is honest about that, but it means two reviewers on
+  the same such model cannot be given different efforts.
+- `C4` adds no configuration key, so there is still no way to say "this tier
+  takes no effort" for a model that *does* support efforts. Unsetting the tier's
+  effort inherits one instead. Nobody has asked for that, and the `gpt-5.6`
+  family already exposes `none` as an explicit value.
+- The catalog argument is required at the two resolution entry points only.
+  Nothing prevents a future caller from computing an assignment some other way,
+  as `reviewAssignments` does when it adopts the runtime's resolved effort.
+- Two of the six reviewers lost their output on this pull request, so the review
+  that verifies the increment covered it less well than its coverage report's
+  three execution failures might suggest. The two surviving heavy specialists,
+  the light reviewer and the medium reviewer all read the changed resolution
+  path, and one of them found the defect that was fixed, but correctness and
+  contracts contributed nothing.
+- The malformed-metadata case `security:1` raised is unanswered by design. A
+  catalog entry whose `reasoning_effort` is present but not an array of strings
+  is read as "no configurable effort" rather than as "unreadable". No observed
+  model produces that shape, and separating the two would need a second notion of
+  the catalog beside `reasoningEfforts`.
+
 ## Exact next increment
 
-**`C3` is complete.** A tier may carry one optional fallback assignment, used for
-one extra attempt for the one reviewer whose own execution failed. Pull request
-#10's balanced review demonstrated the configuration and display surface end to
-end on the installed plugin; the attempt itself rests on the controlled suites,
-because no reviewer failed during that run.
+**`C4` is complete.** A tier whose resolved model advertises no configurable
+reasoning effort resolves to no effort instead of inheriting one, on the tier
+surface and on `C3`'s fallback surface at once. An effort set for the tier itself
+is still validated and refused, and a model that does advertise efforts still
+inherits one and is still refused when it cannot support it. Pull request #11's
+full review demonstrated it end to end on the installed plugin, found one real
+defect in the increment's own display, and cost 269.135657 credits.
 
-**Take `C4` next: a tier whose model supports no configurable effort.** It is
-small, fully specified, blocked by nothing, and needs no product decision. Such a
-tier should resolve to **no** effort rather than inheriting one, so a model like
-`claude-haiku-4.5` can serve it. An explicit effort is still validated and never
-silently lowered, and an inherited effort is still refused rather than dropped
-when the model does support efforts; the change is that a model advertising
-**none** stops inheriting an effort it cannot hold.
+**Take `Q5` next: let a candidate cite the code its changed line breaks.** The
+user chose it over `C5` on 2026-09-08, because it is the one place where this
+tool silently throws away work that is correct.
 
-`C3` gave `C4` a second surface with the same defect, and both should be fixed
-together: a fallback model that advertises no configurable effort is refused
-today because the tier's own effective effort carries over to it, which the C3
-controlled evidence above records as a test case. Expect to touch `resolveField`
-and `resolveFallback` in `config.mjs`, `tierValidation` and
-`validateModelAssignment`, and the assertions in `smoke-config.mjs` that pin the
-current refusals. Note that `reviewAssignments` already fills an unset effort
-from the runtime's resolved default and revalidates it, so check what the
-installed runtime reports for such a model before assuming `undefined` survives.
+**Name the two gates separately; they are not one rule.** "The changed-line
+anchoring rule" has been used loosely here for a family of refusals in
+`candidate()` and `cite()` in `findings.mjs`. Two of them have each discarded a
+true finding, for different reasons, and only the first is `Q5`:
 
-**Then `C5`, and ask before starting it: eligibility for a discarded output.**
+| Pull request | Candidate | Refusal | What it cost |
+| --- | --- | --- | --- |
+| #4 | performance-resources:1 | same changed hunk | true; acted on by hand |
+| #4 | overview:1 | context-window match | not substantive |
+| #4 | contracts:2 (0.99) | context-window match | **a fabrication, correctly stopped** |
+| #5 | correctness:1 (P3, 0.97) | same changed hunk | true; fixed by hand |
+| #10 | overview:1 (P2, 0.95) | same changed hunk | true; the best finding in that review |
+| #10 | overview:2 | context-window match | duplicate; no loss |
+| #11 | overview:1 (P3, 0.93) | context-window match | true; the only finding in that review |
+
+`Q5` is the **same changed hunk** rule, which has cost three true findings:
+
+```js
+if (!file.hunks.some((hunk) => withinHunk(location, hunk) &&
+    (before ? withinHunk(before, hunk) : !hunkHasChanges(file, hunk, "base")) &&
+    (after ? withinHunk(after, hunk) : !hunkHasChanges(file, hunk, "head")))) {
+  throw new Error("Introduction citations and location must identify the same changed hunk.");
+}
+```
+
+The rule exists to prove *this diff introduced it*, by pinning the two sides of
+one hunk. The finding it cannot express is the common one: **this changed line
+breaks that other code**, where the other code is in a different hunk or is not
+changed at all. #4 and #10 failed because the introduction citation and the
+location named different hunks; #5 failed because the candidate passed
+`before: null` while its hunk does remove base-side lines.
+
+Shapes worth weighing, none of them decided:
+
+- An optional citation of the code the change breaks, beside `before`/`after`,
+  which may be unchanged and outside the location's hunk while `before`/`after`
+  still pin the introduction. This matches the problem statement most directly
+  and is the only shape that lets the *victim* be unchanged code.
+- Widening `before`/`after` to any changed hunk in the same file. Smaller, but it
+  still cannot cite unchanged code, which is what #10's finding needed.
+- Leaving the rule alone and reporting the near-miss so an agent reading the
+  timeline sees it. Cheapest, and it fixes recovery rather than the review.
+
+Whichever shape wins, the acceptance criterion is the same: a candidate anchored
+on a changed line can cite the code that change breaks and reach adjudication,
+while every refusal that stops an unbound, out-of-window or fabricated citation
+still fires unchanged. Reconstruct the three recorded rejections as controlled
+fixtures rather than trusting a prose description of them, and note that a
+candidate envelope change touches the reviewer prompt, the adjudicator
+instructions, `findings.mjs` and `retention.mjs` together. Ask the user before
+changing the retained record's schema version.
+
+**Then `Q6`, and weigh it against its own counter-evidence.** `cite()` requires
+`source.lines.slice(startLine - 1, endLine).join("\n") !== quote` to be false,
+so a quote must match its bound source byte for byte. On #11 the overview
+reviewer quoted `config.mjs` lines 223-224 correctly except that it dropped the
+two leading spaces of the first line only, and the whole P3 was discarded. But on
+#4 that same check stopped `contracts:2` at confidence 0.99, where the reviewer
+had **introduced a space into its own quote** and the claimed defect was about
+that space. Normalizing whitespace would have let that fabrication through to
+adjudication. So this is a real trade-off, not an oversight, and the safe
+direction is to keep exact matching as the acceptance path and treat a near-miss
+as something to report or repair from the cited line range, not to relax.
+
+**`C5` remains open, and still needs the user's go-ahead: eligibility for a
+discarded output.**
 Pull request #10's overview reviewer found it, at P2 and confidence 0.95, and the
 changed-line anchoring rule discarded it. A reviewer whose output the evidence
 boundary cannot parse settles as `completed`, so it never becomes eligible for
-its tier's one fallback attempt, while a reviewer that returns nothing does. Four
-of this project's own seven live reviews were incomplete for exactly the reason a
+its tier's one fallback attempt, while a reviewer that returns nothing does. Five
+of this project's own eight live reviews were incomplete for exactly the reason a
 fallback cannot answer, so this is the increment that decides whether `C3` is
 useful in practice rather than only correct.
+
+Pull request #11 is the sharpest case yet, and it shows both halves in one run.
+`correctness` settled `completed` with a single sentence of prose and no
+envelope, so it got nothing; `contracts` settled `incomplete` with no usable
+output, so a configured fallback would have fired for it. Two reviewers lost the
+same way, one eligible and one not, differing only in how the runtime reported
+the end of the attempt.
 
 It is deliberately not a small increment, and it is a product decision as much as
 a change, which is why it needs its own authorization:
@@ -4996,20 +5386,47 @@ assignment. An optional `verifyResult` hook on the same seam, passed from
 out of `findings.mjs`. That is a design to evaluate, not a decision already
 taken.
 
-Three older observations remain open and separately authorizable, and one of them
-is still the oldest thing here. **No review of any mode has ever run against a
-substantial code diff**, though pull request #10 is the closest yet: 984
-additions over 12 files, most of it real logic rather than prose. Second, the
-changed-line anchoring rule has discarded true findings on pull requests #4 and
-#5 and rejected two mis-anchored candidates on #6; a later increment should
-decide how a candidate can anchor on the changed line that causes a breakage
-while citing the unchanged line it breaks. Third, pull request #6's read denials
-landed on the two reviewers that then failed; #7, #8 and #10 had no denial at
-all, so that one may have been specific to #6.
+Older observations follow, in the order they were first seen; each says whether
+it is still open, because two of them have since become increments. The oldest is
+still the largest, and it is open: **no review of any mode has ever run against a
+substantial code diff**, though pull request #10 is the closest so far at 984
+additions over 12 files, most of it real logic rather than prose. It is still
+separately authorizable and nobody has spent a review on it deliberately.
 
-`F6`'s marker contract now has live evidence from three separate runs: five of
-six reviewers on #7, both sessions on #8, and every session on #10. Do not
-reintroduce substring matching and do not widen the unwrap.
+Second, the evidence boundary has discarded four true findings, on pull requests
+#4, #5, #10 and #11, and rejected two mis-anchored candidates on #6. **This is no
+longer an open observation: it is increments `Q5` and `Q6` above**, split
+because two different refusals are responsible. Three of the four were lost to
+the same-changed-hunk rule and one to the exact citation match; the table is in
+"Exact next increment". On #10 and #11 the discarded finding was the overview
+reviewer's, and on #11 it was the only real defect in the review. Every time an
+agent recovered one it was by reading the raw timeline rather than the review's
+own output.
+
+Third, **read denials have now landed on the reviewers that then failed on two of
+eight reviews**, #6 and #11, and #11 shows a mechanism. `insideRoot` in
+`read-only.mjs` resolves a requested path with `realpathSync` and rejects
+anything that throws, so a **path that simply does not exist** is denied exactly
+like one outside the reviewed checkout, and the reviewer is told it may only read
+inside the checkout. Both denied reviewers on #11 had asked for a path that does
+not exist: a plausible-sounding module, and an unexpanded `{a,b}` brace pattern.
+Distinguishing the two cases would let a reviewer learn that a file is absent
+without being told it broke a boundary. It changes a confinement boundary, so it
+needs its own increment, its own tests and its own review; the safe direction is
+that an absent path stays refused, only with an accurate reason.
+
+Fourth, a reviewer can settle `completed` having emitted no envelope at all, as
+`correctness` did on #11 with a single sentence of thinking-style prose. That is
+the `C5` case above rather than a separate one, but #11 is the first run where
+the discarded output was empty of any structure rather than merely mis-shaped.
+
+`F6`'s marker contract now has live evidence from four separate runs: five of six
+reviewers on #7, both sessions on #8, every session on #10, and on #11 every
+session that produced an envelope at all, including the medium tier's
+`claude-sonnet-5` writing paragraphs of prose before the markers. #11's one
+unparsed output contained no envelope, wrapped or otherwise, so it is not
+evidence against the unwrap. Do not reintroduce substring matching and do not
+widen it.
 
 Do not revisit the Agent Factories surface without new information from GitHub.
 Three separate blockers were demonstrated on CLI 1.0.83, and all three would

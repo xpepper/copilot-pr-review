@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
-  parseFixtureArgs, reasoningEfforts, subscriptionModels, validateAssignments,
+  advertisesNoReasoningEffort, parseFixtureArgs, reasoningEfforts, subscriptionModels, validateAssignments,
   runReviewer,
 } from "../extensions/pr-review/fixture.mjs";
 import {
@@ -48,12 +48,20 @@ for (const args of [
 for (const model1 of ["missing", "disabled", "unconfigured", "external/model-a", "auto"]) {
   assert.throws(() => validateAssignments({ ...settings, model1 }, catalog), /No substitution/);
 }
-for (const override of [
-  { effort1: "max" },
-  { model1: "no-reasoning" },
-]) {
-  assert.throws(() => validateAssignments({ ...settings, ...override }, catalog), /Unsupported reasoning/);
-}
+assert.throws(() => validateAssignments({ ...settings, effort1: "max" }, catalog),
+  /Unsupported reasoning effort max for model-a/);
+// A model that advertises no configurable effort says exactly that, rather than
+// reporting the explicit effort as one of several it happens not to support.
+// The fixture requires an explicit effort, so this pair is still refused.
+assert.throws(() => validateAssignments({ ...settings, model1: "no-reasoning" }, catalog),
+  /no-reasoning supports no configurable reasoning effort, so it cannot take low/);
+// The same catalog reading, asked as a question rather than as a refusal. A
+// model this session does not offer answers false: it is refused on the model.
+assert.equal(advertisesNoReasoningEffort("no-reasoning", catalog), true);
+assert.equal(advertisesNoReasoningEffort("model-a", catalog), false);
+assert.equal(advertisesNoReasoningEffort("disabled", catalog), false);
+assert.equal(advertisesNoReasoningEffort("auto", catalog), false);
+assert.equal(advertisesNoReasoningEffort("missing", catalog), false);
 assert.throws(() => validateAssignments({ ...settings, extra: "value" }, catalog), /requires explicit/);
 assert.throws(() => validateAssignments(settings, []), /Unavailable/);
 console.log("PASS fixture argument, subscription policy, and reasoning validation (no models run)");

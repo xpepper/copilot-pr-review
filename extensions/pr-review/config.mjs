@@ -4,7 +4,9 @@ import {
   renameSync, unlinkSync, writeFileSync,
 } from "node:fs";
 import { basename, dirname, isAbsolute, join, sep } from "node:path";
-import { reasoningEfforts, subscriptionModels, validateModelAssignment } from "./fixture.mjs";
+import {
+  advertisesNoReasoningEffort, reasoningEfforts, subscriptionModels, validateModelAssignment,
+} from "./fixture.mjs";
 import {
   canonicalProjectPath, locateProjectConfig, projectConfigDisplayPath, readProjectConfig,
   requireConfig, trustBindingNotes, trustFilename, trustSchemaVersion, validateTrustedProjects,
@@ -200,6 +202,31 @@ function sourceLabel(origin, kind, tier) {
   return `${kind === "inherited" ? "project-inherited" : "project"}:${tier}`;
 }
 
+// The one origin no configuration layer supplies: the model this tier resolved
+// to advertises no configurable reasoning effort, so the tier holds none.
+const noEffortSource = "model";
+// Origins nobody chose. A review resolves and validates them again for itself,
+// so a configuration update is not refused on their account.
+const implicitSources = ["ambient", "unset", noEffortSource];
+// An effort chosen for this tier itself: by an invocation flag, by personal
+// settings, or by a trusted project's file. Those are explicit, and an explicit
+// setting is refused by validation rather than dropped, substituted or lowered.
+// Every other origin holds an effort chosen elsewhere or none at all, and the
+// resolved model may answer for it instead.
+const chosenForThisTier = (source) => ["flag", "configured", "project"].includes(source.split(":")[0]);
+
+// A model that advertises no configurable reasoning effort cannot hold one, so a
+// tier resolving to such a model resolves to no effort rather than to the effort
+// a neighbouring tier, a trusted project or the ambient session would supply.
+// Without this a model like claude-haiku-4.5 could not serve a tier at all.
+// The origin is the model whenever the model is the reason, including when no
+// layer offered an effort to drop: otherwise one session would report
+// (not configurable) [model] and another (unset) [unset] for the same model.
+function effortForModel(model, reasoningEffort, models) {
+  if (chosenForThisTier(reasoningEffort.source)) return reasoningEffort;
+  return advertisesNoReasoningEffort(model, models) ? { value: undefined, source: noEffortSource } : reasoningEffort;
+}
+
 function resolveField(tier, key, settings, origins, flags, ambient) {
   const own = key(tier);
   if (flags[own] !== undefined) return { value: flags[own], source: "flag" };
@@ -220,25 +247,29 @@ function resolveField(tier, key, settings, origins, flags, ambient) {
   return ambient === undefined ? { value: undefined, source: "unset" } : { value: ambient, source: "ambient" };
 }
 
-export function resolveTier(tier, { settings = {}, origins = {}, ambient = {}, flags = {} } = {}) {
+export function resolveTier(tier, { settings = {}, origins = {}, ambient = {}, flags = {}, models } = {}) {
   requireConfig(tiers.includes(tier), `unknown model tier ${JSON.stringify(tier)}`);
-  return {
-    tier,
-    model: resolveField(tier, modelKey, settings, origins, flags, ambient.model),
-    reasoningEffort: resolveField(tier, effortKey, settings, origins, flags, ambient.reasoningEffort),
-  };
+  requireConfig(Array.isArray(models),
+    "resolving a tier needs this session's model catalog, which says whether its model takes a reasoning effort");
+  const model = resolveField(tier, modelKey, settings, origins, flags, ambient.model);
+  const reasoningEffort = resolveField(tier, effortKey, settings, origins, flags, ambient.reasoningEffort);
+  return { tier, model, reasoningEffort: effortForModel(model.value, reasoningEffort, models) };
 }
 
 // A tier's fallback is explicit or absent; only its effort falls back, to the
 // tier's own effective effort, and that pair is then validated like any other.
-export function resolveFallback(primary, { settings = {}, origins = {} } = {}) {
+export function resolveFallback(primary, { settings = {}, origins = {}, models } = {}) {
   const { tier } = primary;
+  requireConfig(Array.isArray(models),
+    "resolving a tier fallback needs this session's model catalog, which says whether its model takes a reasoning effort");
   const model = settings[fallbackModelKey(tier)];
   if (model === undefined) return undefined;
   const effort = settings[fallbackEffortKey(tier)];
-  const reasoningEffort = effort === undefined
+  // The tier's own effort reaches the fallback the way an inherited one reaches
+  // a tier, so a fallback model that advertises none does not receive it either.
+  const reasoningEffort = effortForModel(model, effort === undefined
     ? { value: primary.reasoningEffort.value, source: "primary" }
-    : { value: effort, source: sourceLabel(origins[fallbackEffortKey(tier)], "configured", tier) };
+    : { value: effort, source: sourceLabel(origins[fallbackEffortKey(tier)], "configured", tier) }, models);
   return {
     tier,
     model: { value: model, source: sourceLabel(origins[fallbackModelKey(tier)], "configured", tier) },
@@ -261,7 +292,8 @@ export function resolvedAssignment(resolution) {
 }
 
 const assignmentText = (resolution) => {
-  const show = ({ value, source }) => `${value ?? "(unset)"} [${source}]`;
+  const show = ({ value, source }) =>
+    `${value ?? (source === noEffortSource ? "(not configurable)" : "(unset)")} [${source}]`;
   return `model=${show(resolution.model)} reasoning=${show(resolution.reasoningEffort)}`;
 };
 
@@ -323,7 +355,7 @@ export async function loadConfiguration(parent) {
 // again when a review actually resolves it.
 export function tierValidation(resolution, models) {
   const explicit = [resolution.model.source, resolution.reasoningEffort.source]
-    .some((source) => source !== "ambient" && source !== "unset");
+    .some((source) => !implicitSources.includes(source));
   try {
     validateModelAssignment(resolvedAssignment(resolution), models);
     return { explicit, valid: true };
@@ -339,7 +371,7 @@ export function validateConfiguredTiers(settings, ambient, models, origins = {})
       `${fallbackEffortKey(tier)}. Nothing was changed.`);
   }
   for (const tier of tiers) {
-    const resolution = resolveTier(tier, { settings, origins, ambient });
+    const resolution = resolveTier(tier, { settings, origins, ambient, models });
     const checked = tierValidation(resolution, models);
     if (checked.explicit && !checked.valid) {
       throw new Error(`Refused ${tier}-tier configuration: ${checked.error} ` +
@@ -348,7 +380,7 @@ export function validateConfiguredTiers(settings, ambient, models, origins = {})
     }
     // A configured fallback is always explicit, so it is always validated. An
     // effort the fallback model cannot support is refused, never lowered to fit.
-    const fallback = resolveFallback(resolution, { settings, origins });
+    const fallback = resolveFallback(resolution, { settings, origins, models });
     const checkedFallback = fallback && tierValidation(fallback, models);
     if (checkedFallback && !checkedFallback.valid) {
       throw new Error(`Refused ${tier}-tier fallback configuration: ${checkedFallback.error} ` +
@@ -403,13 +435,15 @@ export function describeConfiguration(configuration, { flags = {}, heading } = {
   ];
   const orphans = orphanFallbackEfforts(effective.settings);
   for (const tier of tiers) {
-    const resolution = resolveTier(tier, { settings: effective.settings, origins: effective.origins, ambient, flags });
+    const resolution = resolveTier(tier,
+      { settings: effective.settings, origins: effective.origins, ambient, flags, models });
     const checked = tierValidation(resolution, models);
     lines.push(`  ${describeTier(resolution)}${checked.valid ? ""
       : ` -- UNUSABLE: ${checked.error}${checked.explicit ? "" : " (ambient only; no explicit setting)"}`}`);
     // Every tier reports its fallback, so an unset one is visibly unset rather
     // than left to be assumed, and a stored pair that configures nothing says so.
-    const fallback = resolveFallback(resolution, { settings: effective.settings, origins: effective.origins });
+    const fallback = resolveFallback(resolution,
+      { settings: effective.settings, origins: effective.origins, models });
     const checkedFallback = fallback && tierValidation(fallback, models);
     lines.push(`    ${describeFallback(fallback)}${fallback
       ? (checkedFallback.valid ? "" : ` -- UNUSABLE: ${checkedFallback.error}`)
@@ -420,10 +454,13 @@ export function describeConfiguration(configuration, { flags = {}, heading } = {
     `autoPostReviews: ${autoPostReviews} [${autoPostSource}].`,
     "Precedence: invocation flags, then a trusted project's settings, then personal settings, then the ambient " +
       "session assignment. Unset tiers inherit the nearest configured tier, preferring the heavier tier when " +
-      "equidistant. Quick and deep reviews use the heavy tier only; balanced also runs its overview reviewer " +
-      "on the light tier; full adds a conventions reviewer on the medium tier.",
+      "equidistant. A tier whose resolved model supports no configurable reasoning effort takes none, reported " +
+      `[${noEffortSource}], rather than inheriting an effort it cannot hold; an effort set for that tier is still ` +
+      "validated against it and refused. Quick and deep reviews use the heavy tier only; balanced also runs its " +
+      "overview reviewer on the light tier; full adds a conventions reviewer on the medium tier.",
     "Fallback models are optional and start unset. A tier's fallback is explicit or absent: it never inherits " +
-      "from another tier, and an unset fallback effort follows that tier's own effective effort. A configured " +
+      "from another tier, and an unset fallback effort follows that tier's own effective effort, unless the " +
+      "fallback model supports no configurable effort, in which case it takes none too. A configured " +
       "fallback gets at most one attempt, for the one reviewer whose own execution failed explicitly, and never " +
       "a whole-review restart. A cancelled reviewer and an unusable explicit assignment are not eligible. " +
       "Reviews have no timeout, so elapsed time alone never triggers a fallback and a hung reviewer waits " +
@@ -463,6 +500,12 @@ export const configHelp = [
   "assignment. Reviews have no timeout, so elapsed time alone never triggers it. Fallbacks start unset and",
   "never inherit from another tier. <tier>FallbackEffort is optional and follows that tier's own effective",
   "effort when unset; it cannot be set without <tier>FallbackModel.",
+  "",
+  "A model that supports no configurable reasoning effort takes none, whether it serves a tier or that tier's",
+  "fallback: it does not inherit the effort a neighbouring tier, a trusted project or this session would",
+  "otherwise supply. Setting <tier>Effort or <tier>FallbackEffort explicitly on such a model is still refused,",
+  "because an explicit value is never dropped or lowered to fit. Use /pr-review models to see which models",
+  "report a configurable effort.",
   "",
   `trust records this session's working directory in the personal store, so ${projectConfigDisplayPath}`,
   "in that directory may override the same keys. Without that record the project file is ignored, never",

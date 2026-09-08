@@ -278,7 +278,8 @@ and publication gates. Cancellation still stops all owned work, no timeout is
 imposed, and incomplete coverage is still reported as incomplete.
 
 Balanced execution is demonstrated by controlled probes, no-inference installed
-dispatch, and two live reviews of this project's own pull requests. #3 ran five
+dispatch, and the live balanced reviews of this project's own pull requests #3,
+#4, #6 and #10. Two of them are worth describing here. #3 ran five
 reviewers, made 89 confined reads with no denials, returned zero findings with
 incomplete coverage, and cost 414.14627 reported AI credits; its light reviewer
 inherited the heavy assignment because no light tier was saved. #4 did run a
@@ -336,7 +337,12 @@ discarding the review. A marker counts only as a whole line, so marker text
 inside the JSON, which any citation of these lines carries, stays payload.
 
 The full-mode review of pull request #7 demonstrated it: five of six reviewers
-emitted the markers, `claude-sonnet-5` among them, with no fence anywhere.
+emitted the markers, `claude-sonnet-5` among them, with no fence anywhere. The
+full-mode review of pull request #11 went further: `claude-sonnet-5` wrote
+several paragraphs of prose and then the markers, and its envelope was taken
+whole. That same review also shows the limit. One `gpt-5.6-terra` specialist
+returned a single sentence of prose and **no markers at all**, and that is
+discarded whole, because there is no envelope to unwrap.
 
 Nothing else is recovered. A repeated or missing marker, a marker sharing its
 line, a fence with prose after it, two fenced blocks, a truncated object, and a
@@ -853,7 +859,10 @@ malformed arguments, empty values, and unsupported models or reasoning efforts
 are explicit errors that write nothing. Models must be available and enabled in
 this session's Copilot subscription, and an effort must be supported by the model
 the tier actually resolves to. An invalid explicit value is refused, never
-replaced by a different model or a lower effort. Because clearing one half of a
+replaced by a different model or a lower effort. A model that supports no
+configurable reasoning effort takes none rather than inheriting one; see [Models
+with no configurable reasoning
+effort](#models-with-no-configurable-reasoning-effort-c4). Because clearing one half of a
 tier can leave the other half unusable, clear a tier's model and effort together.
 
 An unset tier field takes the nearest configured tier, preferring the heavier
@@ -884,13 +893,12 @@ review runs its "light" reviewer on your heavy model at heavy effort, which is
 what makes a balanced review expensive. An unset medium tier inherits heavy over
 light when both are configured, because a tie prefers the heavier tier.
 
-One trap worth knowing: a model that supports no configurable reasoning effort,
-such as `claude-haiku-4.5`, cannot be used in a tier while any effort reaches
-it. An unset `lightEffort` inherits `heavyEffort`, and the resolved pair is
-validated, so the review is refused rather than silently lowered. Pick a light
-model that supports an effort, such as `gemini-3.8-flash`, `gpt-5-mini` or
-`mai-code-1.1-flash`. Letting such a model serve a tier is tracked as increment
-`C4` in [ROADMAP.md](ROADMAP.md).
+One thing worth knowing before you pick a light model. A model that supports no
+configurable reasoning effort, such as `claude-haiku-4.5`, serves a tier with no
+effort at all: it does not inherit the effort another tier or this session would
+otherwise supply, so it is a usable light model. Setting that tier's own effort
+explicitly is still refused. See [Models with no configurable reasoning
+effort](#models-with-no-configurable-reasoning-effort-c4).
 
 Invocation flags win over saved settings for that invocation only and never
 rewrite the file: `heavyModel=`/`heavyEffort=` on `/pr-review NUMBER`, and
@@ -966,7 +974,8 @@ Precedence is per key: invocation flags, then a trusted project's settings, then
 personal settings, then the ambient session assignment. Tier inheritance then
 runs over the merged result, and `show` and the pre-execution report name the
 origin of every value: `flag`, `project:heavy`, `project-inherited:light`,
-`configured:heavy`, `inherited:light`, `ambient`, or `unset`. An invocation never
+`configured:heavy`, `inherited:light`, `ambient`, `unset`, or `model` when the
+resolved model supports no configurable reasoning effort. An invocation never
 rewrites the personal file, the trust record, or the project file.
 
 `autoPostReviews` is overridable by a trusted project, as the scope records.
@@ -1036,9 +1045,11 @@ unset `heavyFallbackModel` means the heavy tier has no fallback, not that the
 light tier's fallback stands in for it. An unset `<tier>FallbackEffort` follows
 that tier's own effective effort, and the resulting pair is validated like any
 other explicit assignment, so an effort the fallback model cannot support is
-refused rather than quietly lowered. Set `<tier>FallbackEffort` when the fallback
-model supports a different set of efforts from the primary. It cannot be set
-without `<tier>FallbackModel`, because on its own it configures nothing.
+refused rather than quietly lowered. The exception is a fallback model that
+supports no configurable effort at all: it takes none, exactly as a tier does.
+Set `<tier>FallbackEffort` when the fallback model supports a different set of
+efforts from the primary. It cannot be set without `<tier>FallbackModel`, because
+on its own it configures nothing.
 
 A fallback that resolves to exactly the tier's own model *and* effort is not a
 fallback and is never attempted; `show` marks it `NOT OFFERED`. The same model at
@@ -1093,6 +1104,59 @@ fallback that also fails, one that cannot start, a completed reviewer and a
 cancelled run starting none, the adjudicator's own attempt, and the retained
 record that keeps both attempts. None of them starts inference or touches the
 network.
+
+### Models with no configurable reasoning effort (C4)
+
+```text
+/pr-review models
+/pr-review-config lightModel=claude-haiku-4.5
+/pr-review-config show
+```
+
+Not every subscription model takes a reasoning effort. `/pr-review models` prints
+`reasoning=(not configurable)` for those that do not, and on the development
+subscription `claude-haiku-4.5` is one of them.
+
+A tier whose resolved model is one of those takes **no** effort. It does not
+inherit the effort a neighbouring tier, a trusted project or the ambient session
+would otherwise supply, because that effort is not one the model can hold.
+`show` and the pre-execution report print `reasoning=(not configurable) [model]`
+for such a tier, so the origin says the model decided it rather than a
+configuration layer. The same rule applies to a tier's optional fallback model:
+the tier's own effort reaches its fallback the way an inherited effort reaches a
+tier, so a fallback model that advertises none does not receive it either.
+
+**An effort you set yourself is still validated and still refused.**
+`lightEffort=low` on a model that supports no effort is an explicit setting, so
+it is an error that changes nothing, exactly like an unsupported effort on a
+model that does support some. Nothing is dropped, substituted or lowered to make
+an explicit value fit; unset it instead. Inheritance is likewise unchanged for
+every model that does advertise efforts: an inherited effort such a model cannot
+support still refuses the review rather than being quietly lowered.
+
+Before this, a model with no configurable effort could not serve a tier at all
+whenever any effort reached it, which in practice meant whenever any other tier
+was configured. That made the cheapest models unusable for the light tier, which
+is the one balanced and full reviews run their overview reviewer on.
+
+Reproduce the controlled and native probes:
+
+```sh
+node scripts/smoke-config.mjs
+node scripts/smoke-review.mjs
+node scripts/smoke-fixture.mjs
+copilot plugin install "$(pwd)"
+COPILOT_CLI_PATH="$(command -v copilot)" \
+COPILOT_SDK_PATH="$(ls -d "$HOME"/.copilot/pkg/*/"$(copilot --version | sed -n 's/.*CLI \([0-9][0-9.]*[0-9]\).*/\1/p')"/copilot-sdk)" \
+PR_REVIEW_HEAVY_MODEL=gpt-5.6-terra PR_REVIEW_HEAVY_EFFORT=high \
+node scripts/smoke-config-runtime.mjs
+```
+
+The native probe needs your subscription to offer at least one model that
+advertises no configurable reasoning effort; it stores that model as the heavy
+tier, reloads the extension, dispatches a real review that displays the
+assignment, and then does the same on the fallback surface. It spends no
+inference credits and restores your personal configuration afterwards.
 
 ### Two-reviewer fixture experiment (F2)
 

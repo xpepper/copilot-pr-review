@@ -94,7 +94,16 @@ assert((await reviewerAssignments(parentModels, quickMode, { heavyModel: "other"
 for (const settings of [
   { heavyModel: "missing" }, { heavyModel: "disabled" }, { heavyModel: "auto" },
   { heavyModel: "provider/model" }, { heavyEffort: "max" }, { heavyModel: "other" },
+  { heavyModel: "plain", heavyEffort: "low" },
 ]) await assert.rejects(reviewerAssignments(parentModels, quickMode, settings), /No substitution/);
+// C4: "plain" advertises no configurable effort, so the tier resolves to none
+// instead of inheriting the ambient one and refusing the review.
+const effortless = await reviewerAssignments(parentModels, quickMode, { heavyModel: "plain" });
+assert(effortless.every(({ model, reasoningEffort, origin }) =>
+  model === "plain" && reasoningEffort === undefined && origin.reasoningEffort === "model"),
+"A model with no configurable effort serves the tier with none");
+assert.match(describeAssignments(quickMode, effortless),
+  /\n {2}correctness \[heavy\]: model=plain \[flag\] reasoning=\(not configurable\) \[model\]/);
 // Balanced runs four heavy specialists and one light overview reviewer.
 const ambientBalanced = await reviewerAssignments(parentModels, balancedMode, {});
 assert.deepEqual(ambientBalanced.map(({ label }) => label),
@@ -250,9 +259,22 @@ assert.equal((await withFallback({}, { heavyModel: "other", heavyEffort: "low" }
 // An unusable explicit fallback refuses the review; nothing is substituted for
 // it and it is not quietly dropped, which would leave a failure uncovered.
 for (const settings of [
-  { heavyFallbackModel: "missing" }, { heavyFallbackModel: "disabled" }, { heavyFallbackModel: "plain" },
+  { heavyFallbackModel: "missing" }, { heavyFallbackModel: "disabled" },
+  { heavyFallbackModel: "plain", heavyFallbackEffort: "low" },
   { heavyFallbackEffort: "high" }, { heavyFallbackEffort: "max" },
 ]) await assert.rejects(withFallback(settings), /No substitution/, JSON.stringify(settings));
+// C4 on the second surface: the tier's own effort is not carried over to a
+// fallback model that advertises none, so it reaches the reviewers.
+const effortlessFallback = await reviewerAssignments(parentModels, quickMode, {}, {
+  ...fallbackConfig,
+  effective: { settings: { heavyModel: "heavy", heavyEffort: "high", heavyFallbackModel: "plain" }, origins: {} },
+});
+assert.deepEqual(effortlessFallback.map(({ fallback }) => fallback), Array(3).fill({
+  model: "plain", reasoningEffort: undefined,
+  origin: { model: "configured:heavy", reasoningEffort: "model" },
+}), "A fallback model with no configurable effort carries none");
+assert.match(describeAssignments(quickMode, effortlessFallback),
+  /\n {4}fallback: model=plain \[configured:heavy\] reasoning=\(not configurable\) \[model\]/);
 const fallbackDescription = describeAssignments(balancedMode, balancedFallback);
 assert.match(fallbackDescription,
   /\n {2}correctness \[heavy\]: model=heavy \[configured:heavy\] reasoning=high \[configured:heavy\]\n {4}fallback: model=other \[configured:heavy\] reasoning=low \[configured:heavy\]\n/);
