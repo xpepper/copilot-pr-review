@@ -444,6 +444,27 @@ const fullReport = { mode: "full", validation: fullResult, complete: true };
 assert.match(formatFindings(fullReport), /^Full review: 4 validated finding\(s\)/);
 assert(!formatFindings(fullReport).includes("withheld"), "Full reports no withheld minor finding");
 console.log("PASS the full findings policy admits every minor severity, caps nothing and withholds nothing");
+// Deep presents all substantiated severities too, and does it from one reviewer:
+// the policy is a presentation rule, independent of how many reviewers ran.
+const deepPolicy = reviewModes.deep.policy;
+const deepReports = [reviewer([
+  minorCandidate("Minor integrated issue", "P3"), minorCandidate("Another integrated issue", "nit"),
+], { label: "integrated" })];
+const deepCollected = collectCandidates(deepReports, boundary, deepPolicy);
+assert.equal(deepCollected.candidates.length, 2);
+assert.equal(deepCollected.issues.length, 0);
+const deepResult = adjudicateCandidates(deepCollected,
+  validator(deepCollected.candidates.map((entry) => decision(entry.id))), boundary, deepPolicy);
+assert.deepEqual(deepResult.findings.map((finding) => finding.id), ["integrated:1", "integrated:2"]);
+assert.deepEqual(deepResult.findings.map((finding) => finding.severity), ["P3", "nit"]);
+assert.deepEqual(deepResult.capped, [], "The deep findings policy withholds no substantiated finding");
+assert.equal(deepResult.complete, true);
+assert.equal(collectCandidates(deepReports, boundary, policy).candidates.length, 0,
+  "Quick still admits no minor candidate, whichever reviewer raised it");
+const deepReport = { mode: "deep", validation: deepResult, complete: true };
+assert.match(formatFindings(deepReport), /^Deep review: 2 validated finding\(s\)/);
+assert(!formatFindings(deepReport).includes("withheld"), "Deep reports no withheld minor finding");
+console.log("PASS the deep findings policy presents every substantiated severity from its single reviewer");
 // F6: reviewers are asked for the envelope between two explicit markers, and
 // code unwraps exactly that delimiter pair, plus one fence that wraps the whole
 // response. Nothing else is recovered: prose without markers, an unmatched or

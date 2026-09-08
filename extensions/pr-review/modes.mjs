@@ -10,13 +10,20 @@ const security = { label: "security", tier: "heavy",
   focus: "Untrusted input, authentication and authorization, secrets, injection, and unsafe defaults." };
 const performanceResources = { label: "performance-resources", tier: "heavy",
   focus: "Algorithmic cost, hot paths, blocking work, allocation, and resource lifetime or leaks." };
+// Deep's one reviewer is deliberately not a specialist: it holds the whole
+// change at once, which is the only thing that separates deep from running the
+// other modes' specialists. It is not a sixth focus and not a fourth effort.
+const integrated = { label: "integrated", tier: "heavy",
+  focus: "The whole pull request as one change: correctness, API and data contracts, security, " +
+    "performance and resource lifetime, and whole-change coherence, together with the interactions " +
+    "between them that no single-focus reviewer sees." };
 const overview = { label: "overview", tier: "light",
   focus: "Whole-change coherence: oversights, missed call sites, misleading names, and small " +
     "defects on the changed lines that a narrow specialist may pass over." };
 
-// Every mode ranks the same severities in the same order. Balanced and full
-// admit the minor ones too and differ only in how many they present, so the
-// vocabulary is declared once and cannot drift between them.
+// Every mode ranks the same severities in the same order. Balanced, full and
+// deep admit the minor ones too and differ only in how many they present, so
+// the vocabulary is declared once and cannot drift between them.
 const majorSeverities = ["P0", "P1", "P2"];
 const minorSeverities = ["P3", "nit"];
 const minorPolicy = (label, minorCap) => ({
@@ -30,6 +37,7 @@ export const reviewModes = {
     aliases: ["--major-only"],
     label: "Quick review",
     evidencePrefix: "Q3",
+    holistic: false,
     specialists: [
       correctness,
       contracts,
@@ -49,6 +57,7 @@ export const reviewModes = {
     aliases: [],
     label: "Balanced review",
     evidencePrefix: "M1",
+    holistic: false,
     specialists: [correctness, contracts, security, performanceResources, overview],
     policy: minorPolicy("Balanced review", 3),
   },
@@ -58,6 +67,7 @@ export const reviewModes = {
     aliases: [],
     label: "Full review",
     evidencePrefix: "M1",
+    holistic: false,
     specialists: [
       correctness, contracts, security, performanceResources, overview,
       { label: "conventions-maintainability", tier: "medium",
@@ -67,6 +77,19 @@ export const reviewModes = {
     // Full presents every qualifying severity, so its minor allowance is
     // unbounded rather than absent: the cap arithmetic stays one number.
     policy: minorPolicy("Full review", Infinity),
+  },
+  // Deep replaces the parallel specialists with a single integrated reviewer,
+  // which is why it is the only mode declaring itself holistic: consumers ask
+  // the mode what kind of review it is rather than inferring it from the count.
+  deep: {
+    id: "deep",
+    flag: "--deep",
+    aliases: [],
+    label: "Deep review",
+    evidencePrefix: "M2",
+    holistic: true,
+    specialists: [integrated],
+    policy: minorPolicy("Deep review", Infinity),
   },
 };
 

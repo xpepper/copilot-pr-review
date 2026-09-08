@@ -136,7 +136,7 @@ try {
   console.log("PASS cancellation and non-absolute working directories are refused");
 
   // 9. The refusal text always names the failed condition, the mode and the fix.
-  for (const mode of [reviewModes.quick, reviewModes.balanced, reviewModes.full]) {
+  for (const mode of [reviewModes.quick, reviewModes.balanced, reviewModes.full, reviewModes.deep]) {
     for (const condition of ["local-head", "working-tree", "remote-head", "not-a-git-checkout"]) {
       const message = refuseCheckout(condition, "detail", 7, mode);
       assert.match(message, new RegExp(`Failed condition: ${condition}`));
@@ -148,7 +148,7 @@ try {
   }
   // The balanced and full gates refuse on exactly the same evidence, each
   // naming its own mode; no mode gets an override or a degraded fallback.
-  for (const mode of [reviewModes.balanced, reviewModes.full]) {
+  for (const mode of [reviewModes.balanced, reviewModes.full, reviewModes.deep]) {
     await assert.rejects(
       assertReviewableCheckout(snapshotFor("c".repeat(40)),
         { cwd: matching.directory, gh: fakeGh("c".repeat(40)), mode }),
