@@ -219,7 +219,8 @@ only findings surviving the Q4 boundary below appear in the final findings view.
 Candidate output may quote PR source; full captured input is not dumped into the
 parent timeline.
 
-`Q3 evidence:` (`M1 evidence:` for balanced and full) is emitted after owned-runtime cleanup and now includes Q4
+`Q3 evidence:` (`M1 evidence:` for balanced and full, `M2 evidence:` for deep) is emitted after
+owned-runtime cleanup and now includes Q4
 `validation` and optional `adjudicator` records. `executionComplete` reports
 specialist execution separately. `complete: true` additionally requires finished
 validation without unresolved evidence or cleanup errors; it never means the PR
@@ -398,7 +399,7 @@ response, then rejects anything else malformed rather than extracting fragments
 from it. Candidates must echo a digest of the code-owned review binding and use
 exactly the defined schema. Candidates must carry numeric confidence **0.8
 through 1** and a severity the mode's findings policy admits: P0-P2 for quick,
-P0-P2 plus P3/nit for balanced and full. This is a conservative admission
+P0-P2 plus P3/nit for balanced, full and deep. This is a conservative admission
 threshold, not calibrated certainty.
 
 Code checks every cited path, side, line range and verbatim quotation against Q2's
@@ -891,7 +892,7 @@ Invocation flags win over saved settings for that invocation only and never
 rewrite the file: `heavyModel=`/`heavyEffort=` on `/pr-review NUMBER`, and
 `--comment`/`--no-comment` over `autoPostReviews`. There is no light-tier or
 medium-tier invocation flag; balanced and full take those assignments from saved
-configuration or the ambient session.
+configuration or the ambient session, and deep resolves neither tier.
 
 Configuration is personal and lives at `<copilot-config-home>/pr-review/config.json`,
 beside the CLI's own `session-state` directory, so it is never inside a reviewed

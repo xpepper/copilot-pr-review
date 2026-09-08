@@ -76,8 +76,10 @@ one.** `scripts/dogfood-review.mjs` waited for a hardcoded `Q3`/`M1` evidence
 prefix, so a deep run would have hung after printing its findings; the
 configuration inspector's tier note named quick, balanced and full only; and the
 roadmap's own exact-next section was stale, which the review itself caught. The
-first two now derive from or are asserted against the mode declarations. If you
-add a mode, grep for the other three mode ids before you push.
+first two now derive from or are asserted against the mode declarations, and a
+final sweep fixed four more prose enumerations in `README.md` and a probe
+comment. If you add a mode, grep for the other four mode ids, and for
+`quick, balanced`, `balanced and full` and `balanced/full`, before you push.
 
 ## The next increment: `C3` or `C4`
 

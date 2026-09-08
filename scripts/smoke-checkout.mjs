@@ -146,7 +146,7 @@ try {
       assert.match(message, /no local file was touched/);
     }
   }
-  // The balanced and full gates refuse on exactly the same evidence, each
+  // Every non-default mode's gate refuses on exactly the same evidence, each
   // naming its own mode; no mode gets an override or a degraded fallback.
   for (const mode of [reviewModes.balanced, reviewModes.full, reviewModes.deep]) {
     await assert.rejects(
