@@ -343,7 +343,9 @@ full-mode review of pull request #11 went further: `claude-sonnet-5` wrote
 several paragraphs of prose and then the markers, and its envelope was taken
 whole. That same review also shows the limit. One `gpt-5.6-terra` specialist
 returned a single sentence of prose and **no markers at all**, and that is
-discarded whole, because there is no envelope to unwrap.
+discarded whole, because there is no envelope to unwrap. An attempt whose output
+is discarded that way is a failed attempt, eligible for its tier's one configured
+fallback; the marker contract itself is unchanged.
 
 Nothing else is recovered. A repeated or missing marker, a marker sharing its
 line, a fence with prose after it, two fenced blocks, a truncated object, and a
@@ -1060,8 +1062,10 @@ fallback gets no further attempt whatever happens next.
 at all, so a reviewer that hangs waits indefinitely and is never replaced; only
 an explicit failure is eligible. In practice that means the attempt settled as a
 failure: a session error, a shutdown before completion, no usable output, an
-attempted forbidden tool call, or reported usage that did not match the
-assignment. Cancelling the run is not a failure and starts no fallback.
+attempted forbidden tool call, reported usage that did not match the assignment,
+or output this tool could not use at all, described under [Discarded output is a
+failed attempt](#discarded-output-is-a-failed-attempt-c5). Cancelling the run is
+not a failure and starts no fallback.
 
 An invalid explicit setting is not eligible either. A model your subscription
 cannot use, or an effort a model does not support, still refuses the review
@@ -1110,16 +1114,12 @@ retained record keeps the failed attempt beside the one that produced the
 result. A recovered reviewer reports completed coverage; a fallback that fails
 too leaves the reviewer incomplete with both failures recorded.
 
-One limitation worth knowing before you configure a fallback. Eligibility is
-tied to how the reviewer's **execution** settled, not to whether its output
-turned out usable. A reviewer that returns text the evidence boundary cannot
-parse counts as completed execution, so it gets no fallback even though its
-output is discarded and its coverage is lost. An empty response does get one,
-because that fails during execution. The asymmetry matters here: discarded
-output is the most common way a reviewer has failed in this project's own live
-reviews. Closing it is tracked as increment `C5` in [ROADMAP.md](ROADMAP.md),
-because the retry decision then has to move to the evidence boundary, after every
-reviewer has settled, rather than staying beside the reviewer that failed.
+Eligibility once depended on how the reviewer's execution settled rather than on
+whether its output turned out usable, so a reviewer that returned text this tool
+could not read counted as completed and got no fallback, while an empty response
+got one. Discarded output is the most common way a reviewer has failed in this
+project's own live reviews, and that asymmetry is now closed: see [Discarded
+output is a failed attempt](#discarded-output-is-a-failed-attempt-c5).
 
 Reproduce the controlled probes:
 
@@ -1134,6 +1134,38 @@ fallback that also fails, one that cannot start, a completed reviewer and a
 cancelled run starting none, the adjudicator's own attempt, and the retained
 record that keeps both attempts. None of them starts inference or touches the
 network.
+
+### Discarded output is a failed attempt (C5)
+
+A reviewer can finish its turn and still deliver nothing this tool can read: a
+paragraph of thinking-style prose instead of the result object, a missing or
+repeated marker, JSON that does not parse, or an object bound to a different
+review. That output is discarded whole, and the attempt that produced it counts
+as a failure. It reports incomplete coverage, and if that reviewer's tier has a
+configured fallback, it gets its one attempt.
+
+This is the same check that decides whether the output can be used at all, asked
+one step earlier so the answer arrives beside the reviewer rather than after
+every reviewer has finished. It applies to the adjudicator too.
+
+**It stops at that outer object, and never reaches the review's judgment about
+your pull request.** These are not failures and are never retried:
+
+- A candidate the evidence boundary refuses, for a quote that does not match the
+  source, an anchor that is not on a changed line, or confidence below the bar.
+  Other candidates in the same output are still kept and still adjudicated.
+- An output that reports no candidate at all. That is an answer, not a failure.
+  Retrying it would spend a second model on manufacturing a finding.
+- An output whose every candidate is refused. Retrying that would run a model
+  again until the gate accepted something.
+- A repaired clipped quotation, which stays a note on a surviving candidate.
+- A candidate the adjudicator rejects on the merits.
+
+A reviewer whose output was discarded now reports `incomplete` whether or not a
+fallback is configured, because the attempt failed either way. With no fallback
+configured nothing is retried and nothing extra is spent, and the review reports
+the same incomplete coverage it always did, now attributed to the reviewer that
+caused it.
 
 ### Models with no configurable reasoning effort (C4)
 

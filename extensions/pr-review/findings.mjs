@@ -169,6 +169,13 @@ function envelope(raw, key, field) {
   return parsed;
 }
 
+// C5: whether an attempt delivered the contract at all, as a predicate the
+// execution seam can apply beside the reviewer that produced it. It is exactly
+// the gate collection applies again below, never a weaker one, and it looks no
+// further than the envelope: what becomes of the candidates inside a valid one
+// is this review's judgment about the change, not the attempt's own failure.
+export const envelopeVerifier = (key, field) => (result) => { envelope(result, key, field); };
+
 function limitations(output, label) {
   return output.limitations.map((entry) => output.schemaVersion === 1 ? {
     kind: "coverage-gap", message: `${label}: legacy unclassified limitation (kept incomplete): ${entry}`,

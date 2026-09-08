@@ -3,8 +3,8 @@ import { createHash } from "node:crypto";
 import { assembleContext } from "../extensions/pr-review/context.mjs";
 import { reviewBinding } from "../extensions/pr-review/review.mjs";
 import {
-  adjudicateCandidates, candidateFormat, collectCandidates, evidenceBoundary, formatFindings,
-  outputEnd, outputStart, reviewKey, validationInstructions,
+  adjudicateCandidates, candidateFormat, collectCandidates, envelopeVerifier, evidenceBoundary,
+  formatFindings, outputEnd, outputStart, reviewKey, validationInstructions,
 } from "../extensions/pr-review/findings.mjs";
 import { formatCoverage, presentationDiagnostics } from "../extensions/pr-review/coverage.mjs";
 import { reviewModes } from "../extensions/pr-review/modes.mjs";
@@ -486,7 +486,7 @@ for (const format of [
     "Both output contracts name the exact markers reviewers must emit");
   assert.match(format, /raw JSON|no fences/i, "The contract still forbids a wrapper inside the markers");
 }
-for (const raw of [
+const usableEnvelopes = [
   delimit(envelopeText()),
   `I'll trace the changed expression first.\n${delimit(envelopeText())}\nThat is my whole assessment.`,
   delimit("```json\n" + envelopeText() + "\n```"),
@@ -494,13 +494,14 @@ for (const raw of [
   "```\n" + envelopeText() + "\n```",
   `  ${delimit(envelopeText())}  `,
   envelopeText(),
-]) {
+];
+for (const raw of usableEnvelopes) {
   const unwrapped = collectCandidates([reviewer([], { result: raw })], boundary, policy);
   assert.deepEqual(unwrapped.diagnostics, [], `Unwrap the delimited envelope: ${raw.slice(0, 40)}`);
   assert.equal(unwrapped.candidates.length, 1);
   assert.equal(adjudicateCandidates(unwrapped, validator(), boundary, policy).findings.length, 1);
 }
-for (const raw of [
+const discardedEnvelopes = [
   `I'll trace the changed expression first.\n${envelopeText()}`,
   "```json\n" + envelopeText() + "\n```\n```json\n" + envelopeText() + "\n```",
   `${outputStart}\n${envelopeText()}`,
@@ -510,7 +511,8 @@ for (const raw of [
   delimit(""),
   "```json\n" + envelopeText() + "\n```\nThat is my whole assessment.",
   "`" + envelopeText() + "`",
-]) {
+];
+for (const raw of discardedEnvelopes) {
   const rejected = collectCandidates([reviewer([], { result: raw })], boundary, policy);
   assert.equal(rejected.candidates.length, 0, `Fail whole rather than search for JSON: ${raw.slice(0, 40)}`);
   assert.match(rejected.diagnostics[0].message, /invalid candidate output/);
@@ -518,15 +520,57 @@ for (const raw of [
 }
 // The unwrap feeds the same parser: a delimited envelope that fails any gate
 // after the parse is rejected exactly as an undelimited one is.
-for (const body of [
+const gatedEnvelopes = [
   JSON.stringify({ schemaVersion: 2, reviewKey: "wrong", candidates: [], limitations: [] }),
   JSON.stringify({ schemaVersion: 2, reviewKey: key, candidates: [], limitations: [], clean: true }),
   "null",
-]) {
-  const gated = collectCandidates([reviewer([], { result: delimit(body) })], boundary, policy);
+].map(delimit);
+for (const body of gatedEnvelopes) {
+  const gated = collectCandidates([reviewer([], { result: body })], boundary, policy);
   assert.equal(gated.candidates.length, 0, "The evidence boundary is unchanged by the unwrap");
   assert.equal(adjudicateCandidates(gated, undefined, boundary, policy).complete, false);
 }
+// C5: retry eligibility asks the same question collection asks, on the same
+// corpus, and stops at the envelope. The verifier must accept exactly what
+// collection can use and reject exactly what it discards whole, so a fallback
+// can never be started by a weaker gate than the one that discarded the output.
+const verifyCandidates = envelopeVerifier(key, "candidates");
+for (const raw of usableEnvelopes) {
+  assert.doesNotThrow(() => verifyCandidates(raw), `A usable envelope is a completed attempt: ${raw.slice(0, 40)}`);
+}
+for (const raw of [...discardedEnvelopes, ...gatedEnvelopes]) {
+  assert.throws(() => verifyCandidates(raw), `A discarded envelope is a failed attempt: ${raw.slice(0, 40)}`);
+}
+// A refused candidate inside a usable envelope is this review's judgment about
+// the change, not the attempt's failure, so the verifier looks no further. The
+// same envelope that yields no candidate at all still reports a completed
+// attempt: an empty result is an answer, and retrying it would spend a second
+// model on manufacturing one.
+for (const candidates of [
+  [{ ...candidate, confidence: 0.5 }],
+  [{ ...candidate, severity: "P3" }],
+  [{ ...candidate, location: citation("head", 1) }],
+  [candidate, { ...candidate, confidence: 0.5 }],
+  [],
+]) {
+  const raw = JSON.stringify({ schemaVersion: 2, reviewKey: key, candidates, limitations: [] });
+  assert.doesNotThrow(() => verifyCandidates(raw),
+    "A candidate the evidence boundary refuses never makes its reviewer's attempt eligible");
+  const refused = collectCandidates([reviewer([], { result: raw })], boundary, policy);
+  assert.equal(refused.candidates.length, candidates.length > 1 ? 1 : 0,
+    "A usable sibling in the same envelope is still collected");
+}
+// The adjudicator holds the same contract, on its own field.
+const verifyDecisions = envelopeVerifier(key, "decisions");
+assert.doesNotThrow(() => verifyDecisions(delimit(decisionsText())));
+assert.throws(() => verifyDecisions(delimit(envelopeText())), /expected exactly schemaVersion/);
+assert.throws(() => verifyCandidates(delimit(decisionsText())), /expected exactly schemaVersion/);
+assert.throws(() => verifyDecisions("Weighing the candidate against the diff."), /Unexpected token/);
+assert.throws(() => verifyDecisions(delimit(JSON.stringify({
+  schemaVersion: 2, reviewKey: "wrong", decisions: [], limitations: [],
+}))), /Wrong schema version or review binding/);
+console.log("PASS retry eligibility is the envelope gate itself, and stops above every candidate-level refusal");
+
 // The adjudicator's output travels the same path.
 const delimitedAdjudication = adjudicateCandidates(
   collectCandidates([reviewer()], boundary, policy),

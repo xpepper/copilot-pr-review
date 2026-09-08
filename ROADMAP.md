@@ -5707,117 +5707,433 @@ only; they have not been reviewed again. The user subsequently authorized
 merging #13 and chose a C5 boundary discussion, not implementation, for the
 next fresh session.
 
+## Completed increment: C5
+
+`C5` makes a discarded reviewer output an eligible failed attempt. It landed on
+branch `c5-discarded-output-eligibility`. The boundary was discussed and
+approved before any code was written, in the session the user reserved for that
+discussion on 2026-09-08; the four choices it named are recorded below with the
+answers the user gave.
+
+### The asymmetry it closes
+
+A reviewer that finished its turn settled `completed` however unusable its
+output turned out to be, because `runReviewer` only asked whether a nonempty
+message arrived before the session went idle. Envelope validation then ran much
+later, in `collectCandidates`, after every reviewer had settled. A reviewer
+whose output could not be parsed was therefore reported as an execution failure
+by the coverage report and as `completed` by its own record, so it could never
+become eligible for its tier's one configured fallback, while a reviewer that
+returned nothing at all could.
+
+Pull request #11 showed both halves in one run. `correctness` settled
+`completed` on one sentence of thinking-style prose and got nothing;
+`contracts` settled `incomplete` on no usable output and would have been
+eligible had a fallback been configured. Two reviewers lost the same way,
+separated only by how the runtime reported the end of the attempt.
+
+### The boundary, and the four choices behind it
+
+**Eligibility is the envelope gate itself, and stops there.** An attempt that
+settled `completed` is demoted to `incomplete`, and so becomes eligible for one
+configured fallback attempt, if and only if `envelope()` throws on its output.
+If `envelope()` returns, the attempt stays `completed` whatever becomes of the
+candidates inside it.
+
+Everything `envelope()` checks is the reviewer's compliance with a format this
+tool specified: the marker pair, the fence unwrap, JSON parsing, the exact key
+set, the schema version, the review-key binding, the result arrays and the
+limitation entries. Everything below it, meaning `candidate()` and adjudication,
+is judgment about the reviewed change. Retrying compliance is legitimate.
+Retrying judgment runs a model again until the gate accepts something, which
+manufactures findings, and it is the direction `SCOPE.md` closed when it dropped
+experimental malformed-output finding extraction from v1.
+
+That distinction also keeps `C5` clear of `Q5` and `Q6`. On #10 the overview
+reviewer's P2 at confidence 0.95 was discarded by the changed-line anchoring
+rule. That was a semantic refusal, and the correct repair was to fix the rule,
+which `Q5` and `Q6` did. A retry would have papered over a gate defect instead
+of fixing it. The two repairs answer different failures and must not be mixed.
+
+Four choices were put to the user before implementation, and all four were
+approved as recommended:
+
+| Choice | Decision | Why |
+| --- | --- | --- |
+| The adjudicator's own discarded decisions | In scope, on the `decisions` field | A malformed adjudication accepts no candidate, which is the most expensive discard in the system |
+| An envelope whose every candidate is refused | Not eligible | Indistinguishable at one attempt from retrying a single refusal; `Q5`/`Q6` answer this by fixing the gate |
+| A well-formed envelope bound to the wrong review key | Eligible, with no carve-out | Nothing usable survives it, so it is structural like any other envelope failure |
+| Whether demotion requires a configured fallback | Demote always | The attribution is wrong either way, and gating it would make a recorded status depend on another user's configuration |
+
+### Where the check sits, and why not at the evidence boundary
+
+The retry decision did **not** move into `findings.mjs`. `reviewAssignments`
+takes an optional `verifyResult` callback, applied in `runAttempt` immediately
+after the existing usage-mismatch demotion, and `review.mjs` supplies it as
+`envelopeVerifier(reviewKey(binding), "candidates")` for the specialists and
+`envelopeVerifier(boundary.key, "decisions")` for the adjudicator. The verifier
+is the same `envelope()` call collection makes, exported as a predicate; it is
+never a weaker gate, and `smoke-findings.mjs` holds it to exactly the corpus
+collection accepts and discards.
+
+Two reasons decided the placement, and the second is decisive:
+
+- The hook needs only the review key, which `reviewPrompt` already computes
+  before any reviewer starts, so nothing was hoisted or restructured and
+  `fixture.mjs` stays evidence-agnostic. The `F2` fixture path passes no hook.
+- **There is no timeout, so a hung reviewer never settles.** Validating in
+  `collectCandidates` would mean no retry could start until `Promise.allSettled`
+  resolved, so one hung reviewer would block every *other* reviewer's fallback
+  indefinitely. Beside the reviewer, each fallback fires as soon as its own
+  attempt settles, independent of its siblings. The roadmap's own earlier
+  sketch of running collection twice was rejected for this reason.
+
+`envelope()` therefore parses twice, once as an eligibility predicate and once
+in collection. It is pure and deterministic, spends nothing, and keeps the
+evidence boundary the single authority on what any of it means.
+
+### What did not change
+
+- The evidence boundary itself. The marker contract and its unwrap, the exact
+  key set, the schema-version and review-key checks, the citation, quote and
+  changed-line gates, `Q5`'s same-hunk rule, `Q6`'s clipped-quote repair,
+  adjudication, deduplication, selection, retention and the publication gates
+  are all untouched. No gate was weakened to make a retry fire.
+- The one-configured-fallback limit. A reviewer still gets at most one extra
+  attempt whatever happens, the review is never restarted, no other reviewer is
+  affected, and a fallback that fails leaves the reviewer incomplete with both
+  failures recorded. A fallback attempt is now verified exactly like the primary
+  it answers, and that is still its only attempt.
+- Cancellation. A cancelled attempt settles `cancelled`, never `incomplete`, so
+  the verifier never runs on it and no fallback starts. Elapsed time still
+  triggers nothing: no timeout, deadline or stuck-reviewer heuristic was added.
+- Confinement. `read-only.mjs` is untouched; the absent-path denial observation
+  stays open and unaddressed.
+- **The retained record.** No key, no status vocabulary and no record schema
+  version changed. `C3`'s invariants already describe this shape exactly: a
+  demotion produces the `incomplete` status `fallbackFrom` requires, and a
+  successful fallback produces the all-reviewers-completed state `complete`
+  requires. No reviewer's raw output was ever retained, on the primary or on
+  `fallbackFrom`, and `C5` does not add it: only the reason the output was
+  discarded travels, in the attempt's error.
+
+### What changes for coverage
+
+Review-level coverage was **already** `INCOMPLETE` in every one of these cases,
+because `collectCandidates` already pushed a blocking `execution-failure` for an
+unparseable envelope. `C5` does not change the headline coverage word on a
+failure. What it changes is attribution and recovery:
+
+- The reviewer's own status becomes `incomplete`, and `executionComplete`
+  becomes false where both previously said the attempt had completed.
+- The reason the output was discarded is carried in the attempt's error, so
+  demotion does not replace the specific parse failure with a generic
+  incomplete-execution message.
+- A successful fallback can now turn a review that would have been `INCOMPLETE`
+  into a `completed` one. That is what `C5` buys.
+
+### Controlled evidence
+
+Test-first throughout. The acceptance assertions failed first on a reviewer that
+settled `completed` with prose, which is the recorded #11 shape, and the
+equivalence assertions failed before the verifier existed.
+
+All twelve controlled suites pass and `git diff --check` is clean. None of them
+starts inference or touches the network:
+
+```sh
+for s in findings review selection retention preview publication publish-later \
+         checkout config context fixture target; do node scripts/smoke-$s.mjs; done
+git diff --check
+```
+
+New demonstrations in `smoke-review.mjs`, on a harness extended with reviewer
+prose, a wrong-key envelope, a refused candidate beside a valid one, and a
+fallback attempt that returns prose too:
+
+- Demotion without a fallback, for prose and for a wrong review key: the
+  reviewer settles `incomplete`, no extra session is created, `executionComplete`
+  is false, the specific parse reason reaches the coverage report, and the other
+  reviewers still complete and are adjudicated.
+- Useful sibling candidates survive another reviewer's fallback with their ids
+  and content intact, and reach the adjudicator unchanged. Exactly one extra
+  session is created, and no other reviewer is retried or reassigned.
+- A candidate refused inside a valid envelope demotes nothing and retries
+  nothing, and the valid sibling in that same envelope is still collected and
+  adjudicated. An envelope whose every candidate is refused likewise starts no
+  attempt, and still blocks completed coverage.
+- A fallback that fails leaves the reviewer incomplete in all three shapes: a
+  setup refusal that creates no session and keeps the attempt that ran, a run
+  failure, and a fallback whose own output is discarded for the same reason as
+  the primary's. None of them gets a third attempt.
+- Cancellation demotes nothing and starts no fallback.
+- A valid envelope reporting no candidate is a completed attempt in quick,
+  balanced, full and deep alike, and starts neither an adjudicator nor a
+  fallback.
+- Demotion and recovery behave the same in all four modes, and a demoted
+  reviewer falls back on its own tier: balanced's light `overview` and full's
+  medium `conventions-maintainability` each recover on their own tier's
+  configured fallback, never on the heavy one.
+- A `Q6` repair leaves the attempt completed and starts no fallback.
+- The adjudicator's own discarded decisions are eligible: one fallback attempt
+  recovers it, and when that attempt is discarded too, no candidate is accepted
+  and coverage stays incomplete.
+
+New demonstrations in `smoke-findings.mjs`, which prove the predicate is the
+gate rather than a copy of it:
+
+- The verifier accepts exactly the seven envelope shapes `collectCandidates`
+  can use, and rejects exactly the nine it discards whole plus the three that
+  fail the post-parse gates.
+- It does not throw on an envelope carrying a candidate below the confidence
+  bar, a candidate with a severity the mode does not admit, a candidate anchored
+  off the changed lines, a valid candidate beside a refused one, or no candidate
+  at all, while collection still refuses each of those candidates.
+- The adjudicator's field is checked as its own contract: a candidates envelope
+  is refused on the decisions field and the reverse, and prose and a wrong
+  review key are refused on both.
+
+### Cost
+
+Fallbacks start unset, so **a user with no configured fallback spends nothing
+extra**; they get corrected attribution only. A fallback attempt re-sends the
+full prompt and is a complete second review pass, so it costs roughly what the
+primary cost rather than less.
+
+| Tier | Recorded per-reviewer charge | Runs |
+| --- | --- | --- |
+| Heavy | 28.36 to 57.14 credits | #10, #11, #13 |
+| Light overview | 5.49 to 7.77 credits | #10, #11, #13 |
+| Medium `claude-sonnet-5` | 92.93905 credits | #11 |
+
+The worst case is bounded by `C3` and unchanged by `C5`: at most one extra
+attempt per reviewer plus one for the adjudicator, so seven in full mode and six
+in balanced. Against this project's own history, a configured heavy fallback
+would have added roughly 30 credits to #13's 134.753239, and would have fired
+twice on #11 for roughly 70 credits against 269.135657. `C5` adds no instruction
+text and no prompt tokens to any primary attempt.
+
+### Installed balanced review of pull request #14
+
+The installed plugin reviewed `C5`'s own pull request once, in **balanced** mode
+named explicitly. Balanced is the default topology and `C5` adds no mode, so no
+other topology was required; full would have added a medium reviewer without
+putting the change on a seam balanced does not already cross.
+
+```sh
+gh pr checkout 14
+copilot plugin install "$(pwd)"
+COPILOT_CLI_PATH="$(command -v copilot)" \
+COPILOT_SDK_PATH="$(ls -d "$HOME"/.copilot/pkg/*/"$(copilot --version \
+  | sed -n 's/.*CLI \([0-9][0-9.]*[0-9]\).*/\1/p')"/copilot-sdk)" \
+node scripts/dogfood-review.mjs 14 --balanced --all --no-comment
+```
+
+Reviewed head `761e01c`, base `58deae8`, seven files, 666 additions and 152
+deletions. Five reviewers from saved personal configuration, and **no configured
+fallback on any tier**:
+
+| Reviewer | Tier, actual model, effort | Settled | Tool calls | Reads | Denials | Credits |
+| --- | --- | --- | --- | --- | --- | --- |
+| correctness | heavy, `gpt-5.6-terra`, high | completed | 4 | 4 | 0 | 24.630630 |
+| contracts | heavy, `gpt-5.6-terra`, high | completed | 10 | 10 | 0 | 28.570110 |
+| security | heavy, `gpt-5.6-terra`, high | completed | 8 | 8 | 0 | 29.858490 |
+| performance-resources | heavy, `gpt-5.6-terra`, high | completed | 4 | 4 | 0 | 23.664930 |
+| overview | light, `gpt-5.6-luna`, high | completed | 16 | 16 | 0 | 4.012691 |
+
+Per-reviewer reported nano-AIU charges sum to **110.736851 credits**, the
+runtime's own figure. There were 42 tool calls and 42 reads, 24 `view`, 17 `rg`
+and one `glob`, with **no permission denial and no tool denial**, as on #10 and
+#12. All recorded usage matched the assignments. Runtime reviewer events ran
+from 17:09:29.690Z to 17:10:33.736Z. No timeout or intervention was applied and
+the working tree was untouched throughout. Nothing was published.
+
+**Coverage is INCOMPLETE**, on one coverage gap and three informational caveats,
+with **zero execution failures**. There were zero candidates, so no adjudicator
+session ran, and nothing was accepted, rejected, deduplicated or capped. This is
+not a clean-review claim.
+
+**What this run does and does not demonstrate about `C5`.**
+
+- Every reviewer completed and every envelope parsed, so **the demotion path was
+  never taken**. The run shows that `C5` does not break the ordinary path; it
+  does not show a live demotion.
+- The verifier nevertheless ran live on five real reviewer outputs, on the
+  execution seam, before collection saw any of them, and demoted none. Every one
+  carried the marker pair exactly once and parsed. That is real evidence for one
+  specific risk: the predicate does not reject well-formed live model output that
+  collection then accepts. It is a sixth run of live evidence for `F6`'s marker
+  contract, across two model families.
+- **No fallback was configured on any tier**, so no fallback attempt could have
+  started even had a reviewer been demoted. The `C3` execution path `C5` feeds
+  remains live-unobserved, exactly as before this increment.
+- Zero candidates means the adjudicator never ran, so `envelopeVerifier` on the
+  `decisions` field is controlled-only evidence.
+
+**The reviewers said the same thing about the gap, and they are right.**
+`performance-resources` recorded the one coverage gap: the captured context
+holds controlled assertions but no runtime trace or workload with a configured
+fallback, so latency, peak concurrent-session count and the credit charge when
+several unusable outputs trigger their fallbacks cannot be assessed from the
+supplied evidence. `contracts` recorded the matching caveat: the checkout and
+harness changes establish the verifier's source-level integration but cannot
+establish how a live runtime behaves after a malformed primary output triggers a
+configured fallback. `correctness` noted that the controlled assertions were
+present but not executed by the review, and `security` limited itself to the
+captured diff and checkout. All four are preserved as reported. They are not
+relabelled to make the review complete, and they agree with the limitations this
+increment already recorded for itself.
+
+**No defect candidate was proposed**, so no finding was fixed and none was
+rejected by hand, and no implementation changed in response. Zero findings is
+never a clean-review claim, and the coverage gap outranks the passing controlled
+suites as a statement about what is still unknown.
+
+The complete timeline was saved before analysis, outside the checkout, in
+`c5-review-timeline.log` in this session's scratchpad, alongside
+`c5-review-evidence.json` and the five original `c5-<reviewer>-verbatim.txt`
+strings taken from the timeline's structured evidence. They stay local. The
+retained review is bound to originating session
+`13aa9f39-f66d-491b-bd5a-05be35833afb`, invocation
+`cfe6ad3e-fcde-4040-8030-5bf7c90a440d`, with review key
+`6df48c4664395458cb89865de3d538837b74f895a902b4a04780e3d3eeca0bdf`.
+
+CLI 1.0.83 was used with its derived bundled SDK. No other credit-spending
+probe, factory invocation or rerun was performed, and the personal configuration
+file was not moved or edited. The commits after this review change documentation
+only and have not been reviewed again.
+
+### Remaining limitations
+
+- **No live run has demoted an attempt.** Every reviewer on #14 completed and
+  every envelope parsed, so the demotion path is demonstrated only by the
+  controlled suites, with scripted reviewer output. What #14 does establish is
+  the narrower converse: the verifier ran live on five real outputs and demoted
+  none of them, so the predicate does not reject well-formed model output that
+  collection then accepts.
+- **No live run has started a fallback from a demotion, and none could have.**
+  No tier had a configured fallback on #14, and the project has never configured
+  one for any live review, so the whole `C3` execution path `C5` feeds remains
+  live-unobserved. #11 is still the only run where one would have fired. Whether
+  a real model that emitted prose once produces a usable envelope on a different
+  assignment is therefore still unestablished, and the reviewers on #14 said so
+  themselves. Do not read the controlled evidence as evidence about model
+  behaviour.
+- The adjudicator's half is controlled-only. #14 produced zero candidates, so no
+  adjudicator session ran and `envelopeVerifier` on the `decisions` field has
+  never been exercised live.
+- Demotion is a visible change for a user with no fallback configured: a
+  reviewer that previously read `completed` now reads `incomplete`. That is more
+  accurate, and it is documented, but it is a behaviour change rather than a
+  pure addition.
+- `envelope()` runs twice per attempt. That is deliberate and costs no credits,
+  but it does mean a future change to the envelope contract has two callers that
+  must stay identical; the equivalence assertions in `smoke-findings.mjs` exist
+  to catch a divergence.
+- The absent-path read denial recorded on #6, #11 and #13 is untouched and still
+  open. `C5` makes a reviewer that fails after such a denial eligible for a
+  fallback, which is not the same as fixing the denial.
+
 ## Exact next increment
 
-**Q6 is complete on pull request #13; the user has authorized its merge.**
-Both recorded near-misses reach controlled adjudication while the recorded
-fabrication does not. Its installed balanced review ran once and was incomplete;
-live repaired-candidate adjudication is still unobserved. Do not redo Q6 or
-spend another review to manufacture positive evidence.
+**`C5` is complete and merged from pull request #14.** Its one authorized
+installed review ran in balanced mode, cost 110.736851 credits and is recorded
+above. Coverage was INCOMPLETE on one coverage gap and three caveats, with zero
+execution failures, zero candidates and no adjudicator session. That
+authorization is spent: do not rerun it.
 
-**The next session is a C5 boundary discussion only.** On 2026-09-08 the user
-explicitly chose: "Discuss the C5 boundary and wait for approval before
-implementation." Start from clean `main` after #13 is merged, inspect git and
-the open PRs, and do not treat merge authorization as C5 implementation
-authorization. If #13 is still open, report the unfinished merge first.
+**The live gap that review names is the honest state of `C5`.** No live run has
+demoted an attempt, none has started a fallback from one, and no tier has ever
+had a fallback configured for a live review. Say that plainly rather than
+describing the controlled suites as proof of live behaviour.
 
-Discuss which discarded outputs should count as failed attempts: an invalid
-envelope, an otherwise valid envelope with an invalid candidate, and a valid
-empty candidate list are distinct cases. Trace the current completion and
-fallback seam before recommending where to validate output. Explain effects on
-coverage and retained status across all modes, preservation of useful sibling
-candidates, and the extra cost of a configured fallback. Keep Q6 quote repair
-and semantic rejection distinct from envelope failure.
+**Nothing about `C5` should be redone or widened.** Its boundary was discussed
+and approved before implementation, and the four choices recorded in its table
+are settled: the adjudicator is in scope, an all-refused envelope is not
+eligible, a wrong review key is eligible, and demotion never depends on a
+fallback being configured. Do not move the check into `findings.mjs`, and do not
+extend eligibility below the envelope; both were considered and rejected with
+reasons.
 
-The discussion is complete when it produces a proposed eligibility rule,
-decision table, and controlled acceptance cases, with unresolved choices
-clearly named. Present that proposal and wait for explicit approval before code
-changes or any credit-spending run. Do not start another increment instead.
+### The next increment is `Q7`: an absent path is refused as absent
 
-**`C5` remains open, and still needs the user's go-ahead: eligibility for a
-discarded output.**
-Pull request #10's overview reviewer found it, at P2 and confidence 0.95, and the
-changed-line anchoring rule discarded it. A reviewer whose output the evidence
-boundary cannot parse settles as `completed`, so it never becomes eligible for
-its tier's one fallback attempt, while a reviewer that returns nothing does. Five
-of this project's own live reviews were incomplete for exactly the reason a
-fallback cannot answer, so this is the increment that decides whether `C3` is
-useful in practice rather than only correct.
+**`Q7` is the next increment. It still needs the user's go-ahead before
+implementation, and it must not begin with code.**
 
-Pull request #11 is the sharpest case yet, and it shows both halves in one run.
-`correctness` settled `completed` with a single sentence of prose and no
-envelope, so it got nothing; `contracts` settled `incomplete` with no usable
-output, so a configured fallback would have fired for it. Two reviewers lost the
-same way, one eligible and one not, differing only in how the runtime reported
-the end of the attempt.
+`insideRoot` in `read-only.mjs` resolves a requested path with `realpathSync` and
+returns `undefined` when that throws, so the permission handler rejects a path
+that simply does not exist inside the reviewed checkout **exactly as it rejects
+one outside it**, and tells the reviewer it may only read inside the checkout.
+A reviewer that asked for a plausible-sounding module it guessed at is therefore
+told it attempted a boundary escape, which is both untrue and unhelpful: it
+cannot learn that the file is absent and try the right path.
 
-It is deliberately not a small increment, and it is a product decision as much as
-a change, which is why it needs its own authorization:
+This has now landed on a reviewer that then failed on **#6, #11 and #13**. On
+#11 both denied reviewers had asked for a path that does not exist: a plausible
+module name, and an unexpanded `{a,b}` brace pattern. On #13 the `contracts`
+reviewer searched a nonexistent root-level `findings.mjs` instead of
+`extensions/pr-review/findings.mjs`, took the denial, and produced no usable
+output. Temporal association does not prove causation, and the roadmap has never
+claimed it does, but three runs is enough to fix the message.
 
-- The retry decision has to move across the evidence boundary. Envelope
-  validation lives in `findings.mjs` and runs in `collectCandidates` after every
-  reviewer has settled, so the attempt would start after the batch rather than
-  beside the reviewer that failed, and collection would have to run twice.
-- What `completed` means changes for every mode, whether or not a fallback is
-  configured, so coverage classification, the retained record's reviewer status
-  and `smoke-retention.mjs`'s invariants all move with it.
-- A second reviewer run on a large diff costs real credits. On #10 a single heavy
-  reviewer cost between 39 and 58 of the 233 credits the review spent.
+**`C5` did not fix this and must not be mistaken for a fix.** It makes a
+reviewer that fails after such a denial eligible for a configured fallback. That
+is a different attempt with the same misleading refusal, not an accurate one.
 
-One shape worth weighing first: `reviewAssignments` already turns a `completed`
-attempt into an `incomplete` one when reported usage does not match the
-assignment. An optional `verifyResult` hook on the same seam, passed from
-`review.mjs` with the review key, would keep the retry beside the reviewer and
-out of `findings.mjs`. That is a design to evaluate, not a decision already
-taken.
+**The safe direction is fixed in advance: an absent path stays refused.** Only
+the reason changes. `Q7` must not widen what a reviewer may read, and the
+increment is a refusal-message change, not a confinement change.
 
-Older observations follow, in the order they were first seen; each says whether
-it is still open, because two of them have since become increments. The oldest is
-still the largest, and it is open: **no review of any mode has ever run against a
-substantial code diff**, though pull request #10 is the closest so far at 984
-additions over 12 files, most of it real logic rather than prose. It is still
-separately authorizable and nobody has spent a review on it deliberately.
+The hard part is that the distinction must not itself leak. Telling a reviewer
+"that file does not exist" about a path *outside* the root would report on the
+host filesystem, which is exactly what confinement exists to prevent. So the
+absent-path reason may only be given for a request that would have been inside
+the root had it existed, decided without resolving or stating anything outside
+the root. Weigh at least these before writing code:
 
-Second, the evidence boundary has discarded a true finding on pull requests #4,
-#5, #10, #11 and #12, and rejected two mis-anchored candidates on #6. **This is
-no longer an open observation: it is increments `Q5` and `Q6` above**, split
-because two different refusals are responsible. The same-changed-hunk rows are
-`Q5` and are closed; Q6 repairs the recorded clipped quotes while preserving
-exact acceptance and the fabrication refusal. The historical table is in
-"Completed increment: Q6". On #10 and #11 the discarded finding was the overview
-reviewer's, and on #11 and #12 it was the only real defect in the review. Every
-time an agent recovered one it was by reading the raw timeline rather than the
-review's own output.
+- Lexical containment of the normalized request against the root, decided before
+  any filesystem call, as the gate on which reason is given.
+- The symlink case, which is why `realpathSync` is there at all: a path that
+  lexically looks contained but resolves outside must keep the boundary refusal,
+  and a partially-resolvable chain must not be walked outside the root.
+- Whether `permissionDenials` should record the two kinds separately, and what
+  that does to `smoke-reviewer-tools.mjs` and to the retained record. Prefer no
+  retained-record schema change; say so if one turns out to be unavoidable, and
+  ask before changing its version.
+- Whether a relative path, an empty path and a non-string path keep their
+  current refusal unchanged.
 
-Third, **read denials have landed on reviewers that then failed**, on #6,
-#11 and #13. #13 repeats the absent-path denial on its contracts reviewer,
-which returned no usable output;
-the observation is still open, not authorization to change confinement.
-No reviewer was denied a read
-or a tool on #12, whose five sessions made 41 tool calls between them. `insideRoot` in
-`read-only.mjs` resolves a requested path with `realpathSync` and rejects
-anything that throws, so a **path that simply does not exist** is denied exactly
-like one outside the reviewed checkout, and the reviewer is told it may only read
-inside the checkout. Both denied reviewers on #11 had asked for a path that does
-not exist: a plausible-sounding module, and an unexpanded `{a,b}` brace pattern.
-Distinguishing the two cases would let a reviewer learn that a file is absent
-without being told it broke a boundary. It changes a confinement boundary, so it
-needs its own increment, its own tests and its own review; the safe direction is
-that an absent path stays refused, only with an accurate reason.
+Acceptance is: a path absent inside the root is refused with an accurate reason,
+every path outside the root is refused exactly as today with no new information
+in the message, controlled tests cover the symlink-escape and
+lexically-contained-but-resolving-outside cases, and no reviewer gains a read it
+did not have. Discuss the boundary and present it before implementing, as `C5`
+did; that sequence worked and is now the expected one for an increment that
+touches a gate.
 
-Fourth, a reviewer can settle `completed` having emitted no envelope at all, as
-`correctness` did on #11 with a single sentence of thinking-style prose. That is
-the `C5` case above rather than a separate one, but #11 is the first run where
-the discarded output was empty of any structure rather than merely mis-shaped.
+### Recorded, not scheduled
 
-`F6`'s marker contract has live evidence from five of six
-reviewers on #7, both sessions on #8, every session on #10, on #11 every session
-that produced an envelope at all, including the medium tier's `claude-sonnet-5`
-writing paragraphs of prose before the markers, every session on #12, and every
-completed reviewer on #13. #11's
-one unparsed output contained no envelope, wrapped or otherwise, so it is not
-evidence against the unwrap. Do not reintroduce substring matching and do not
-widen it.
+These stay open and are **not** the next increment. Do not start one instead of
+`Q7` without the user saying so.
+
+- **A review against a substantial code diff**, the oldest and largest open
+  observation. No review of any mode has run against one; #10 is the closest at
+  984 additions over 12 files, and #14 is 666 over seven. It is separately
+  authorizable and nobody has spent a review on it deliberately.
+- **A live review with a fallback configured**, the only way to close the gap
+  #14's reviewers named about `C3` and `C5`. That is a deliberate credit
+  decision, because a discarded output would then spend a second attempt.
+- `L1` remains pending; copy no upstream source.
+- `V1`, the opt-in project safeguards in `SCOPE.md`, is not started.
+
+`F6`'s marker contract has live evidence from five of six reviewers on #7, both
+sessions on #8, every session on #10, on #11 every session that produced an
+envelope at all, including the medium tier's `claude-sonnet-5` writing paragraphs
+of prose before the markers, every session on #12, every completed reviewer on
+#13, and all five reviewers on #14. #11's one unparsed output contained no
+envelope, wrapped or otherwise, so it is not evidence against the unwrap. Do not
+reintroduce substring matching and do not widen it. `C5` changed nothing about
+the unwrap; it changed only what an attempt whose output fails it is called.
 
 Do not revisit the Agent Factories surface without new information from GitHub.
 Three separate blockers were demonstrated on CLI 1.0.83, and all three would
@@ -5826,10 +6142,11 @@ the confined tool grant that leaks `skill` and `sql`. A new CLI version is new
 information; a new reading of the same documentation is not.
 
 Do not add a timeout, a deadline or a "stuck reviewer" heuristic to make
-fallbacks fire more often. `SCOPE.md` forbids review timeouts, and `C3` depends
-on their absence: elapsed time is never a fallback trigger.
+fallbacks fire more often. `SCOPE.md` forbids review timeouts, and both `C3` and
+`C5` depend on their absence: elapsed time is never a fallback trigger, and `C5`
+sits beside the reviewer precisely because a hung reviewer never settles.
 
-Keep `L1` pending and copy no upstream source. Land every increment on its own
-branch and pull request, review that pull request with this plugin before asking
-for a merge, and record the outcome here; `main` refuses direct pushes and
-merging stays the user's call.
+Land every increment on its own branch and pull request, review that pull
+request with this plugin before asking for a merge, and record the outcome here;
+`main` refuses direct pushes and merging stays the user's call. Playground pull
+requests #1 and #2 must never be merged or republished.

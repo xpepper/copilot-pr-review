@@ -14,8 +14,8 @@ import {
   captureOnlyFlag, defaultModeId, describePolicy, modeFlags, modeForFlag, reviewMode,
 } from "./modes.mjs";
 import {
-  adjudicateCandidates, candidateFormat, collectCandidates, evidenceBoundary, formatFindings,
-  reviewKey, validationInstructions,
+  adjudicateCandidates, candidateFormat, collectCandidates, envelopeVerifier, evidenceBoundary,
+  formatFindings, reviewKey, validationInstructions,
 } from "./findings.mjs";
 
 const settingKeys = ["heavyModel", "heavyEffort"];
@@ -268,6 +268,7 @@ export async function executeReviewRun(parent, client, options, assignments, {
       await startRuntime();
       const report = await reviewAssignments(parent, client, assignments, {
         signal, systemMessage: { mode: "append", content: reviewInstructions(mode) }, access,
+        verifyResult: envelopeVerifier(reviewKey(binding), "candidates"),
         intro: `${prefix} ${mode.label.toLowerCase()}. ${assignments.length} reviewer(s); ` +
           "outputs are untrusted, unvalidated candidates.",
         outputLabel: `Unvalidated candidate output for ${binding.repository.nameWithOwner}#${binding.number} at ${binding.head}`,
@@ -296,6 +297,7 @@ export async function executeReviewRun(parent, client, options, assignments, {
           ...heavy, label: "evidence-validator",
         }], {
           signal, systemMessage: { mode: "append", content: validationInstructions(mode.policy) },
+          verifyResult: envelopeVerifier(boundary.key, "decisions"),
           intro: "Q4 validation pass: source-grounded adversarial adjudication, not another review specialist.",
           outputLabel: "Untrusted adjudication output",
           prompt: () => [
