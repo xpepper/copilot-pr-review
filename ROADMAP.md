@@ -52,7 +52,7 @@ posting them.
 | C3 | Completed | A tier may carry one optional fallback assignment, used for one extra attempt for the one reviewer whose own execution failed. No timer, no whole-review restart, no silent substitution, and no cross-tier inheritance. Demonstrated by the twelve controlled suites, two installed no-inference probes, and the live balanced review of pull request #10, which cost 233.19659 credits, completed all six sessions and found one real documentation defect. No fallback attempt has run live. | C1, Q3; [Fallbacks/execution](SCOPE.md#models-configuration-and-execution) |
 | C4 | Completed | A tier whose resolved model supports no configurable reasoning effort resolves to no effort instead of inheriting one, so such a model can serve a tier; the same rule covers a tier's fallback model. An explicit effort is still validated and never silently lowered, and a capable model still inherits and is still refused. Demonstrated by the twelve controlled suites, two installed no-inference probes, and the live full review of pull request #11, which cost 269.135657 credits, reported incomplete coverage on three execution failures, and found one real defect in this increment's own display. | C1; [Configuration](SCOPE.md#models-configuration-and-execution) |
 | Q5 | Completed | A candidate anchored on a changed line carries an optional `breaks` citation for the code that change breaks, which may be unchanged, in another hunk, or in another changed file, and which passes the same bound, in-window, exact-quote checks as every other citation. A supplied introduction citation still belongs to the location's own hunk; a null one is now a claim the adjudicator tests. Demonstrated by the twelve controlled suites, the reconstructed rejections from pull requests #4, #5 and #10, and the live balanced review of pull request #12, which cost 137.274102 credits, saw a reviewer use the new citation, and found one real defect in this increment's adjudicator contract. | Q4; [Modes/findings](SCOPE.md#review-modes-and-findings) |
-| Q6 | Pending | A citation that differs from its bound source by a near-miss at either end of the quote stops silently discarding the whole finding. Pull request #11's only true finding was lost to two leading spaces, and pull request #12's to a trailing comma on the last line of a `breaks` citation. Weighed against pull request #4, where the same exact-match check stopped a 0.99-confidence fabrication whose claim was itself about whitespace. | Q5; [Modes/findings](SCOPE.md#review-modes-and-findings) |
+| Q6 | Completed | Candidate-only clipped-end quote repair restores exact bound source without dropping a named line. Controlled reconstructions of #11 and #12 reach adjudication; #4's inserted-space fabrication stays refused. PR #13's installed balanced review cost 134.753239 credits and was incomplete: contracts returned no usable output and correctness reported a coverage gap. No candidates or adjudication occurred, so live repair behavior remains unobserved. Exact adjudicator/publication checks and both schema versions are unchanged. | Q5; [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | C5 | Pending | A completed reviewer whose output the evidence boundary discards becomes eligible for its tier's one fallback attempt, as an empty response already is. Found by pull request #10's overview reviewer and discarded by the evidence boundary's same-hunk rule. Needs the user's go-ahead: it moves the retry decision across the evidence boundary. | C3, Q4; [Fallbacks/execution](SCOPE.md#models-configuration-and-execution) |
 | V1 | Pending | `--verify` enforces matching branch/SHA/cleanliness before reviewers and presents discovered existing commands for approval. | Q1; [Safeguards](SCOPE.md#optional-project-safeguards) |
 | V2 | Pending | Execute only approved existing safeguards with installed dependencies; show evidence and artifacts without autofix or checkout manipulation. | V1; [Safeguards](SCOPE.md#optional-project-safeguards) |
@@ -5517,22 +5517,20 @@ from inside the factory body.
 - **The published comment does not carry the citation**, so a reader on GitHub
   sees the broken code only insofar as the finding's prose names it.
 
-## Exact next increment
+## Completed increment: Q6
 
-**`Q5` is complete.** A candidate anchored on a changed line carries an optional
-`breaks` citation for the code that change breaks, which may be unchanged, in
-another hunk, or in another changed file. A supplied introduction citation still
-belongs to the location's own hunk; a null one is now a claim the adjudicator
-tests rather than a code check about the whole hunk. Pull request #12's balanced
-review demonstrated it end to end, cost 137.274102 credits, watched a live
-reviewer use the new citation on the first try, and found one real defect in this
-increment's own adjudicator contract.
+**Implementation is on `q6-source-bound-quote-repair`, from `main` at
+`ba8f0fc`, checkpoint `fb0ec79`, pull request #13.** Its one installed balanced
+review has run, with incomplete coverage and the limitations recorded below.
+Q5 is complete and
+its own-hunk, optional `breaks`, null-side claim and publication-body decisions
+stand. No C5 retry or reviewer-status change is included.
 
-**Take `Q6` next: stop discarding a whole finding over a near-miss quote.**
-`cite()` requires `source.lines.slice(startLine - 1, endLine).join("\n") !== quote`
-to be false, so a quote must match its bound source byte for byte. That check has
-now discarded two true findings and stopped one fabrication, and it is the only
-refusal still throwing away correct work:
+### Recorded refusals that motivated Q6
+
+Before Q6, a candidate's quote had to match its bound source byte for byte at
+ingestion or the whole candidate was discarded. This check discarded two true
+findings and stopped one fabrication:
 
 | Pull request | Candidate | Refusal | What it cost |
 | --- | --- | --- | --- |
@@ -5546,7 +5544,7 @@ refusal still throwing away correct work:
 | #12 | correctness:1 (P2, 0.88) | context-window match | true; fixed on the branch |
 
 The same-changed-hunk rows are `Q5`, and they are closed. Every remaining row is
-this one check. **Weigh it against its own counter-evidence before you touch it.**
+this one check, with counter-evidence that constrains the repair.
 On #11 the overview reviewer quoted `config.mjs` lines 223-224 correctly except
 that it dropped the two **leading** spaces of the first line, and the whole P3 was
 discarded. On #12 the `correctness` reviewer quoted eleven lines of `findings.mjs`
@@ -5557,18 +5555,184 @@ where the reviewer had **introduced a space into its own quote** and the claimed
 defect was about that space. Normalizing whitespace would have let that
 fabrication through to adjudication.
 
-So this is a real trade-off, not an oversight. **Keep exact matching as the
-acceptance path**, and treat a near-miss as something to report or repair from
-the cited line range. A repair that re-derives the quote from the bound source and
-line range, then requires the reviewer's quote to be a contiguous span of it,
-would have recovered #11 and #12 while still refusing #4, because #4's quote is
-not a span of anything in the source. Weigh its own cost before adopting it: a
-span rule lets a reviewer quote a fragment while naming a wider line range, so
-whatever survives has to keep the anchor honest. That is a design to evaluate,
-not a decision already taken; the acceptance criterion is that both recorded near-misses
-reach adjudication while the recorded fabrication still does not, reconstructed as
-controlled fixtures rather than trusted from this description. Note that a
-near-miss can now appear on any citation a candidate carries, including `breaks`.
+### Chosen boundary and its cost
+
+`cite()` remains exact-only. Candidate ingestion alone may repair a quote that
+is a contiguous span of the exact bound source range, has exactly the same
+number of physical lines, and has non-whitespace text on both boundary lines.
+The line-count constraint prevents a fragment on an unchanged line from claiming
+a wider range containing a changed line. Nothing searches outside the named
+range, moves an anchor, normalizes whitespace, inserts a reviewer-invented
+character, or joins disjoint spans. The restored full lines go through `cite()`
+before reaching the existing changed-line and same-hunk gates.
+
+The repair applies to every candidate citation, including `breaks`. An
+informational caveat records candidate ID, field, original citation and restored
+citation; the adjudicator receives those diagnostics alongside the canonical
+candidates. Claims are never rewritten, and the contract explicitly requires
+rejecting a claim that depends on omitted text or whitespace being absent.
+Adjudicator evidence and publication still call strict `cite()`, not repair.
+
+The cost is deliberate: a very short fragment, even punctuation, can be repaired
+on the physical line it actually names. That is no proof of a defect, and the
+adjudicator still has to disprove the whole claim against full source. Requiring
+word boundaries or permitting only whitespace clipping would miss #12's comma
+and mid-sentence quote. Unrestricted substring matching was rejected because it
+could discard whole lines and launder an anchor. Reporting without repairing was
+rejected because the acceptance criterion requires the findings to reach
+adjudication. Repair diagnostics duplicate source text in the adjudicator input
+and retained diagnostics; they can increase tokens and credits when triggered.
+
+No candidate-envelope or retained-record schema version changed; the factory
+probe's schema mirror therefore needs no edit. The published inline body is
+unchanged. F6's marker/fence parser, C5 eligibility and all runtime APIs are
+untouched. L1 remains pending; no upstream source was copied.
+
+### Controlled evidence at the implementation checkpoint
+
+All twelve recorded controlled suites passed before editing. After implementing,
+`smoke-findings`, `smoke-review`, `smoke-preview`, `smoke-retention` and
+`smoke-publish-later` pass; `git diff --check` passes.
+
+`scripts/q6-citation-fixture.mjs` reconstructs the original reviewer claims and
+source excerpts with relocated line numbers and self-contained synthetic diffs.
+It is not a full historical-review replay. Original outputs were recovered from
+the local reviewer sessions identified in that file, and the source excerpts
+were compared byte for byte with reviewed heads `03b7463` (#11), `5569605`
+(#12) and `ae2c55c` (#4), not guessed from this roadmap's prose.
+
+`smoke-findings.mjs` establishes that #11's location and after, and #12's breaks
+and evidence, are repaired and reach controlled adjudication, while #4's
+inserted-space fabrication never reaches it. It covers clipping either or both
+ends of every candidate citation, refused interior edits and omitted lines,
+unchanged-line and wrong-hunk refusals after repair, and exact-only adjudicator
+citations. `smoke-review.mjs` carries repaired quotes and original/restored
+diagnostics through the actual adjudicator prompt, selection, preview and a
+retained-record disk round trip. Scripted acceptance and rejection both work:
+repair does not decide the claim.
+
+The first disk-round-trip test failed because its synthetic session workspace
+did not have the session ID as basename; the fixture was corrected to obey the
+existing store guard, and the guard is unchanged.
+
+### Installed balanced review of pull request #13
+
+On 2026-09-08 the installed plugin reviewed head
+`fb0ec79a87c1cb45768de29837e9ac0f895bee4e`, 536 additions and 355 deletions over
+8 files. **Balanced was explicitly selected**, because Q6 adds no mode and
+balanced is the default topology. The medium tier did not run.
+
+| Reviewer | Tier, actual model, effort | Settled | Tool calls | Reads | Permission denials | Credits |
+| --- | --- | --- | --- | --- | --- | --- |
+| correctness | heavy, `gpt-5.6-terra`, high | completed | 13 | 13 | 0 | 35.073770 |
+| contracts | heavy, `gpt-5.6-terra`, high | incomplete, no usable output | 14 | 13 | 1 read | 31.486510 |
+| security | heavy, `gpt-5.6-terra`, high | completed | 8 | 8 | 0 | 33.436010 |
+| performance-resources | heavy, `gpt-5.6-terra`, high | completed | 3 | 3 | 0 | 28.363690 |
+| overview | light, `gpt-5.6-luna`, high | completed | 14 | 14 | 0 | 6.393259 |
+
+Per-reviewer reported nano-AIU charges sum to **134.753239 credits**. There
+were 52 tool calls, 51 reads, one permission denial and no tool denials.
+All recorded usage matched the assignments above. Runtime reviewer events ran
+from 16:17:03.117Z to 16:20:52.845Z; the overview reviewer continued after the
+others settled. No timeout or intervention was applied, and the working tree
+remained untouched throughout.
+
+**Coverage is INCOMPLETE**, with one execution failure, one coverage gap and
+three informational caveats. There were zero candidates, zero accepted,
+rejected, duplicate or capped findings, and no adjudicator session. Nothing
+was published. This is not a clean-review claim.
+
+- `contracts` returned an empty result and settled incomplete:
+  `Error: Reviewer produced no usable output.` Its last recorded tool request
+  searched a nonexistent root-level `findings.mjs`, instead of
+  `extensions/pr-review/findings.mjs`, and incurred the read denial. This
+  repeats the absent-path denial observation from #6 and #11; temporal
+  association does not prove why the model then produced no output. No
+  fallback ran. The confinement refusal and retry eligibility were not changed.
+- `correctness` reported that the captured changes could not establish whether
+  real reviewers and adjudicators reliably use and semantically evaluate
+  repaired quotations. Its wording says the installed review is pending,
+  which was true of the captured documentation, but this run now exists.
+  **Its underlying limitation remains real:** no candidate in this run
+  exercised repair or adjudication. The reported coverage gap is preserved,
+  not relabeled as a caveat to make the review complete.
+- `security` noted that no installed-runtime review output was supplied.
+  `performance-resources` noted the absence of workload measurements for
+  additional diagnostic prompt tokens and credits. `overview` limited its
+  assessment to the textual diff. These caveats are retained.
+
+No defect candidate was proposed, so no finding was fixed or rejected by hand
+and no implementation changed in response. The execution failure is evidence
+about the shipped tool, not overridden by the passing controlled suites.
+The review demonstrates installation, dispatch, revision gating, real
+assignments, confined reads and degraded-result delivery at this checkpoint.
+It does **not** demonstrate live repaired-candidate semantic acceptance.
+Repair and its prompt/retention plumbing remain controlled-only observations;
+the additional token and credit cost has not been measured.
+All completed reviewers used the F6 markers; its parser was not changed.
+
+The complete timeline was saved during execution, before analysis, at
+`$HOME/.copilot/session-state/d6d1da8c-3f3a-4ff9-b133-3fa85f9bbd1e/files/q6-review-timeline.log`.
+That directory also holds `q6-review-evidence.json` and
+`q6-<reviewer>-verbatim.txt`, with the original per-reviewer result strings
+extracted from the timeline's structured `M1 evidence` (including the empty
+contracts result). These artifacts stay local. The originating retained session
+is `b47f1b5c-38ba-4744-8512-bd6030c89b5b`, invocation
+`27d7fb45-3dbb-42ce-a8bf-37d0b88a91cc`, retained digest
+`b41fbdb294aa67599267fb3487e66cd3ea8d5e629d1584e74c4c2b0ec7eb3111`.
+
+Reproduction commands (the live command below **already spent the one authorized
+review**; do not repeat without new authorization):
+
+```sh
+node scripts/smoke-findings.mjs
+node scripts/smoke-review.mjs
+node scripts/smoke-preview.mjs
+node scripts/smoke-retention.mjs
+node scripts/smoke-publish-later.mjs
+git diff --check
+
+gh pr checkout 13
+copilot plugin install "$(pwd)"
+COPILOT_CLI_PATH="$(command -v copilot)" \
+COPILOT_SDK_PATH="$(ls -d "$HOME"/.copilot/pkg/*/"$(copilot --version \
+  | sed -n 's/.*CLI \([0-9][0-9.]*[0-9]\).*/\1/p')"/copilot-sdk)" \
+node scripts/dogfood-review.mjs 13 --balanced --all --no-comment
+```
+
+CLI 1.0.83 was used with its derived bundled SDK. No other credit-spending
+probe, factory invocation or rerun was performed. The personal configuration
+file was not moved or edited. The post-review checkpoints change documentation
+only; they have not been reviewed again. The user subsequently authorized
+merging #13 and chose a C5 boundary discussion, not implementation, for the
+next fresh session.
+
+## Exact next increment
+
+**Q6 is complete on pull request #13; the user has authorized its merge.**
+Both recorded near-misses reach controlled adjudication while the recorded
+fabrication does not. Its installed balanced review ran once and was incomplete;
+live repaired-candidate adjudication is still unobserved. Do not redo Q6 or
+spend another review to manufacture positive evidence.
+
+**The next session is a C5 boundary discussion only.** On 2026-09-08 the user
+explicitly chose: "Discuss the C5 boundary and wait for approval before
+implementation." Start from clean `main` after #13 is merged, inspect git and
+the open PRs, and do not treat merge authorization as C5 implementation
+authorization. If #13 is still open, report the unfinished merge first.
+
+Discuss which discarded outputs should count as failed attempts: an invalid
+envelope, an otherwise valid envelope with an invalid candidate, and a valid
+empty candidate list are distinct cases. Trace the current completion and
+fallback seam before recommending where to validate output. Explain effects on
+coverage and retained status across all modes, preservation of useful sibling
+candidates, and the extra cost of a configured fallback. Keep Q6 quote repair
+and semantic rejection distinct from envelope failure.
+
+The discussion is complete when it produces a proposed eligibility rule,
+decision table, and controlled acceptance cases, with unresolved choices
+clearly named. Present that proposal and wait for explicit approval before code
+changes or any credit-spending run. Do not start another increment instead.
 
 **`C5` remains open, and still needs the user's go-ahead: eligibility for a
 discarded output.**
@@ -5618,14 +5782,18 @@ Second, the evidence boundary has discarded a true finding on pull requests #4,
 #5, #10, #11 and #12, and rejected two mis-anchored candidates on #6. **This is
 no longer an open observation: it is increments `Q5` and `Q6` above**, split
 because two different refusals are responsible. The same-changed-hunk rows are
-`Q5` and are closed; the exact citation match is `Q6` and is not. The table is in
-"Exact next increment". On #10 and #11 the discarded finding was the overview
+`Q5` and are closed; Q6 repairs the recorded clipped quotes while preserving
+exact acceptance and the fabrication refusal. The historical table is in
+"Completed increment: Q6". On #10 and #11 the discarded finding was the overview
 reviewer's, and on #11 and #12 it was the only real defect in the review. Every
 time an agent recovered one it was by reading the raw timeline rather than the
 review's own output.
 
-Third, **read denials have landed on the reviewers that then failed on two
-reviews**, #6 and #11, and #11 shows a mechanism. No reviewer was denied a read
+Third, **read denials have landed on reviewers that then failed**, on #6,
+#11 and #13. #13 repeats the absent-path denial on its contracts reviewer,
+which returned no usable output;
+the observation is still open, not authorization to change confinement.
+No reviewer was denied a read
 or a tool on #12, whose five sessions made 41 tool calls between them. `insideRoot` in
 `read-only.mjs` resolves a requested path with `realpathSync` and rejects
 anything that throws, so a **path that simply does not exist** is denied exactly
@@ -5642,10 +5810,11 @@ Fourth, a reviewer can settle `completed` having emitted no envelope at all, as
 the `C5` case above rather than a separate one, but #11 is the first run where
 the discarded output was empty of any structure rather than merely mis-shaped.
 
-`F6`'s marker contract now has live evidence from five separate runs: five of six
+`F6`'s marker contract has live evidence from five of six
 reviewers on #7, both sessions on #8, every session on #10, on #11 every session
 that produced an envelope at all, including the medium tier's `claude-sonnet-5`
-writing paragraphs of prose before the markers, and every session on #12. #11's
+writing paragraphs of prose before the markers, every session on #12, and every
+completed reviewer on #13. #11's
 one unparsed output contained no envelope, wrapped or otherwise, so it is not
 evidence against the unwrap. Do not reintroduce substring matching and do not
 widen it.

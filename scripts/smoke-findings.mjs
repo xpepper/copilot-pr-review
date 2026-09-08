@@ -8,6 +8,7 @@ import {
 } from "../extensions/pr-review/findings.mjs";
 import { formatCoverage, presentationDiagnostics } from "../extensions/pr-review/coverage.mjs";
 import { reviewModes } from "../extensions/pr-review/modes.mjs";
+import { q6CitationCases } from "./q6-citation-fixture.mjs";
 import {
   blobSha, breakageBaseSource, breakageDiff, breakageHeadSource,
   validationBaseSource, validationDiff, validationHeadSource,
@@ -668,7 +669,7 @@ for (const [invalid, expected] of [
   [{ ...at("breakage.js", "head", 9), path: "shipping.js" }, /outside bound source provenance/],
   [{ ...at("breakage.js", "head", 9), startLine: 40, endLine: 40 }, /does not exactly match a supplied context window/],
   [{ ...at("breakage.js", "head", 9), quote: "  return qualifies(subtotal) ? 0 : 501;" }, /does not exactly match/],
-  [{ ...at("breakage.js", "head", 9), quote: " return qualifies(subtotal) ? 0 : 500;" }, /does not exactly match/],
+  [{ ...at("breakage.js", "head", 9), quote: "  return  qualifies(subtotal) ? 0 : 500;" }, /does not exactly match/],
   [{ ...at("breakage.js", "head", 9), ref: breakageBinding.head }, /Citation: expected exactly/],
   [{ path: "breakage.js", side: "head", startLine: 9, endLine: 9 }, /Citation: expected exactly/],
   ["breakage.js:9", /Citation: expected exactly/],
@@ -757,6 +758,137 @@ assert.match(validationInstructions(policy), /A null before claims this change r
 assert.match(validationInstructions(policy), /reject a replacement presented as a pure addition or deletion/);
 assert.match(validationInstructions(policy), /EVERY assertion the candidate makes is supported, in its prose and in its citations alike/);
 console.log("PASS Q5: a changed-line anchor can cite the code it breaks, and every citation refusal still fires");
+
+// Q6 preserves the exact acceptance path. Only candidate ingestion can restore
+// clipped ends; adjudication evidence and publication still use strict cite().
+for (const field of ["location", "before", "after", "breaks", "evidence"]) {
+  for (const clip of [(quote) => quote.slice(1), (quote) => quote.slice(0, -1),
+    (quote) => quote.slice(1, -1)]) {
+    const entry = structuredClone(breaker);
+    const original = field === "evidence" ? entry.evidence[0] : entry[field];
+    const supplied = { ...original, quote: clip(original.quote) };
+    if (field === "evidence") entry.evidence[0] = supplied;
+    else entry[field] = supplied;
+    assert.throws(() => breakageBoundary.cite(supplied), /does not exactly match/,
+      "The exact citation API must still refuse clipped text");
+    const repaired = adjudicateBreakage([entry]);
+    assert.equal(repaired.gathered.candidates.length, 1, `Repair either end of ${field}`);
+    assert.equal(repaired.result.findings.length, 1);
+    assert.equal(repaired.result.complete, true, "A reported repair is a caveat, not an execution failure");
+    const finding = repaired.result.findings[0];
+    const canonical = field === "evidence" ? finding.evidence[0] : finding[field];
+    assert.deepEqual(canonical, breakageBoundary.cite(original));
+    assert.equal(repaired.result.diagnostics.length, 1);
+    assert.match(repaired.result.diagnostics[0].message, /repaired clipped-end citation/);
+    assert(repaired.result.diagnostics[0].message.includes(JSON.stringify(supplied)));
+    assert(repaired.result.diagnostics[0].message.includes(JSON.stringify(original)));
+    assert.equal(finding.actual, breaker.actual, "Repair must not edit the claim");
+  }
+}
+for (const supplied of [
+  { ...at("breakage.js", "head", 4, 5), quote: at("breakage.js", "head", 4).quote },
+  { ...at("breakage.js", "head", 5, 6), quote: ";\n}" },
+  { ...at("breakage.js", "head", 5, 6), quote: " \n}" },
+  { ...at("breakage.js", "head", 5, 6), quote: at("breakage.js", "head", 5, 6).quote.replace("return", "return ") },
+  { ...at("breakage.js", "head", 5), quote: at("breakage.js", "head", 17).quote },
+  { ...at("breakage.js", "head", 5), quote: "return ...;" },
+]) {
+  // A punctuation fragment is still text on its actual line, just as it is in
+  // an exact citation. It cannot be stretched over an omitted line.
+  if (supplied.quote === ";\n}") {
+    assert.equal(collectCandidates([breakageReviewer([{ ...breaker, location: supplied }])],
+      breakageBoundary, policy).candidates.length, 1);
+    continue;
+  }
+  const refused = collectCandidates([breakageReviewer([{ ...breaker, location: supplied }])],
+    breakageBoundary, policy);
+  assert.equal(refused.candidates.length, 0, `Do not invent or drop a line: ${JSON.stringify(supplied)}`);
+}
+const repairedWrongHunk = collectCandidates([breakageReviewer([{
+  ...breaker, before: { ...at("breakage.js", "base", 17), quote: at("breakage.js", "base", 17).quote.slice(2) },
+}])], breakageBoundary, policy);
+assert.equal(repairedWrongHunk.candidates.length, 0);
+assert.match(repairedWrongHunk.issues[0], /same changed hunk/);
+const repairedUnchanged = collectCandidates([breakageReviewer([{
+  ...breaker, location: { ...at("breakage.js", "head", 9), quote: at("breakage.js", "head", 9).quote.slice(2) },
+}])], breakageBoundary, policy);
+assert.equal(repairedUnchanged.candidates.length, 0);
+assert.match(repairedUnchanged.issues[0], /not an anchor on changed lines/);
+const clippedDecision = adjudicateCandidates(collected, validator([decision(undefined, {
+  evidence: [{ ...citation("head"), quote: citation("head").quote.slice(2) }],
+})]), boundary, policy);
+assert.equal(clippedDecision.findings.length, 0, "Do not repair the adjudicator's independent evidence");
+
+for (const fixture of q6CitationCases) {
+  // Self-contained bound excerpts: original source and original candidate prose,
+  // relocated ranges, synthetic additions/replacement diff, no network or git
+  // history dependency. These are controlled gate proofs, not semantic inference.
+  const files = fixture.files.map((file) => ({
+    ...file, base: file.base ? `${file.base}\n` : "", head: `${file.head}\n`,
+  }));
+  const diff = files.map(({ path, base, head }) => {
+    const oldLines = base ? base.slice(0, -1).split("\n") : [];
+    const newLines = head.slice(0, -1).split("\n");
+    return [
+      `diff --git a/${path} b/${path}`,
+      `index ${base ? blobSha(base) : "0".repeat(40)}..${blobSha(head)} 100644`,
+      `--- ${base ? `a/${path}` : "/dev/null"}`, `+++ b/${path}`,
+      `@@ -${base ? 1 : 0},${oldLines.length} +1,${newLines.length} @@`,
+      ...oldLines.map((line) => `-${line}`), ...newLines.map((line) => `+${line}`), "",
+    ].join("\n");
+  }).join("");
+  const snapshot = {
+    repository, pull: { ...breakageSnapshot.pull, changedFiles: files.length },
+    diff, diffSha256: createHash("sha256").update(diff).digest("hex"),
+  };
+  const context = await assembleContext(snapshot, {
+    gh: async (args) => {
+      const request = /contents\/([^?]+)\?ref=([0-9a-f]{40})/.exec(args[5]);
+      const path = decodeURIComponent(request[1]);
+      const text = files.find((file) => file.path === path)[request[2] === snapshot.pull.head.sha ? "head" : "base"];
+      return JSON.stringify({ type: "file", path, encoding: "base64", sha: blobSha(text),
+        size: Buffer.byteLength(text), content: Buffer.from(text).toString("base64") });
+    },
+  });
+  const bound = evidenceBoundary(snapshot, context, reviewBinding(snapshot, context));
+  const gathered = collectCandidates([{
+    label: fixture.label, status: "completed", result: JSON.stringify({
+      schemaVersion: 2, reviewKey: bound.key, candidates: [fixture.candidate], limitations: [],
+    }),
+  }], bound, reviewModes.balanced.policy);
+  if (fixture.repairedFields === null) {
+    assert.equal(gathered.candidates.length, 0, "PR #4's inserted-space fabrication never reaches adjudication");
+    assert.match(gathered.issues[0], /does not exactly match/);
+    continue;
+  }
+  assert.equal(gathered.candidates.length, 1, `PR #${fixture.pr}'s true finding reaches adjudication`);
+  assert.deepEqual(gathered.issues, []);
+  assert.equal(gathered.diagnostics.length, fixture.repairedFields.length);
+  for (const field of fixture.repairedFields) {
+    assert(gathered.diagnostics.some(({ message }) => message.includes(`in ${field} from bound source`)));
+  }
+  const canonical = gathered.candidates[0];
+  for (const citation of [canonical.location, canonical.before, canonical.after, canonical.breaks,
+    ...canonical.evidence].filter(Boolean)) {
+    const { ref, blobSha, ...raw } = citation;
+    assert.deepEqual(bound.cite(raw), citation, "Every repaired quotation passes the unchanged exact path");
+  }
+  for (const field of ["title", "trigger", "expected", "actual", "introduction", "severity", "confidence"]) {
+    assert.equal(canonical[field], fixture.candidate[field], "No claim is rewritten");
+  }
+  const decided = adjudicateCandidates(gathered, {
+    status: "completed", result: JSON.stringify({
+      schemaVersion: 2, reviewKey: bound.key, limitations: [],
+      decisions: [{ candidateId: canonical.id, verdict: "accept", allClaimsSupported: true,
+        reason: "Controlled acceptance of the recorded real defect; not a live model judgment.",
+        evidence: [{ ...fixture.candidate.evidence[0],
+          quote: files[1].head.slice(0, -1) }], duplicateOf: null }],
+    }),
+  }, bound, reviewModes.balanced.policy);
+  assert.equal(decided.findings.length, 1);
+  assert.equal(decided.complete, true);
+}
+console.log("PASS Q6: both recorded clipped-end near-misses reach adjudication; the inserted-space fabrication does not");
 console.log("PASS strict candidates, exact provenance/changed lines, confidence/severity, and fail-closed malformed output");
 console.log("PASS mocked semantic rejection/uncertainty, explicit same-defect deduplication, distinct same-line issues and degraded retention");
 console.log("PASS renamed/added/deleted files, insertion/deletion context, and shared-cause cross-file deduplication");

@@ -430,6 +430,22 @@ offered it, #12, citing code eleven lines away in a different hunk. Renamed path
 separate base/head identities. Unsupported citations and missing evidence remain
 visible coverage issues, not silent filtering into a clean result.
 
+**Clipped quotation ends (Q6).** Exact full-line matching remains the acceptance
+path. At candidate ingestion only, a quote that is a contiguous span of its bound
+source range can be restored to those exact full lines. It must still cover
+every named line and include non-whitespace text on its first and last lines:
+no inserted characters, interior edits, omitted whole lines, range expansion or
+search elsewhere in the file. This applies to any candidate citation, including
+`breaks`; changed-line and same-hunk requirements remain unchanged.
+
+Each repair is reported as an informational caveat with the field, original
+quote and restored source, passed to adjudication and retained with the result.
+The candidate's prose is never rewritten. The adjudicator must reject a claim
+that relies on omitted text or whitespace being absent. A short fragment can
+still be repaired on its actual line; that proves provenance, not its meaning.
+Adjudicator evidence and publication checks stay exact-only, and the published
+inline comment body is unchanged.
+
 When eligible candidates exist, one **separate, isolated validation session**
 uses the effective heavy model/effort in the same owned runtime. Its assignment
 is displayed before its prompt. This uses additional subscription credits; it
