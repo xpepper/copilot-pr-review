@@ -6036,17 +6036,16 @@ only and have not been reviewed again.
 
 ## Exact next increment
 
-**`C5` is complete on pull request #14, whose merge is the user's decision.**
-Its one authorized installed review ran in balanced mode, cost 110.736851
-credits and is recorded above. Coverage was INCOMPLETE on one coverage gap and
-three caveats, with zero execution failures, zero candidates and no adjudicator
-session. That authorization is spent: do not rerun it, and do not review the
-later documentation-only commits.
+**`C5` is complete and merged from pull request #14.** Its one authorized
+installed review ran in balanced mode, cost 110.736851 credits and is recorded
+above. Coverage was INCOMPLETE on one coverage gap and three caveats, with zero
+execution failures, zero candidates and no adjudicator session. That
+authorization is spent: do not rerun it.
 
-**The live gap the review names is the honest state of this increment.** No live
-run has demoted an attempt, none has started a fallback from one, and no tier
-has ever had a fallback configured for a live review. Say that plainly rather
-than describing the controlled suites as proof of live behaviour.
+**The live gap that review names is the honest state of `C5`.** No live run has
+demoted an attempt, none has started a fallback from one, and no tier has ever
+had a fallback configured for a live review. Say that plainly rather than
+describing the controlled suites as proof of live behaviour.
 
 **Nothing about `C5` should be redone or widened.** Its boundary was discussed
 and approved before implementation, and the four choices recorded in its table
@@ -6056,41 +6055,85 @@ fallback being configured. Do not move the check into `findings.mjs`, and do not
 extend eligibility below the envelope; both were considered and rejected with
 reasons.
 
-**The next increment is the user's choice among the observations below.** None
-is started, and none is authorized. The two strongest candidates:
+### The next increment is `Q7`: an absent path is refused as absent
 
-- **The absent-path read denial**, which #11's narrative named as the next
-  candidate after `C5`. `insideRoot` in `read-only.mjs` resolves a requested path
-  with `realpathSync` and rejects anything that throws, so a path that simply
-  does not exist inside the checkout is denied exactly like one outside it, and
-  the reviewer is told it may only read inside the checkout. It has now landed on
-  a reviewer that then failed on #6, #11 and #13. Distinguishing the two cases
-  would let a reviewer learn that a file is absent without being told it broke a
-  boundary. It changes a confinement boundary, so it needs its own increment, its
-  own tests and its own review; **the safe direction is that an absent path stays
-  refused, only with an accurate reason.** This is an observation, not
-  authorization to change confinement.
-- **A review against a substantial code diff**, which is the oldest open
-  observation and still the largest. No review of any mode has ever run against
-  one; #10 is the closest at 984 additions over 12 files, most of it real logic
-  rather than prose. It is separately authorizable and nobody has spent a review
-  on it deliberately.
+**`Q7` is the next increment. It still needs the user's go-ahead before
+implementation, and it must not begin with code.**
 
-A third, now sharpened by `C5`: **no live review has ever configured a fallback**,
-so the whole `C3` execution path, which `C5` now feeds, is live-unobserved. #11
-remains the only run where one would have fired. Establishing it would mean
-configuring a fallback tier before a live review and accepting that a discarded
-output may spend a second attempt. That is a deliberate credit decision, not
-something to arrange incidentally.
+`insideRoot` in `read-only.mjs` resolves a requested path with `realpathSync` and
+returns `undefined` when that throws, so the permission handler rejects a path
+that simply does not exist inside the reviewed checkout **exactly as it rejects
+one outside it**, and tells the reviewer it may only read inside the checkout.
+A reviewer that asked for a plausible-sounding module it guessed at is therefore
+told it attempted a boundary escape, which is both untrue and unhelpful: it
+cannot learn that the file is absent and try the right path.
+
+This has now landed on a reviewer that then failed on **#6, #11 and #13**. On
+#11 both denied reviewers had asked for a path that does not exist: a plausible
+module name, and an unexpanded `{a,b}` brace pattern. On #13 the `contracts`
+reviewer searched a nonexistent root-level `findings.mjs` instead of
+`extensions/pr-review/findings.mjs`, took the denial, and produced no usable
+output. Temporal association does not prove causation, and the roadmap has never
+claimed it does, but three runs is enough to fix the message.
+
+**`C5` did not fix this and must not be mistaken for a fix.** It makes a
+reviewer that fails after such a denial eligible for a configured fallback. That
+is a different attempt with the same misleading refusal, not an accurate one.
+
+**The safe direction is fixed in advance: an absent path stays refused.** Only
+the reason changes. `Q7` must not widen what a reviewer may read, and the
+increment is a refusal-message change, not a confinement change.
+
+The hard part is that the distinction must not itself leak. Telling a reviewer
+"that file does not exist" about a path *outside* the root would report on the
+host filesystem, which is exactly what confinement exists to prevent. So the
+absent-path reason may only be given for a request that would have been inside
+the root had it existed, decided without resolving or stating anything outside
+the root. Weigh at least these before writing code:
+
+- Lexical containment of the normalized request against the root, decided before
+  any filesystem call, as the gate on which reason is given.
+- The symlink case, which is why `realpathSync` is there at all: a path that
+  lexically looks contained but resolves outside must keep the boundary refusal,
+  and a partially-resolvable chain must not be walked outside the root.
+- Whether `permissionDenials` should record the two kinds separately, and what
+  that does to `smoke-reviewer-tools.mjs` and to the retained record. Prefer no
+  retained-record schema change; say so if one turns out to be unavoidable, and
+  ask before changing its version.
+- Whether a relative path, an empty path and a non-string path keep their
+  current refusal unchanged.
+
+Acceptance is: a path absent inside the root is refused with an accurate reason,
+every path outside the root is refused exactly as today with no new information
+in the message, controlled tests cover the symlink-escape and
+lexically-contained-but-resolving-outside cases, and no reviewer gains a read it
+did not have. Discuss the boundary and present it before implementing, as `C5`
+did; that sequence worked and is now the expected one for an increment that
+touches a gate.
+
+### Recorded, not scheduled
+
+These stay open and are **not** the next increment. Do not start one instead of
+`Q7` without the user saying so.
+
+- **A review against a substantial code diff**, the oldest and largest open
+  observation. No review of any mode has run against one; #10 is the closest at
+  984 additions over 12 files, and #14 is 666 over seven. It is separately
+  authorizable and nobody has spent a review on it deliberately.
+- **A live review with a fallback configured**, the only way to close the gap
+  #14's reviewers named about `C3` and `C5`. That is a deliberate credit
+  decision, because a discarded output would then spend a second attempt.
+- `L1` remains pending; copy no upstream source.
+- `V1`, the opt-in project safeguards in `SCOPE.md`, is not started.
 
 `F6`'s marker contract has live evidence from five of six reviewers on #7, both
 sessions on #8, every session on #10, on #11 every session that produced an
 envelope at all, including the medium tier's `claude-sonnet-5` writing paragraphs
-of prose before the markers, every session on #12, and every completed reviewer
-on #13. #11's one unparsed output contained no envelope, wrapped or otherwise, so
-it is not evidence against the unwrap. Do not reintroduce substring matching and
-do not widen it. `C5` changed nothing about the unwrap; it changed only what an
-attempt whose output fails it is called.
+of prose before the markers, every session on #12, every completed reviewer on
+#13, and all five reviewers on #14. #11's one unparsed output contained no
+envelope, wrapped or otherwise, so it is not evidence against the unwrap. Do not
+reintroduce substring matching and do not widen it. `C5` changed nothing about
+the unwrap; it changed only what an attempt whose output fails it is called.
 
 Do not revisit the Agent Factories surface without new information from GitHub.
 Three separate blockers were demonstrated on CLI 1.0.83, and all three would
@@ -6103,8 +6146,7 @@ fallbacks fire more often. `SCOPE.md` forbids review timeouts, and both `C3` and
 `C5` depend on their absence: elapsed time is never a fallback trigger, and `C5`
 sits beside the reviewer precisely because a hung reviewer never settles.
 
-Keep `L1` pending and copy no upstream source. Land every increment on its own
-branch and pull request, review that pull request with this plugin before asking
-for a merge, and record the outcome here; `main` refuses direct pushes and
-merging stays the user's call. Playground pull requests #1 and #2 must never be
-merged or republished.
+Land every increment on its own branch and pull request, review that pull
+request with this plugin before asking for a merge, and record the outcome here;
+`main` refuses direct pushes and merging stays the user's call. Playground pull
+requests #1 and #2 must never be merged or republished.
