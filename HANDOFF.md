@@ -26,15 +26,13 @@ before you start.
 
 ## Recorded state
 
-- **You are starting on branch `m2-deep-mode`, on pull request #8, which is not
-  merged.** Read this handoff from that pull request. If the user has merged it,
-  start from a fresh `main` instead; the branch will be deleted and its
-  individual commits will not be ancestors of `main`, so read `git log` and the
-  pull requests rather than looking for hashes from it.
-- Pull request #8 completed `M2`. Nothing is uncommitted. Branch from the
-  merged `main` for the next increment; do not continue on `m2-deep-mode`.
+- **You are starting on a clean `main` with no increment in flight.** `main` is
+  the squash merge of pull request #8, which completed `M2`. Nothing is
+  uncommitted and no increment branch is open. Branch from `main`.
 - Pull requests #3, #4 and #5 delivered `M1`, #6 delivered `F5`, #7 delivered
-  `F6`. All are merged and their branches are gone.
+  `F6`, #8 delivered `M2`. All are merged, their branches are deleted, and their
+  individual commits are not ancestors of `main`, so read `git log` and the pull
+  requests rather than looking for hashes from them.
 - Pull requests #1 and #2 are synthetic publication playgrounds from P4 and P5.
   **Never merge them**, and never republish to them.
 - `M1`, `F5`, `F6` and `M2` are Completed. `C3` and `C4` are the ready
