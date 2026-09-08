@@ -233,7 +233,7 @@ export function validateRecord(record, sessionId) {
       }
     }
   }
-  if (value.complete) requireValue(value.reviewers.length === mode.specialists.length &&
+  if (value.complete) requireValue(value.reviewers.length === mode.reviewers.length &&
     value.reviewers.every((reviewer) => reviewer.status === "completed") &&
     (!value.adjudicator || value.adjudicator.status === "completed"), "incomplete reviewer coverage");
   const selection = value.selection;

@@ -1,5 +1,5 @@
-// Review modes are pure declarations: reviewer topology, the tier each reviewer
-// resolves, and the findings policy the mode presents. Nothing here executes,
+// Review modes are pure declarations: the reviewers a mode runs, the tier each
+// one resolves, and the findings policy the mode presents. Nothing here executes,
 // so every consumer (instructions, adjudication, retention, publication) reads
 // the same source for what a mode is allowed to report.
 const correctness = { label: "correctness", tier: "heavy",
@@ -38,7 +38,7 @@ export const reviewModes = {
     label: "Quick review",
     evidencePrefix: "Q3",
     holistic: false,
-    specialists: [
+    reviewers: [
       correctness,
       contracts,
       { label: "security-performance-resources", tier: "heavy",
@@ -58,7 +58,7 @@ export const reviewModes = {
     label: "Balanced review",
     evidencePrefix: "M1",
     holistic: false,
-    specialists: [correctness, contracts, security, performanceResources, overview],
+    reviewers: [correctness, contracts, security, performanceResources, overview],
     policy: minorPolicy("Balanced review", 3),
   },
   full: {
@@ -68,7 +68,7 @@ export const reviewModes = {
     label: "Full review",
     evidencePrefix: "M1",
     holistic: false,
-    specialists: [
+    reviewers: [
       correctness, contracts, security, performanceResources, overview,
       { label: "conventions-maintainability", tier: "medium",
         focus: "Project conventions, naming, structure, error handling, tests and documentation; " +
@@ -88,7 +88,7 @@ export const reviewModes = {
     label: "Deep review",
     evidencePrefix: "M2",
     holistic: true,
-    specialists: [integrated],
+    reviewers: [integrated],
     policy: minorPolicy("Deep review", Infinity),
   },
 };

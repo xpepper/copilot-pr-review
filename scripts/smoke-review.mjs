@@ -244,7 +244,7 @@ function harness({
 } = {}) {
   const messages = [];
   const sessions = [];
-  const specialists = mode.specialists.length;
+  const reviewerCount = mode.reviewers.length;
   let sends = 0;
   const client = {
     starts: 0, stops: 0, forces: 0,
@@ -257,7 +257,7 @@ function harness({
     async forceStop() { this.forces++; },
     async createSession(config) {
       assert.equal(config.enableConfigDiscovery, false);
-      const validating = sessions.length === specialists;
+      const validating = sessions.length === reviewerCount;
       assert.deepEqual(config.systemMessage, {
         mode: "append", content: validating ? validationInstructions(mode.policy) : reviewInstructions(mode),
       });
@@ -340,7 +340,7 @@ function harness({
             return;
           }
           // No reviewer completes until every specialist prompt is in flight.
-          if (sends !== specialists) return;
+          if (sends !== reviewerCount) return;
           await new Promise(setImmediate);
           if (failure === "cancel") {
             controller.abort(new DOMException("manual cancellation", "AbortError"));
@@ -357,7 +357,7 @@ function harness({
                 ["reviewer", "tool-call", "usage", "missing-usage"].includes(failure) ? "partial candidate" : JSON.stringify({
                 schemaVersion: 2, reviewKey: input.reviewKey, limitations: i === 1 ? limitations : [],
                 candidates: withCandidate && candidateFrom.includes(i) ? [{
-                  title: `Keep value at 1 (${mode.specialists[i].label})`, severity, confidence: 0.9,
+                  title: `Keep value at 1 (${mode.reviewers[i].label})`, severity, confidence: 0.9,
                   location: cite("head"), before: cite("base"), after: cite("head"),
                   trigger: "Read value", expected: "1", actual: "2",
                   introduction: "The constant changed", evidence: [cite("base")],
