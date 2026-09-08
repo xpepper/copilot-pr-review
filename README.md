@@ -278,7 +278,8 @@ and publication gates. Cancellation still stops all owned work, no timeout is
 imposed, and incomplete coverage is still reported as incomplete.
 
 Balanced execution is demonstrated by controlled probes, no-inference installed
-dispatch, and two live reviews of this project's own pull requests. #3 ran five
+dispatch, and the live balanced reviews of this project's own pull requests #3,
+#4, #6 and #10. Two of them are worth describing here. #3 ran five
 reviewers, made 89 confined reads with no denials, returned zero findings with
 incomplete coverage, and cost 414.14627 reported AI credits; its light reviewer
 inherited the heavy assignment because no light tier was saved. #4 did run a
@@ -336,7 +337,12 @@ discarding the review. A marker counts only as a whole line, so marker text
 inside the JSON, which any citation of these lines carries, stays payload.
 
 The full-mode review of pull request #7 demonstrated it: five of six reviewers
-emitted the markers, `claude-sonnet-5` among them, with no fence anywhere.
+emitted the markers, `claude-sonnet-5` among them, with no fence anywhere. The
+full-mode review of pull request #11 went further: `claude-sonnet-5` wrote
+several paragraphs of prose and then the markers, and its envelope was taken
+whole. That same review also shows the limit. One `gpt-5.6-terra` specialist
+returned a single sentence of prose and **no markers at all**, and that is
+discarded whole, because there is no envelope to unwrap.
 
 Nothing else is recovered. A repeated or missing marker, a marker sharing its
 line, a fence with prose after it, two fenced blocks, a truncated object, and a
