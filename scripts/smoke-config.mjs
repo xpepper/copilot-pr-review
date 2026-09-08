@@ -4,8 +4,9 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSyn
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import {
-  configFilename, configSchemaVersion, configurationStore, describeConfiguration, executeConfiguration,
-  layerSettings, loadConfiguration, parseConfigArgs, resolveTier, validateConfiguredTiers, validateSettings,
+  configFilename, configHelp, configSchemaVersion, configurationStore, describeConfiguration, executeConfiguration,
+  layerSettings, loadConfiguration, orphanFallbackEfforts, parseConfigArgs, resolveFallback, resolveTier,
+  tiers, validateConfiguredTiers, validateSettings,
 } from "../extensions/pr-review/config.mjs";
 import {
   locateProjectConfig, projectConfigSegments, projectSchemaVersion, readProjectConfig, trustFilename,
@@ -164,6 +165,63 @@ console.log("PASS configuration argument parsing, unknown keys, malformed assign
   console.log("PASS nearest-tier and ambient inheritance, flag precedence, and refusal without substitution");
 }
 
+// --- configured fallback models --------------------------------------------
+{
+  const ambient = { model: "heavy", reasoningEffort: "high" };
+  const fallbackOf = (settings, tier, flags, origins) =>
+    resolveFallback(resolveTier(tier, { settings, origins, ambient, flags }), { settings, origins });
+  // Fallbacks are optional and start unset: nothing else configures one.
+  assert.equal(fallbackOf({}, "heavy"), undefined, "Fallbacks start unset");
+  assert.equal(fallbackOf({ heavyModel: "heavy", heavyEffort: "high" }, "heavy"), undefined,
+    "Configuring a tier does not give it a fallback");
+  // A fallback never inherits from a neighbouring tier, because an unset one
+  // means no fallback rather than a farther tier's model.
+  assert.equal(fallbackOf({ lightFallbackModel: "other" }, "heavy"), undefined,
+    "A heavy fallback is not inherited from the light tier");
+  assert.equal(fallbackOf({ heavyFallbackModel: "other" }, "light"), undefined,
+    "A light fallback is not inherited from the heavy tier");
+  assert.deepEqual(fallbackOf({ heavyFallbackModel: "other" }, "heavy"), {
+    tier: "heavy", identical: false,
+    model: { value: "other", source: "configured:heavy" },
+    reasoningEffort: { value: "high", source: "primary" },
+  }, "An unset fallback effort follows the tier's own effective effort");
+  assert.deepEqual(fallbackOf({ heavyFallbackModel: "other", heavyFallbackEffort: "low" }, "heavy").reasoningEffort,
+    { value: "low", source: "configured:heavy" }, "An explicit fallback effort is used as configured");
+  assert.deepEqual(fallbackOf({ heavyFallbackModel: "other" }, "heavy", { heavyEffort: "low" }).reasoningEffort,
+    { value: "low", source: "primary" }, "The inherited fallback effort follows the invocation flag too");
+  assert.deepEqual(fallbackOf({ heavyFallbackModel: "other" }, "heavy", {}, { heavyFallbackModel: "project" }).model,
+    { value: "other", source: "project:heavy" }, "A trusted project's fallback keeps its own origin");
+  // A fallback that resolves to exactly this tier's own assignment is not a
+  // fallback; a different effort on the same model still is.
+  assert.equal(fallbackOf({ heavyFallbackModel: "heavy" }, "heavy").identical, true);
+  assert.equal(fallbackOf({ heavyFallbackModel: "heavy", heavyFallbackEffort: "low" }, "heavy").identical, false);
+  assert.equal(fallbackOf({ heavyFallbackModel: "other" }, "heavy", { heavyModel: "other", heavyEffort: "high" }).identical,
+    true, "An invocation flag can make a configured fallback identical to the primary");
+  // An effort with no model configures no fallback at all, and is never treated
+  // as one; storing that pair is refused below.
+  assert.equal(fallbackOf({ heavyFallbackEffort: "low" }, "heavy"), undefined);
+  assert.deepEqual(orphanFallbackEfforts({ heavyFallbackEffort: "low", lightFallbackEffort: "low" }), ["light", "heavy"]);
+  assert.deepEqual(orphanFallbackEfforts({ heavyFallbackEffort: "low", heavyFallbackModel: "other" }), []);
+
+  validateConfiguredTiers({ heavyFallbackModel: "other", heavyFallbackEffort: "low" }, ambient, catalog);
+  validateConfiguredTiers({ heavyModel: "other", heavyEffort: "low", heavyFallbackModel: "heavy" }, ambient, catalog);
+  for (const settings of [
+    { heavyFallbackModel: "missing" }, { heavyFallbackModel: "disabled" }, { heavyFallbackModel: "auto" },
+    { heavyFallbackModel: "provider/model" }, { heavyFallbackModel: "other", heavyFallbackEffort: "max" },
+    // "other" supports only low, so the tier's own high effort cannot carry over
+    // to it; that is refused rather than quietly lowered.
+    { heavyFallbackModel: "other" },
+    // "plain" advertises no configurable effort at all, so it cannot serve a
+    // tier that has one. C4 is the increment that lets such a model qualify.
+    { heavyFallbackModel: "plain" },
+    { heavyFallbackEffort: "low" },
+    // Every tier validates its own fallback, not just the heavy one.
+    { lightFallbackModel: "plain", lightFallbackEffort: "low" },
+  ]) assert.throws(() => validateConfiguredTiers(settings, ambient, catalog),
+    /Refused .*-tier fallback configuration/, JSON.stringify(settings));
+  console.log("PASS optional fallbacks: explicit only, no cross-tier inheritance, and refusal without substitution");
+}
+
 // --- command behaviour ------------------------------------------------------
 {
   const h = harness();
@@ -212,6 +270,62 @@ console.log("PASS configuration argument parsing, unknown keys, malformed assign
   assert.deepEqual((await executeConfiguration(h.parent, "unset autoPostReviews")).settings, {});
   assert.deepEqual(JSON.parse(readFileSync(h.filename, "utf8")), { schemaVersion: configSchemaVersion, settings: {} });
   console.log("PASS show, set, unset, unchanged reporting, and refusals that write nothing");
+}
+
+// --- the fallback surface is displayed before anything runs -----------------
+{
+  const h = harness({ home: "fallback-display" });
+  const store = await configurationStore(h.parent);
+  const shown = describeConfiguration(await loadConfiguration(h.parent));
+  assert.equal(shown.split("\n").filter((line) => line.startsWith("    fallback: ")).length, tiers.length,
+    "Every tier reports its fallback, so an unset one is visible rather than assumed");
+  assert.equal(shown.split("\n").filter((line) => line === "    fallback: (none)").length, tiers.length);
+  assert.match(shown, /Fallback models are optional and start unset/);
+  assert.match(shown, /at most one attempt/);
+  assert.match(shown, /elapsed time alone never triggers a fallback/);
+
+  store.write({ heavyFallbackModel: "other", heavyFallbackEffort: "low" });
+  const configured = describeConfiguration(await loadConfiguration(h.parent));
+  assert.match(configured, /\n {2}heavy: model=heavy \[ambient\] reasoning=high \[ambient\]\n {4}fallback: model=other \[configured:heavy\] reasoning=low \[configured:heavy\]\n/);
+  assert.equal(configured.split("\n").filter((line) => line === "    fallback: (none)").length, tiers.length - 1,
+    "A heavy fallback is not shared with the light or medium tier");
+
+  store.write({ heavyModel: "other", heavyEffort: "low", heavyFallbackModel: "other" });
+  assert.match(describeConfiguration(await loadConfiguration(h.parent)),
+    /\n {4}fallback: model=other \[configured:heavy\] reasoning=low \[primary\] -- NOT OFFERED: identical to this tier's own assignment\n/);
+
+  // A hand-edited or later-changed file can still hold a pair the update command
+  // would have refused. Both stay visible instead of silently doing something.
+  store.write({ heavyFallbackModel: "other" });
+  assert.match(describeConfiguration(await loadConfiguration(h.parent)),
+    /\n {4}fallback: model=other \[configured:heavy\] reasoning=high \[primary\] -- UNUSABLE: Unsupported reasoning effort high for other\. No substitution\.\n/);
+  store.write({ heavyFallbackEffort: "low" });
+  assert.match(describeConfiguration(await loadConfiguration(h.parent)),
+    /\n {4}fallback: \(none\); heavyFallbackEffort is set but heavyFallbackModel is not, so no fallback is configured\.\n/);
+
+  assert.match(configHelp, /heavyFallbackModel/);
+  assert.match(configHelp, /at most one attempt/);
+  console.log("PASS every tier's fallback, its origin and its refusals are displayed before any reviewer starts");
+}
+
+// --- storing, replacing and clearing a fallback -----------------------------
+{
+  const h = harness({ home: "fallback-store" });
+  const set = await executeConfiguration(h.parent, "heavyFallbackModel=other heavyFallbackEffort=low");
+  assert.deepEqual(set.changed, ["heavyFallbackModel", "heavyFallbackEffort"]);
+  assert.deepEqual(set.settings, { heavyFallbackModel: "other", heavyFallbackEffort: "low" });
+  const stored = readFileSync(h.filename, "utf8");
+  // The fallback effort follows the tier, so clearing only the model would leave
+  // an effort configuring nothing at all.
+  await assert.rejects(executeConfiguration(h.parent, "unset heavyFallbackModel"),
+    /Refused heavy-tier fallback configuration: heavyFallbackEffort is set but heavyFallbackModel is not/);
+  await assert.rejects(executeConfiguration(h.parent, "heavyFallbackModel=missing"),
+    /Refused heavy-tier fallback configuration: Unavailable or disabled Copilot-subscription model/);
+  await assert.rejects(executeConfiguration(h.parent, "heavyFallbackEffort=high"),
+    /Refused heavy-tier fallback configuration: Unsupported reasoning effort high for other/);
+  assert.equal(readFileSync(h.filename, "utf8"), stored, "A refused fallback update leaves the stored file byte-identical");
+  assert.deepEqual((await executeConfiguration(h.parent, "unset heavyFallbackModel heavyFallbackEffort")).settings, {});
+  console.log("PASS fallback assignments are stored, replaced and cleared as one explicit pair");
 }
 
 // --- the saved configuration actually drives quick assignments --------------

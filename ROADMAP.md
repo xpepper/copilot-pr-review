@@ -4619,6 +4619,78 @@ installed runtime to demonstrate deep mode itself.
   family checking itself, which is weaker than the cross-model check a mixed-tier
   mode gets.
 
+## In-flight increment: C3
+
+**Not complete.** This section records what has landed on branch `c3-fallback-models`
+so far; it is rewritten as a completed-increment entry only after the pull request
+has been reviewed by the installed plugin.
+
+Implementation so far: the optional fallback assignment in
+`extensions/pr-review/config.mjs`. Exercise: `scripts/smoke-config.mjs`.
+
+### Configuration boundary
+
+- Six new keys, `<tier>FallbackModel` and `<tier>FallbackEffort` for light,
+  medium and heavy, alongside the six primary tier keys and `autoPostReviews`.
+  They layer exactly like the others: invocation flags, then a trusted project's
+  file, then personal settings.
+- **A fallback never inherits from another tier.** Unset means this tier has no
+  fallback, not that a neighbouring tier can stand in for it. That is the whole
+  point of "optional fallbacks start unset and must be configured explicitly":
+  cross-tier inheritance would hand a tier a fallback nobody configured for it.
+- An unset `<tier>FallbackEffort` follows that tier's own effective effort,
+  reported as source `primary`, and the resulting pair is then validated like any
+  other explicit assignment. An effort the fallback model cannot support is
+  refused, never lowered; the fix is to set `<tier>FallbackEffort` explicitly.
+- `<tier>FallbackEffort` without `<tier>FallbackModel` configures nothing, so
+  storing that pair is refused. One that arrives anyway, from a hand-edited file
+  or a project file changed after it was trusted, stays inert and is reported in
+  the configuration display rather than guessed at.
+- A fallback that resolves to exactly this tier's own model **and** effort is not
+  a fallback; it is reported `NOT OFFERED` and is never attempted. The same model
+  at a different effort still is one.
+- Fallbacks have no invocation flag, like `lightModel` and `mediumModel` before
+  them. They are configuration only.
+- The configuration report prints a `fallback:` line for every tier, so an unset
+  one is visibly unset, and states the attempt policy: at most one attempt, only
+  for a reviewer whose own execution failed explicitly, never a whole-review
+  restart, and never triggered by elapsed time.
+
+### Controlled evidence so far
+
+Test-first: every assertion below was written first and failed on the missing
+`resolveFallback` and `orphanFallbackEfforts` exports and on the missing display
+lines. One of them caught a wrong expectation in the test itself, which was
+corrected rather than the code.
+
+`node scripts/smoke-config.mjs` passes, with no network and no inference:
+
+- Fallbacks start unset; configuring a tier does not configure a fallback for it;
+  a light fallback is not inherited by heavy and a heavy fallback is not
+  inherited by light.
+- An unset fallback effort follows the tier's effective effort, including one set
+  by an invocation flag; an explicit one is used as configured; a trusted
+  project's fallback keeps its own origin label.
+- The identical-to-primary case, including one an invocation flag creates.
+- Refusals that change nothing: an unavailable, disabled, `auto` or compound
+  fallback model; an unsupported explicit fallback effort; a tier effort the
+  fallback model cannot support; a fallback model advertising no configurable
+  effort at all (the case `C4` exists to allow); an orphan fallback effort; and
+  the same check on a non-heavy tier.
+- The display shows one `fallback:` line per tier, the configured line with its
+  origins, `NOT OFFERED`, `UNUSABLE`, and the orphan note, plus the attempt
+  policy prose; the help text carries the same policy.
+- Storing, replacing and clearing a fallback pair through `/pr-review-config`,
+  with every refusal leaving the stored file byte-identical.
+
+The other eleven controlled suites still pass unchanged.
+
+### Still to do in this increment
+
+Reviewer assignment, the single fallback attempt during execution, its evidence
+in the retained record and coverage report, user documentation, and the pull
+request review that is this increment's real integration test.
+
 ## Exact next increment
 
 **`M2` is complete.** `--deep` runs one integrated heavy reviewer over the whole

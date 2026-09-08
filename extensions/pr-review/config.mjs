@@ -21,9 +21,16 @@ export const sessionStateDirectoryName = "session-state";
 export const tiers = ["light", "medium", "heavy"];
 export const modelKey = (tier) => `${tier}Model`;
 export const effortKey = (tier) => `${tier}Effort`;
+// A tier may also carry one optional fallback assignment, used at most once for
+// a reviewer whose own execution failed explicitly. It is a separate key rather
+// than a second value on the tier, so leaving it out means this tier has no
+// fallback rather than that some other tier can stand in for it.
+export const fallbackModelKey = (tier) => `${tier}FallbackModel`;
+export const fallbackEffortKey = (tier) => `${tier}FallbackEffort`;
 const assignmentKeys = tiers.flatMap((tier) => [modelKey(tier), effortKey(tier)]);
+const fallbackAssignmentKeys = tiers.flatMap((tier) => [fallbackModelKey(tier), fallbackEffortKey(tier)]);
 const booleanKeys = ["autoPostReviews"];
-export const configurationKeys = [...assignmentKeys, ...booleanKeys];
+export const configurationKeys = [...assignmentKeys, ...fallbackAssignmentKeys, ...booleanKeys];
 export const configurationDefaults = { autoPostReviews: false };
 
 export function validateSettings(settings) {
@@ -222,13 +229,50 @@ export function resolveTier(tier, { settings = {}, origins = {}, ambient = {}, f
   };
 }
 
+// A tier's fallback is explicit or absent; only its effort falls back, to the
+// tier's own effective effort, and that pair is then validated like any other.
+export function resolveFallback(primary, { settings = {}, origins = {} } = {}) {
+  const { tier } = primary;
+  const model = settings[fallbackModelKey(tier)];
+  if (model === undefined) return undefined;
+  const effort = settings[fallbackEffortKey(tier)];
+  const reasoningEffort = effort === undefined
+    ? { value: primary.reasoningEffort.value, source: "primary" }
+    : { value: effort, source: sourceLabel(origins[fallbackEffortKey(tier)], "configured", tier) };
+  return {
+    tier,
+    model: { value: model, source: sourceLabel(origins[fallbackModelKey(tier)], "configured", tier) },
+    reasoningEffort,
+    // A fallback resolving to this tier's own assignment is not a fallback, so
+    // it is never offered; the same model at a different effort still is.
+    identical: model === primary.model.value && reasoningEffort.value === primary.reasoningEffort.value,
+  };
+}
+
+// An effort with no model configures nothing. Storing that pair is refused, and
+// one that reaches us anyway stays inert and is reported rather than guessed at.
+export function orphanFallbackEfforts(settings = {}) {
+  return tiers.filter((tier) =>
+    settings[fallbackEffortKey(tier)] !== undefined && settings[fallbackModelKey(tier)] === undefined);
+}
+
 export function resolvedAssignment(resolution) {
   return { model: resolution.model.value, reasoningEffort: resolution.reasoningEffort.value };
 }
 
-export function describeTier(resolution) {
+const assignmentText = (resolution) => {
   const show = ({ value, source }) => `${value ?? "(unset)"} [${source}]`;
-  return `${resolution.tier}: model=${show(resolution.model)} reasoning=${show(resolution.reasoningEffort)}`;
+  return `model=${show(resolution.model)} reasoning=${show(resolution.reasoningEffort)}`;
+};
+
+export function describeTier(resolution) {
+  return `${resolution.tier}: ${assignmentText(resolution)}`;
+}
+
+export function describeFallback(resolution) {
+  if (!resolution) return "fallback: (none)";
+  return `fallback: ${assignmentText(resolution)}${resolution.identical
+    ? " -- NOT OFFERED: identical to this tier's own assignment" : ""}`;
 }
 
 export async function ambientAssignment(parent) {
@@ -289,6 +333,11 @@ export function tierValidation(resolution, models) {
 }
 
 export function validateConfiguredTiers(settings, ambient, models, origins = {}) {
+  for (const tier of orphanFallbackEfforts(settings)) {
+    throw new Error(`Refused ${tier}-tier fallback configuration: ${fallbackEffortKey(tier)} is set but ` +
+      `${fallbackModelKey(tier)} is not, so no fallback model exists. Set both, or unset ` +
+      `${fallbackEffortKey(tier)}. Nothing was changed.`);
+  }
   for (const tier of tiers) {
     const resolution = resolveTier(tier, { settings, origins, ambient });
     const checked = tierValidation(resolution, models);
@@ -296,6 +345,16 @@ export function validateConfiguredTiers(settings, ambient, models, origins = {})
       throw new Error(`Refused ${tier}-tier configuration: ${checked.error} ` +
         `Effective ${describeTier(resolution)}. Set or unset a tier's model and reasoning effort ` +
         "together, or use /pr-review models to list supported values. Nothing was changed.");
+    }
+    // A configured fallback is always explicit, so it is always validated. An
+    // effort the fallback model cannot support is refused, never lowered to fit.
+    const fallback = resolveFallback(resolution, { settings, origins });
+    const checkedFallback = fallback && tierValidation(fallback, models);
+    if (checkedFallback && !checkedFallback.valid) {
+      throw new Error(`Refused ${tier}-tier fallback configuration: ${checkedFallback.error} ` +
+        `Effective ${tier} ${describeFallback(fallback)}. An unset ${fallbackEffortKey(tier)} follows the ` +
+        `tier's own effective effort, so set ${fallbackEffortKey(tier)} explicitly or choose another ` +
+        "fallback model. Nothing was changed.");
     }
   }
   return settings;
@@ -342,11 +401,20 @@ export function describeConfiguration(configuration, { flags = {}, heading } = {
     `Ambient session model: ${ambient.model ?? "(unset)"} reasoning=${ambient.reasoningEffort ?? "(unset)"}.`,
     "Effective tier assignments:",
   ];
+  const orphans = orphanFallbackEfforts(effective.settings);
   for (const tier of tiers) {
     const resolution = resolveTier(tier, { settings: effective.settings, origins: effective.origins, ambient, flags });
     const checked = tierValidation(resolution, models);
     lines.push(`  ${describeTier(resolution)}${checked.valid ? ""
       : ` -- UNUSABLE: ${checked.error}${checked.explicit ? "" : " (ambient only; no explicit setting)"}`}`);
+    // Every tier reports its fallback, so an unset one is visibly unset rather
+    // than left to be assumed, and a stored pair that configures nothing says so.
+    const fallback = resolveFallback(resolution, { settings: effective.settings, origins: effective.origins });
+    const checkedFallback = fallback && tierValidation(fallback, models);
+    lines.push(`    ${describeFallback(fallback)}${fallback
+      ? (checkedFallback.valid ? "" : ` -- UNUSABLE: ${checkedFallback.error}`)
+      : (orphans.includes(tier) ? `; ${fallbackEffortKey(tier)} is set but ${fallbackModelKey(tier)} ` +
+        "is not, so no fallback is configured." : "")}`);
   }
   lines.push(
     `autoPostReviews: ${autoPostReviews} [${autoPostSource}].`,
@@ -354,6 +422,12 @@ export function describeConfiguration(configuration, { flags = {}, heading } = {
       "session assignment. Unset tiers inherit the nearest configured tier, preferring the heavier tier when " +
       "equidistant. Quick and deep reviews use the heavy tier only; balanced also runs its overview reviewer " +
       "on the light tier; full adds a conventions reviewer on the medium tier.",
+    "Fallback models are optional and start unset. A tier's fallback is explicit or absent: it never inherits " +
+      "from another tier, and an unset fallback effort follows that tier's own effective effort. A configured " +
+      "fallback gets at most one attempt, for the one reviewer whose own execution failed explicitly, and never " +
+      "a whole-review restart. A cancelled reviewer and an unusable explicit assignment are not eligible. " +
+      "Reviews have no timeout, so elapsed time alone never triggers a fallback and a hung reviewer waits " +
+      "indefinitely. Fallbacks have no invocation flag; configure them here.",
     "Invocation flags such as heavyModel=/heavyEffort= and --comment/--no-comment override these settings for " +
       "that invocation only and never rewrite the personal or project file.",
     "Explicit values are never silently substituted or lowered: an unusable assignment refuses the review.",
@@ -383,6 +457,12 @@ export const configHelp = [
   "use /pr-review models to list them. Unknown keys, malformed assignments and unsupported values are",
   "errors that change nothing. autoPostReviews accepts only true or false and defaults to false.",
   "Assignments in one invocation are applied together or not at all.",
+  "",
+  "A tier's optional <tier>FallbackModel is used for at most one attempt, for the one reviewer whose own",
+  "execution failed explicitly; it never restarts the review and never replaces an unusable explicit",
+  "assignment. Reviews have no timeout, so elapsed time alone never triggers it. Fallbacks start unset and",
+  "never inherit from another tier. <tier>FallbackEffort is optional and follows that tier's own effective",
+  "effort when unset; it cannot be set without <tier>FallbackModel.",
   "",
   `trust records this session's working directory in the personal store, so ${projectConfigDisplayPath}`,
   "in that directory may override the same keys. Without that record the project file is ignored, never",
