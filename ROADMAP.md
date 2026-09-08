@@ -6385,6 +6385,27 @@ safeguard ran.
 `scripts/smoke-reviewer-tools.mjs` was not run and was not required: `V1a` does
 not touch `read-only.mjs`.
 
+Both no-inference runtime probes pass against the **installed** plugin built
+from this branch, so the flag is demonstrated to reach the real dispatch and the
+real gate:
+
+- `node scripts/smoke-runtime.mjs` accepts `--verify` as a review flag and still
+  rejects `123 --verify --capture-only` with the combination error, asserting no
+  model turn, subagent or tool execution in the whole probe.
+- `node scripts/smoke-runtime.mjs --targets` dispatches
+  `/pr-review 1 --quick --no-comment --all --verify` against the controlled
+  fixture checkout. The run logs the verification notice before it starts,
+  records `verify: true`, refuses with `Failed condition: local-head` under the
+  heading `Quick review with --verify refused`, suggests
+  `rerun /pr-review 1 --quick --verify`, starts no reviewer and no owned
+  runtime, and leaves the checkout byte-identical.
+
+That fixture's local `HEAD` is not the captured head, so the refusal it reaches
+is the existing head condition rather than one of the two new ones. It
+demonstrates that the flag reaches the installed gate and is reported; the
+branch and untracked conditions themselves are covered by the controlled suites
+against real git checkouts. Neither probe spends Copilot credits.
+
 ### Remaining limitations
 
 - **A branch name is not a lineage.** The gate proves the current branch carries
@@ -6395,8 +6416,25 @@ not touch `read-only.mjs`.
   uses one. The message names both the expected and the current branch.
 - **Nothing about safeguard execution is demonstrated, because nothing executes.**
   The flag's whole purpose is still ahead of it.
-- The branch and untracked conditions have no live evidence of refusing a real
-  reviewer run, beyond the installed-plugin dispatch recorded below.
+- **The two new conditions have no installed-plugin evidence of their own.** The
+  runtime fixture refuses earlier, on the head condition. Only the controlled
+  suites exercise the branch and untracked refusals, against real git checkouts
+  but not through the real dispatch.
+
+### Reproduction
+
+```sh
+# The twelve controlled suites cover every V1a refusal and the pass-through.
+for s in findings review selection retention preview publication publish-later \
+  checkout config context fixture target; do node scripts/smoke-$s.mjs; done
+
+# The installed-plugin probes. No inference and no credits, but they need a live
+# runtime connection and the plugin installed from this checkout.
+COPILOT_CLI_PATH="$(command -v copilot)" \
+COPILOT_SDK_PATH="$(ls -d "$HOME"/.copilot/pkg/*/"$(copilot --version \
+  | sed -n 's/.*CLI \([0-9][0-9.]*[0-9]\).*/\1/p')"/copilot-sdk)" \
+node scripts/smoke-runtime.mjs --targets
+```
 
 ## Exact next increment
 
