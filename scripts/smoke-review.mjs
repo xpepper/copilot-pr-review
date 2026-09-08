@@ -324,9 +324,13 @@ const checkoutGit = async (args, cwd, { signal } = {}) => {
   if (args[0] === "rev-parse" && args[1] === "HEAD") return `${checkoutState.head}\n`;
   if (args[0] === "status") return checkoutState.status;
   // Only the verification profile asks which branch is checked out, and git
-  // itself fails this command on a detached HEAD rather than naming one.
+  // itself fails this command on a detached HEAD rather than naming one. Real
+  // `symbolic-ref --quiet` exits 1 there, which is the status the gate reads as
+  // detached, so the double carries it rather than an unlabelled failure.
   if (args[0] === "symbolic-ref") {
-    if (!checkoutState.branch) throw new Error("fatal: ref HEAD is not a symbolic ref");
+    if (!checkoutState.branch) {
+      throw Object.assign(new Error("Command failed: git symbolic-ref --quiet --short HEAD"), { code: 1 });
+    }
     return `${checkoutState.branch}\n`;
   }
   throw new Error(`Unexpected git command: ${JSON.stringify(args)} in ${cwd}`);
@@ -1093,6 +1097,30 @@ for (const [scenario, state, expected, fix] of [
   const record = retainedRecord(report);
   validateRecord(record, h.parent.sessionId);
   assert(!Object.hasOwn(record.outcome, "verify"), "The retained record schema is unchanged");
+}
+{
+  // Cancelling the run while the gate is reading the branch is a cancellation,
+  // not a refused checkout: the gate's own refusals are the only thing reported
+  // as one, and a cancelled probe must never be diagnosed as a detached HEAD.
+  const previous = checkoutState;
+  checkoutState = { head: "b".repeat(40), status: "", branch: "feature" };
+  const h = harness();
+  const cancellingGit = async (args, cwd, gitOptions) => {
+    if (args[0] === "symbolic-ref") {
+      h.controller.abort(new DOMException("cancel during the preflight", "AbortError"));
+      gitOptions.signal.throwIfAborted();
+    }
+    return checkoutGit(args, cwd, gitOptions);
+  };
+  const report = await executeReviewRun(h.parent, h.client, { ...options, verify: true },
+    structuredClone(assignments), { controller: h.controller, gh: fakeGh(), git: cancellingGit });
+  assert.equal(report.cancelled, true);
+  assert.notEqual(report.disposition, "refused", "A cancelled preflight is not a refused checkout");
+  assert(!h.messages.some((message) => /detached HEAD/.test(message)),
+    "A cancellation is never reported as a detached HEAD");
+  assert.equal(h.sessions.length, 0);
+  assert.equal(h.client.starts, 0);
+  checkoutState = previous;
 }
 console.log("PASS --verify refuses on branch and untracked conditions, and otherwise reviews and says nothing ran");
 

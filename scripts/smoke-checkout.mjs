@@ -212,6 +212,55 @@ try {
   execFileSync("git", ["-C", verified.directory, "checkout", "--quiet", "pr-branch"]);
   console.log("PASS a differently named branch at the reviewed commit refuses verification");
 
+  // The branch probe answers exactly one question, so only its own answer may be
+  // read as one. `git symbolic-ref --quiet` exits 1 with no output when HEAD is
+  // not a symbolic ref; a cancellation and an operational failure are different
+  // facts, and reporting either as a detached HEAD would be a false diagnosis.
+  const branchProbeRejects = (failure) => async (args, cwd, gitOptions) =>
+    (args[0] === "symbolic-ref" ? Promise.reject(failure) : runGit(args, cwd, gitOptions));
+  const cancellation = Object.assign(new Error("The operation was aborted"),
+    { name: "AbortError", code: "ABORT_ERR" });
+  const cancelling = new AbortController();
+  const cancellingGit = async (args, cwd, gitOptions) => {
+    if (args[0] !== "symbolic-ref") return runGit(args, cwd, gitOptions);
+    // Cancelling aborts the signal and rejects the call that was in flight.
+    cancelling.abort(cancellation);
+    throw cancellation;
+  };
+  await assert.rejects(
+    assertReviewableCheckout(target, {
+      cwd: verified.directory, gh: fakeGh(verified.head), verify: true,
+      git: cancellingGit, signal: cancelling.signal,
+    }),
+    (error) => {
+      assert.equal(error, cancellation, "A cancelled branch probe propagates rather than becoming a refusal");
+      return true;
+    });
+  const brokenGit = Object.assign(new Error("fatal: not a git repository"), { code: 128 });
+  await assert.rejects(
+    assertReviewableCheckout(target, {
+      cwd: verified.directory, gh: fakeGh(verified.head), verify: true, git: branchProbeRejects(brokenGit),
+    }),
+    (error) => {
+      assert.match(error.message, /Failed condition: head-branch/);
+      assert.match(error.message, /not a git repository/,
+        "An operational failure is reported as itself, not as a detached HEAD");
+      assert.doesNotMatch(error.message, /detached HEAD/);
+      return true;
+    });
+  // Exit status 1 is the detached answer itself, and still refuses as one.
+  const notSymbolic = Object.assign(new Error("Command failed: git symbolic-ref"), { code: 1 });
+  await assert.rejects(
+    assertReviewableCheckout(target, {
+      cwd: verified.directory, gh: fakeGh(verified.head), verify: true, git: branchProbeRejects(notSymbolic),
+    }),
+    (error) => {
+      assert.match(error.message, /Failed condition: head-branch/);
+      assert.match(error.message, /detached HEAD/);
+      return true;
+    });
+  console.log("PASS only the branch probe's own exit status 1 is read as a detached HEAD");
+
   // Untracked files warn for an ordinary review and refuse verification: a
   // safeguard's own artifacts could not be told apart from them afterwards.
   writeFileSync(join(verified.directory, "scratch.txt"), "local scratch\n");

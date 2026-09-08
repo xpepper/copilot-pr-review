@@ -118,7 +118,15 @@ export async function assertReviewableCheckout(snapshot,
       // symbolic-ref answers the question directly: it fails on a detached HEAD
       // instead of reporting a branch name that no branch could hold.
       branch = (await git(["symbolic-ref", "--quiet", "--short", "HEAD"], cwd, { signal })).trim();
-    } catch {
+    } catch (error) {
+      // `--quiet` exits 1 with no output when HEAD is not a symbolic ref, and
+      // that exit status is the only rejection meaning "detached". A cancelled
+      // probe observed nothing and belongs to the run, and any other failure is
+      // reported as what it was: neither may be diagnosed as a detached HEAD.
+      if (signal?.aborted) throw error;
+      if (error?.code !== 1) {
+        refuse("head-branch", `the current branch of this checkout could not be read (${String(error.message)}).`);
+      }
       branch = "";
     }
     if (!branch) {

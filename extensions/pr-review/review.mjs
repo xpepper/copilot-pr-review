@@ -260,6 +260,10 @@ export async function executeReviewRun(parent, client, options, assignments, {
       try {
         access = await assertReviewableCheckout(target.snapshot, { cwd, gh: request, git, signal, mode, verify });
       } catch (refusal) {
+        // A cancelled run is not a refused checkout. The gate's own refusals are
+        // the only thing reported as one; whatever the cancellation caused belongs
+        // to the owned run, which reports it as the cancellation it was.
+        if (signal.aborted) throw refusal;
         await parent.log(String(refusal.message ?? refusal), { level: "error" });
         return {
           coverage: "not-started", disposition: "refused",
