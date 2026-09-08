@@ -316,6 +316,16 @@ try {
     (!model.policy || model.policy.state === "enabled") &&
     !(model.capabilities?.supports?.reasoning_effort ?? []).length);
   assert(effortless, "This probe needs a subscription model that advertises no configurable reasoning effort");
+  // reviewAssignments adopts the runtime's own resolved effort for an assignment
+  // that carries none and revalidates it, so a runtime that reported an effort
+  // for such a model would refuse the reviewer after configuration allowed it.
+  // Ask a real session rather than assume none survives. No prompt is sent.
+  const effortlessSession = await client.createSession({ model: effortless.id, availableTools: [] });
+  const effortlessCurrent = await effortlessSession.rpc.model.getCurrent();
+  assert.equal(effortlessCurrent.modelId, effortless.id, "The runtime retains such a model");
+  assert.equal(effortlessCurrent.reasoningEffort, undefined,
+    `The runtime reported ${effortlessCurrent.reasoningEffort} for a model advertising no configurable ` +
+    "effort, which a reviewer would revalidate against the catalog and refuse");
   const setEffortless = await run(session, `heavyModel=${effortless.id}`);
   assert.equal(setEffortless.error, undefined,
     `A tier on a model with no configurable effort was refused: ${setEffortless.error}`);
