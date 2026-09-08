@@ -6175,6 +6175,85 @@ symlink are each refused exactly as before, with no absent-path wording, no file
 content and a `read` denial recorded. It spends no inference and still passes
 its existing assertions unchanged.
 
+### Installed balanced review of pull request #15
+
+The one authorized review ran in explicit **balanced** mode, the default
+topology, because this increment adds no mode. It cost **106.509803 credits**:
+`correctness` 23.90053, `contracts` 28.98964, `security` 22.06032,
+`performance-resources` 13.81085, `overview` 2.822913 and the adjudicator
+14.92555. Four heavy specialists ran `gpt-5.6-terra`/high, overview ran
+`gpt-5.6-luna`/high, and the adjudicator ran `gpt-5.6-terra`. There were 36 tool
+calls and 36 confined reads, with **no permission denial and no tool denial**.
+
+Coverage is **INCOMPLETE**: three execution failures, zero coverage gaps and
+five informational caveats. Two validated findings were accepted, both P2, both
+real, and both fixed on this branch. This is not a clean-review claim.
+
+**`C5`'s demotion fired live for the first time.** The `overview` reviewer
+returned an envelope whose JSON was invalid at position 3101, `envelopeVerifier`
+threw, and the attempt that had settled `completed` was demoted to `incomplete`
+with `Discarded unusable reviewer output`. No tier had a configured fallback, so
+no fallback attempt started. That closes half of `C5`'s live gap recorded above:
+the demotion path is no longer controlled-only. **The other half is unchanged.**
+No live run has yet started a fallback from a demotion, because no live review
+has ever had one configured.
+
+The other two execution failures were candidate citations rejected at the
+evidence boundary, from `correctness` and `contracts`. Two more candidates had
+clipped-end citations repaired by `Q6` before adjudication. Both mechanisms
+behaved as recorded.
+
+### The two findings, and what changed
+
+**`contracts:1`, P2, accepted and fixed.** The refusal formatted
+`relative(root, resolve(path))`, which collapses a `missing/..` segment. A
+request for `<root>/missing/../present.js`, where `present.js` exists, was told
+`No such path inside the reviewed checkout: present.js`. The path genuinely does
+not resolve, so refusing it is right, but naming a file that does exist is
+exactly the inaccuracy this increment set out to remove. The refusal now names
+the path as it was requested.
+
+**`security:1`, P2, accepted and fixed, with its stated mechanism corrected.**
+The walk began at `dirname(path)`, so a symlink in the final position was never
+resolved. Every final symlink under the root was classified as an absent in-root
+path. The reviewer described the consequence as an existence oracle for the
+symlink's target outside the checkout. **That specific claim does not
+reproduce**, and it is recorded as rejected: the reviewed implementation
+answered with the absent reason whether or not the external target existed, so
+the two states were indistinguishable.
+
+The underlying defect is real and worse in a different way. Measured against the
+reviewed implementation:
+
+| Request | Reviewed implementation | After the fix |
+|---|---|---|
+| Final symlink, target outside, absent | absent reason | mute refusal |
+| Final symlink, target outside, **present** | absent reason | mute refusal |
+| Path under a dangling symlink | absent reason | mute refusal |
+| Final symlink, target inside, absent | absent reason | mute refusal |
+| Absent path under a resolving outside directory link | mute refusal | mute refusal |
+
+The second row is the one that mattered: a symlink resolving to an existing file
+outside the checkout was told `No such path inside the reviewed checkout`, which
+contradicts the boundary this increment states. The walk now starts at the
+requested path and asks `lstat` whether each entry exists before resolving it,
+so an entry that exists but does not resolve keeps the mute refusal. A symlink
+in the checkout may point anywhere, and where it points is not this refusal's
+business. A final symlink dangling **inside** the root is now also mute, which
+under-delivers rather than over-delivers.
+
+Both fixes landed as one commit after the review, with tests confirmed red
+against the reviewed implementation at `ca955b4`. The twelve suites and the
+confinement probe pass again, and the probe gained the live dangling-symlink
+case that the `correctness` caveat asked for. **Those commits have not been
+reviewed again**; this increment's single authorization is spent.
+
+Three caveats are preserved as reported and needed no change: that the probe did
+not exercise a final dangling symlink, since corrected; that the resolver
+divergence is documented on macOS only, which this roadmap already records; and
+that no workload evidence substantiates a performance concern about the
+ancestor walk.
+
 ### Remaining limitations
 
 - **No live review has exercised this.** The reason is demonstrated to reach the
@@ -6197,8 +6276,12 @@ its existing assertions unchanged.
   after such a denial remains eligible for its one configured fallback. `Q7`
   makes the refusal accurate for the primary attempt and for the fallback alike,
   but it does not recover the lost output and it does not make a fallback fire.
-  No tier has ever had a fallback configured for a live review, so that path
-  stays live-unobserved.
+  #15 demoted a live attempt for the first time and still could not start a
+  fallback, because no tier had one configured, so that path stays
+  live-unobserved.
+- **A final symlink under the root never receives the absent reason**, even when
+  it dangles inside the checkout. Distinguishing that case would mean resolving
+  where the link points, which is what the mute refusal exists to avoid.
 - The resolver correction is demonstrated on macOS. `realpathSync.native` is the
   operating system resolver on every supported platform, but the divergence
   between it and Node's implementation was reproduced here only.
