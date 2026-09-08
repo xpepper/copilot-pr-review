@@ -26,79 +26,82 @@ before you start.
 
 ## Recorded state
 
-- **You are starting on `main`, with no increment in flight.** `main` is the
-  squash merge of pull request #7, which completed `F6`. Pull requests #3, #4 and
-  #5 delivered `M1`, and #6 delivered `F5`, before it. Those branches are deleted
-  and their individual commits are not ancestors of `main`, so read `git log` and
-  the pull requests rather than looking for hashes from them.
-- Nothing is uncommitted and no increment branch is open. Branch from `main` for
-  `M2`.
+- **You are starting on branch `m2-deep-mode`, on pull request #8, which is not
+  merged.** Read this handoff from that pull request. If the user has merged it,
+  start from a fresh `main` instead; the branch will be deleted and its
+  individual commits will not be ancestors of `main`, so read `git log` and the
+  pull requests rather than looking for hashes from it.
+- Pull request #8 completed `M2`. Nothing is uncommitted. Branch from the
+  merged `main` for the next increment; do not continue on `m2-deep-mode`.
+- Pull requests #3, #4 and #5 delivered `M1`, #6 delivered `F5`, #7 delivered
+  `F6`. All are merged and their branches are gone.
 - Pull requests #1 and #2 are synthetic publication playgrounds from P4 and P5.
   **Never merge them**, and never republish to them.
-- `M1`, `F5` and `F6` are Completed. `M2` is next and is no longer blocked.
-- Five live reviews of this repository's own pull requests exist: #3 and #4 in
-  balanced mode, #5 in full mode, #6 in balanced mode, #7 in full mode. All five
-  are spent. **Any review you run needs its own authorization; none of these
-  carry over.**
+- `M1`, `F5`, `F6` and `M2` are Completed. `C3` and `C4` are the ready
+  candidates; `L1` stays pending.
+- Six live reviews of this repository's own pull requests exist: #3 and #4
+  balanced, #5 full, #6 balanced, #7 full, #8 deep. All six are spent. **Any
+  review you run needs its own authorization; none of these carry over.**
 
-## What `F6` settled, so you do not redo it
+## What `M2` settled, so you do not redo it
 
-The user was asked to choose between `F5`'s three options and chose **both** that
-change something: reviewers and the adjudicator are asked for the envelope
-between `<<<PR_REVIEW_JSON>>>` and `<<<END_PR_REVIEW_JSON>>>`, each alone on its
-line, **and** code unwraps that pair, then one fence wrapping the whole response.
-Read "Completed increment: F6" in `ROADMAP.md` in full before touching
-`findings.mjs`.
+`--deep` is implemented and demonstrated. It declares **one** reviewer,
+`integrated`, on the heavy tier, and that is the whole topology: deep resolves no
+light and no medium tier at all. Its findings policy is full's, `minorCap:
+Infinity`, so every substantiated severity is presented and nothing is withheld.
+Deep is the only mode declaring `holistic: true`, and exactly two pieces of
+reviewer text read that flag: the instructions, which cast it as the pull
+request's only reviewer rather than a specialist and scope a null result to the
+whole change, and the prompt, which heads the assignment `Assigned reviewer:`.
+Do not infer holism from the reviewer count, and do not make deep a further
+specialist or a higher reasoning effort.
 
-Two results matter for anything you do next.
+Read "Completed increment: M2" in `ROADMAP.md` before touching `modes.mjs`.
+Three results there matter for whatever you do next.
 
-- **The contract works on real models.** In pull request #7's full-mode review,
-  five of six reviewers emitted the markers on their own lines, including
-  `claude-sonnet-5`, which also emitted a line of prose first and no fence at
-  all. That is pull request #5's fence failure and #6's prose failure both gone in
-  one run. The light model ignored the markers and emitted a bare object, which
-  the strict floor still accepts.
-- **Payload text is not a wrapper.** The first implementation counted marker
-  substrings, so a reviewer citing the lines that define the markers discarded its
-  own output. Four of six reviewers died that way, three of them while reporting
-  that very defect. Markers and fences now count only as whole lines. Do not
-  reintroduce substring matching, and do not widen the unwrap: everything after
-  the parse is unchanged, and `ROADMAP.md` carries a table of what still fails
-  whole.
+- **The evidence boundary was not touched, and that is the point.** The marker
+  contract and its unwrap, the exact-key check, the schema version and review-key
+  binding, the citation, quote and changed-line gates, adjudication in a separate
+  zero-tool session, deduplication, selection, retention and the publication
+  gates are shared code that never learned about deep. Keep it that way.
+- **The `F6` marker contract now has live evidence from a second run.** Both of
+  #8's sessions emitted the markers on their own lines and both parsed. Do not
+  reintroduce substring matching and do not widen the unwrap.
+- **`mode.specialists` is now `mode.reviewers`**, because deep's one reviewer is
+  deliberately not a specialist. Pure rename, no behaviour change.
 
-The fix is verified by the twelve controlled suites and by replaying the six
-captured reviewer outputs, **not** by a second live review. Five of six parse
-under the fix against two as reviewed. The next live review of any increment is
-the first real evidence for that number; report it as such.
+One class of defect showed up three times in this increment and is worth
+watching for: **a list or sentence that enumerates modes and forgets the new
+one.** `scripts/dogfood-review.mjs` waited for a hardcoded `Q3`/`M1` evidence
+prefix, so a deep run would have hung after printing its findings; the
+configuration inspector's tier note named quick, balanced and full only; and the
+roadmap's own exact-next section was stale, which the review itself caught. The
+first two now derive from or are asserted against the mode declarations. If you
+add a mode, grep for the other three mode ids before you push.
 
-## The next increment is `M2`, deep mode
+## The next increment: `C3` or `C4`
 
-Read the mode table in `SCOPE.md` under "Review modes and findings" as the
-requirement, and `ROADMAP.md`'s `M1` sections for how the three existing modes
-were built and demonstrated. `M2` is done when all of this holds:
+Every mode in `SCOPE.md`'s table now exists, so the next increment leaves the
+mode surface. `ROADMAP.md`'s "Exact next increment" section states both
+candidates in full. `C3` is the smaller one and is recommended.
 
-- `--deep` selects **one integrated heavy reviewer** that considers the whole
-  pull request, rather than the parallel specialists of the other modes.
-- Its findings policy presents **all substantiated severities**.
-- Mode flags stay mutually exclusive: a second mode flag is refused, as
-  `--quick`, `--balanced` and `--full` already are.
-- Reviewer count and concurrency follow the selected mode, and the effective
-  assignment display names the deep reviewer before anything starts.
-- Deep means **holistic** review. It is not a larger parallel review, not a
-  sixth specialist, and not an ascending fourth reasoning effort.
+`C3` is configured fallback models: at most one configured fallback attempt per
+eligible failed reviewer, never a whole-review restart, never a timer, and never
+a silent substitution. Optional fallbacks start unset and must be configured
+explicitly. The constraint that makes it delicate is in `SCOPE.md`: **elapsed
+time alone must never trigger a fallback**, so a hung reviewer waits
+indefinitely and only an explicit failure is eligible. Extend `C1`'s tier
+layering in `config.mjs` and the assertions in `smoke-config.mjs` rather than
+inventing a parallel path.
 
-The modes live in `extensions/pr-review/modes.mjs`, which owns each mode's `id`,
-`flag`, `label`, reviewer list and findings policy; `review.mjs` turns that into
-assignments and instructions. `scripts/smoke-review.mjs`, `smoke-findings.mjs`
-and `smoke-checkout.mjs` carry the per-mode assertions the existing modes added,
-including refusal loops that read `mode.label` and `mode.flag` rather than
-literals. Extend those rather than inventing a parallel test path.
+`C4` is smaller still: a tier whose resolved model supports no configurable
+reasoning effort should resolve to no effort instead of inheriting one, so such
+a model can serve the tier. An explicit effort is still validated and never
+silently lowered.
 
-Keep the evidence boundary exactly as it is: the marker contract and its unwrap,
-the exact-key check, the schema version and review-key binding, the citation,
-quote and changed-line gates, adjudication, deduplication and the findings
-policy. Keep `L1` pending and copy no upstream source. Update `README.md` for the
-new mode, since it is user-visible.
+Whatever you pick, keep the evidence boundary exactly as it is, keep `L1`
+pending, copy no upstream source, and update `README.md` if the change is
+user-visible.
 
 ## Running the real integration test
 
@@ -111,11 +114,11 @@ node scripts/dogfood-review.mjs NUMBER --all --no-comment
 ```
 
 Name the mode deliberately. Without a mode flag the runner takes the default,
-balanced. Say in `ROADMAP.md` which mode you used and why; `F6` used full because
-full is the only mode that assigns the medium tier, and the saved medium model is
-the one whose output started the whole problem. For `M2` the obvious answer is
-`--deep`, since exercising the mode it adds is the point, and it is also the
-cheapest topology in the tool: one reviewer plus the adjudicator.
+balanced. Say in `ROADMAP.md` which mode you used and why; `M2` used `--deep`
+because deep was the mode it added, and because deep is the cheapest topology in
+the tool, one reviewer plus the adjudicator. For an increment that changes no
+mode, balanced is the honest default and full is the only mode that exercises the
+medium tier.
 
 Derive the SDK path instead of pinning a version. Old packages under
 `~/.copilot/pkg/` are never pruned, so a pinned path keeps resolving after a
@@ -137,7 +140,11 @@ tree, refuses `--comment`, prints the whole plugin timeline, and reports the
 settled outcome with the runtime's credit figure. `copilot -p "/pr-review N"` is
 not a substitute: prompt mode starts an ambient model turn instead of
 dispatching the command. The run takes tens of minutes; do not treat a quiet
-timeline as a hang.
+timeline as a hang. #8's deep review took roughly twenty minutes for one
+reviewer.
+
+Do not modify the working tree while a review is running: the reviewer is
+reading that checkout live.
 
 Record from that run: the mode, the model and effort each reviewer actually
 used, coverage, findings, withheld findings, coverage gaps, tool calls and
@@ -145,9 +152,10 @@ denials, and the reported credits. The per-reviewer `policy.toolCalls`,
 `policy.reads`, `policy.permissionDenials` and `policy.toolDenials` fields in the
 evidence record carry the read evidence; `billing` carries the charge. Save the
 reviewers' verbatim output from the timeline before you analyse anything: `F6`'s
-diagnosis and its replay evidence both came from those strings. Fix real findings
-on the same branch and say which you rejected and why. A refusal or failure is a
-defect report about the tool; never weaken a gate to make the run pass.
+diagnosis and its replay evidence both came from those strings, and `M2`'s
+marker evidence came from #8's. Fix real findings on the same branch and say
+which you rejected and why. A refusal or failure is a defect report about the
+tool; never weaken a gate to make the run pass.
 
 ## Runtime and validation caveats
 
@@ -160,16 +168,17 @@ defect report about the tool; never weaken a gate to make the run pass.
 - Controlled suites (no inference/network): `node scripts/smoke-<name>.mjs` for
   `findings`, `review`, `selection`, `retention`, `preview`, `publication`,
   `publish-later`, `checkout`, `config`, `context`, `fixture`, `target`. All
-  twelve passed on pull request #7, as did `git diff --check`. Re-run them
+  twelve passed on pull request #8, as did `git diff --check`. Re-run them
   before you start: they need no network and no inference.
 - Installed probes require both `COPILOT_CLI_PATH` and `COPILOT_SDK_PATH`, set
   the same derived way as the integration test above rather than pinned to a
   version. No-inference probes: `smoke-runtime.mjs --targets --startup` was rerun
-  on pull request #7 after the fix and passed. `smoke-runtime.mjs --targets
-  --matching-checkout --startup`, `smoke-retention-runtime.mjs`,
-  `smoke-reviewer-tools.mjs` with `PR_REVIEW_HEAVY_MODEL=gpt-5.6-terra` and with
-  `claude-sonnet-5`, and `smoke-config-runtime.mjs` were last rerun on pull
-  request #5; `F6` changed `findings.mjs` only, which none of them exercises.
+  on pull request #8 and passed, now dispatching four modes.
+  `smoke-runtime.mjs --targets --matching-checkout --startup`,
+  `smoke-retention-runtime.mjs`, `smoke-reviewer-tools.mjs` with
+  `PR_REVIEW_HEAVY_MODEL=gpt-5.6-terra` and with `claude-sonnet-5`, and
+  `smoke-config-runtime.mjs` were last rerun on pull request #5; `F6` and `M2`
+  changed nothing any of them exercises.
 - `scripts/smoke-factory.mjs` is `F5`'s probe. Without `--spend` it starts no
   subagent and spends nothing, and it is a useful no-inference regression on the
   factory surface if you ever need to check whether the gate has lifted. With
@@ -179,11 +188,12 @@ defect report about the tool; never weaken a gate to make the run pass.
   restore it byte-identically, or skip that probe. Verify the restore with
   `shasum -a 256`; a shell that dies mid-script can leave it moved away.
 - Reviewing costs real credits and scales with the diff and the reviewer count:
-  79.238565 for five balanced reviewers on a 3-file, 848-addition pull request,
-  124.2079 for six full reviewers on a 4-file one, 276.266849 for six full
-  reviewers on a 13-file one, 414.14627 for five balanced reviewers on a 27-file
-  one, and 27.89 for three quick reviewers on a small one. Report the runtime's
-  figure; never estimate it.
+  68.27393 for one deep reviewer on a 12-file, 385-addition pull request,
+  79.238565 for five balanced reviewers on a 3-file, 848-addition one, 124.2079
+  for six full reviewers on a 4-file one, 276.266849 for six full reviewers on a
+  13-file one, 414.14627 for five balanced reviewers on a 27-file one, and 27.89
+  for three quick reviewers on a small one. Report the runtime's figure; never
+  estimate it.
 - Inference authorization does not accumulate. The workflow authorizes the one
   review of your increment's pull request. `smoke-factory.mjs --spend`, the
   recorded R1 live command, harness `--quick` paths, `--read-live`, fixture
@@ -196,11 +206,13 @@ defect report about the tool; never weaken a gate to make the run pass.
 - Cold `session.resume` of retained command-only records remains unsupported.
   Do not invent transcript recovery. The adjudicator remains zero-tool and
   citations remain restricted to captured diff/context evidence.
-- Three older observations remain open and separately authorizable: no review has
-  ever run against a substantial code diff, so review quality is undemonstrated;
-  the changed-line anchoring rule keeps discarding true findings; and pull request
-  #6's read denials landed on the two reviewers that then failed, though #7 had no
-  denial at all.
+- Three older observations remain open and separately authorizable. The oldest
+  is the largest: **no review of any mode has ever run against a substantial code
+  diff**, so review quality is undemonstrated; all six live runs reviewed this
+  project's own documentation-heavy pull requests, and #8's two findings were
+  both documentation defects. The changed-line anchoring rule keeps discarding
+  true findings. And pull request #6's read denials landed on the two reviewers
+  that then failed, though #7 and #8 had no denial at all.
 - Two sessions once worked on the same branch at the same time, and the second
   wrote a handoff from a stale premise. If that happens again, rebase rather
   than force-push, and say so in your report.
@@ -211,7 +223,8 @@ Work on a branch named for the increment. Commit locally at meaningful validated
 checkpoints, staging only that checkpoint's files and preserving unrelated
 changes. Do not amend, rewrite published history, force-push, or push to `main`.
 Update `ROADMAP.md` with evidence and remaining limitations before committing; a
-checkpoint does not by itself complete an increment.
+checkpoint does not by itself complete an increment, and the roadmap should say
+so while the increment is in flight.
 
 Push the branch, open its pull request with `gh pr create`, run the integration
 test above, record the outcome, and leave merging to the user.
