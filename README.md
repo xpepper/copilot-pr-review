@@ -324,7 +324,14 @@ candidate JSON in a ```` ```json ```` fence, and the parser performs no fence
 stripping by design, so the conventions reviewer's whole output was discarded as
 an execution failure. Until that is resolved, a Claude-family medium model spends
 a sixth reviewer's credits and contributes nothing. Prefer a GPT-family medium
-model. See [ROADMAP.md](ROADMAP.md).
+model.
+
+The strictness is not specific to fences or to one model family: any wrapper
+around the envelope discards the whole output. The review of pull request #6
+discarded a `gpt-5.6-terra` specialist that emitted a sentence of prose before
+its JSON, the same way. `F5` investigated whether the runtime could return
+parsed structured output instead and found it unusable on Copilot CLI 1.0.83;
+the evidence and the open decision are in [ROADMAP.md](ROADMAP.md).
 
 ### Grounded findings and deduplication (Q4)
 

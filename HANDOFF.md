@@ -3,7 +3,7 @@
 Read `AGENTS.md`, `SCOPE.md` and `ROADMAP.md`, then inspect the working tree,
 recent commits, open pull requests and the implementation before editing
 anything. `SCOPE.md` is the authoritative product specification; `ROADMAP.md`
-records demonstrated evidence, runtime caveats and the exact next increment.
+records demonstrated evidence, runtime caveats and the exact next step.
 Do not rely on previous conversations or reopen settled product decisions.
 
 ## How work lands here
@@ -26,86 +26,72 @@ before you start.
 
 ## Recorded state
 
-- `main` is the squash merge of pull request #5, which completed `M1` by adding
-  the full review mode. Pull requests #3 and #4 delivered the balanced half and
-  the integration-test working agreement before it. All three branches are
-  deleted and their individual commits are not ancestors of `main`, so read
-  `git log` and the pull requests rather than looking for hashes from them.
-- Nothing is uncommitted and no increment pull request is open.
+- `main` is the squash merge of pull request #5, which completed `M1`. Pull
+  requests #3 and #4 delivered the balanced half and the integration-test
+  working agreement before it. Those branches are deleted and their individual
+  commits are not ancestors of `main`, so read `git log` and the pull requests
+  rather than looking for hashes from them.
+- **Pull request #6 is open and unmerged: it is `F5`, on branch
+  `f5-structured-output-spike`, and this handoff lives on it.** Nothing is
+  uncommitted. Merging is the user's call.
 - Pull requests #1 and #2 are synthetic publication playgrounds from P4 and P5.
   **Never merge them**, and never republish to them.
-- `M1` is Completed. Both halves are recorded in `ROADMAP.md` under "Completed
-  increment: M1, balanced half" and "Completed increment: M1, full half". Read
-  the second in full before you start, and do not repeat it.
-- Three live reviews of this repository's own pull requests exist: #3 and #4 in
-  balanced mode, #5 in full mode. All three are spent. **Yours needs its own
-  authorization, and none of these carry over.**
+- `M1` is Completed. `F5` is Completed; read "Completed increment: F5" in
+  `ROADMAP.md` in full before you start, and do not repeat it.
+- Four live reviews of this repository's own pull requests exist: #3 and #4 in
+  balanced mode, #5 in full mode, #6 in balanced mode. All four are spent.
+  **Any review you run needs its own authorization; none of these carry over.**
 
-What `M1` shipped, so you do not rebuild it:
+## What `F5` settled, so you do not redo it
 
-- `extensions/pr-review/modes.mjs` declares each mode as data: reviewer
-  topology with each reviewer's tier, findings policy, label, flag and evidence
-  prefix. Everything mode-dependent reads it, which is why adding a mode touches
-  almost nothing else.
-- `--balanced` is the default: four heavy specialists plus one light overview
-  reviewer, presenting P0-P2 plus at most three P3/nit findings. `--full` adds a
-  medium `conventions-maintainability` reviewer and presents every qualifying
-  severity with no minor cap. `--quick` and `--major-only` are three heavy
-  specialists and P0-P2 only. Mode flags are mutually exclusive, and
-  `--capture-only` is the capture-without-reviewers path the no-inference probes
-  use.
-- Every tier resolves through the same layering, and an `Effective reviewer
-  assignments:` block shows each reviewer, tier, model, effort and origin before
-  execution. Only `heavyModel=`/`heavyEffort=` are invocation flags; light and
-  medium come from `/pr-review-config`.
+`F5` was a bounded feasibility spike. It changed no shipped behaviour: `envelope`
+is untouched, no reviewer moved, and no mode, configuration key, fallback,
+timeout, safeguard, reviewer shell tool or gate override was added. It added two
+files under `scripts/`, `smoke-factory.mjs` and `f5-factory-extension.mjs`, and
+they are a probe, not a shipped path.
 
-## The defect that decides the next increment
+It answered whether the runtime can return parsed structured output for a
+reviewer, so reviewer output stops depending on a model family's willingness to
+emit bare JSON. **The answer is no on Copilot CLI 1.0.83**, for three
+independently demonstrated reasons:
 
-Pull request #5's review ran full mode with all three tiers on genuinely
-distinct models for the first time, made 95 confined reads with zero denials,
-and cost 276.266849 credits. It returned zero validated findings with incomplete
-coverage, and it found two things that matter more than those numbers.
+- The whole Agent Factories surface sits behind a CLI feature flag that is off
+  for this account and is read from the CLI process's own environment. Only an
+  extension connection may register a factory, and an extension joins the user's
+  foreground session, whose environment the plugin does not set.
+- A joining extension cannot register `onPermissionRequest` at all: `joinSession`
+  never settles and the CLI reports the extension `failed`. That handler is how
+  the shipped reviewers confine reads to the verified checkout.
+- A custom agent declaring `view`/`grep`/`glob` is enforced as five tools, adding
+  `skill` and `sql`. `assertReviewerTools` would refuse to start a review against
+  that set, and `F4` and `R1` are not negotiable.
 
-**A reviewer model fenced its JSON and the whole output was discarded.**
-`claude-sonnet-5` returned its candidates wrapped in a ```` ```json ```` fence,
-so `envelope` rejected everything it produced. Frame this correctly: it is **not
-a full-mode or medium-tier defect**. The same parser handles specialist
-candidates and adjudicator decisions, so a Claude-family *heavy* tier would lose
-every reviewer's output and every adjudication decision too. Full mode merely
-exposed it first, because the medium tier was the first place a Claude model was
-ever configured for a live run. Three separate instructions already tell
-reviewers to return plain JSON with no fences, and the model ignored all three.
+It also measured, with one authorized run costing 15.870500 credits: the
+documented one-retry does **not** spawn a second subagent, but a schema failure
+still charges a full turn and returns nothing; a failed subagent resolves `null`
+with no reason anywhere in the run envelope, terminal state, agent summary or
+progress records; and a factory run body written by an extension is an ordinary
+closure that reaches every shipped module by dynamic import.
 
-**The evidence gate rejected a true finding for the second review running.**
-`correctness:1` correctly observed that a README sentence stated the medium
-tier's tie-break unconditionally; it was rejected because its introduction
-citations did not identify the same changed hunk as its location. The point was
-acted on anyway. Read the rejected candidates and any discarded reviewer output
-yourself; the validated list is not the whole review.
+**Do not revisit that surface without new information from GitHub.** All three
+blockers would have to change. A new CLI version is new information; a new
+reading of the same documentation is not.
 
-## Implement only the exact next increment
+## The next step is the user's decision, not an implementation
 
-**`F5`, as specified at the end of `ROADMAP.md`.** The user has already chosen
-this path over relaxing the parser: research a structural answer first, by
-demonstration rather than by reading declarations.
+`ROADMAP.md`'s "Exact next increment" section states it in full. In short, `F5`
+recommends the narrow fence unwrap, and pull request #6's own review then
+qualified that recommendation: a `gpt-5.6-terra` specialist was discarded for
+emitting prose before its JSON, which a fence unwrap would not have recovered.
+Three options are on the table, and the user picks one: the narrow fence unwrap,
+marker-delimited reviewer output, or changing nothing and keeping GPT-family
+tiers.
 
-In short: `SessionConfig` and `MessageOptions` expose no output-schema option, so
-the stdio integration selected at `F3` cannot constrain reviewer output today.
-The only structured-output surface is the experimental Agent Factories API, where
-`ctx.agent(prompt, { schema })` resolves to parsed JSON instead of text. `F5`
-settles whether that is usable here by answering four questions with evidence:
-whether a factory-owned subagent can hold exactly the confined `view`/`grep`/
-`glob` grant, what the documented one-retry-on-schema-failure actually costs,
-whether its `null` failure result keeps incomplete coverage visible as
-incomplete, and whether a factory `run` body can reach this extension's modules
-at all given that it closes over nothing and cannot use static imports.
-
-`F5` produces evidence and a recommendation. **It changes no shipped behaviour.**
-Do not relax `envelope`, do not migrate any reviewer, and do not start `M2`,
-which now depends on `F5`. The full acceptance criteria are in `ROADMAP.md`.
-
-The probe spends inference, so **ask for explicit authorization before running
-it** and say what it will cost. None carries over from any earlier session.
+**Ask, and do not choose for them.** Whichever they pick is a behavioural change
+to `findings.mjs` and lands as `F6` on its own branch and pull request, reviewed
+once with this plugin. The increments table carries `F6` as **Blocked on a user
+decision**, and `M2` now depends on `F6` rather than on `F5`, so do not read
+`F5` being Completed as clearance to start deep mode.
 
 ## Running the real integration test
 
@@ -118,9 +104,9 @@ node scripts/dogfood-review.mjs NUMBER --all --no-comment
 ```
 
 Name the mode deliberately. Without a mode flag the runner takes the default,
-balanced. `F5` changes no mode, so balanced is the right choice for its review;
-name it explicitly rather than relying on the default, and say in `ROADMAP.md`
-which mode you used and why.
+balanced. Say in `ROADMAP.md` which mode you used and why; `F5` used balanced
+because it changes no mode, so the default topology was the right one to
+exercise.
 
 Derive the SDK path instead of pinning a version. Old packages under
 `~/.copilot/pkg/` are never pruned, so a pinned path keeps resolving after a
@@ -147,8 +133,8 @@ Record from that run: the mode, the model and effort each reviewer actually
 used, coverage, findings, withheld findings, coverage gaps, tool calls and
 denials, and the reported credits. The per-reviewer `policy.toolCalls`,
 `policy.reads`, `policy.permissionDenials` and `policy.toolDenials` fields in the
-`M1 evidence:` record carry the read evidence; `billing` carries the charge. Fix
-real findings on the same branch and say which you rejected and why. A refusal or
+evidence record carry the read evidence; `billing` carries the charge. Fix real
+findings on the same branch and say which you rejected and why. A refusal or
 failure is a defect report about the tool; never weaken a gate to make the run
 pass.
 
@@ -157,41 +143,44 @@ pass.
 - Consult the installed SDK and current official documentation before adopting
   runtime APIs. Installed SDK:
   `~/.copilot/pkg/darwin-arm64/1.0.83/copilot-sdk`, CLI `1.0.83`. Demonstrate
-  capabilities; declarations and plugin format support alone are not proof. This
-  matters more than usual for `F5`, whose whole subject is an experimental API.
+  capabilities; declarations and plugin format support alone are not proof.
+  `F5` is the cautionary case: the SDK's own documentation described a retry
+  that spawns twice and a self-contained run body, and neither held on this
+  runtime.
 - Reinstall with `copilot plugin install "$(pwd)"` after every extension change,
   before running any installed-runtime probe or the integration test.
 - Controlled suites (no inference/network): `node scripts/smoke-<name>.mjs` for
   `findings`, `review`, `selection`, `retention`, `preview`, `publication`,
   `publish-later`, `checkout`, `config`, `context`, `fixture`, `target`. All
-  twelve passed on pull request #5, as did `git diff --check`. Re-run them
+  twelve passed on pull request #6, as did `git diff --check`. Re-run them
   before you start: they need no network and no inference.
+- `scripts/smoke-factory.mjs` is `F5`'s probe. Without `--spend` it starts no
+  subagent and spends nothing, and it is a useful no-inference regression on the
+  factory surface if you ever need to check whether the gate has lifted. With
+  `--spend` it costs credits and needs explicit authorization.
 - Installed probes require both `COPILOT_CLI_PATH` and `COPILOT_SDK_PATH`, set
   the same derived way as the integration test above rather than pinned to a
-  version. No-inference probes, all rerun on pull request #5:
-  `smoke-runtime.mjs --targets --startup`,
-  `smoke-runtime.mjs --targets --matching-checkout --startup`,
-  `smoke-retention-runtime.mjs`, `smoke-reviewer-tools.mjs` with
-  `PR_REVIEW_HEAVY_MODEL=gpt-5.6-terra` and with `claude-sonnet-5`, and
-  `smoke-config-runtime.mjs`.
-- The installed draft-skip loop in `smoke-runtime.mjs --startup` dispatches all
-  three modes and asserts each one's reviewer count, tier lines and
-  findings-policy text. Extend it the same way for any new mode.
+  version. No-inference probes: `smoke-runtime.mjs --targets --startup` was
+  rerun on pull request #6 and passed. `smoke-runtime.mjs --targets
+  --matching-checkout --startup`, `smoke-retention-runtime.mjs`,
+  `smoke-reviewer-tools.mjs` with `PR_REVIEW_HEAVY_MODEL=gpt-5.6-terra` and with
+  `claude-sonnet-5`, and `smoke-config-runtime.mjs` were last rerun on pull
+  request #5 and were not rerun here, because `F5` changed nothing under
+  `extensions/`; `git diff main -- extensions plugin.json` was empty.
 - `smoke-config-runtime.mjs` refuses to run while a personal
   `<copilot-config-home>/pr-review/config.json` exists. Copy it aside and
   restore it byte-identically, or skip that probe. Verify the restore with
   `shasum -a 256`; a shell that dies mid-script can leave it moved away.
 - Reviewing costs real credits and scales with the diff and the reviewer count:
-  276.266849 for six full reviewers on a 13-file pull request, 414.14627 for
-  five balanced reviewers on a 27-file one, 79.82605 for five on a 4-file one,
-  and 27.89 for three quick reviewers on a small one. A genuinely light model is
-  what keeps the extra reviewers affordable: on pull request #5 the light
-  reviewer cost 6.50463 against 43-51 for each heavy specialist. Report the
-  runtime's figure; never estimate it.
+  79.238565 for five balanced reviewers on a 3-file, 848-addition pull request,
+  276.266849 for six full reviewers on a 13-file one, 414.14627 for five
+  balanced reviewers on a 27-file one, and 27.89 for three quick reviewers on a
+  small one. Report the runtime's figure; never estimate it.
 - Inference authorization does not accumulate. The workflow authorizes the one
-  review of your increment's pull request. The `F5` probe, the recorded R1 live
-  command, harness `--quick` paths, `--read-live`, fixture inference and any
-  publication each still need a fresh explicit instruction in your own session.
+  review of your increment's pull request. `smoke-factory.mjs --spend`, the
+  recorded R1 live command, harness `--quick` paths, `--read-live`, fixture
+  inference and any publication each still need a fresh explicit instruction in
+  your own session.
 - Cold `session.resume` of retained command-only records remains unsupported.
   Do not invent transcript recovery. The adjudicator remains zero-tool and
   citations remain restricted to captured diff/context evidence.
