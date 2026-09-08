@@ -7,12 +7,18 @@ conversation or reopen Q5's settled decisions.
 
 ## Recorded state
 
-Q6 is complete on branch `q6-source-bound-quote-repair`, pull request #13,
-branched from `main` at `ba8f0fc` (the squash merge of #12). Implementation
-checkpoint `fb0ec79` was reviewed with the installed plugin once. The checkpoint
-containing this handoff changes documentation only and was not reviewed again.
-The PR is left open; merging is the user's decision. No uncommitted work is
-intended to remain. Inspect git and GitHub rather than assuming it has merged.
+This handoff is prepared for a fresh session on **clean `main` after the
+user-authorized merge of pull request #13**. Confirm the merge, branch and
+working-tree state before proceeding; if #13 is still open, report the
+unfinished merge rather than starting another increment.
+
+Q6 is complete. Its branch was `q6-source-bound-quote-repair`, from `main` at
+`ba8f0fc` (the squash merge of #12). Implementation checkpoint `fb0ec79` was
+reviewed with the installed plugin once; `6e5b420` recorded that review.
+The later checkpoints, including this handoff, change documentation only and
+were not reviewed again. A squash merge need not retain those individual
+commits as ancestors of main; use #13 and git history to reconcile state.
+No uncommitted work or increment in flight is intended to remain.
 
 Q6 repairs candidate-only clipped quote ends from the exact bound source range.
 It requires a contiguous span, the same physical line count, and non-whitespace
@@ -65,19 +71,27 @@ records its invocation, digest, charges and exact reproduction command.
 
 ## Exact next step
 
-**No next implementation is authorized. Ask the user before C5.** Do not redo
-Q6 or widen it. The next action is the user's merge/continuation decision,
-not another review of #13. Its one-review authorization is spent.
+**Discuss C5's boundary, then wait for approval before implementation.**
+The user explicitly chose that next step on 2026-09-08. Merge authorization is
+not authorization to implement C5, run another review of #13, or spend credits.
+Do not redo Q6 or widen it; its one-review authorization is spent.
 
 C5 moves retry eligibility across the evidence boundary and changes what
-completed means; its proposed seam and decisions are in "Exact next increment"
-in the roadmap. If authorized, it must make discarded output eligible for at
-most one configured fallback without whole-review retries, automatic
-substitution, cancellation retries or timers, and preserve visible incomplete
-coverage across every mode. Define the exact eligibility boundary with the
-user before implementation; do not silently fold candidate rejection into it.
-Keep L1 pending and copy no upstream source. Do not start V1 or another
-increment to avoid the C5 authorization gate.
+completed means. Read "Exact next increment" in the roadmap and inspect the
+current execution/collection seam. Explain the difference between an invalid
+envelope, a valid envelope with an invalid candidate, and a valid empty result.
+Propose a precise eligibility rule and a decision table, including no configured
+fallback, failed fallback, cancellation, useful sibling candidates, coverage
+and retained statuses across every mode. Keep Q6 repair and semantic rejection
+distinct from malformed output. Explain the cost of an additional attempt.
+
+The session's acceptance criterion is a source-grounded proposal with controlled
+acceptance cases and unresolved choices identified, followed by an explicit
+approval gate. **Do not edit implementation or run inference before approval.**
+Any later implementation must preserve the one-configured-fallback limit,
+no whole-review restart, no silent substitution, no cancellation retry and no
+timer. Keep L1 pending and copy no upstream source. Do not start V1 or another
+increment instead.
 
 ## For a future authorized increment
 

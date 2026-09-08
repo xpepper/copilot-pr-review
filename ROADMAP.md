@@ -5702,20 +5702,37 @@ node scripts/dogfood-review.mjs 13 --balanced --all --no-comment
 
 CLI 1.0.83 was used with its derived bundled SDK. No other credit-spending
 probe, factory invocation or rerun was performed. The personal configuration
-file was not moved or edited. The post-review checkpoint changes documentation
-only; it has not been reviewed again. Merging stays the user's decision.
+file was not moved or edited. The post-review checkpoints change documentation
+only; they have not been reviewed again. The user subsequently authorized
+merging #13 and chose a C5 boundary discussion, not implementation, for the
+next fresh session.
 
 ## Exact next increment
 
-**Q6 is complete on pull request #13, left open for the user's merge decision.**
+**Q6 is complete on pull request #13; the user has authorized its merge.**
 Both recorded near-misses reach controlled adjudication while the recorded
 fabrication does not. Its installed balanced review ran once and was incomplete;
 live repaired-candidate adjudication is still unobserved. Do not redo Q6 or
 spend another review to manufacture positive evidence.
 
-**No next implementation is authorized. Ask the user before starting C5.**
-Its proposed boundary and acceptance questions follow; do not fold them into
-Q6 or start another increment instead.
+**The next session is a C5 boundary discussion only.** On 2026-09-08 the user
+explicitly chose: "Discuss the C5 boundary and wait for approval before
+implementation." Start from clean `main` after #13 is merged, inspect git and
+the open PRs, and do not treat merge authorization as C5 implementation
+authorization. If #13 is still open, report the unfinished merge first.
+
+Discuss which discarded outputs should count as failed attempts: an invalid
+envelope, an otherwise valid envelope with an invalid candidate, and a valid
+empty candidate list are distinct cases. Trace the current completion and
+fallback seam before recommending where to validate output. Explain effects on
+coverage and retained status across all modes, preservation of useful sibling
+candidates, and the extra cost of a configured fallback. Keep Q6 quote repair
+and semantic rejection distinct from envelope failure.
+
+The discussion is complete when it produces a proposed eligibility rule,
+decision table, and controlled acceptance cases, with unresolved choices
+clearly named. Present that proposal and wait for explicit approval before code
+changes or any credit-spending run. Do not start another increment instead.
 
 **`C5` remains open, and still needs the user's go-ahead: eligibility for a
 discarded output.**
