@@ -4,8 +4,9 @@ An original Copilot CLI plugin prototype. **Balanced (the default), full and
 quick reviews include grounded candidate validation, deduplication, finding selection,
 posting-authority controls, code-controlled COMMENT publication, and session-bound
 retention with uncertain-write protection. A retained selection can also be published later by
-an explicit command, without rerunning reviewers. Personal model tiers and
-`autoPostReviews` are inspected and updated with `/pr-review-config`.**
+an explicit command, without rerunning reviewers. Personal model tiers, optional
+per-tier fallback models and `autoPostReviews` are inspected and updated with
+`/pr-review-config`.**
 [SCOPE.md](SCOPE.md) is the authoritative product specification;
 [ROADMAP.md](ROADMAP.md) records delivery status and runtime evidence.
 
@@ -839,10 +840,13 @@ record without inference or mutation.
 
 Text commands only: there is no interactive menu and no finding editor. Keys are
 `lightModel`, `lightEffort`, `mediumModel`, `mediumEffort`, `heavyModel`,
-`heavyEffort`, and `autoPostReviews`. They correspond to the upstream `light`,
-`medium`, `heavy`, `*_thinking`, and `autoPostReviews` settings; upstream's other
-fields are not ported. `autoPostReviews` accepts only `true` or `false` and
-defaults to false.
+`heavyEffort`, the optional `lightFallbackModel`, `lightFallbackEffort`,
+`mediumFallbackModel`, `mediumFallbackEffort`, `heavyFallbackModel` and
+`heavyFallbackEffort` described under [Configured fallback
+models](#configured-fallback-models-c3), and `autoPostReviews`. The tier keys
+correspond to the upstream `light`, `medium`, `heavy`, `*_thinking`, and
+`autoPostReviews` settings; upstream's other fields are not ported.
+`autoPostReviews` accepts only `true` or `false` and defaults to false.
 
 Every assignment in one invocation applies together or not at all. Unknown keys,
 malformed arguments, empty values, and unsupported models or reasoning efforts
@@ -890,9 +894,9 @@ model that supports an effort, such as `gemini-3.8-flash`, `gpt-5-mini` or
 
 Invocation flags win over saved settings for that invocation only and never
 rewrite the file: `heavyModel=`/`heavyEffort=` on `/pr-review NUMBER`, and
-`--comment`/`--no-comment` over `autoPostReviews`. There is no light-tier or
-medium-tier invocation flag; balanced and full take those assignments from saved
-configuration or the ambient session, and deep resolves neither tier.
+`--comment`/`--no-comment` over `autoPostReviews`. There is no light-tier,
+medium-tier or fallback invocation flag; balanced and full take those assignments
+from saved configuration or the ambient session, and deep resolves neither tier.
 
 Configuration is personal and lives at `<copilot-config-home>/pr-review/config.json`,
 beside the CLI's own `session-state` directory, so it is never inside a reviewed
@@ -996,6 +1000,84 @@ still winning, an extension reload, revoked trust, and malformed or unusable
 project files refusing the review. Neither spends inference credits. The native
 probe runs in a disposable fixture checkout, and snapshots and restores both
 personal files before and after the run.
+
+### Configured fallback models (C3)
+
+```text
+/pr-review-config heavyFallbackModel=claude-sonnet-5 heavyFallbackEffort=high
+/pr-review-config show
+/pr-review-config unset heavyFallbackModel heavyFallbackEffort
+```
+
+Each tier may carry one optional fallback assignment, `<tier>FallbackModel` and
+`<tier>FallbackEffort`, for all three tiers. It buys **one extra attempt, for the
+one reviewer whose own execution failed**, and nothing else. The review is never
+restarted, no other reviewer is affected, and a reviewer that has used its
+fallback gets no further attempt whatever happens next.
+
+**Elapsed time never triggers a fallback.** This tool imposes no review timeout
+at all, so a reviewer that hangs waits indefinitely and is never replaced; only
+an explicit failure is eligible. In practice that means the attempt settled as a
+failure: a session error, a shutdown before completion, no usable output, an
+attempted forbidden tool call, or reported usage that did not match the
+assignment. Cancelling the run is not a failure and starts no fallback.
+
+An invalid explicit setting is not eligible either. A model your subscription
+cannot use, or an effort a model does not support, still refuses the review
+before anything starts, exactly as it does without a fallback configured. The
+fallback answers a failure during execution, never a configuration you cannot
+run, and nothing is ever silently substituted.
+
+Fallbacks start unset and must be configured explicitly, per tier. **A fallback
+never inherits from another tier**, unlike a tier's own model and effort: an
+unset `heavyFallbackModel` means the heavy tier has no fallback, not that the
+light tier's fallback stands in for it. An unset `<tier>FallbackEffort` follows
+that tier's own effective effort, and the resulting pair is validated like any
+other explicit assignment, so an effort the fallback model cannot support is
+refused rather than quietly lowered. Set `<tier>FallbackEffort` when the fallback
+model supports a different set of efforts from the primary. It cannot be set
+without `<tier>FallbackModel`, because on its own it configures nothing.
+
+A fallback that resolves to exactly the tier's own model *and* effort is not a
+fallback and is never attempted; `show` marks it `NOT OFFERED`. The same model at
+a different effort still counts, so a lower-effort retry of the same model is a
+legitimate fallback.
+
+Fallbacks have no invocation flag, like the light and medium tiers before them:
+`/pr-review-config` is the only place to set them. A `heavyModel=` flag overrides
+the tier's own assignment for that invocation while the configured fallback
+stays as saved.
+
+Which reviewers get one follows the tier, so it follows the mode. A heavy
+fallback covers quick's three specialists, balanced's and full's four heavy
+specialists, deep's one integrated reviewer, and the evidence adjudicator, which
+resolves the heavy tier like any other reviewer and so gets its own single
+attempt. It never covers balanced's light overview reviewer or full's medium
+conventions reviewer; configure `lightFallbackModel` and `mediumFallbackModel`
+for those.
+
+Nothing about a fallback is hidden. `show` prints a `fallback:` line for every
+tier, so an unset one is visibly unset, and the pre-execution report names the
+fallback beside each reviewer that has one. When one is used, the timeline says
+which reviewer fell back and why, the review's coverage report carries an
+informational caveat naming both assignments and the primary failure, and the
+retained record keeps the failed attempt beside the one that produced the
+result. A recovered reviewer reports completed coverage; a fallback that fails
+too leaves the reviewer incomplete with both failures recorded.
+
+Reproduce the controlled probes:
+
+```sh
+node scripts/smoke-config.mjs
+node scripts/smoke-review.mjs
+node scripts/smoke-retention.mjs
+```
+
+They cover resolution and refusal, the single attempt for a failed reviewer, a
+fallback that also fails, one that cannot start, a completed reviewer and a
+cancelled run starting none, the adjudicator's own attempt, and the retained
+record that keeps both attempts. None of them starts inference or touches the
+network.
 
 ### Two-reviewer fixture experiment (F2)
 
@@ -1105,7 +1187,8 @@ clean-review claim or publication. Normal SDK transcripts may persist, and
 forced termination does not guarantee a final transcript flush. The prototype
 can capture PRs, bind source context, resolve personal and explicitly trusted
 project configuration, run the quick, balanced and full specialists or
-deep's single integrated reviewer, and validate/deduplicate findings, but cannot execute project safeguards. It does not restrict or change the model of the surrounding Copilot session. The SDK may
+deep's single integrated reviewer, attempt one configured fallback for a reviewer
+whose own execution failed, and validate/deduplicate findings, but cannot execute project safeguards. It does not restrict or change the model of the surrounding Copilot session. The SDK may
 retain its own session transcripts; no plugin review archive is implemented.
 
 No upstream source has been copied. Source reuse/licensing assessment remains

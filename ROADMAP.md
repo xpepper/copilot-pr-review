@@ -4767,10 +4767,22 @@ New demonstrations, none of which start inference or touch the network:
   when it repeats the surviving assignment, when it carries a label, or when it
   loses its model.
 
+### User-visible documentation
+
+`README.md` gains a "Configured fallback models (C3)" section stating the whole
+policy: one extra attempt for the one reviewer that failed, what is eligible and
+what is not, that elapsed time never is, that fallbacks start unset and never
+inherit across tiers, that they have no invocation flag, which reviewers a tier's
+fallback covers in each mode, and what the timeline, the coverage report and the
+retained record show when one is used. The C1 key list now names all six new
+keys, the invocation-flag paragraph says there is no fallback flag, and the
+runtime boundary names the capability. The extension's own `help` and `status`
+text carry the same policy in short form.
+
 ### Still to do in this increment
 
-User documentation, and the pull request review that is this increment's real
-integration test.
+The installed-plugin probe, and the pull request review that is this increment's
+real integration test.
 
 ## Exact next increment
 
