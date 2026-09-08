@@ -26,9 +26,9 @@ before you start.
 
 ## Recorded state
 
-- **You are starting on pull request #12's branch, `q5-cite-broken-code`, which
-  is not merged.** It completes `Q5` and carries its review evidence. Merging is
-  the user's call. If it has been merged, branch from a fresh `main` instead.
+- **You are starting on a clean `main` with no increment in flight.** `main` is
+  the squash merge of pull request #12, which completed `Q5`. Nothing should be
+  uncommitted and no increment branch should be open. Branch from `main`.
 - Pull requests #3, #4 and #5 delivered `M1`, #6 delivered `F5`, #7 delivered
   `F6`, #8 delivered `M2`, #10 delivered `C3`, #11 delivered `C4`, #12 delivers
   `Q5`. Read `git log` and the pull requests rather than looking for hashes from
@@ -93,8 +93,8 @@ because its one candidate never reached one. Three things in it matter to you.
 - **The finding was true and it was about `Q5` itself.** Relaxing the null
   introduction side moved a deterministic check onto the adjudicator, and the
   adjudicator contract never said so: its acceptance rule enumerated the
-  candidate's prose fields only. Fixed on the branch in the second commit, with
-  controlled assertions on the contract text.
+  candidate's prose fields only. Fixed inside the same increment, with
+  controlled assertions on the contract text, after the review.
 
 ## The next increment: `Q6`
 
