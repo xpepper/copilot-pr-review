@@ -100,6 +100,11 @@ Worth remembering: `contracts` found the same defect independently and was
 a supplied window, so it never reached adjudication. Two reviewers agreeing did
 not save the finding. One of them citing exactly did.
 
+The complete timeline was saved before analysis, outside the checkout, as
+`~/.claude/pr-review-timelines/v1a-review-16-timeline.log`, with the run's
+evidence JSON beside it. They stay local. The roadmap records the invocation,
+binding, charges and reproduction.
+
 What the run does not show: no live run has been cancelled during the preflight,
 and no live run has exercised the branch or untracked refusals, because the
 runtime fixture refuses earlier on the head condition. Those have controlled

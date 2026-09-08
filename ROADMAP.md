@@ -6491,6 +6491,10 @@ The controlled double had to be corrected with the implementation.
 which real git does not produce; it now carries exit status 1, which is what
 the gate reads.
 
+The complete stdout timeline was saved before analysis, outside the checkout, as
+`~/.claude/pr-review-timelines/v1a-review-16-timeline.log`, with the run's
+evidence JSON beside it as `v1a-review-16-evidence.json`. They stay local.
+
 Both fixes landed as one commit after the review, with tests confirmed red
 against the reviewed implementation at `88400df`: the cancelled probe became a
 `head-branch` refusal, and the run reported `disposition: "refused"`. The
