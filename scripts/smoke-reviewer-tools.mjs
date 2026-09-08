@@ -33,6 +33,9 @@ mkdirSync(join(outsideDirectory, "nested"));
 // shape that made the handler approve one path while the tool opened another.
 symlinkSync(join(outsideDirectory, "nested"), join(checkout, "escape"));
 writeFileSync(join(checkout, "secret.txt"), "reviewed content\n");
+// A symlink in the checkout whose target outside it does not exist. Calling
+// that absent would say whether the target exists.
+symlinkSync(join(outsideDirectory, "gone.txt"), join(checkout, "dangling"));
 
 const client = new CopilotClient({
   connection: RuntimeConnection.forStdio({ path: resolve(cliPath), env: process.env }),
@@ -164,6 +167,8 @@ try {
     // kernel, and the open the tool performs, resolve it outside the checkout.
     ["a symlink escape with a decoy inside", `${root}${sep}escape${sep}..${sep}secret.txt`],
     ["an absent path behind that symlink", `${root}${sep}escape${sep}..${sep}absent.txt`],
+    ["a dangling symlink in the checkout", join(root, "dangling")],
+    ["a path under a dangling symlink", join(root, "dangling", "nested.rs")],
   ]) {
     const refused = await reader.rpc.tools.execute({ name: "view", arguments: { path } });
     const refusedText = JSON.stringify(refused);

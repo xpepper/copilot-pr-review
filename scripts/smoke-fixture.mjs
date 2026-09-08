@@ -92,6 +92,11 @@ writeFileSync(join(outsideRoot, "nested", "secret.txt"), "also not reviewed cont
 symlinkSync(join(outsideRoot, "nested"), join(root, "escape"));
 symlinkSync(join(root, "src"), join(root, "mirror"));
 writeFileSync(join(root, "secret.txt"), "reviewed content\n");
+writeFileSync(join(root, "present.js"), "export const present = true;\n");
+// Symlinks whose targets do not exist. The one pointing out of the checkout is
+// the oracle: whether its target exists must not change the refusal.
+symlinkSync(join(outsideRoot, "gone.txt"), join(root, "dangling-out"));
+symlinkSync(join(root, "gone.js"), join(root, "dangling-in"));
 const readEvidence = reviewerEvidence({ root });
 const reading = readingReviewerPolicy(readEvidence, root);
 assert.deepEqual(reading.availableTools, ["builtin:view", "builtin:grep", "builtin:glob"]);
@@ -121,6 +126,10 @@ const absent = [
   [join(root, "a", "b", "c.js"), join("a", "b", "c.js")],
   [join(root, "src", "caller.js", "nested.js"), join("src", "caller.js", "nested.js")],
   [join(root, "mirror", "missing.js"), join("mirror", "missing.js")],
+  // The reason names the path as it was requested. Collapsing it first would
+  // report an existing file as absent: this path does not resolve, but
+  // present.js does exist.
+  [`${root}${sep}missing${sep}..${sep}present.js`, `missing${sep}..${sep}present.js`],
 ];
 for (const [path, named] of absent) {
   const decision = await reading.onPermissionRequest({ kind: "read", path });
@@ -153,6 +162,12 @@ const refused = [
   { kind: "read", path: join(root, "escape", "absent.txt") },
   { kind: "read", path: `${root}${sep}escape${sep}..${sep}absent.txt` },
   { kind: "read", path: escape },
+  // A symlink that exists but does not resolve keeps the mute refusal, whether
+  // it points out of the checkout or inside it. Calling it absent would say
+  // whether its target exists, and a symlink in the checkout may point anywhere.
+  { kind: "read", path: join(root, "dangling-out") },
+  { kind: "read", path: join(root, "dangling-out", "nested.js") },
+  { kind: "read", path: join(root, "dangling-in") },
   { kind: "read", path: join("relative", "missing.js") },
   { kind: "read", path: "" },
   { kind: "read", path: 7 },
@@ -172,6 +187,18 @@ assert(!readEvidence.reads.includes("secret.txt"),
 // dropped without reconstructing it from tool calls.
 assert.deepEqual(readEvidence.permissionDenials,
   [...absent.map(() => "read-absent"), ...refused.map((request) => request.kind)]);
+
+// The refusal must not become an existence oracle for a path outside the root.
+// A reviewer can ask for the same in-root symlink twice; the answer must not
+// depend on whether the file it points at outside the checkout has appeared.
+const dangling = { kind: "read", path: join(root, "dangling-out") };
+const beforeTarget = await reading.onPermissionRequest(dangling);
+writeFileSync(join(outsideRoot, "gone.txt"), "must never be readable\n");
+const afterTarget = await reading.onPermissionRequest(dangling);
+assert.deepEqual(afterTarget, beforeTarget,
+  "the refusal for a checkout symlink must not reveal whether its target outside exists");
+assert.equal(afterTarget.feedback, undefined);
+assert.deepEqual(readEvidence.permissionDenials.slice(-2), ["read", "read"]);
 // Granted read tools must reach the permission handler instead of being
 // hook-approved, so confinement still applies to every read.
 for (const toolName of [...readOnlyTools, "rg"]) {
