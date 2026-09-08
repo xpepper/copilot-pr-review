@@ -4779,10 +4779,58 @@ keys, the invocation-flag paragraph says there is no fallback flag, and the
 runtime boundary names the capability. The extension's own `help` and `status`
 text carry the same policy in short form.
 
+### Installed-plugin evidence
+
+The extension was reinstalled with `copilot plugin install "$(pwd)"` at the
+branch head before each probe. Neither probe sent a model prompt, so neither
+spent Copilot credits. CLI 1.0.83 with its bundled SDK, Node.js 26.1.0,
+macOS arm64.
+
+`smoke-runtime.mjs --targets --startup` passed unchanged. It dispatches all four
+modes against a skipped draft and asserts their assignment displays; this
+increment adds a line to that display only when a fallback is configured, and
+that probe configures none, so its expectations are unchanged.
+
+`smoke-config-runtime.mjs` was extended with the C3 surface and passed against
+the **installed** plugin with the child-only controlled `gh` fixture:
+
+- Native refusals that left the stored file byte-identical: an unavailable
+  fallback model, an unsupported explicit fallback effort, and a fallback effort
+  with no fallback model.
+- `heavyFallbackModel=<alternate> heavyFallbackEffort=<effort>` stored exactly
+  those two keys beside the existing settings. After an extension reload, `show`
+  reported the heavy fallback line with `configured:heavy` origins, `(none)` for
+  the other two tiers, and the fallback policy prose including the sentence that
+  elapsed time alone never triggers one. The reloaded process therefore read the
+  stored file rather than run memory.
+- A real `/pr-review 2 --deep --no-comment` invocation displayed the fallback
+  under the `integrated [heavy]` reviewer and the summary line `Configured
+  fallbacks: 1 of 1 reviewer(s) have one`. PR 2 is the fixture draft, so it is
+  skipped and no reviewer ever starts.
+- A real `/pr-review 2 --balanced --no-comment` invocation displayed `Configured
+  fallbacks: 4 of 5 reviewer(s) have one` and exactly four fallback lines, so the
+  light overview reviewer really does resolve a tier with no fallback.
+- `unset heavyFallbackModel heavyFallbackEffort` restored the rest of the saved
+  configuration byte for byte.
+
+Two notes for whoever runs that probe next. It does **not** refuse when a
+personal `<copilot-config-home>/pr-review/config.json` already exists, as
+`HANDOFF.md` claimed; it fails its first assertion, which expects `not created
+yet`. Move the file aside and restore it afterwards. This session did, and
+verified the restore with `shasum -a 256`: digest
+`30794150a3db740f7dcf6f9d7a5a827d3729c5599f7456f582af735d3f297ea9`, mode `0600`,
+before and after. The probe also now needs a **second** usable subscription
+model, one that is not the ambient model and advertises a configurable reasoning
+effort, because a fallback identical to the tier's own assignment is not offered.
+
+The other installed probes were last rerun on pull requests #5 and #7.
+`smoke-reviewer-tools.mjs` and `smoke-retention-runtime.mjs` exercise reviewer
+tool confinement and retained-record reload, neither of which this increment
+changes; the fallback attempt reuses the same session preparation they cover.
+
 ### Still to do in this increment
 
-The installed-plugin probe, and the pull request review that is this increment's
-real integration test.
+The pull request review that is this increment's real integration test.
 
 ## Exact next increment
 
