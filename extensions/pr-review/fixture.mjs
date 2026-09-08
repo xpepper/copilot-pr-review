@@ -54,13 +54,24 @@ export function validateAssignments(settings, list) {
   });
 }
 
+// A model this session offers that advertises no configurable reasoning effort
+// at all, so it can hold none. A model the catalog does not offer answers false:
+// that is refused on the model itself, and nothing about its effort is inferred.
+export function advertisesNoReasoningEffort(model, list) {
+  const available = subscriptionModels(list).find((entry) => entry.id === model);
+  return available !== undefined && reasoningEfforts(available).length === 0;
+}
+
 export function validateModelAssignment({ model, reasoningEffort }, list) {
   const available = subscriptionModels(list).find((entry) => entry.id === model);
   if (!available) {
     throw new Error(`Unavailable or disabled Copilot-subscription model: ${model}. No substitution.`);
   }
-  if (reasoningEffort !== undefined && !reasoningEfforts(available).includes(reasoningEffort)) {
-    throw new Error(`Unsupported reasoning effort ${reasoningEffort} for ${model}. No substitution.`);
+  const supported = reasoningEfforts(available);
+  if (reasoningEffort !== undefined && !supported.includes(reasoningEffort)) {
+    throw new Error(supported.length
+      ? `Unsupported reasoning effort ${reasoningEffort} for ${model}. No substitution.`
+      : `${model} supports no configurable reasoning effort, so it cannot take ${reasoningEffort}. No substitution.`);
   }
 }
 

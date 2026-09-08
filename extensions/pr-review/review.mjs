@@ -77,7 +77,8 @@ export async function reviewerAssignments(parent, mode, flags, configuration) {
   const tiers = new Map();
   for (const { tier } of mode.reviewers) {
     if (tiers.has(tier)) continue;
-    const resolution = resolveTier(tier, { settings, origins, ambient: context.ambient, flags });
+    const resolution = resolveTier(tier,
+      { settings, origins, ambient: context.ambient, flags, models: context.models });
     const assignment = resolvedAssignment(resolution);
     validateModelAssignment(assignment, context.models);
     // A configured fallback is an explicit assignment too, so it is resolved and
@@ -85,7 +86,7 @@ export async function reviewerAssignments(parent, mode, flags, configuration) {
     // has already failed. An unusable one refuses the review like any other
     // explicit setting; it is never dropped, which would leave the failure it
     // was configured for uncovered.
-    const fallbackResolution = resolveFallback(resolution, { settings, origins });
+    const fallbackResolution = resolveFallback(resolution, { settings, origins, models: context.models });
     let fallback;
     if (fallbackResolution && !fallbackResolution.identical) {
       fallback = resolvedAssignment(fallbackResolution);
