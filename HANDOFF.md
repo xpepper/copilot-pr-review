@@ -7,12 +7,15 @@ conversation or reopen settled decisions.
 
 ## Recorded state
 
-This handoff is prepared on branch **`q7-absent-path-refusal`**, pull request
-**#15**, branched from `main` at `bf7d390`, the squash merge of #14. Confirm
-whether #15 is still open or has been merged before proceeding; if it is merged,
-start from clean `main` and reconcile against git history. The only other open
+This handoff is prepared for a fresh session on **clean `main` after the
+user-authorized merge of pull request #15**, which carried `Q7` from branch
+`q7-absent-path-refusal`, branched from `main` at `bf7d390`. Confirm the merge,
+branch and working-tree state before proceeding; if #15 is still open, report the
+unfinished merge rather than starting another increment. The only other open
 pull requests should be the synthetic playground ones, #1 and #2, which must
-never be merged or republished. **Merging #15 is the user's decision.**
+never be merged or republished. A squash merge need not retain the individual
+commits as ancestors of `main`; use #15 and git history to reconcile state. No
+uncommitted work or increment in flight is intended to remain.
 
 `Q7` is complete. Its boundary was discussed and approved before any code was
 written, which is now the expected sequence for an increment that touches a
@@ -99,14 +102,37 @@ local. The roadmap records the invocation, binding, charges and reproduction.
 
 ## Exact next step
 
-**There is no next increment chosen. Ask the user which one to start; do not
-pick one.** The roadmap lists what is open under "Recorded, not scheduled": a
-review against a substantial code diff, a live review with a fallback
-configured, a live review in which a reviewer is refused an absent path, `L1`,
-and `V1`. None is scheduled or authorized.
+**The next increment is `V1a`: the `--verify` flag and its preflight refusal.**
+Read "The next increment is `V1a`" under "Exact next increment" in the roadmap;
+it is authoritative and fuller than this summary.
 
-If #15 is still open, the useful work is whatever the user asks about it, not a
-new increment.
+`V1` in `SCOPE.md`, the opt-in project safeguards, is the last agreed v1
+capability not started, and far too large for one increment. `V1a` is its first
+slice and deliberately the one that **executes nothing**: no safeguard
+discovery, no approval prompt, no command execution, no change to what any
+reviewer receives. A verification-enabled run either passes the preflight and
+proceeds as an ordinary review, or stops before any reviewer starts.
+
+Two of the three preconditions `SCOPE.md` requires already hold for every
+review: `assertReviewableCheckout` in `checkout.mjs` refuses unless local `HEAD`
+equals the captured head and no tracked file is modified or staged. **It never
+reads the current branch name**, so a detached `HEAD` at the right commit passes
+today, and untracked files warn rather than refuse. `V1a` is a bounded addition
+to that existing gate.
+
+**Discuss the boundary and present it before writing code, then wait for the
+user's explicit approval.** That sequence worked for `C5` and `Q7` and is now
+expected for any increment that touches a gate. The roadmap names five choices
+to settle first, with a recommendation for each: untracked files under
+`--verify`, branch identity and detached `HEAD`, where the gate lives, flag
+interactions, and what a passing preflight does when nothing can run yet.
+
+**Do not start another increment instead**, and do not pull safeguard discovery,
+approval or execution into `V1a`. Executing pull-request controlled code is the
+largest safety boundary in this project and needs its own increment, discussion,
+tests and review. A review against a substantial code diff, a live review with a
+fallback configured, a live review in which a reviewer is refused an absent
+path, and `L1` are all recorded as open in the roadmap and none is scheduled.
 
 ## Validation and runtime caveats
 
