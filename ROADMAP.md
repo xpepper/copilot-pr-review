@@ -5938,115 +5938,57 @@ text and no prompt tokens to any primary attempt.
 
 ## Exact next increment
 
-**Q6 is complete on pull request #13; the user has authorized its merge.**
-Both recorded near-misses reach controlled adjudication while the recorded
-fabrication does not. Its installed balanced review ran once and was incomplete;
-live repaired-candidate adjudication is still unobserved. Do not redo Q6 or
-spend another review to manufacture positive evidence.
+**`C5` is complete on pull request #14, and its installed review is the open
+question.** The controlled evidence is in "Completed increment: C5" above. The
+increment changes behaviour under `extensions/`, so `AGENTS.md` treats it as
+undemonstrated until the installed plugin has reviewed its own pull request
+once; that review spends credits and needs the user's explicit go-ahead. If it
+has not run, say so plainly rather than describing the controlled suites as the
+increment's verification of record.
 
-**The next session is a C5 boundary discussion only.** On 2026-09-08 the user
-explicitly chose: "Discuss the C5 boundary and wait for approval before
-implementation." Start from clean `main` after #13 is merged, inspect git and
-the open PRs, and do not treat merge authorization as C5 implementation
-authorization. If #13 is still open, report the unfinished merge first.
+**Nothing about `C5` should be redone or widened.** Its boundary was discussed
+and approved before implementation, and the four choices recorded in its table
+are settled: the adjudicator is in scope, an all-refused envelope is not
+eligible, a wrong review key is eligible, and demotion never depends on a
+fallback being configured. Do not move the check into `findings.mjs`, and do not
+extend eligibility below the envelope; both were considered and rejected with
+reasons.
 
-Discuss which discarded outputs should count as failed attempts: an invalid
-envelope, an otherwise valid envelope with an invalid candidate, and a valid
-empty candidate list are distinct cases. Trace the current completion and
-fallback seam before recommending where to validate output. Explain effects on
-coverage and retained status across all modes, preservation of useful sibling
-candidates, and the extra cost of a configured fallback. Keep Q6 quote repair
-and semantic rejection distinct from envelope failure.
+**The next increment is the user's choice among the observations below.** None
+is started, and none is authorized. The two strongest candidates:
 
-The discussion is complete when it produces a proposed eligibility rule,
-decision table, and controlled acceptance cases, with unresolved choices
-clearly named. Present that proposal and wait for explicit approval before code
-changes or any credit-spending run. Do not start another increment instead.
+- **The absent-path read denial**, which #11's narrative named as the next
+  candidate after `C5`. `insideRoot` in `read-only.mjs` resolves a requested path
+  with `realpathSync` and rejects anything that throws, so a path that simply
+  does not exist inside the checkout is denied exactly like one outside it, and
+  the reviewer is told it may only read inside the checkout. It has now landed on
+  a reviewer that then failed on #6, #11 and #13. Distinguishing the two cases
+  would let a reviewer learn that a file is absent without being told it broke a
+  boundary. It changes a confinement boundary, so it needs its own increment, its
+  own tests and its own review; **the safe direction is that an absent path stays
+  refused, only with an accurate reason.** This is an observation, not
+  authorization to change confinement.
+- **A review against a substantial code diff**, which is the oldest open
+  observation and still the largest. No review of any mode has ever run against
+  one; #10 is the closest at 984 additions over 12 files, most of it real logic
+  rather than prose. It is separately authorizable and nobody has spent a review
+  on it deliberately.
 
-**`C5` remains open, and still needs the user's go-ahead: eligibility for a
-discarded output.**
-Pull request #10's overview reviewer found it, at P2 and confidence 0.95, and the
-changed-line anchoring rule discarded it. A reviewer whose output the evidence
-boundary cannot parse settles as `completed`, so it never becomes eligible for
-its tier's one fallback attempt, while a reviewer that returns nothing does. Five
-of this project's own live reviews were incomplete for exactly the reason a
-fallback cannot answer, so this is the increment that decides whether `C3` is
-useful in practice rather than only correct.
+A third, now sharpened by `C5`: **no live review has ever configured a fallback**,
+so the whole `C3` execution path, which `C5` now feeds, is live-unobserved. #11
+remains the only run where one would have fired. Establishing it would mean
+configuring a fallback tier before a live review and accepting that a discarded
+output may spend a second attempt. That is a deliberate credit decision, not
+something to arrange incidentally.
 
-Pull request #11 is the sharpest case yet, and it shows both halves in one run.
-`correctness` settled `completed` with a single sentence of prose and no
-envelope, so it got nothing; `contracts` settled `incomplete` with no usable
-output, so a configured fallback would have fired for it. Two reviewers lost the
-same way, one eligible and one not, differing only in how the runtime reported
-the end of the attempt.
-
-It is deliberately not a small increment, and it is a product decision as much as
-a change, which is why it needs its own authorization:
-
-- The retry decision has to move across the evidence boundary. Envelope
-  validation lives in `findings.mjs` and runs in `collectCandidates` after every
-  reviewer has settled, so the attempt would start after the batch rather than
-  beside the reviewer that failed, and collection would have to run twice.
-- What `completed` means changes for every mode, whether or not a fallback is
-  configured, so coverage classification, the retained record's reviewer status
-  and `smoke-retention.mjs`'s invariants all move with it.
-- A second reviewer run on a large diff costs real credits. On #10 a single heavy
-  reviewer cost between 39 and 58 of the 233 credits the review spent.
-
-One shape worth weighing first: `reviewAssignments` already turns a `completed`
-attempt into an `incomplete` one when reported usage does not match the
-assignment. An optional `verifyResult` hook on the same seam, passed from
-`review.mjs` with the review key, would keep the retry beside the reviewer and
-out of `findings.mjs`. That is a design to evaluate, not a decision already
-taken.
-
-Older observations follow, in the order they were first seen; each says whether
-it is still open, because two of them have since become increments. The oldest is
-still the largest, and it is open: **no review of any mode has ever run against a
-substantial code diff**, though pull request #10 is the closest so far at 984
-additions over 12 files, most of it real logic rather than prose. It is still
-separately authorizable and nobody has spent a review on it deliberately.
-
-Second, the evidence boundary has discarded a true finding on pull requests #4,
-#5, #10, #11 and #12, and rejected two mis-anchored candidates on #6. **This is
-no longer an open observation: it is increments `Q5` and `Q6` above**, split
-because two different refusals are responsible. The same-changed-hunk rows are
-`Q5` and are closed; Q6 repairs the recorded clipped quotes while preserving
-exact acceptance and the fabrication refusal. The historical table is in
-"Completed increment: Q6". On #10 and #11 the discarded finding was the overview
-reviewer's, and on #11 and #12 it was the only real defect in the review. Every
-time an agent recovered one it was by reading the raw timeline rather than the
-review's own output.
-
-Third, **read denials have landed on reviewers that then failed**, on #6,
-#11 and #13. #13 repeats the absent-path denial on its contracts reviewer,
-which returned no usable output;
-the observation is still open, not authorization to change confinement.
-No reviewer was denied a read
-or a tool on #12, whose five sessions made 41 tool calls between them. `insideRoot` in
-`read-only.mjs` resolves a requested path with `realpathSync` and rejects
-anything that throws, so a **path that simply does not exist** is denied exactly
-like one outside the reviewed checkout, and the reviewer is told it may only read
-inside the checkout. Both denied reviewers on #11 had asked for a path that does
-not exist: a plausible-sounding module, and an unexpanded `{a,b}` brace pattern.
-Distinguishing the two cases would let a reviewer learn that a file is absent
-without being told it broke a boundary. It changes a confinement boundary, so it
-needs its own increment, its own tests and its own review; the safe direction is
-that an absent path stays refused, only with an accurate reason.
-
-Fourth, a reviewer can settle `completed` having emitted no envelope at all, as
-`correctness` did on #11 with a single sentence of thinking-style prose. That is
-the `C5` case above rather than a separate one, but #11 is the first run where
-the discarded output was empty of any structure rather than merely mis-shaped.
-
-`F6`'s marker contract has live evidence from five of six
-reviewers on #7, both sessions on #8, every session on #10, on #11 every session
-that produced an envelope at all, including the medium tier's `claude-sonnet-5`
-writing paragraphs of prose before the markers, every session on #12, and every
-completed reviewer on #13. #11's
-one unparsed output contained no envelope, wrapped or otherwise, so it is not
-evidence against the unwrap. Do not reintroduce substring matching and do not
-widen it.
+`F6`'s marker contract has live evidence from five of six reviewers on #7, both
+sessions on #8, every session on #10, on #11 every session that produced an
+envelope at all, including the medium tier's `claude-sonnet-5` writing paragraphs
+of prose before the markers, every session on #12, and every completed reviewer
+on #13. #11's one unparsed output contained no envelope, wrapped or otherwise, so
+it is not evidence against the unwrap. Do not reintroduce substring matching and
+do not widen it. `C5` changed nothing about the unwrap; it changed only what an
+attempt whose output fails it is called.
 
 Do not revisit the Agent Factories surface without new information from GitHub.
 Three separate blockers were demonstrated on CLI 1.0.83, and all three would
@@ -6055,10 +5997,12 @@ the confined tool grant that leaks `skill` and `sql`. A new CLI version is new
 information; a new reading of the same documentation is not.
 
 Do not add a timeout, a deadline or a "stuck reviewer" heuristic to make
-fallbacks fire more often. `SCOPE.md` forbids review timeouts, and `C3` depends
-on their absence: elapsed time is never a fallback trigger.
+fallbacks fire more often. `SCOPE.md` forbids review timeouts, and both `C3` and
+`C5` depend on their absence: elapsed time is never a fallback trigger, and `C5`
+sits beside the reviewer precisely because a hung reviewer never settles.
 
 Keep `L1` pending and copy no upstream source. Land every increment on its own
 branch and pull request, review that pull request with this plugin before asking
 for a merge, and record the outcome here; `main` refuses direct pushes and
-merging stays the user's call.
+merging stays the user's call. Playground pull requests #1 and #2 must never be
+merged or republished.
