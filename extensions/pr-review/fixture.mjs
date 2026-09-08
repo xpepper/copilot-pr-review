@@ -160,7 +160,7 @@ const failedAttempt = (record) => ({
 });
 
 export async function reviewAssignments(parent, client, assignments, {
-  signal, prompt, intro, outputLabel, systemMessage, access,
+  signal, prompt, intro, outputLabel, systemMessage, access, verifyResult,
   probeTools = false, injectFailure = false,
 }) {
   const log = (message, level = "info") => parent.log(message, { level });
@@ -197,6 +197,19 @@ export async function reviewAssignments(parent, client, assignments, {
     ))) {
       evidence.status = "incomplete";
       evidence.error = "Actual model/reasoning/subscription usage did not match the assignment.";
+    }
+    // An attempt that ran but delivered no usable output is a failed attempt,
+    // exactly like one whose reported usage was wrong. Checking it here keeps
+    // the answer beside the reviewer that failed, so a fallback never waits on
+    // the rest of the batch; nothing about what the output means is decided
+    // here, and the evidence boundary still parses it again for itself.
+    if (evidence.status === "completed" && verifyResult) {
+      try {
+        verifyResult(evidence.result);
+      } catch (error) {
+        evidence.status = "incomplete";
+        evidence.error = `Discarded unusable reviewer output: ${String(error)}`;
+      }
     }
     await log(evidence.status === "completed"
       ? `Reviewer ${display}: completed\n${outputLabel}:\n${evidence.result}`

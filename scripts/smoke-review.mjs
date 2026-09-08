@@ -314,6 +314,7 @@ const checkoutGit = async (args, cwd, { signal } = {}) => {
 function harness({
   failure, fallbackFailure, controller = new AbortController(), withCandidate = false, acceptCandidate = false,
   limitations = [], mode = reviewModes.quick, severity = "P2", candidateFrom = [0], clipQuotes = false,
+  badAnchor = false, extraBadCandidate = false, proseFrom = [0],
 } = {}) {
   const messages = [];
   const sessions = [];
@@ -401,6 +402,14 @@ function harness({
               await client.forceStop();
               return;
             }
+            if (failure === "validator-prose" && !fallbackAttempt) {
+              this.emit("assistant.message", { content: "Weighing the candidate against the diff." });
+              this.emit("assistant.usage", {
+                model: config.model, reasoningEffort: config.reasoningEffort ?? "low", isByok: false,
+              });
+              this.emit("session.idle");
+              return;
+            }
             this.emit("assistant.message", { content: failure === "validator-malformed" ? "{}" : JSON.stringify({
               schemaVersion: 2, reviewKey: input.reviewKey, limitations: [],
               decisions: input.candidates.map((candidate) => ({
@@ -429,9 +438,13 @@ function harness({
               return;
             }
             const input = JSON.parse(this.prompt.split("\n").at(-1));
-            this.emit("assistant.message", { content: JSON.stringify({
-              schemaVersion: 2, reviewKey: input.reviewKey, limitations: [], candidates: [],
-            }) });
+            // A fallback attempt is verified exactly like the primary it answers,
+            // so an unusable envelope from it is a failure too, and still the
+            // only attempt this reviewer gets.
+            this.emit("assistant.message", { content: fallbackFailure === "prose"
+              ? "Still tracing the changed expression." : JSON.stringify({
+                schemaVersion: 2, reviewKey: input.reviewKey, limitations: [], candidates: [],
+              }) });
             this.emit("assistant.usage", {
               model: this.model, reasoningEffort: this.reasoningEffort ?? "low", isByok: false,
             });
@@ -452,18 +465,28 @@ function harness({
               path: "example.js", side, startLine: 1, endLine: 1,
               quote: `export const value = ${side === "head" ? 2 : 1};`.slice(0, clipQuotes ? -1 : undefined),
             });
-            reviewer.emit("assistant.message", { content: i === 0 &&
-                ["reviewer", "tool-call", "usage", "missing-usage"].includes(failure) ? "partial candidate" : JSON.stringify({
-                schemaVersion: 2, reviewKey: input.reviewKey, limitations: i === 1 ? limitations : [],
-                candidates: withCandidate && candidateFrom.includes(i) ? [{
-                  title: `Keep value at 1 (${mode.reviewers[i].label})`, severity, confidence: 0.9,
-                  location: cite("head"), before: cite("base"), after: cite("head"),
-                  // Unchanged code outside the only hunk: the shape Q5 exists for.
-                  breaks: { path: "example.js", side: "head", startLine: 2, endLine: 2,
-                    quote: 'export const label = "fixture";'.slice(0, clipQuotes ? -1 : undefined) },
-                  trigger: "Read value", expected: "1", actual: "2",
-                  introduction: "The constant changed", evidence: [cite("base")],
-                }] : [],
+            const unchanged = { path: "example.js", side: "head", startLine: 2, endLine: 2,
+              quote: 'export const label = "fixture";'.slice(0, clipQuotes ? -1 : undefined) };
+            const discards = failure === "prose" ? proseFrom.includes(i) : i === 0;
+            const claim = (location) => ({
+              title: `Keep value at 1 (${mode.reviewers[i].label})`, severity, confidence: 0.9,
+              location, before: cite("base"), after: cite("head"),
+              // Unchanged code outside the only hunk: the shape Q5 exists for.
+              breaks: unchanged,
+              trigger: "Read value", expected: "1", actual: "2",
+              introduction: "The constant changed", evidence: [cite("base")],
+            });
+            reviewer.emit("assistant.message", { content: discards &&
+                ["reviewer", "tool-call", "usage", "missing-usage", "prose"].includes(failure) ? "partial candidate" : JSON.stringify({
+                // A well-formed envelope bound to the wrong review is discarded
+                // whole, exactly like one that does not parse.
+                schemaVersion: 2, reviewKey: failure === "wrong-key" && i === 0 ? "0".repeat(64) : input.reviewKey,
+                limitations: i === 1 ? limitations : [],
+                // badAnchor keeps the envelope valid and puts a candidate on
+                // unchanged code, so only that candidate is refused.
+                candidates: withCandidate && candidateFrom.includes(i)
+                  ? [claim(badAnchor ? unchanged : cite("head")), ...(extraBadCandidate ? [claim(unchanged)] : [])]
+                  : [],
               }),
             });
             if (failure === "reviewer" && i === 0) {
@@ -661,6 +684,224 @@ for (const failure of [undefined, "cancel"]) {
   assert.equal(report.coverage, "completed");
 }
 console.log("PASS one fallback attempt per explicitly failed reviewer, never on cancellation and never a restart");
+
+// C5: a completed attempt whose output the evidence boundary cannot parse is a
+// failed attempt, and so is eligible for its tier's one configured fallback.
+// Eligibility is decided by the envelope and by nothing below it: the reviewer's
+// compliance with the contract may be retried, its judgment about the change may
+// not. Every case below distinguishes those two.
+for (const failure of ["prose", "wrong-key"]) {
+  // Demotion does not depend on a fallback being configured: the attempt failed
+  // whether or not anything can answer it, and the record has to say so.
+  const h = harness({ failure, withCandidate: true, candidateFrom: [1, 2] });
+  const report = await executeReviewRun(h.parent, h.client, options, structuredClone(assignments), {
+    controller: h.controller, gh: fakeGh(), git: checkoutGit,
+  });
+  validateRecord(retainedRecord(report), h.parent.sessionId);
+  assert.equal(h.sessions.length, 4, `Three reviewers and the adjudicator; nothing is retried: ${failure}`);
+  assert.equal(report.reviewers[0].status, "incomplete", `An unusable envelope is a failed attempt: ${failure}`);
+  assert.equal(report.reviewers[0].fallbackFrom, undefined);
+  assert.equal(report.executionComplete, false, `A discarded output is not a completed execution: ${failure}`);
+  assert.equal(report.coverage, "incomplete", failure);
+  assert(report.reviewers.slice(1).every((r) => r.status === "completed"), failure);
+  // The reason the output was discarded survives demotion instead of being
+  // replaced by a generic incomplete-execution message.
+  assert.match(report.reviewers[0].error, failure === "prose" ? /Unexpected token/ : /Wrong schema version or review binding/);
+  assert(h.messages.some((m) => /Execution failure: correctness: incomplete/.test(m)), failure);
+  assert(h.messages.some((m) => (failure === "prose" ? /Unexpected token/ : /review binding/).test(m)), failure);
+}
+{
+  // The one reviewer that failed is retried, and its siblings are untouched:
+  // their candidates keep their ids and still reach adjudication.
+  const h = harness({ failure: "prose", withCandidate: true, candidateFrom: [1, 2] });
+  const report = await executeReviewRun(h.parent, h.client, options, withFallbackAssignments(), {
+    controller: h.controller, gh: fakeGh(), git: checkoutGit,
+  });
+  validateRecord(retainedRecord(report), h.parent.sessionId);
+  assert.equal(h.sessions.length, 5, "One extra session: correctness's single fallback attempt");
+  assert.equal(report.reviewers[0].status, "completed");
+  assert.equal(report.reviewers[0].model, "other", "The recovered reviewer ran the configured fallback");
+  assert.match(report.reviewers[0].fallbackFrom.error, /Unexpected token/);
+  assert.equal(report.reviewers[0].fallbackFrom.status, "incomplete");
+  assert(report.reviewers.slice(1).every((r) => r.model === "heavy" && r.fallbackFrom === undefined),
+    "No other reviewer is retried or reassigned");
+  const adjudicated = JSON.parse(h.sessions.find((s) => s.validating).prompt.split("\n").at(-1));
+  assert.deepEqual(adjudicated.candidates.map(({ id }) => id), ["contracts:1", "security-performance-resources:1"],
+    "Useful sibling candidates survive another reviewer's fallback unchanged");
+  // The recovered reviewer completes the review, which is what C5 buys: this run
+  // would have been INCOMPLETE with the same reviewer output before it.
+  assert.equal(report.coverage, "completed");
+  assert.equal(report.executionComplete, true);
+  assert(h.messages.some((m) => /Informational caveat: correctness: primary model=heavy reasoning=high failed .*completed this reviewer/.test(m)));
+  // C3's retained shape already describes this outcome, so no record key and no
+  // record schema version changes with C5.
+  const stored = retainedRecord(report).outcome.reviewers[0];
+  assert.deepEqual(Object.keys(stored.fallbackFrom).sort(),
+    ["completedAt", "error", "model", "reasoningEffort", "sessionId", "startedAt", "status", "usage"]);
+  assert(!("result" in stored) && !("result" in stored.fallbackFrom),
+    "The discarded output itself is never retained; only the reason it was discarded");
+}
+{
+  // A candidate refused inside a valid envelope is the review's judgment about
+  // the change, not the reviewer's failure. Nothing is demoted, nothing is
+  // retried, and the sibling candidate in that same envelope is kept.
+  const h = harness({ withCandidate: true, extraBadCandidate: true, candidateFrom: [0], severity: "P2" });
+  const report = await executeReviewRun(h.parent, h.client, options, withFallbackAssignments(), {
+    controller: h.controller, gh: fakeGh(), git: checkoutGit,
+  });
+  validateRecord(retainedRecord(report), h.parent.sessionId);
+  assert.equal(h.sessions.length, 4, "Three reviewers and the adjudicator; a refused candidate starts no attempt");
+  assert(report.reviewers.every((r) => r.status === "completed" && r.fallbackFrom === undefined));
+  assert.equal(report.executionComplete, true);
+  const adjudicated = JSON.parse(h.sessions.find((s) => s.validating).prompt.split("\n").at(-1));
+  assert.deepEqual(adjudicated.candidates.map(({ id }) => id), ["correctness:1"],
+    "The valid sibling in the same envelope is kept and adjudicated");
+  assert.equal(report.validation.diagnostics.filter((d) =>
+    /correctness:2: rejected at evidence boundary/.test(d.message)).length, 1);
+  assert(!report.validation.diagnostics.some((d) => /incomplete specialist execution/.test(d.message)));
+}
+{
+  // Every candidate refused is still no failed attempt. This is the case C5
+  // deliberately refuses: retrying it would run the model again until the gate
+  // accepts something, which is what Q5 and Q6 answered by fixing the gate.
+  const h = harness({ withCandidate: true, badAnchor: true, candidateFrom: [0, 1, 2] });
+  const report = await executeReviewRun(h.parent, h.client, options, withFallbackAssignments(), {
+    controller: h.controller, gh: fakeGh(), git: checkoutGit,
+  });
+  validateRecord(retainedRecord(report), h.parent.sessionId);
+  assert.equal(h.sessions.length, 3, "No adjudicator, and no fallback attempt for a semantic refusal");
+  assert(report.reviewers.every((r) => r.status === "completed" && r.fallbackFrom === undefined));
+  assert.equal(report.executionComplete, true);
+  assert.equal(report.coverage, "incomplete", "The refusals still block completed coverage");
+  assert.equal(report.validation.findings.length, 0);
+  assert.equal(report.validation.diagnostics.filter((d) => /rejected at evidence boundary/.test(d.message)).length, 3);
+  assert(!h.messages.some((m) => /falling back once/.test(m)));
+}
+for (const fallbackFailure of ["run", "setup", "prose"]) {
+  // The one attempt is the only attempt, however the fallback fails, including
+  // when the fallback's own output is discarded for the same reason.
+  const h = harness({ failure: "prose", fallbackFailure });
+  const report = await executeReviewRun(h.parent, h.client, options, withFallbackAssignments(), {
+    controller: h.controller, gh: fakeGh(), git: checkoutGit,
+  });
+  validateRecord(retainedRecord(report), h.parent.sessionId);
+  assert.equal(report.coverage, "incomplete", fallbackFailure);
+  assert.equal(h.sessions.length, fallbackFailure === "setup" ? 3 : 4,
+    `One fallback attempt at most, never a second: ${fallbackFailure}`);
+  assert.equal(report.reviewers[0].status, "incomplete", fallbackFailure);
+  assert(report.reviewers.slice(1).every((r) => r.status === "completed"), fallbackFailure);
+  if (fallbackFailure === "setup") {
+    // The reviewer keeps the attempt that actually ran, and says why the
+    // configured answer to its failure never started.
+    assert.equal(report.reviewers[0].model, "heavy");
+    assert.equal(report.reviewers[0].fallbackFrom, undefined);
+    assert.match(report.reviewers[0].error, /Unexpected token.*fallback setup failed/s);
+  } else {
+    assert.equal(report.reviewers[0].model, "other");
+    assert.match(report.reviewers[0].fallbackFrom.error, /Unexpected token/);
+    assert.match(report.reviewers[0].error,
+      fallbackFailure === "run" ? /fallback failed too/ : /Unexpected token/);
+    assert(h.messages.some((m) => /Informational caveat: correctness: primary model=heavy .*also failed/.test(m)),
+      fallbackFailure);
+  }
+}
+{
+  // Cancellation is not an explicit failure, so it never demotes an attempt and
+  // never starts a fallback. Elapsed time still triggers nothing at all.
+  const h = harness({ failure: "cancel" });
+  const report = await executeReviewRun(h.parent, h.client, options, withFallbackAssignments(), {
+    controller: h.controller, gh: fakeGh(), git: checkoutGit,
+  });
+  validateRecord(retainedRecord(report), h.parent.sessionId);
+  assert.equal(report.cancelled, true);
+  assert.equal(h.sessions.length, 3, "A cancelled run starts no fallback attempt");
+  assert(report.reviewers.every((r) => r.status === "cancelled" && r.fallbackFrom === undefined),
+    "A cancelled attempt is never demoted to an eligible failure");
+  assert(!h.messages.some((m) => /falling back once/.test(m)));
+}
+for (const mode of [quickMode, balancedMode, fullMode, deepMode]) {
+  // A valid envelope that reports no candidate is a legitimate review outcome in
+  // every mode, not a discarded output. Nothing is demoted and nothing is spent.
+  const h = harness({ mode });
+  const report = await executeReviewRun(h.parent, h.client,
+    { ...parseReviewArgs(`1 ${mode.flag} --no-comment`), all: true },
+    await withFallback({}, {}, mode), { controller: h.controller, gh: fakeGh(), git: checkoutGit });
+  validateRecord(retainedRecord(report), h.parent.sessionId);
+  assert.equal(h.sessions.length, mode.reviewers.length,
+    `An empty result starts no adjudicator and no fallback: ${mode.id}`);
+  assert(report.reviewers.every((r) => r.status === "completed" && r.fallbackFrom === undefined), mode.id);
+  assert.equal(report.executionComplete, true, mode.id);
+  assert.equal(report.coverage, "completed", mode.id);
+}
+for (const mode of [quickMode, balancedMode, fullMode, deepMode]) {
+  // Demotion and recovery behave the same in every mode, and a demoted reviewer
+  // falls back on its own tier. Balanced's light overview is the case that
+  // proves a heavy fallback never stands in for it.
+  const last = mode.reviewers.length - 1;
+  const h = harness({ mode, failure: "prose", proseFrom: [last] });
+  const assignmentsForMode = await withFallback(
+    { lightModel: "other", lightEffort: "low", lightFallbackModel: "heavy", lightFallbackEffort: "high",
+      mediumModel: "other", mediumEffort: "low", mediumFallbackModel: "heavy", mediumFallbackEffort: "high" },
+    {}, mode);
+  const report = await executeReviewRun(h.parent, h.client,
+    { ...parseReviewArgs(`1 ${mode.flag} --no-comment`), all: true },
+    assignmentsForMode, { controller: h.controller, gh: fakeGh(), git: checkoutGit });
+  validateRecord(retainedRecord(report), h.parent.sessionId);
+  assert.equal(h.sessions.length, mode.reviewers.length + 1, `Exactly one extra attempt: ${mode.id}`);
+  const recovered = report.reviewers[last];
+  assert.equal(recovered.status, "completed", mode.id);
+  assert.equal(recovered.model, assignmentsForMode[last].fallback.model,
+    `A demoted reviewer falls back on its own tier: ${mode.id}`);
+  assert.equal(recovered.fallbackFrom.model, assignmentsForMode[last].model, mode.id);
+  assert.match(recovered.fallbackFrom.error, /Unexpected token/, mode.id);
+  assert.equal(report.coverage, "completed", mode.id);
+  assert(report.reviewers.slice(0, last).every((r) => r.fallbackFrom === undefined), mode.id);
+}
+{
+  // A Q6 repair is a caveat on a surviving candidate, never a failure signal:
+  // the envelope parsed, so the attempt completed and nothing is retried.
+  const h = harness({ withCandidate: true, clipQuotes: true, candidateFrom: [0] });
+  const report = await executeReviewRun(h.parent, h.client, options, withFallbackAssignments(), {
+    controller: h.controller, gh: fakeGh(), git: checkoutGit,
+  });
+  validateRecord(retainedRecord(report), h.parent.sessionId);
+  assert.equal(h.sessions.length, 4, "A repaired citation starts no fallback attempt");
+  assert(report.reviewers.every((r) => r.status === "completed" && r.fallbackFrom === undefined));
+  assert.equal(report.executionComplete, true);
+  assert(report.validation.diagnostics.some((d) =>
+    d.kind === "caveat" && /repaired clipped-end citation/.test(d.message)));
+  assert(!h.messages.some((m) => /falling back once/.test(m)));
+}
+{
+  // The adjudicator holds the same contract, so its own discarded decisions are
+  // a failed attempt eligible for the heavy tier's one fallback.
+  const h = harness({ failure: "validator-prose", withCandidate: true });
+  const report = await executeReviewRun(h.parent, h.client, options, withFallbackAssignments(), {
+    controller: h.controller, gh: fakeGh(), git: checkoutGit,
+  });
+  validateRecord(retainedRecord(report), h.parent.sessionId);
+  assert.equal(h.sessions.length, 5, "Three reviewers, the adjudicator, and its one fallback attempt");
+  assert.equal(report.adjudicator.status, "completed");
+  assert.equal(report.adjudicator.model, "other");
+  assert.match(report.adjudicator.fallbackFrom.error, /Unexpected token/);
+  assert.equal(report.coverage, "completed");
+  assert(report.reviewers.every((r) => r.status === "completed" && r.fallbackFrom === undefined));
+}
+{
+  // When the adjudicator's fallback is discarded too, no candidate is accepted
+  // and the coverage says so; nothing is retried a third time.
+  const h = harness({ failure: "validator-malformed", withCandidate: true });
+  const report = await executeReviewRun(h.parent, h.client, options, withFallbackAssignments(), {
+    controller: h.controller, gh: fakeGh(), git: checkoutGit,
+  });
+  validateRecord(retainedRecord(report), h.parent.sessionId);
+  assert.equal(h.sessions.length, 5, "The adjudicator gets one fallback attempt, never a second");
+  assert.equal(report.adjudicator.status, "incomplete");
+  assert.match(report.adjudicator.fallbackFrom.error, /expected exactly schemaVersion/);
+  assert.equal(report.validation.findings.length, 0);
+  assert.equal(report.coverage, "incomplete");
+}
+console.log("PASS an unparseable envelope is an eligible failure, while a refused candidate, an empty result and a repair are not");
 
 for (const failure of [undefined, "reviewer", "cancel", "cleanup", "validator-malformed", "validator-setup"]) {
   const limitations = [{ kind: "caveat", reason: "External dependency internals not audited.", impact: null }];
