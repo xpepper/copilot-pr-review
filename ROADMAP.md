@@ -4626,7 +4626,7 @@ pull request, presents every substantiated severity, and refuses a second mode
 flag. Pull request #8's deep review demonstrated it end to end and reached
 completed coverage, the first of this project's own increment pull requests to do
 so. It found two real defects in its own documentation; both are fixed above.
-Merging #8 is the user's call.
+Pull request #8 is merged, and `main` carries it.
 
 Every mode in `SCOPE.md`'s table now exists, so the next increment leaves the
 mode surface. Two candidates are ready, and `C3` is the smaller one.
