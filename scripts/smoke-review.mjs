@@ -315,7 +315,7 @@ function fakeGh() {
 // The gate runs real Git in smoke-checkout.mjs; here it is injected so the
 // synthetic fixture PR can stand in for a checked-out head revision.
 const checkout = realpathSync(mkdtempSync(join(tmpdir(), "pr-review-quick-checkout-")));
-let checkoutState = { head: "b".repeat(40), status: "" };
+let checkoutState = { head: "b".repeat(40), status: "", branch: "feature" };
 const gitCalls = [];
 const checkoutGit = async (args, cwd, { signal } = {}) => {
   signal?.throwIfAborted();
@@ -323,6 +323,12 @@ const checkoutGit = async (args, cwd, { signal } = {}) => {
   if (args[0] === "rev-parse" && args[1] === "--show-toplevel") return `${checkout}\n`;
   if (args[0] === "rev-parse" && args[1] === "HEAD") return `${checkoutState.head}\n`;
   if (args[0] === "status") return checkoutState.status;
+  // Only the verification profile asks which branch is checked out, and git
+  // itself fails this command on a detached HEAD rather than naming one.
+  if (args[0] === "symbolic-ref") {
+    if (!checkoutState.branch) throw new Error("fatal: ref HEAD is not a symbolic ref");
+    return `${checkoutState.branch}\n`;
+  }
   throw new Error(`Unexpected git command: ${JSON.stringify(args)} in ${cwd}`);
 };
 
@@ -1022,6 +1028,73 @@ for (const [scenario, state, expected] of [
   assert.match(refusal, /rerun \/pr-review 1 --quick/);
 }
 console.log("PASS the revision gate refuses mismatched, dirty and stale checkouts before any reviewer session");
+
+// V1a: the stricter profile refuses before any reviewer starts, and each of the
+// same checkouts still passes an ordinary review of the same pull request.
+for (const [scenario, state, expected, fix] of [
+  ["untracked path", { head: "b".repeat(40), status: "?? scratch.txt\n" },
+    /1 untracked path\(s\) are present/, /remove or ignore those paths yourself/],
+  ["detached HEAD", { head: "b".repeat(40), status: "", branch: "" },
+    /detached HEAD at b{40}, not PR #1's head branch feature/, /gh pr checkout 1/],
+  ["another branch", { head: "b".repeat(40), status: "", branch: "local-work" },
+    /current branch is local-work, but PR #1's head branch is feature/, /gh pr checkout 1/],
+]) {
+  const previous = checkoutState;
+  checkoutState = { branch: "feature", ...state };
+  const h = harness();
+  const report = await executeReviewRun(h.parent, h.client, { ...options, verify: true },
+    structuredClone(assignments), { controller: h.controller, gh: fakeGh(), git: checkoutGit });
+  assert.equal(report.verify, true, scenario);
+  assert.equal(report.coverage, "not-started", scenario);
+  assert.equal(report.disposition, "refused", scenario);
+  assert.equal(h.sessions.length, 0, "No reviewer session may be created");
+  assert.equal(h.client.starts, 0, "No owned runtime may start");
+  validateRecord(retainedRecord(report), h.parent.sessionId);
+  const refusal = h.messages.find((message) => message.startsWith("Quick review with --verify refused"));
+  assert.match(refusal, expected, scenario);
+  assert.match(refusal, fix, scenario);
+  assert.match(refusal, /rerun \/pr-review 1 --quick --verify/, scenario);
+  assert(!h.messages.some((message) => message.startsWith("R1 checkout:")), scenario);
+
+  // The identical checkout is an ordinary review's business as usual: the
+  // stricter conditions belong to the flag, not to the gate everyone reaches.
+  const ordinary = harness();
+  const proceeded = await executeReviewRun(ordinary.parent, ordinary.client, options,
+    structuredClone(assignments), { controller: ordinary.controller, gh: fakeGh(), git: checkoutGit });
+  assert.equal(proceeded.verify, false, scenario);
+  assert.notEqual(proceeded.coverage, "not-started", scenario);
+  assert(ordinary.sessions.length > 0, "An ordinary review of the same checkout still runs");
+  const opened = ordinary.messages.find((message) => message.startsWith("R1 checkout: "));
+  assert.doesNotMatch(opened, /verif/i, "An ordinary run's checkout report is unchanged");
+  checkoutState = previous;
+}
+{
+  // A passing preflight is an ordinary review of its mode. It says so in the
+  // timeline, so the flag can never be read as evidence that a safeguard ran.
+  const h = harness();
+  const report = await executeReviewRun(h.parent, h.client, { ...options, verify: true },
+    structuredClone(assignments), { controller: h.controller, gh: fakeGh(), git: checkoutGit });
+  assert.equal(report.verify, true);
+  assert.notEqual(report.coverage, "not-started");
+  assert(h.sessions.length > 0, "A passing preflight starts the mode's reviewers");
+  const opened = h.messages.find((message) => message.startsWith("R1 checkout: "));
+  assert.match(opened, /"verify":true/);
+  assert.match(opened, /"branch":"feature"/);
+  assert.match(opened, /preflight passed on head branch feature/);
+  assert.match(opened, /No project safeguard was discovered, approved or run/);
+  assert(gitCalls.some((args) => args[0] === "symbolic-ref"), "The branch is read from git, never assumed");
+  // Verification changes no reviewer's input. The harness already asserts every
+  // session's system message equals this mode's ordinary instructions, so the
+  // prompts are what remains to check for a claim no safeguard could support.
+  assert(h.sessions.every((session) => !/--verify|safeguard/i.test(session.prompt ?? "")),
+    "A verification run's reviewers receive exactly an ordinary review's input");
+  // The flag stays out of the retained record: it changes no published finding
+  // and no publication authority, so it needs no schema version of its own.
+  const record = retainedRecord(report);
+  validateRecord(record, h.parent.sessionId);
+  assert(!Object.hasOwn(record.outcome, "verify"), "The retained record schema is unchanged");
+}
+console.log("PASS --verify refuses on branch and untracked conditions, and otherwise reviews and says nothing ran");
 
 for (const number of [2, 3, 4, 5, 8, 9, 10]) {
   const h = harness();

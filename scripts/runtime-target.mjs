@@ -345,6 +345,41 @@ export async function prepareTargetSmoke({ allowPublish = false, coordinatePost 
           console.log(`PASS /pr-review 1 --quick refused on a mismatched checkout: ${refused.split("\n")[1]}`);
         } finally { unsubscribe(); }
 
+        // V1a: the same refusal through the installed plugin with --verify set.
+        // It spends no inference either: the stricter profile is still a gate
+        // that stops before any reviewer, and it names the flag that applied it.
+        const beforeVerify = await descendants();
+        const verifyRefusal = Promise.withResolvers();
+        const verifyMessages = [];
+        const stopVerifyWatch = session.on((event) => {
+          if (!["session.info", "session.error"].includes(event.type)) return;
+          verifyMessages.push(event.data.message);
+          if (event.data.message.startsWith("Q3 evidence: ")) {
+            verifyRefusal.resolve(JSON.parse(event.data.message.slice("Q3 evidence: ".length)));
+          }
+        });
+        try {
+          const dispatched = await session.rpc.commands.execute({
+            commandName: "pr-review", args: "1 --quick --no-comment --all --verify",
+          });
+          assert.equal(dispatched.error, undefined);
+          const outcome = await verifyRefusal.promise;
+          assert.equal(outcome.verify, true, "The run records that verification was requested");
+          assert.equal(outcome.coverage, "not-started");
+          assert.equal(outcome.disposition, "refused");
+          assert.deepEqual(outcome.reviewers, []);
+          assert(verifyMessages.some((message) => /^Verification: --verify is set\./.test(message)),
+            "A verification run states its boundary before it starts");
+          const refusedVerify = verifyMessages.find((message) =>
+            message.startsWith("Quick review with --verify refused"));
+          assert.match(refusedVerify, /Failed condition: (local-head|working-tree)/);
+          assert.match(refusedVerify, /rerun \/pr-review 1 --quick --verify/);
+          assert(!verifyMessages.some((message) => /^Reviewer /.test(message)), "No reviewer may start");
+          assert.deepEqual(await descendants(), beforeVerify, "A refused review starts no owned runtime");
+          assert.equal(await localState(), localBefore, "The gate never touches the checkout");
+          console.log(`PASS /pr-review 1 --quick --verify refused, running nothing: ${refusedVerify.split("\n")[1]}`);
+        } finally { stopVerifyWatch(); }
+
         const bound = await dispatchTarget(session, "11");
         assert.equal(bound.disposition, "captured");
         assert.equal(bound.context.head, "b".repeat(40));
@@ -359,7 +394,7 @@ export async function prepareTargetSmoke({ allowPublish = false, coordinatePost 
         for (const [args, expected] of [
           ["8 --capture-only", /HTTP 404/], ["9 --capture-only", /changed during capture/],
           ["10 --capture-only", /truncated/i], ["0 --capture-only", /positive safe integer/],
-          ["1 --verify --capture-only", /Unsupported arguments/],
+          ["1 --verify --capture-only", /cannot be combined with --verify/],
           ["1 --capture-only --quick", /cannot be combined/],
         ]) {
           const result = await session.rpc.commands.execute({ commandName: "pr-review", args });

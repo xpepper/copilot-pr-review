@@ -227,7 +227,8 @@ export async function executeReviewRun(parent, client, options, assignments, {
   const outcome = await executeOwnedRun(parent, client, {
     controller, onStopped, subject: mode.label, evidencePrefix: prefix,
     details: () => ({
-      mode: mode.id, noComment: options.noComment, invocation, binding, validation, adjudicator,
+      mode: mode.id, noComment: options.noComment, verify: options.verify === true,
+      invocation, binding, validation, adjudicator,
       executionComplete: execution?.complete ?? false,
       reviewers: assignments.map((assignment) => ({
         ...assignment, status: "incomplete", error: "Review did not reach specialist execution.",
@@ -252,9 +253,12 @@ export async function executeReviewRun(parent, client, options, assignments, {
       // Reviewers read the checkout, so it must provably be the reviewed
       // revision. A mismatch refuses the review; it never degrades to a
       // context-only run, and never touches the checkout.
+      // Verification opts into a stricter profile of that same gate; it selects no
+      // other behaviour, and a run that passes it is an ordinary review.
+      const verify = options.verify === true;
       let access;
       try {
-        access = await assertReviewableCheckout(target.snapshot, { cwd, gh: request, git, signal, mode });
+        access = await assertReviewableCheckout(target.snapshot, { cwd, gh: request, git, signal, mode, verify });
       } catch (refusal) {
         await parent.log(String(refusal.message ?? refusal), { level: "error" });
         return {
@@ -265,7 +269,15 @@ export async function executeReviewRun(parent, client, options, assignments, {
       }
       await parent.log(`R1 checkout: ${JSON.stringify({
         root: access.root, head: access.head, untracked: access.untracked.length,
+        ...(verify ? { verify, branch: access.branch } : {}),
       })}\nReviewers may read this checkout read-only; it matches the captured head and has no modified tracked file.` +
+        // A passing preflight must never be mistaken for evidence that something
+        // ran, so the run says plainly that nothing did.
+        (verify
+          ? `\nV1a verification preflight passed on head branch ${access.branch}, with no untracked path. ` +
+            "No project safeguard was discovered, approved or run, and no reviewer receives safeguard output; " +
+            "this is an ordinary review of the selected mode."
+          : "") +
         (access.untracked.length
           ? `\nWarning: ${access.untracked.length} untracked file(s) are present and readable; they are not reviewed content.`
           : ""));

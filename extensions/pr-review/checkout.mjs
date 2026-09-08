@@ -55,6 +55,15 @@ export function refuseCheckout(condition, detail, number, mode = reviewModes.qui
   ].join("\n");
 }
 
+// Displayed before a verification-enabled run starts, so the flag states its own
+// boundary rather than being inferred from a review that looks like any other.
+export const verificationNotice = [
+  `Verification: ${verifyFlag} is set. This run additionally requires the pull request's head branch and a `,
+  "tree with no untracked path, checked with the revision gate before any reviewer starts.",
+  "\nNo project safeguard is discovered, presented, approved or executed, and no reviewer receives safeguard ",
+  "output. A passing preflight is an ordinary review of the selected mode, so this flag grounds no claim in it.",
+].join("");
+
 function statusEntries(status) {
   const lines = status.split("\n").filter((line) => line.trim());
   return {
