@@ -309,6 +309,62 @@ try {
     "Clearing the fallback pair restores the rest of the saved configuration byte for byte");
   console.log("PASS the saved heavy fallback reaches exactly its own reviewers, and every refusal writes nothing");
 
+  // --- C4: a model that advertises no configurable reasoning effort ----------
+  // The saved light tier carries an effort, so before C4 that effort inherited
+  // onto this model and refused both the update and the review.
+  const effortless = list.find((model) => !model.id.includes("/") && model.id !== "auto" &&
+    (!model.policy || model.policy.state === "enabled") &&
+    !(model.capabilities?.supports?.reasoning_effort ?? []).length);
+  assert(effortless, "This probe needs a subscription model that advertises no configurable reasoning effort");
+  const setEffortless = await run(session, `heavyModel=${effortless.id}`);
+  assert.equal(setEffortless.error, undefined,
+    `A tier on a model with no configurable effort was refused: ${setEffortless.error}`);
+  await reload(session);
+  const shownEffortless = await show(session);
+  assert(shownEffortless.includes(
+    `heavy: model=${effortless.id} [configured:heavy] reasoning=(not configurable) [model]`),
+  `The reloaded extension reports no effort for such a tier: ${shownEffortless}`);
+  assert(!/heavy: .*UNUSABLE/.test(shownEffortless), `Such a tier stays usable: ${shownEffortless}`);
+  assert.match(shownEffortless, /supports no configurable reasoning effort takes none, reported \[model\]/);
+  // Deep resolves the heavy tier only, so its one reviewer is the one that runs
+  // this model, with no effort, displayed before anything starts.
+  const deepEffortless = (await quickRun(session, "2 --deep --no-comment")).find((message) =>
+    message.startsWith("Effective reviewer assignments:"));
+  assert(deepEffortless.includes(
+    `integrated [heavy]: model=${effortless.id} [configured:heavy] reasoning=(not configurable) [model]`),
+  `The deep reviewer carries that model with no effort: ${deepEffortless}`);
+  // An effort set for the tier itself is explicit, so it is still refused rather
+  // than dropped or lowered to fit.
+  const beforeExplicit = readFileSync(filename, "utf8");
+  const refusedEffort = await run(session, `heavyEffort=${other}`);
+  assert.match(refusedEffort.error ?? "", /supports no configurable reasoning effort/,
+    "An explicit effort on such a model is refused, not dropped");
+  assert.equal(readFileSync(filename, "utf8"), beforeExplicit, "That refusal writes nothing");
+  const clearedEffortless = await run(session, "unset heavyModel");
+  assert.equal(clearedEffortless.error, undefined, `unset failed: ${clearedEffortless.error}`);
+
+  // The same rule on the second surface C3 left behind: the tier's own effort
+  // does not carry over to a fallback model that advertises none.
+  const refusedFallbackEffort = await run(session,
+    `heavyFallbackModel=${effortless.id} heavyFallbackEffort=${alternateEffort}`);
+  assert.match(refusedFallbackEffort.error ?? "", /supports no configurable reasoning effort/);
+  assert.equal(readFileSync(filename, "utf8"), beforeFallback, "That refusal writes nothing either");
+  const setEffortlessFallback = await run(session, `heavyFallbackModel=${effortless.id}`);
+  assert.equal(setEffortlessFallback.error, undefined,
+    `A fallback on a model with no configurable effort was refused: ${setEffortlessFallback.error}`);
+  await reload(session);
+  const shownEffortlessFallback = await show(session);
+  assert(shownEffortlessFallback.includes(
+    `    fallback: model=${effortless.id} [configured:heavy] reasoning=(not configurable) [model]`),
+  `The stored fallback takes no effort from its tier: ${shownEffortlessFallback}`);
+  assert(!/fallback: model=.*(UNUSABLE|NOT OFFERED)/.test(shownEffortlessFallback),
+    `Such a fallback is offered: ${shownEffortlessFallback}`);
+  const clearedFallback = await run(session, "unset heavyFallbackModel");
+  assert.equal(clearedFallback.error, undefined, `fallback unset failed: ${clearedFallback.error}`);
+  assert.equal(readFileSync(filename, "utf8"), beforeFallback,
+    "The C4 exercise restores the rest of the saved configuration byte for byte");
+  console.log("PASS a tier and a fallback on a model with no configurable effort resolve to none and stay usable");
+
   writeFileSync(filename, JSON.stringify({ schemaVersion: configSchemaVersion,
     settings: { heavyModel: "definitely-not-a-model" } }), { mode: 0o600 });
   const refused = await run(session, "2 --quick --no-comment", "pr-review");
