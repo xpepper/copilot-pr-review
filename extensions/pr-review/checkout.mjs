@@ -32,15 +32,26 @@ export async function runGit(args, cwd, { signal } = {}) {
 // evidence about code that is not the reviewed revision. There is deliberately
 // no override flag and no degraded context-only fallback, and this never
 // switches branches, stashes, pulls or cleans to satisfy itself.
-export function refuseCheckout(condition, detail, number, mode = reviewModes.quick) {
+export function refuseCheckout(condition, detail, number, mode = reviewModes.quick, { verify = false } = {}) {
+  // A refused verification run says so, and repeats the flag in its fix, because
+  // the same checkout may be perfectly reviewable without it.
+  const rerun = `/pr-review ${number} ${mode.flag}${verify ? ` ${verifyFlag}` : ""}`;
+  const fix = {
+    "remote-head": `Fix: rerun ${rerun} after \`gh pr checkout ${number}\` to capture the new head.`,
+    // Cleaning the checkout is the user's decision, never this gate's: it says
+    // which paths are in the way and stops.
+    untracked: `Fix: remove or ignore those paths yourself, then rerun ${rerun}.`,
+    "head-branch": `Fix: run \`gh pr checkout ${number}\` in this checkout, then rerun ${rerun}.`,
+  }[condition] ?? `Fix: run \`gh pr checkout ${number}\` in this checkout, commit or discard your own ` +
+    `changes, then rerun ${rerun}.`;
   return [
-    `${mode.label} refused before any reviewer started: ${detail}`,
+    `${mode.label}${verify ? ` with ${verifyFlag}` : ""} refused before any reviewer started: ${detail}`,
     `Failed condition: ${condition}.`,
     "Reviewers read the local checkout, so it must be exactly the reviewed revision.",
+    ...(verify ? [`${verifyFlag} additionally requires the pull request's head branch and a tree with no ` +
+      "untracked path, because safeguards would run commands in this checkout."] : []),
     "There is no override flag; nothing was reviewed, and no local file was touched.",
-    condition === "remote-head"
-      ? `Fix: rerun /pr-review ${number} ${mode.flag} after \`gh pr checkout ${number}\` to capture the new head.`
-      : `Fix: run \`gh pr checkout ${number}\` in this checkout, commit or discard your own changes, then rerun /pr-review ${number} ${mode.flag}.`,
+    fix,
   ].join("\n");
 }
 
@@ -53,12 +64,17 @@ function statusEntries(status) {
   };
 }
 
-export async function assertReviewableCheckout(snapshot, { cwd, gh, git = runGit, signal, mode = reviewModes.quick } = {}) {
+// `verify` selects the stricter profile a verification-enabled run needs. It adds
+// conditions to this one gate rather than introducing a second one, so a single
+// place decides whether a checkout may be used at all, and the ordinary profile
+// runs exactly the commands and checks it ran before.
+export async function assertReviewableCheckout(snapshot,
+  { cwd, gh, git = runGit, signal, mode = reviewModes.quick, verify = false } = {}) {
   signal?.throwIfAborted();
   const number = snapshot.pull.number;
   const captured = snapshot.pull.head.sha;
   const refuse = (condition, detail) => {
-    throw new Error(refuseCheckout(condition, detail, number, mode));
+    throw new Error(refuseCheckout(condition, detail, number, mode, { verify }));
   };
   let top;
   try {
@@ -80,6 +96,31 @@ export async function assertReviewableCheckout(snapshot, { cwd, gh, git = runGit
     refuse("local-head",
       `local HEAD is ${head}, but PR #${number} was captured at head ${captured}.`);
   }
+  // Safeguards run commands in this checkout and may leave artifacts behind, so a
+  // verification run must be on the PR's own head branch: a detached HEAD at the
+  // right commit is the reviewed revision but not a branch anything can land on.
+  let branch;
+  if (verify) {
+    const expected = snapshot.pull.head.ref;
+    if (typeof expected !== "string" || !expected) {
+      throw new Error("The verification preflight requires the captured head branch.");
+    }
+    try {
+      // symbolic-ref answers the question directly: it fails on a detached HEAD
+      // instead of reporting a branch name that no branch could hold.
+      branch = (await git(["symbolic-ref", "--quiet", "--short", "HEAD"], cwd, { signal })).trim();
+    } catch {
+      branch = "";
+    }
+    if (!branch) {
+      refuse("head-branch",
+        `this checkout has a detached HEAD at ${head}, not PR #${number}'s head branch ${expected}.`);
+    }
+    if (branch !== expected) {
+      refuse("head-branch",
+        `the current branch is ${branch}, but PR #${number}'s head branch is ${expected}.`);
+    }
+  }
   const { dirty, untracked } = statusEntries(await git(
     ["status", "--porcelain=v1", "--untracked-files=normal"], cwd, { signal },
   ));
@@ -87,6 +128,14 @@ export async function assertReviewableCheckout(snapshot, { cwd, gh, git = runGit
     refuse("working-tree",
       `${dirty.length} tracked file(s) are modified or staged, so the checkout is not the published revision: ` +
       `${dirty.slice(0, 5).join(", ")}${dirty.length > 5 ? ", ..." : ""}.`);
+  }
+  // An untracked path cannot be mistaken for modified reviewed code, which is why
+  // an ordinary review only warns. A verification run refuses it: once safeguards
+  // have written their own artifacts, nothing can tell the two apart.
+  if (verify && untracked.length) {
+    refuse("untracked",
+      `${untracked.length} untracked path(s) are present, and a safeguard's own artifacts could not be ` +
+      `told apart from them afterwards: ${untracked.slice(0, 5).join(", ")}${untracked.length > 5 ? ", ..." : ""}.`);
   }
   // A moved remote head means the captured snapshot is already stale; stop
   // rather than re-capturing mid-run.
@@ -100,5 +149,5 @@ export async function assertReviewableCheckout(snapshot, { cwd, gh, git = runGit
     refuse("remote-head",
       `PR #${number} now has head ${current?.head?.sha ?? "(unreadable)"}, but this run captured ${captured}.`);
   }
-  return { root, head, untracked };
+  return { root, head, untracked, ...(verify ? { branch } : {}) };
 }
