@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, sep } from "node:path";
 import {
   advertisesNoReasoningEffort, parseFixtureArgs, reasoningEfforts, subscriptionModels, validateAssignments,
   runReviewer,
@@ -84,6 +84,10 @@ mkdirSync(join(root, "src"));
 writeFileSync(join(root, "src", "caller.js"), "import { value } from \"../example.js\";\n");
 const outsideRoot = realpathSync(mkdtempSync(join(tmpdir(), "pr-review-outside-")));
 writeFileSync(join(outsideRoot, "secret.txt"), "not reviewed content\n");
+mkdirSync(join(outsideRoot, "nested"));
+// A symlink out of the checkout, and a decoy of the same name inside it.
+symlinkSync(join(outsideRoot, "nested"), join(root, "escape"));
+writeFileSync(join(root, "secret.txt"), "reviewed content\n");
 const readEvidence = reviewerEvidence({ root });
 const reading = readingReviewerPolicy(readEvidence, root);
 assert.deepEqual(reading.availableTools, ["builtin:view", "builtin:grep", "builtin:glob"]);
@@ -92,8 +96,17 @@ assert.throws(() => readingReviewerPolicy(readEvidence, "relative/path"), /absol
 for (const path of [root, join(root, "src"), join(root, "src", "caller.js"), join(root, "src", "..", "src")]) {
   assert.equal((await reading.onPermissionRequest({ kind: "read", path })).kind, "approve-once");
 }
+// One double-dot segment after that symlink used to be approved: Node's
+// fs.realpathSync collapses ".." textually before it resolves symlinks, while
+// the operating system, and so the tool that then opens the path, does not.
+// The handler approved one path and the reviewer read another, outside the
+// reviewed checkout, recorded in the run's evidence as an in-root read.
+const escape = `${root}${sep}escape${sep}..${sep}secret.txt`;
+assert.equal(readFileSync(escape, "utf8"), "not reviewed content\n",
+  "this request really does open a file outside the reviewed checkout");
 for (const request of [
   { kind: "read", path: join(outsideRoot, "secret.txt") },
+  { kind: "read", path: escape },
   { kind: "read", path: join(root, "..") },
   { kind: "read", path: join(root, "src", "..", "..", "escape.js") },
   { kind: "read", path: join(root, "missing.js") },
@@ -104,7 +117,10 @@ for (const request of [
   assert.equal((await reading.onPermissionRequest(request)).kind, "reject", JSON.stringify(request));
 }
 assert.deepEqual(readEvidence.reads, [".", "src", join("src", "caller.js"), "src"]);
-assert.deepEqual(readEvidence.permissionDenials, ["read", "read", "read", "read", "read", "write", "shell"]);
+assert(!readEvidence.reads.includes("secret.txt"),
+  "a read whose file is outside the checkout is never recorded as an in-root read");
+assert.deepEqual(readEvidence.permissionDenials,
+  ["read", "read", "read", "read", "read", "read", "write", "shell"]);
 // Granted read tools must reach the permission handler instead of being
 // hook-approved, so confinement still applies to every read.
 for (const toolName of [...readOnlyTools, "rg"]) {

@@ -35,7 +35,12 @@ function insideRoot(root, path) {
   if (typeof path !== "string" || !path) return undefined;
   let real;
   try {
-    real = realpathSync(path);
+    // The operating system resolver, not Node's: fs.realpathSync collapses ".."
+    // textually before it resolves symlinks, so a checkout containing a symlink
+    // to a directory could make it answer for a path inside the root while the
+    // tool that opens the request reads the file the kernel resolves to,
+    // outside it. This must agree with the open that follows it.
+    real = realpathSync.native(path);
   } catch {
     return undefined;
   }
