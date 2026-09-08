@@ -31,7 +31,7 @@ export async function retentionFixture(sessionId, {
     introduction: "The changed operator adds quantity instead of multiplying.",
     location: cite("head"), before: cite("base"), after: cite("head"), evidence: [cite("head", 1)],
   };
-  const reviewers = reviewMode.specialists.map(({ label }) => ({
+  const reviewers = reviewMode.reviewers.map(({ label }) => ({
     label, model: "controlled-model", reasoningEffort: "high", status: "completed", sessionId: randomUUID(),
     usage: [{ model: "controlled-model", reasoningEffort: "high", isByok: false }],
     result: JSON.stringify({

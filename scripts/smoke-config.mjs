@@ -12,7 +12,7 @@ import {
   trustSchemaVersion, validateTrustedProjects,
 } from "../extensions/pr-review/project.mjs";
 import { parseReviewArgs, reviewerAssignments } from "../extensions/pr-review/review.mjs";
-import { reviewModes } from "../extensions/pr-review/modes.mjs";
+import { modeIds, reviewModes } from "../extensions/pr-review/modes.mjs";
 import { executeRetainedReview } from "../extensions/pr-review/retained-run.mjs";
 import { sessionStore } from "../extensions/pr-review/retention.mjs";
 import { respond } from "./target-fixture.mjs";
@@ -245,6 +245,13 @@ console.log("PASS configuration argument parsing, unknown keys, malformed assign
   assert.equal(posting.autoPostReviews, true);
   assert.equal(posting.autoPostSource, "configured");
   assert.match(describeConfiguration(posting), /autoPostReviews: true \[configured\]/);
+  // The tier note is mode-dependent prose, so it is checked against the declared
+  // modes rather than left to drift when a mode is added.
+  const precedence = describeConfiguration(posting).split("\n")
+    .find((line) => line.startsWith("Precedence:")).toLowerCase();
+  for (const id of modeIds) {
+    assert(precedence.includes(id), `The precedence note must say which tiers ${id} mode uses`);
+  }
   console.log("PASS saved tiers drive quick assignments, flags override them, and invalid settings are refused");
 }
 // --- the effective autoPostReviews reaches the retained posting policy ------

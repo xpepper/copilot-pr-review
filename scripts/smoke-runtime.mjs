@@ -122,7 +122,7 @@ try {
     console.log(`PASS /pr-review ${args}`);
   }
 
-  for (const args of ["123 --deep --no-comment", "status extra", "cancel extra", "--comment"]) {
+  for (const args of ["123 --verify --no-comment", "status extra", "cancel extra", "--comment"]) {
     const result = await session.rpc.commands.execute({ commandName: "pr-review", args });
     assert.match(result.error, /Unsupported arguments\. No review was started\./);
     console.log(`PASS rejected /pr-review ${args}`);
@@ -148,18 +148,25 @@ try {
     ["123 --quick --balanced --no-comment", /mutually exclusive/],
     ["123 --balanced --full --no-comment", /mutually exclusive/],
     ["123 --full --major-only --no-comment", /mutually exclusive/],
+    ["123 --balanced --deep --no-comment", /mutually exclusive/],
+    ["123 --deep --major-only --no-comment", /mutually exclusive/],
     ["123 --capture-only --balanced", /cannot be combined/],
     ["123 --capture-only --full", /cannot be combined/],
+    ["123 --capture-only --deep", /cannot be combined/],
     ["123 --quick --no-comment --comment", /Conflicting posting flags/],
     ["123 --balanced --no-comment --comment", /Conflicting posting flags/],
     ["123 --full --no-comment --comment", /Conflicting posting flags/],
+    ["123 --deep --no-comment --comment", /Conflicting posting flags/],
     ["123 --full --no-comment mediumModel=missing-m1-model", /Invalid or duplicate review setting/],
     ["123 --quick --no-comment heavyModel=missing-q3-model", /Unavailable/],
     ["123 --balanced --no-comment heavyModel=missing-m1-model", /Unavailable/],
     ["123 --full --no-comment heavyModel=missing-m1-model", /Unavailable/],
+    ["123 --deep --no-comment mediumModel=missing-m2-model", /Invalid or duplicate review setting/],
+    ["123 --deep --no-comment heavyModel=missing-m2-model", /Unavailable/],
     [`123 --quick --no-comment heavyModel=${available.id} heavyEffort=invalid-effort`, /Unsupported reasoning/],
     [`123 --balanced --no-comment heavyModel=${available.id} heavyEffort=invalid-effort`, /Unsupported reasoning/],
     [`123 --full --no-comment heavyModel=${available.id} heavyEffort=invalid-effort`, /Unsupported reasoning/],
+    [`123 --deep --no-comment heavyModel=${available.id} heavyEffort=invalid-effort`, /Unsupported reasoning/],
   ]) {
     const before = (await session.getEvents()).length;
     const result = await session.rpc.commands.execute({ commandName: "pr-review", args });
@@ -187,7 +194,9 @@ try {
       // A draft target settles every mode before any reviewer starts, so this
       // exercises installed dispatch, tier resolution and settlement without
       // spending inference.
-      for (const [mode, prefix, reviewers] of [["--quick", "Q3", 3], ["--balanced", "M1", 5], ["--full", "M1", 6]]) {
+      for (const [mode, prefix, reviewers] of [
+        ["--quick", "Q3", 3], ["--balanced", "M1", 5], ["--full", "M1", 6], ["--deep", "M2", 1],
+      ]) {
         const before = (await session.getEvents()).length;
         settled = Promise.withResolvers();
         const result = await session.rpc.commands.execute({
@@ -207,7 +216,7 @@ try {
         assert.equal(assignments.split("\n").filter((line) => line.startsWith("  ")).length, reviewers,
           `${mode} must show one assignment line per reviewer`);
         assert(assignments.includes("[flag]"), "An invocation flag is reported as the origin it is");
-        if (mode !== "--quick") {
+        if (!["--quick", "--deep"].includes(mode)) {
           assert.match(assignments, /overview \[light\]: model=\S+ \[[^\]]+\]/,
             "The light overview reviewer resolves and reports its own tier");
         }
@@ -219,6 +228,13 @@ try {
             "The medium conventions reviewer resolves and reports its own tier");
           assert.match(assignments,
             /findings policy: P0-P2 findings, plus every substantiated P3\/nit finding/);
+        }
+        if (mode === "--deep") {
+          assert.match(assignments, /integrated \[heavy\]: model=\S+ \[flag\] reasoning=\S+ \[flag\]/,
+            "The single integrated reviewer resolves and reports the heavy tier");
+          assert.match(assignments,
+            /findings policy: P0-P2 findings, plus every substantiated P3\/nit finding/);
+          assert(!/\[light\]|\[medium\]/.test(assignments), "Deep resolves no light or medium tier");
         }
         assert(!messages.some((message) => /^Reviewer /.test(message)), "A skipped draft starts no reviewer");
         console.log(`PASS installed ${mode} dispatch settled a skipped draft without inference`);
