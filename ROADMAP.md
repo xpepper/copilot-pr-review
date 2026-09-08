@@ -6030,96 +6030,221 @@ only and have not been reviewed again.
   but it does mean a future change to the envelope contract has two callers that
   must stay identical; the equivalence assertions in `smoke-findings.mjs` exist
   to catch a divergence.
-- The absent-path read denial recorded on #6, #11 and #13 is untouched and still
-  open. `C5` makes a reviewer that fails after such a denial eligible for a
-  fallback, which is not the same as fixing the denial.
+- The absent-path read denial recorded on #6, #11 and #13 was untouched by `C5`,
+  which makes a reviewer that fails after such a denial eligible for a fallback
+  rather than fixing the denial. `Q7` later changed the refusal itself; it did
+  not change anything recorded here about `C5`.
+
+## Completed increment: Q7
+
+**`Q7` makes an absent path refused as absent rather than as a boundary escape,
+and corrects a confinement defect found while implementing it.** The boundary
+was discussed and approved before any code was written, as `C5`'s was.
+
+### The two refusals, and how they stay apart
+
+`insideRoot` resolved a requested path and returned `undefined` when that threw,
+so a path that simply does not exist inside the reviewed checkout was refused
+exactly like one outside it. The refusal carried no reason at all, and the
+reviewer's system message says reads are confined and nothing else exists, so a
+reviewer that guessed at a plausible module name had every reason to read the
+silence as a boundary refusal and none to look for the right path. That has
+landed on a reviewer which then failed on **#6, #11 and #13**. Association is
+not causation and this roadmap has never claimed otherwise; three runs was
+enough to fix the message.
+
+**The path stays refused and no reviewer gains a read it did not have.** Only
+the reason changes, and only for a request that would have been inside the root
+had it existed. The test is: an absolute path, lexically under the root before
+any filesystem call, whose nearest existing ancestor still resolves inside the
+root. The walk climbs from the requested path towards the root and stops there,
+so nothing outside the root is ever resolved or named, which is what the
+approved boundary required.
+
+The walk is what closes the oracle a lexical check alone would open. A symlink
+inside the checkout pointing outside would otherwise let a reviewer distinguish
+a present from an absent file *outside* the root: the present one resolves
+outside and is refused as an escape, the absent one throws and would be called
+absent. Resolving the nearest existing ancestor sees the symlink land outside
+and keeps the escape refusal.
+
+| Request | Decision | Reason given |
+|---|---|---|
+| Anything resolving inside the root | approve, unchanged | none |
+| Absent, ancestors inside the root | reject | absent |
+| Absent, several missing ancestors | reject | absent |
+| Unexpanded brace pattern inside the root | reject | absent |
+| Present or absent path outside the root | reject, unchanged | none |
+| Double-dot escape, verbatim | reject, unchanged | none |
+| Symlink inside the root to outside, target present or absent | reject, unchanged | none |
+| In-root path failing with a permission or symlink-loop error | reject, unchanged | none |
+| Relative, empty, or non-string path | reject, unchanged | none |
+| Any permission kind other than `read` | reject, unchanged | none |
+
+The six choices settled before implementation, all of which hold in the shipped
+code: the out-of-root refusal stays mute; the two refusals are recorded apart as
+`read` and `read-absent`; the absent message names the path relative to the root
+and points at `glob` and `grep`; the walk continues only on `ENOENT` and
+`ENOTDIR` and refuses on anything else; a relative path keeps today's approval
+behaviour and never receives the absent reason; and the live probe asserts a
+stable substring rather than the whole sentence.
+
+**No retained-record schema changed and no version was bumped.** `retainedRecord`
+picks a fixed reviewer key list that does not include `policy`, so read denials
+never enter the record. They do appear in the run's logged evidence JSON, which
+is where earlier denial counts were read from, and that is where the two kinds
+are now distinguishable.
+
+### The confinement defect this increment found and fixed
+
+**`fs.realpathSync` collapses `..` textually before it resolves symlinks. The
+operating system does not, and neither does the `open()` the granted read tool
+performs afterwards.** The permission handler therefore approved one path while
+the reviewer read another:
+
+```
+request      <root>/escape/../target.txt   escape -> a directory outside the root
+realpathSync <root>/target.txt             inside the root, approved
+realpath(3)  <base>/target.txt             outside the root
+open() reads the file outside the root
+```
+
+Run against the pre-`Q7` implementation, the handler answered `approve-once`,
+the read returned content from outside the reviewed checkout, and the run's own
+evidence recorded it as an in-root read of `target.txt`. Preconditions are a
+symlink to a directory in the checkout, a decoy of the same relative name inside
+the root, and a reviewer that asks for that path. **The checkout is the pull
+request head**, so a pull request can supply both halves, and the untrusted diff
+can attempt to induce the request. The reviewer system message is a defence
+against that inducement, not a guarantee.
+
+The correction is to resolve with the operating system resolver, so the answer
+the handler approves is the file that is opened. It landed as its own commit,
+before the `Q7` behaviour change, with the exploit shape as a controlled
+regression test. It narrows what a reviewer may read and widens nothing.
+
+This was not a planned part of `Q7`. It surfaced because the approved boundary
+required covering a path that looks contained but resolves outside, and that
+case turned out to be broken rather than merely untested. The user authorized
+folding it into this increment rather than scheduling it separately, so that the
+hole did not sit in `main` while a separate increment waited.
+
+### Runtime facts demonstrated, not inferred
+
+Three no-inference probes against CLI 1.0.83 settled the design. They sent no
+prompt, started no model turn and spent no credits.
+
+- Every path reaching the permission handler from `view`, `grep` and `glob` is
+  already absolute. A relative argument is resolved against the session working
+  directory, which is the verified root; one that climbs out arrives as an
+  absolute path outside the root. The relative branch is unreachable from the
+  shipped read tools on this CLI and is defensive only.
+- Absolute paths arrive verbatim. Single-dot, double-dot and trailing separators
+  are not normalized by the runtime, so all normalization is the plugin's.
+- A nonexistent path still fires a read permission request; the runtime does not
+  pre-check existence. That is why an absent path reached the same refusal.
+- A non-string or missing `path` never reaches the handler: the tool schema
+  fails first with `resultType: "failure"`. An empty string does reach it.
+- `{ kind: "reject" }` produces exactly `The user rejected this tool call.`
+  Before `Q7` the denial said nothing about the checkout at all.
+- `{ kind: "reject", feedback }` puts `The user rejected this tool call. User
+  feedback: <text>` into `textResultForLlm`, the model-facing field, **and flips
+  `resultType` from `rejected` to `denied`**. Attaching the reason only to the
+  absent case therefore leaves every escape refusal byte-identical to before,
+  result type included.
+
+### Controlled evidence
+
+The twelve controlled suites pass, before and after each commit. `git diff
+--check` is clean.
+
+`smoke-fixture.mjs` drives `readingReviewerPolicy` directly against a real
+temporary checkout that now contains a symlink out of it, a symlink within it,
+and a decoy file, and asserts every row of the table above on both the decision
+and the reason it carries. Its escape regression asserts first that the request
+really does open a file outside the checkout, then that the handler refuses it,
+then that the refused read is never recorded as an in-root read. That assertion
+was confirmed red against the previous resolver, with `approve-once` where
+`reject` is required.
+
+`smoke-reviewer-tools.mjs`, the confinement probe outside the twelve, adds the
+live half on the real runtime: an absent in-root read is denied with the absent
+reason naming the requested path and nothing outside it, and an absent path
+outside, a symlink escape with a decoy inside, and an absent path behind that
+symlink are each refused exactly as before, with no absent-path wording, no file
+content and a `read` denial recorded. It spends no inference and still passes
+its existing assertions unchanged.
+
+### Remaining limitations
+
+- **No live review has exercised this.** The reason is demonstrated to reach the
+  tool result's model-facing text on the real runtime. What a reviewer then does
+  with it is model behaviour, and no reviewer has yet been refused this way in a
+  live run. Whether it recovers a reviewer that would otherwise have failed is
+  unproven, and a later clean run would not prove it either.
+- **`Q7` does not establish causation for #6, #11 and #13.** It removes a
+  plausible cause of those failures. It cannot show it was the cause.
+- **A request naming the checkout through a symlinked ancestor keeps the mute
+  refusal.** Lexical containment is decided against the resolved root, so a path
+  expressed through a symlinked prefix, such as `/var` for `/private/var` on
+  macOS, is not lexically contained and never receives the absent reason. It is
+  still approved when it resolves inside, because approval resolves the path.
+  This is safe and it under-delivers rather than over-delivers. In the shipped
+  configuration the reviewer's working directory and the root named in its
+  prompt are both the resolved root, so a request has no source for a symlinked
+  prefix; the probe hit it only because its own fixture root was unresolved.
+- **`C5` is unchanged and is still not a fix for this.** A reviewer that fails
+  after such a denial remains eligible for its one configured fallback. `Q7`
+  makes the refusal accurate for the primary attempt and for the fallback alike,
+  but it does not recover the lost output and it does not make a fallback fire.
+  No tier has ever had a fallback configured for a live review, so that path
+  stays live-unobserved.
+- The resolver correction is demonstrated on macOS. `realpathSync.native` is the
+  operating system resolver on every supported platform, but the divergence
+  between it and Node's implementation was reproduced here only.
+
+### Reproduction
+
+```sh
+# The twelve controlled suites. No inference, no network.
+for s in findings review selection retention preview publication publish-later \
+  checkout config context fixture target; do node scripts/smoke-$s.mjs; done
+
+# The confinement probe. No inference, but it needs a live runtime connection.
+COPILOT_CLI_PATH="$(command -v copilot)" \
+COPILOT_SDK_PATH="$(ls -d "$HOME"/.copilot/pkg/*/"$(copilot --version \
+  | sed -n 's/.*CLI \([0-9][0-9.]*[0-9]\).*/\1/p')"/copilot-sdk)" \
+node scripts/smoke-reviewer-tools.mjs
+```
 
 ## Exact next increment
 
 **`C5` is complete and merged from pull request #14.** Its one authorized
 installed review ran in balanced mode, cost 110.736851 credits and is recorded
-above. Coverage was INCOMPLETE on one coverage gap and three caveats, with zero
-execution failures, zero candidates and no adjudicator session. That
-authorization is spent: do not rerun it.
+above. That authorization is spent: do not rerun it. Nothing about `C5` should
+be redone or widened; the four choices recorded in its table are settled.
 
-**The live gap that review names is the honest state of `C5`.** No live run has
-demoted an attempt, none has started a fallback from one, and no tier has ever
-had a fallback configured for a live review. Say that plainly rather than
-describing the controlled suites as proof of live behaviour.
+**`Q7` is complete on its own branch and pull request, recorded above.** Its
+boundary was approved before implementation, and the confinement defect it found
+was folded in on the user's explicit instruction rather than scheduled
+separately.
 
-**Nothing about `C5` should be redone or widened.** Its boundary was discussed
-and approved before implementation, and the four choices recorded in its table
-are settled: the adjudicator is in scope, an all-refused envelope is not
-eligible, a wrong review key is eligible, and demotion never depends on a
-fallback being configured. Do not move the check into `findings.mjs`, and do not
-extend eligibility below the envelope; both were considered and rejected with
-reasons.
-
-### The next increment is `Q7`: an absent path is refused as absent
-
-**`Q7` is the next increment. It still needs the user's go-ahead before
-implementation, and it must not begin with code.**
-
-`insideRoot` in `read-only.mjs` resolves a requested path with `realpathSync` and
-returns `undefined` when that throws, so the permission handler rejects a path
-that simply does not exist inside the reviewed checkout **exactly as it rejects
-one outside it**, and tells the reviewer it may only read inside the checkout.
-A reviewer that asked for a plausible-sounding module it guessed at is therefore
-told it attempted a boundary escape, which is both untrue and unhelpful: it
-cannot learn that the file is absent and try the right path.
-
-This has now landed on a reviewer that then failed on **#6, #11 and #13**. On
-#11 both denied reviewers had asked for a path that does not exist: a plausible
-module name, and an unexpanded `{a,b}` brace pattern. On #13 the `contracts`
-reviewer searched a nonexistent root-level `findings.mjs` instead of
-`extensions/pr-review/findings.mjs`, took the denial, and produced no usable
-output. Temporal association does not prove causation, and the roadmap has never
-claimed it does, but three runs is enough to fix the message.
-
-**`C5` did not fix this and must not be mistaken for a fix.** It makes a
-reviewer that fails after such a denial eligible for a configured fallback. That
-is a different attempt with the same misleading refusal, not an accurate one.
-
-**The safe direction is fixed in advance: an absent path stays refused.** Only
-the reason changes. `Q7` must not widen what a reviewer may read, and the
-increment is a refusal-message change, not a confinement change.
-
-The hard part is that the distinction must not itself leak. Telling a reviewer
-"that file does not exist" about a path *outside* the root would report on the
-host filesystem, which is exactly what confinement exists to prevent. So the
-absent-path reason may only be given for a request that would have been inside
-the root had it existed, decided without resolving or stating anything outside
-the root. Weigh at least these before writing code:
-
-- Lexical containment of the normalized request against the root, decided before
-  any filesystem call, as the gate on which reason is given.
-- The symlink case, which is why `realpathSync` is there at all: a path that
-  lexically looks contained but resolves outside must keep the boundary refusal,
-  and a partially-resolvable chain must not be walked outside the root.
-- Whether `permissionDenials` should record the two kinds separately, and what
-  that does to `smoke-reviewer-tools.mjs` and to the retained record. Prefer no
-  retained-record schema change; say so if one turns out to be unavoidable, and
-  ask before changing its version.
-- Whether a relative path, an empty path and a non-string path keep their
-  current refusal unchanged.
-
-Acceptance is: a path absent inside the root is refused with an accurate reason,
-every path outside the root is refused exactly as today with no new information
-in the message, controlled tests cover the symlink-escape and
-lexically-contained-but-resolving-outside cases, and no reviewer gains a read it
-did not have. Discuss the boundary and present it before implementing, as `C5`
-did; that sequence worked and is now the expected one for an increment that
-touches a gate.
+**There is no next increment chosen.** The open items below are recorded, none
+is scheduled, and each needs the user to pick it. Do not start one unasked.
 
 ### Recorded, not scheduled
 
-These stay open and are **not** the next increment. Do not start one instead of
-`Q7` without the user saying so.
+These stay open and none is scheduled. Do not start one without the user
+saying so.
 
 - **A review against a substantial code diff**, the oldest and largest open
   observation. No review of any mode has run against one; #10 is the closest at
   984 additions over 12 files, and #14 is 666 over seven. It is separately
   authorizable and nobody has spent a review on it deliberately.
+- **A live review in which a reviewer is refused an absent path**, the only way
+  to learn whether `Q7`'s reason changes what a reviewer does next. It cannot be
+  arranged deliberately without inducing the request, so it is a matter of
+  watching later reviews rather than an increment to schedule.
 - **A live review with a fallback configured**, the only way to close the gap
   #14's reviewers named about `C3` and `C5`. That is a deliberate credit
   decision, because a discarded output would then spend a second attempt.
