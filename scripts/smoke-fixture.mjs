@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, sep } from "node:path";
 import {
   advertisesNoReasoningEffort, parseFixtureArgs, reasoningEfforts, subscriptionModels, validateAssignments,
   runReviewer,
@@ -84,27 +84,121 @@ mkdirSync(join(root, "src"));
 writeFileSync(join(root, "src", "caller.js"), "import { value } from \"../example.js\";\n");
 const outsideRoot = realpathSync(mkdtempSync(join(tmpdir(), "pr-review-outside-")));
 writeFileSync(join(outsideRoot, "secret.txt"), "not reviewed content\n");
+mkdirSync(join(outsideRoot, "nested"));
+writeFileSync(join(outsideRoot, "nested", "secret.txt"), "also not reviewed content\n");
+// A symlink out of the checkout is the case the real-path resolution exists
+// for, a symlink within it must not turn into an escape either, and a file of
+// the same name inside the root is the decoy the escape below needs.
+symlinkSync(join(outsideRoot, "nested"), join(root, "escape"));
+symlinkSync(join(root, "src"), join(root, "mirror"));
+writeFileSync(join(root, "secret.txt"), "reviewed content\n");
+writeFileSync(join(root, "present.js"), "export const present = true;\n");
+// Symlinks whose targets do not exist. The one pointing out of the checkout is
+// the oracle: whether its target exists must not change the refusal.
+symlinkSync(join(outsideRoot, "gone.txt"), join(root, "dangling-out"));
+symlinkSync(join(root, "gone.js"), join(root, "dangling-in"));
 const readEvidence = reviewerEvidence({ root });
 const reading = readingReviewerPolicy(readEvidence, root);
 assert.deepEqual(reading.availableTools, ["builtin:view", "builtin:grep", "builtin:glob"]);
 assert.deepEqual(readOnlyTools, ["view", "grep", "glob"]);
 assert.throws(() => readingReviewerPolicy(readEvidence, "relative/path"), /absolute reviewed checkout root/);
-for (const path of [root, join(root, "src"), join(root, "src", "caller.js"), join(root, "src", "..", "src")]) {
-  assert.equal((await reading.onPermissionRequest({ kind: "read", path })).kind, "approve-once");
+// Approval is unchanged, and still decided by resolving the requested path
+// itself rather than a normalized rewrite of it.
+const approved = [
+  [root, "."],
+  [join(root, "src"), "src"],
+  [join(root, "src", "caller.js"), join("src", "caller.js")],
+  [join(root, "src", "..", "src"), "src"],
+  [`${root}${sep}.${sep}src`, "src"],
+  [`${root}${sep}src${sep}`, "src"],
+  [join(root, "mirror", "caller.js"), join("src", "caller.js")],
+];
+for (const [path] of approved) {
+  assert.equal((await reading.onPermissionRequest({ kind: "read", path })).kind, "approve-once", path);
 }
-for (const request of [
+// Q7: a path that would have been inside the root had it existed is still
+// refused, but with a reason the reviewer can act on. It names the path the
+// reviewer itself asked for, relative to the root, and nothing else.
+const absent = [
+  [join(root, "missing.js"), "missing.js"],
+  [join(root, "src", "missing.mjs"), join("src", "missing.mjs")],
+  [join(root, "scripts", "smoke-{config,review}.mjs"), join("scripts", "smoke-{config,review}.mjs")],
+  [join(root, "a", "b", "c.js"), join("a", "b", "c.js")],
+  [join(root, "src", "caller.js", "nested.js"), join("src", "caller.js", "nested.js")],
+  [join(root, "mirror", "missing.js"), join("mirror", "missing.js")],
+  // The reason names the path as it was requested. Collapsing it first would
+  // report an existing file as absent: this path does not resolve, but
+  // present.js does exist.
+  [`${root}${sep}missing${sep}..${sep}present.js`, `missing${sep}..${sep}present.js`],
+];
+for (const [path, named] of absent) {
+  const decision = await reading.onPermissionRequest({ kind: "read", path });
+  assert.equal(decision.kind, "reject", path);
+  assert.match(decision.feedback, /No such path inside the reviewed checkout/, path);
+  assert(decision.feedback.includes(named), `${decision.feedback} must name ${named}`);
+  assert(!decision.feedback.includes(outsideRoot), "an absent-path refusal never names anything outside the root");
+}
+// Every other refusal stays exactly as mute as it was. Saying that a path
+// outside the root does not exist would report on the host filesystem, which
+// is what confinement is for, so a path that only looks contained, one that
+// resolves outside through a symlink, and one whose base this handler cannot
+// know all keep the bare rejection.
+// A symlink out of the checkout, a decoy of the same name inside it, and one
+// double-dot segment used to approve a read of the file outside. Node's
+// fs.realpathSync collapses ".." textually before it resolves symlinks; the
+// operating system, and so the tool that then opens the path, does not. The
+// handler must resolve the way the kernel does, or it approves one path and
+// the reviewer reads another.
+const escape = `${root}${sep}escape${sep}..${sep}secret.txt`;
+assert.equal(readFileSync(escape, "utf8"), "not reviewed content\n",
+  "this request really does open a file outside the reviewed checkout");
+const refused = [
   { kind: "read", path: join(outsideRoot, "secret.txt") },
+  { kind: "read", path: join(outsideRoot, "absent.txt") },
   { kind: "read", path: join(root, "..") },
   { kind: "read", path: join(root, "src", "..", "..", "escape.js") },
-  { kind: "read", path: join(root, "missing.js") },
+  { kind: "read", path: `${root}${sep}..${sep}outside.txt` },
+  { kind: "read", path: join(root, "escape", "secret.txt") },
+  { kind: "read", path: join(root, "escape", "absent.txt") },
+  { kind: "read", path: `${root}${sep}escape${sep}..${sep}absent.txt` },
+  { kind: "read", path: escape },
+  // A symlink that exists but does not resolve keeps the mute refusal, whether
+  // it points out of the checkout or inside it. Calling it absent would say
+  // whether its target exists, and a symlink in the checkout may point anywhere.
+  { kind: "read", path: join(root, "dangling-out") },
+  { kind: "read", path: join(root, "dangling-out", "nested.js") },
+  { kind: "read", path: join(root, "dangling-in") },
+  { kind: "read", path: join("relative", "missing.js") },
+  { kind: "read", path: "" },
+  { kind: "read", path: 7 },
   { kind: "read" },
   { kind: "write", path: join(root, "src", "caller.js") },
   { kind: "shell", path: root },
-]) {
-  assert.equal((await reading.onPermissionRequest(request)).kind, "reject", JSON.stringify(request));
+];
+for (const request of refused) {
+  const decision = await reading.onPermissionRequest(request);
+  assert.equal(decision.kind, "reject", JSON.stringify(request));
+  assert.equal(decision.feedback, undefined, JSON.stringify(request));
 }
-assert.deepEqual(readEvidence.reads, [".", "src", join("src", "caller.js"), "src"]);
-assert.deepEqual(readEvidence.permissionDenials, ["read", "read", "read", "read", "read", "write", "shell"]);
+assert.deepEqual(readEvidence.reads, approved.map(([, recorded]) => recorded));
+assert(!readEvidence.reads.includes("secret.txt"),
+  "a read whose file is outside the checkout is never recorded as an in-root read");
+// The two refusals are recorded apart, so a later run can say why coverage
+// dropped without reconstructing it from tool calls.
+assert.deepEqual(readEvidence.permissionDenials,
+  [...absent.map(() => "read-absent"), ...refused.map((request) => request.kind)]);
+
+// The refusal must not become an existence oracle for a path outside the root.
+// A reviewer can ask for the same in-root symlink twice; the answer must not
+// depend on whether the file it points at outside the checkout has appeared.
+const dangling = { kind: "read", path: join(root, "dangling-out") };
+const beforeTarget = await reading.onPermissionRequest(dangling);
+writeFileSync(join(outsideRoot, "gone.txt"), "must never be readable\n");
+const afterTarget = await reading.onPermissionRequest(dangling);
+assert.deepEqual(afterTarget, beforeTarget,
+  "the refusal for a checkout symlink must not reveal whether its target outside exists");
+assert.equal(afterTarget.feedback, undefined);
+assert.deepEqual(readEvidence.permissionDenials.slice(-2), ["read", "read"]);
 // Granted read tools must reach the permission handler instead of being
 // hook-approved, so confinement still applies to every read.
 for (const toolName of [...readOnlyTools, "rg"]) {

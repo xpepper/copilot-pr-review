@@ -2,12 +2,13 @@
 // built-in tool subset, and does the runtime actually enforce that subset?
 // It sends no prompt, spends no inference, and changes no review behavior.
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 import {
-  assertReviewerTools, readOnlyToolFilters, readOnlyTools, readingReviewerPolicy, reviewerEvidence, reviewerPolicy,
+  absentDenial, assertReviewerTools, readOnlyToolFilters, readOnlyTools, readingReviewerPolicy, reviewerEvidence,
+  reviewerPolicy,
 } from "../extensions/pr-review/read-only.mjs";
 
 const sdkPath = process.env.COPILOT_SDK_PATH;
@@ -24,9 +25,17 @@ const checkout = mkdtempSync(join(tmpdir(), "pr-review-reviewer-tools-"));
 const root = realpathSync(checkout);
 mkdirSync(join(checkout, "src"));
 writeFileSync(join(checkout, "src", "consumer.rs"), "use lapin::Channel;\nfn main() {}\n");
-const outsideDirectory = mkdtempSync(join(tmpdir(), "pr-review-outside-"));
+const outsideDirectory = realpathSync(mkdtempSync(join(tmpdir(), "pr-review-outside-")));
 const outside = join(outsideDirectory, "secret.txt");
 writeFileSync(outside, "must never be readable by a reviewer\n");
+mkdirSync(join(outsideDirectory, "nested"));
+// A symlink out of the checkout plus a decoy of the same name inside it: the
+// shape that made the handler approve one path while the tool opened another.
+symlinkSync(join(outsideDirectory, "nested"), join(checkout, "escape"));
+writeFileSync(join(checkout, "secret.txt"), "reviewed content\n");
+// A symlink in the checkout whose target outside it does not exist. Calling
+// that absent would say whether the target exists.
+symlinkSync(join(outsideDirectory, "gone.txt"), join(checkout, "dangling"));
 
 const client = new CopilotClient({
   connection: RuntimeConnection.forStdio({ path: resolve(cliPath), env: process.env }),
@@ -129,6 +138,50 @@ try {
   assert.deepEqual(evidence.reads, [join("src", "consumer.rs")], "A refused read is never recorded as read evidence");
   console.log("PASS reads outside the reviewed checkout are denied by the permission handler");
 
+  // 5c. Q7: a path that would have been inside the checkout had it existed is
+  // still refused, and the reviewer is told which of the two refusals it got.
+  // This is the seam the reason has to survive: the runtime, not a test double,
+  // decides what a rejected tool call says back to the model.
+  // Paths are named the way a reviewer sees them: its working directory is the
+  // resolved root, and that is the root the review prompt states, so a request
+  // is expressed under the resolved root rather than a symlinked prefix of it.
+  const absentRead = await reader.rpc.tools.execute({
+    name: "view", arguments: { path: join(root, "src", "missing.rs") },
+  });
+  const absentText = JSON.stringify(absentRead);
+  assert.equal(absentRead.resultType, "denied", `An absent in-root read was not denied: ${absentText}`);
+  assert(absentRead.textResultForLlm.includes("No such path inside the reviewed checkout"),
+    `The reviewer was not told the path is absent: ${absentText}`);
+  assert(absentRead.textResultForLlm.includes(join("src", "missing.rs")),
+    `The absent-path refusal did not name the requested path: ${absentText}`);
+  assert(!absentText.includes(outsideDirectory), "An absent-path refusal never names anything outside the checkout");
+  assert.equal(evidence.permissionDenials.at(-1), absentDenial,
+    "An absent path is recorded apart from a refused boundary escape");
+  assert.deepEqual(evidence.reads, [join("src", "consumer.rs")], "A refused read is never recorded as read evidence");
+
+  // 5d. Every other refusal is unchanged, message included. Saying that a path
+  // outside the checkout does not exist would report on the host filesystem.
+  for (const [label, path] of [
+    ["an absent path outside", join(outsideDirectory, "absent.txt")],
+    // Node's fs.realpathSync would answer <checkout>/secret.txt for this; the
+    // kernel, and the open the tool performs, resolve it outside the checkout.
+    ["a symlink escape with a decoy inside", `${root}${sep}escape${sep}..${sep}secret.txt`],
+    ["an absent path behind that symlink", `${root}${sep}escape${sep}..${sep}absent.txt`],
+    ["a dangling symlink in the checkout", join(root, "dangling")],
+    ["a path under a dangling symlink", join(root, "dangling", "nested.rs")],
+  ]) {
+    const refused = await reader.rpc.tools.execute({ name: "view", arguments: { path } });
+    const refusedText = JSON.stringify(refused);
+    assert.equal(refused.resultType, "rejected", `${label} was not refused as today: ${refusedText}`);
+    assert(!refusedText.includes("No such path"), `${label} leaked an absent-path reason: ${refusedText}`);
+    assert(!refusedText.includes("must never be readable") && !refusedText.includes("not reviewed"),
+      `${label} leaked file content: ${refusedText}`);
+    assert.equal(evidence.permissionDenials.at(-1), "read", label);
+  }
+  assert(!evidence.reads.includes("secret.txt"),
+    "A read whose file is outside the checkout is never recorded as an in-root read");
+  console.log("PASS an absent path is refused as absent, and every escape is refused exactly as before");
+
   const searchArguments = (path) => ({ pattern: "lapin", ...(searchTool === "rg" ? { paths: path } : { path }) });
   const search = await reader.rpc.tools.execute({ name: searchTool, arguments: searchArguments(root) });
   assert(!["denied", "rejected", "failure"].includes(search.resultType), JSON.stringify(search));
@@ -141,7 +194,7 @@ try {
   assert.equal(evidence.permissionDenials.at(-1), "read");
   console.log(`PASS ${searchTool} uses the unchanged builtin:grep grant and stays confined`);
 
-  // 5c. The runtime accepts only a fixed decision vocabulary. F4 demonstrated
+  // 5e. The runtime accepts only a fixed decision vocabulary. F4 demonstrated
   // that the previous `denied-no-approval-rule` value was refused as an unknown
   // variant, turning a denial into a transport failure. Show both halves now:
   // the malformed value still fails, and the shipped `reject` denies cleanly.
