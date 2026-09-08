@@ -26,19 +26,18 @@ before you start.
 
 ## Recorded state
 
-- **`C3` is complete and lives on branch `c3-fallback-models`, pull request #10,
-  which is open and unmerged.** Merging is the user's call. If it has been
-  merged by the time you read this, branch from `main`; if not, ask before
-  building on top of an unmerged branch.
+- **You are starting on a clean `main` with no increment in flight.** `main` is
+  the squash merge of pull request #10, which completed `C3`. Nothing should be
+  uncommitted and no increment branch should be open. Branch from `main`.
 - Pull requests #3, #4 and #5 delivered `M1`, #6 delivered `F5`, #7 delivered
-  `F6`, #8 delivered `M2`, #10 delivers `C3`. All but #10 are merged, their
-  branches are deleted, and their individual commits are not ancestors of
-  `main`, so read `git log` and the pull requests rather than looking for hashes
-  from them.
+  `F6`, #8 delivered `M2`, #10 delivered `C3`. All are merged, their branches
+  are deleted, and their individual commits are not ancestors of `main`, so read
+  `git log` and the pull requests rather than looking for hashes from them.
 - Pull requests #1 and #2 are synthetic publication playgrounds from P4 and P5.
   **Never merge them**, and never republish to them.
-- `M1`, `F5`, `F6`, `M2` and `C3` are Completed. `C4` and the new `C5` are the
-  ready candidates; `L1` stays pending.
+- `M1`, `F5`, `F6`, `M2` and `C3` are Completed. **`C4` is the next increment**
+  and `C5` is the one after it, though `C5` needs the user's go-ahead first;
+  `L1` stays pending.
 - Seven live reviews of this repository's own pull requests exist: #3 and #4
   balanced, #5 full, #6 balanced, #7 full, #8 deep, #10 balanced. All seven are
   spent. **Any review you run needs its own authorization; none of these carry
@@ -99,21 +98,26 @@ from the key list. Watch for that defect class in your own increment: a list or 
 count that enumerates something you just extended. It has now been the defect a
 review of this project found four times.
 
-## The next increment: `C4` or `C5`
+## The next increment: `C4`
 
-`ROADMAP.md`'s "Exact next increment" section states both in full.
+**Implement `C4`, and only `C4`, unless the user says otherwise.**
+`ROADMAP.md`'s "Exact next increment" section states it in full, names the
+functions to expect to touch, and states `C5` after it.
 
-`C4` is the smaller one. A tier whose resolved model supports no configurable
-reasoning effort should resolve to **no** effort instead of inheriting one, so
-such a model can serve the tier. An explicit effort is still validated and never
-silently lowered. `C3` gave that increment a second surface: a fallback model
-that advertises no configurable effort is refused today for exactly the same
-reason, and the roadmap's C3 evidence records that refusal as a test case.
+A tier whose resolved model supports no configurable reasoning effort should
+resolve to **no** effort instead of inheriting one, so a model like
+`claude-haiku-4.5` can serve the tier. An explicit effort is still validated and
+never silently lowered, and an inherited effort a capable model cannot support is
+still refused; what changes is that a model advertising **no** efforts stops
+inheriting one it cannot hold. `C3` left a second surface with the same defect,
+a fallback model that advertises no configurable effort, and both should be fixed
+together. `smoke-config.mjs` currently asserts both refusals, so those assertions
+are where the increment starts.
 
-`C5` is the one the review asked for, and the one that decides whether `C3` is
-useful in practice. It is larger and it is a product decision as much as a
-change: it moves the retry decision across the evidence boundary, so ask the user
-before starting it.
+`C5` comes after it and **needs the user's explicit go-ahead before you start**:
+it decides whether `C3` is useful in practice, but it moves the retry decision
+across the evidence boundary, changes what `completed` means for every mode, and
+costs credits per extra attempt. Do not fold it into `C4`.
 
 Keep the evidence boundary exactly as it is, keep `L1` pending, copy no upstream
 source, and update `README.md` if the change is user-visible.

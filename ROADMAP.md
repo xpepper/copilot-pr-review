@@ -4949,13 +4949,52 @@ one extra attempt for the one reviewer whose own execution failed. Pull request
 end on the installed plugin; the attempt itself rests on the controlled suites,
 because no reviewer failed during that run.
 
-**`C4`, a tier whose model supports no configurable effort.** Such a tier should
-resolve to **no** effort rather than inheriting one, so a model like
+**Take `C4` next: a tier whose model supports no configurable effort.** It is
+small, fully specified, blocked by nothing, and needs no product decision. Such a
+tier should resolve to **no** effort rather than inheriting one, so a model like
 `claude-haiku-4.5` can serve it. An explicit effort is still validated and never
-silently lowered. `C3` gives this increment a second surface with the same
-defect: a fallback model that advertises no configurable effort is refused today
-because the tier's own effective effort carries over to it, which the C3 evidence
-above records as a test case. Fix both together, or say why not.
+silently lowered, and an inherited effort is still refused rather than dropped
+when the model does support efforts; the change is that a model advertising
+**none** stops inheriting an effort it cannot hold.
+
+`C3` gave `C4` a second surface with the same defect, and both should be fixed
+together: a fallback model that advertises no configurable effort is refused
+today because the tier's own effective effort carries over to it, which the C3
+controlled evidence above records as a test case. Expect to touch `resolveField`
+and `resolveFallback` in `config.mjs`, `tierValidation` and
+`validateModelAssignment`, and the assertions in `smoke-config.mjs` that pin the
+current refusals. Note that `reviewAssignments` already fills an unset effort
+from the runtime's resolved default and revalidates it, so check what the
+installed runtime reports for such a model before assuming `undefined` survives.
+
+**Then `C5`, and ask before starting it: eligibility for a discarded output.**
+Pull request #10's overview reviewer found it, at P2 and confidence 0.95, and the
+changed-line anchoring rule discarded it. A reviewer whose output the evidence
+boundary cannot parse settles as `completed`, so it never becomes eligible for
+its tier's one fallback attempt, while a reviewer that returns nothing does. Four
+of this project's own seven live reviews were incomplete for exactly the reason a
+fallback cannot answer, so this is the increment that decides whether `C3` is
+useful in practice rather than only correct.
+
+It is deliberately not a small increment, and it is a product decision as much as
+a change, which is why it needs its own authorization:
+
+- The retry decision has to move across the evidence boundary. Envelope
+  validation lives in `findings.mjs` and runs in `collectCandidates` after every
+  reviewer has settled, so the attempt would start after the batch rather than
+  beside the reviewer that failed, and collection would have to run twice.
+- What `completed` means changes for every mode, whether or not a fallback is
+  configured, so coverage classification, the retained record's reviewer status
+  and `smoke-retention.mjs`'s invariants all move with it.
+- A second reviewer run on a large diff costs real credits. On #10 a single heavy
+  reviewer cost between 39 and 58 of the 233 credits the review spent.
+
+One shape worth weighing first: `reviewAssignments` already turns a `completed`
+attempt into an `incomplete` one when reported usage does not match the
+assignment. An optional `verifyResult` hook on the same seam, passed from
+`review.mjs` with the review key, would keep the retry beside the reviewer and
+out of `findings.mjs`. That is a design to evaluate, not a decision already
+taken.
 
 Three older observations remain open and separately authorizable, and one of them
 is still the oldest thing here. **No review of any mode has ever run against a
