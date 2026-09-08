@@ -48,7 +48,7 @@ posting them.
 | M1 | Completed | Balanced is the default with its four heavy specialists, light overview reviewer and three-finding P3/nit cap. `--full` adds a medium conventions/maintainability reviewer and presents every qualifying severity with no minor cap. Demonstrated by controlled probes, no-inference installed dispatch, and live reviews of this repository's own pull requests #3, #4 and #5; #5 ran all three tiers on distinct models. A Claude-family medium model's fenced output is a recorded open defect. | Q4, C1; [Modes](SCOPE.md#review-modes-and-findings) |
 | F5 | Completed | Structured output is demonstrated unusable on CLI 1.0.83: the factory surface is behind a CLI feature flag and reachable only from a joined foreground session, a joining extension cannot register the permission handler that confines reviewer reads, and a custom agent's declared `view`/`grep`/`glob` grant leaks `skill` and `sql`. Retry cost, `null` failure semantics and module reach measured below. Recommendation recorded: fall back to a narrow fence unwrap, with its cost stated and the choice left to the user. No reviewer was migrated. | M1, F3; [Technical feasibility](SCOPE.md#technical-uncertainties-and-proposed-sequence) |
 | F6 | Completed | Reviewer output survives a model that wraps it. Reviewers and the adjudicator are asked for the envelope between two explicit markers, and code unwraps that delimiter pair, then one fence that wraps the whole response; markers and fences count only when they are the whole line, so payload text is never a wrapper. Everything after the parse is unchanged, and a table below pins what is still discarded whole. Demonstrated by the full-mode review of pull request #7, which discarded four reviewers on a substring-counting defect it also reported; that defect is fixed and the captured outputs replayed. | F5; [Modes/findings](SCOPE.md#review-modes-and-findings) |
-| M2 | Pending | Deep uses one holistic reviewer; reject conflicting mode flags. | F6, M1; [Modes](SCOPE.md#review-modes-and-findings) |
+| M2 | In flight | Deep uses one holistic reviewer; reject conflicting mode flags. Implemented and demonstrated by the controlled suites; not demonstrated until the installed plugin has reviewed its own pull request. | F6, M1; [Modes](SCOPE.md#review-modes-and-findings) |
 | C3 | Pending | Explicit optional fallback with at most one eligible retry per failed reviewer; no timers or silent substitutions. | C1, Q3; [Fallbacks/execution](SCOPE.md#models-configuration-and-execution) |
 | C4 | Pending | A tier whose resolved model supports no configurable reasoning effort resolves to no effort instead of inheriting one, so such a model can serve a tier. An explicit effort is still validated and never silently lowered. | C1; [Configuration](SCOPE.md#models-configuration-and-execution) |
 | V1 | Pending | `--verify` enforces matching branch/SHA/cleanliness before reviewers and presents discovered existing commands for approval. | Q1; [Safeguards](SCOPE.md#optional-project-safeguards) |
@@ -4382,6 +4382,114 @@ demonstrated, and rerunning the review needs its own authorization.
   review needs its own authorization.
 - A model that emits neither markers nor a wrapper is unaffected: today's
   passing reviewers keep passing on exactly the path they use now.
+
+## Increment M2: deep mode, pending its live review
+
+Implementation: `extensions/pr-review/modes.mjs`, `review.mjs` and
+`extension.mjs` wording. Probes: `scripts/smoke-review.mjs`,
+`smoke-findings.mjs`, `smoke-checkout.mjs` and `smoke-runtime.mjs`. No upstream
+source was copied. No fallback, timeout, safeguard, reviewer shell tool, gate
+override, configuration key or interactive menu was added, and no user checkout
+was altered to satisfy the revision gate. `L1` remains pending.
+
+### Mode boundary
+
+`--deep` declares **one** reviewer, `integrated`, on the **heavy** tier, and
+that single declaration is the whole topology: deep resolves no light and no
+medium tier at all. Its focus is the whole pull request as one change,
+correctness, API and data contracts, security, performance and resource
+lifetime and whole-change coherence together, including the interactions between
+them that no single-focus reviewer sees.
+
+Deep is the only mode declaring `holistic: true`, and two pieces of reviewer
+text read that flag rather than inferring intent from the reviewer count:
+
+- The instructions cast the reviewer as this pull request's only reviewer rather
+  than a specialist, add that no specialist covers any part of the change and
+  that consequences appearing only across the changed files are its own, and ask
+  it to say so **for the whole change** when nothing is supported, instead of
+  for an assigned focus.
+- The prompt heads the assignment `Assigned reviewer: integrated. You are this
+  review's only reviewer.` rather than `Assigned specialist: ...`.
+
+Nothing else about deep is special, and that is deliberate. Its findings policy
+is full's: the same severities, `minorCap` declared `Infinity`, so every
+substantiated P3 and nit is presented, `capped` stays empty and a duplicate of a
+presented minor finding stays an ordinary alias. Every evidence rule is shared
+code that never learned about deep: the marker contract and its unwrap, the
+exact-key check, the schema version and review-key binding, the citation, quote
+and changed-line gates, adjudication, deduplication, selection, retention and
+the publication gates. The adjudicator is still a separate zero-tool heavy
+session, so deep does not become one model judging its own candidates.
+
+Balanced remains the default when no mode flag is given, mode flags remain
+mutually exclusive, `--major-only` remains the quick alias, and quick, balanced
+and full are untouched.
+
+One refactor rode along, on green and in its own commit: `mode.specialists`
+became `mode.reviewers`, because deep's one reviewer is deliberately not a
+specialist. It is a pure rename across `modes.mjs`, `review.mjs`,
+`retention.mjs`, `retention-fixture.mjs` and `smoke-review.mjs`, with no
+declaration, tier, policy or consumer behaviour change.
+
+### Controlled evidence
+
+**This increment is not demonstrated yet.** The controlled suites use test
+doubles, and the section below is what they prove. The installed no-inference
+probe and the live review of this increment's own pull request are recorded
+after them; until those exist, deep mode is implemented, not delivered.
+
+Test-first: every assertion below was added before the implementation and failed
+on the missing `reviewModes.deep` export, `--deep` being rejected as an
+unsupported target argument, and the missing holistic wording. Setting deep's
+`holistic` to `false` still fails the reviewer-instruction assertions, so they
+test the flag rather than passing incidentally.
+
+All twelve controlled suites pass on this branch, and `git diff --check` is
+clean. They need no network and no inference:
+
+```sh
+for s in findings review selection retention preview publication publish-later \
+         checkout config context fixture target; do node scripts/smoke-$s.mjs; done
+git diff --check
+```
+
+New demonstrations, all without inference or network access:
+
+- Mode parsing: `--deep` alone, with `--all --comment`, with `--include-drafts`
+  and with `heavyModel=`/`heavyEffort=`; `--deep` rejected against `--quick`,
+  `--balanced`, `--full` and `--major-only`; `--deep --deep` rejected as a
+  duplicate; `--deep` rejected with `--capture-only` and with conflicting posting
+  flags; and `--deep ... lightModel=`/`mediumModel=` rejected as invalid review
+  settings, exactly as the other modes reject them.
+- Topology and tiers: deep resolves exactly one heavy reviewer named
+  `integrated`. An unconfigured tier falls back to the ambient assignment; a
+  configured light tier never reaches it; invocation flags win over saved
+  settings; and an unusable heavy model refuses the review with no substitution.
+  Its effective-assignment display reads `deep mode, 1 reviewer(s)`, carries the
+  uncapped findings-policy text, shows exactly one assignment line, and contains
+  no `[light]` or `[medium]` line.
+- Reviewer text: the deep instructions keep every boundary the other modes state
+  (untrusted data, the three confined tools, no repository-wide audit, citations
+  from bound context, no writes or commands) while dropping the specialist
+  framing, and the deep prompt names its one reviewer and carries the
+  whole-change focus. Quick, balanced and full still say `specialist` and still
+  scope a null result to the assigned focus.
+- A settled deep run through `executeReviewRun`: one specialist session plus one
+  adjudicator, both on the heavy tier, `M2 binding:` and `M2 evidence:` markers,
+  one accepted `nit` finding presented with `capped` empty, selection of it, and
+  a proposed body reading `Deep review: 1 selected validated finding(s)`.
+- Findings policy at unit level: two minor candidates from the single
+  `integrated` reviewer are both presented in declared severity order, nothing
+  is capped, and `formatFindings` labels the result `Deep review`. The same two
+  candidates are still admitted by no quick policy at all.
+- Retention: a deep record validates, and relabelling it `balanced` or `full` is
+  rejected as incomplete reviewer coverage, because one reviewer cannot satisfy
+  their topology; relabelled `quick` it is rejected for a severity outside that
+  policy.
+- The checkout gate refuses with deep's own label and fixing command
+  (`Deep review refused ...`, `rerun /pr-review 12 --deep`), on the same evidence
+  as quick, balanced and full.
 
 ## Exact next increment
 

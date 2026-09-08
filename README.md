@@ -167,7 +167,7 @@ and checked against actual usage. The parent model is unchanged.
 exclusive. The existing draft/closed overrides still apply to reviewing, not
 inline publication. Every mode accepts `--comment`, `--no-comment`, or neither;
 the posting flags conflict. Authorized selections can publish, as described
-below. `--deep` and `--verify` remain unsupported. Personal and
+below. `--verify` remains unsupported. Personal and
 explicitly trusted project configuration are applied; fallback models are not.
 
 Dispatch returns after acceptance so cancellation remains available during capture
@@ -343,6 +343,42 @@ output, and every check after the parse is unchanged. `F5` investigated whether 
 structured output instead and found it unusable on Copilot CLI 1.0.83; that
 evidence, this increment's boundary, and the exact list of what still fails whole
 are in [ROADMAP.md](ROADMAP.md).
+
+### Deep review mode (M2)
+
+```text
+/pr-review 123 --deep --no-comment
+/pr-review 123 --deep --no-comment --all
+```
+
+Deep replaces the parallel specialists with **one integrated heavy reviewer**
+that holds the whole pull request at once. Correctness, API and data contracts,
+security, performance and resource lifetime, and whole-change coherence are all
+its responsibility, and so are the consequences that appear only when the
+changed files are taken together. Deep is holistic review: it is not a larger
+parallel review, not a further specialist, and not a higher reasoning effort.
+
+The reviewer resolves the heavy tier through exactly the same layering as every
+other mode, so `heavyModel=` and `heavyEffort=` apply, and no light or medium
+tier is resolved at all. The `Effective reviewer assignments:` block names the
+integrated reviewer, its tier, model, effort and the origin of each value before
+anything starts. With one reviewer and the adjudicator, deep runs the fewest
+sessions of any mode on the same diff, and it is the least parallel: nothing
+overlaps with anything else.
+
+The deep findings policy presents **every substantiated severity**. Accepted P3
+and nit findings are all presented, nothing is withheld and `capped` stays
+empty, as in full. Minor findings still have to anchor on a line this diff
+changed and pass the same evidence gate, adjudication and deduplication.
+
+Everything else is unchanged from the parallel modes: the same revision gate,
+the same confined `view`/`grep`/`glob` reads, the same marker contract and
+unwrap on reviewer output, the same isolated adjudication in a separate
+zero-tool session rather than the reviewer judging its own candidates,
+incomplete-coverage reporting, selection, retention, publication gates and
+cancellation. The retained schema holds a deep record to deep's own topology, so
+a one-reviewer record cannot claim balanced or full coverage. Mode flags remain
+mutually exclusive, and balanced remains the default.
 
 ### Grounded findings and deduplication (Q4)
 
@@ -1057,8 +1093,8 @@ logging. An abruptly lost parent cannot receive a final report; there is no
 clean-review claim or publication. Normal SDK transcripts may persist, and
 forced termination does not guarantee a final transcript flush. The prototype
 can capture PRs, bind source context, resolve personal and explicitly trusted
-project configuration, run the quick, balanced and full specialists, and
-validate/deduplicate findings, but cannot execute project safeguards. It does not restrict or change the model of the surrounding Copilot session. The SDK may
+project configuration, run the quick, balanced and full specialists or
+deep's single integrated reviewer, and validate/deduplicate findings, but cannot execute project safeguards. It does not restrict or change the model of the surrounding Copilot session. The SDK may
 retain its own session transcripts; no plugin review archive is implemented.
 
 No upstream source has been copied. Source reuse/licensing assessment remains
