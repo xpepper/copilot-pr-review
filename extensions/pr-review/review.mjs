@@ -303,6 +303,7 @@ export async function executeReviewRun(parent, client, options, assignments, {
             JSON.stringify({
               reviewKey: boundary.key, binding,
               candidates: collected.candidates,
+              candidateDiagnostics: collected.diagnostics,
               untrustedDiff: target.snapshot.diff, untrustedContext: target.context.text,
             }),
           ].join("\n"),

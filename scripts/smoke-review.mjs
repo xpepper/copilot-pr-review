@@ -313,7 +313,7 @@ const checkoutGit = async (args, cwd, { signal } = {}) => {
 
 function harness({
   failure, fallbackFailure, controller = new AbortController(), withCandidate = false, acceptCandidate = false,
-  limitations = [], mode = reviewModes.quick, severity = "P2", candidateFrom = [0],
+  limitations = [], mode = reviewModes.quick, severity = "P2", candidateFrom = [0], clipQuotes = false,
 } = {}) {
   const messages = [];
   const sessions = [];
@@ -450,7 +450,7 @@ function harness({
             const input = JSON.parse(reviewer.prompt.split("\n").at(-1));
             const cite = (side) => ({
               path: "example.js", side, startLine: 1, endLine: 1,
-              quote: `export const value = ${side === "head" ? 2 : 1};`,
+              quote: `export const value = ${side === "head" ? 2 : 1};`.slice(0, clipQuotes ? -1 : undefined),
             });
             reviewer.emit("assistant.message", { content: i === 0 &&
                 ["reviewer", "tool-call", "usage", "missing-usage"].includes(failure) ? "partial candidate" : JSON.stringify({
@@ -460,7 +460,7 @@ function harness({
                   location: cite("head"), before: cite("base"), after: cite("head"),
                   // Unchanged code outside the only hunk: the shape Q5 exists for.
                   breaks: { path: "example.js", side: "head", startLine: 2, endLine: 2,
-                    quote: 'export const label = "fixture";' },
+                    quote: 'export const label = "fixture";'.slice(0, clipQuotes ? -1 : undefined) },
                   trigger: "Read value", expected: "1", actual: "2",
                   introduction: "The constant changed", evidence: [cite("base")],
                 }] : [],
@@ -954,6 +954,48 @@ for (const [flags, all] of ["--no-comment", "--comment", ""].flatMap((flag) => [
     h.messages.findIndex((m) => m.startsWith("Q3 evidence:")));
 }
 console.log("PASS quick selection/authority/preview consume final findings after cleanup, without rerunning inference");
+
+for (const acceptCandidate of [true, false]) {
+  const h = harness({ withCandidate: true, acceptCandidate, clipQuotes: true });
+  const report = await executeReviewRun(h.parent, h.client, parseReviewArgs("1 --quick --all --no-comment"),
+    structuredClone(assignments), { controller: h.controller, gh: fakeGh(), git: checkoutGit });
+  const input = JSON.parse(h.sessions.find((session) => session.validating).prompt.split("\n").at(-1));
+  const canonical = input.candidates[0];
+  const fields = ["location", "before", "after", "breaks", "evidence[0]"];
+  assert.equal(input.candidateDiagnostics.length, fields.length);
+  for (const field of fields) {
+    assert(input.candidateDiagnostics.some(({ message }) => message.includes(`in ${field} from bound source`)));
+  }
+  assert.equal(canonical.location.quote, "export const value = 2;");
+  assert.equal(canonical.breaks.quote, 'export const label = "fixture";');
+  assert.match(validationInstructions(quickMode.policy), /reject a claim that depends on the omitted text or whitespace being absent/);
+  assert.equal(report.complete, true);
+  assert.equal(report.validation.findings.length, acceptCandidate ? 1 : 0);
+  if (acceptCandidate) {
+    assert.equal(report.preview.status, "suppressed");
+    assert.equal(report.preview.request.payload.comments[0].line, 1);
+    assert.doesNotMatch(report.preview.request.payload.comments[0].body, /repaired|restored|citation/);
+  } else {
+    assert.equal(report.validation.rejected.length, 1, "Repair is not semantic acceptance");
+    assert.equal(report.selection.status, "empty");
+  }
+  const record = retainedRecord(report);
+  const directory = mkdtempSync(join(tmpdir(), "pr-review-q6-"));
+  try {
+    const workspacePath = join(directory, h.parent.sessionId);
+    mkdirSync(workspacePath);
+    const store = await sessionStore({
+      sessionId: h.parent.sessionId, rpc: { metadata: { snapshot: async () => ({
+        sessionId: h.parent.sessionId, workspacePath, isRemote: false, workingDirectory: directory,
+      }) } },
+    });
+    await store.write(record);
+    assert.deepEqual(await store.read(), record, "Canonical quotes and repair diagnostics survive reload");
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+}
+console.log("PASS repaired candidate citations reach adjudication, retain their diagnostics, and remain subject to rejection");
 
 const directory = mkdtempSync(join(tmpdir(), "pr-review-preview-"));
 try {

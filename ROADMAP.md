@@ -52,7 +52,7 @@ posting them.
 | C3 | Completed | A tier may carry one optional fallback assignment, used for one extra attempt for the one reviewer whose own execution failed. No timer, no whole-review restart, no silent substitution, and no cross-tier inheritance. Demonstrated by the twelve controlled suites, two installed no-inference probes, and the live balanced review of pull request #10, which cost 233.19659 credits, completed all six sessions and found one real documentation defect. No fallback attempt has run live. | C1, Q3; [Fallbacks/execution](SCOPE.md#models-configuration-and-execution) |
 | C4 | Completed | A tier whose resolved model supports no configurable reasoning effort resolves to no effort instead of inheriting one, so such a model can serve a tier; the same rule covers a tier's fallback model. An explicit effort is still validated and never silently lowered, and a capable model still inherits and is still refused. Demonstrated by the twelve controlled suites, two installed no-inference probes, and the live full review of pull request #11, which cost 269.135657 credits, reported incomplete coverage on three execution failures, and found one real defect in this increment's own display. | C1; [Configuration](SCOPE.md#models-configuration-and-execution) |
 | Q5 | Completed | A candidate anchored on a changed line carries an optional `breaks` citation for the code that change breaks, which may be unchanged, in another hunk, or in another changed file, and which passes the same bound, in-window, exact-quote checks as every other citation. A supplied introduction citation still belongs to the location's own hunk; a null one is now a claim the adjudicator tests. Demonstrated by the twelve controlled suites, the reconstructed rejections from pull requests #4, #5 and #10, and the live balanced review of pull request #12, which cost 137.274102 credits, saw a reviewer use the new citation, and found one real defect in this increment's adjudicator contract. | Q4; [Modes/findings](SCOPE.md#review-modes-and-findings) |
-| Q6 | Pending | A citation that differs from its bound source by a near-miss at either end of the quote stops silently discarding the whole finding. Pull request #11's only true finding was lost to two leading spaces, and pull request #12's to a trailing comma on the last line of a `breaks` citation. Weighed against pull request #4, where the same exact-match check stopped a 0.99-confidence fabrication whose claim was itself about whitespace. | Q5; [Modes/findings](SCOPE.md#review-modes-and-findings) |
+| Q6 | In progress | Candidate-only clipped-end quote repair restores exact bound source without dropping a named line. Controlled reconstructions of #11 and #12 reach adjudication; #4's inserted-space fabrication stays refused. Exact adjudicator/publication checks and both schema versions are unchanged. The increment's installed balanced review is still pending. | Q5; [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | C5 | Pending | A completed reviewer whose output the evidence boundary discards becomes eligible for its tier's one fallback attempt, as an empty response already is. Found by pull request #10's overview reviewer and discarded by the evidence boundary's same-hunk rule. Needs the user's go-ahead: it moves the retry decision across the evidence boundary. | C3, Q4; [Fallbacks/execution](SCOPE.md#models-configuration-and-execution) |
 | V1 | Pending | `--verify` enforces matching branch/SHA/cleanliness before reviewers and presents discovered existing commands for approval. | Q1; [Safeguards](SCOPE.md#optional-project-safeguards) |
 | V2 | Pending | Execute only approved existing safeguards with installed dependencies; show evidence and artifacts without autofix or checkout manipulation. | V1; [Safeguards](SCOPE.md#optional-project-safeguards) |
@@ -5517,22 +5517,18 @@ from inside the factory body.
 - **The published comment does not carry the citation**, so a reader on GitHub
   sees the broken code only insofar as the finding's prose names it.
 
-## Exact next increment
+## Increment in progress: Q6
 
-**`Q5` is complete.** A candidate anchored on a changed line carries an optional
-`breaks` citation for the code that change breaks, which may be unchanged, in
-another hunk, or in another changed file. A supplied introduction citation still
-belongs to the location's own hunk; a null one is now a claim the adjudicator
-tests rather than a code check about the whole hunk. Pull request #12's balanced
-review demonstrated it end to end, cost 137.274102 credits, watched a live
-reviewer use the new citation on the first try, and found one real defect in this
-increment's own adjudicator contract.
+**Implementation is on `q6-source-bound-quote-repair`, from `main` at
+`ba8f0fc`; the installed-plugin review is still pending.** Q5 is complete and
+its own-hunk, optional `breaks`, null-side claim and publication-body decisions
+stand. No C5 retry or reviewer-status change is included.
 
-**Take `Q6` next: stop discarding a whole finding over a near-miss quote.**
-`cite()` requires `source.lines.slice(startLine - 1, endLine).join("\n") !== quote`
-to be false, so a quote must match its bound source byte for byte. That check has
-now discarded two true findings and stopped one fabrication, and it is the only
-refusal still throwing away correct work:
+### Recorded refusals that motivated Q6
+
+Before Q6, a candidate's quote had to match its bound source byte for byte at
+ingestion or the whole candidate was discarded. This check discarded two true
+findings and stopped one fabrication:
 
 | Pull request | Candidate | Refusal | What it cost |
 | --- | --- | --- | --- |
@@ -5546,7 +5542,7 @@ refusal still throwing away correct work:
 | #12 | correctness:1 (P2, 0.88) | context-window match | true; fixed on the branch |
 
 The same-changed-hunk rows are `Q5`, and they are closed. Every remaining row is
-this one check. **Weigh it against its own counter-evidence before you touch it.**
+this one check, with counter-evidence that constrains the repair.
 On #11 the overview reviewer quoted `config.mjs` lines 223-224 correctly except
 that it dropped the two **leading** spaces of the first line, and the whole P3 was
 discarded. On #12 the `correctness` reviewer quoted eleven lines of `findings.mjs`
@@ -5557,18 +5553,75 @@ where the reviewer had **introduced a space into its own quote** and the claimed
 defect was about that space. Normalizing whitespace would have let that
 fabrication through to adjudication.
 
-So this is a real trade-off, not an oversight. **Keep exact matching as the
-acceptance path**, and treat a near-miss as something to report or repair from
-the cited line range. A repair that re-derives the quote from the bound source and
-line range, then requires the reviewer's quote to be a contiguous span of it,
-would have recovered #11 and #12 while still refusing #4, because #4's quote is
-not a span of anything in the source. Weigh its own cost before adopting it: a
-span rule lets a reviewer quote a fragment while naming a wider line range, so
-whatever survives has to keep the anchor honest. That is a design to evaluate,
-not a decision already taken; the acceptance criterion is that both recorded near-misses
-reach adjudication while the recorded fabrication still does not, reconstructed as
-controlled fixtures rather than trusted from this description. Note that a
-near-miss can now appear on any citation a candidate carries, including `breaks`.
+### Chosen boundary and its cost
+
+`cite()` remains exact-only. Candidate ingestion alone may repair a quote that
+is a contiguous span of the exact bound source range, has exactly the same
+number of physical lines, and has non-whitespace text on both boundary lines.
+The line-count constraint prevents a fragment on an unchanged line from claiming
+a wider range containing a changed line. Nothing searches outside the named
+range, moves an anchor, normalizes whitespace, inserts a reviewer-invented
+character, or joins disjoint spans. The restored full lines go through `cite()`
+before reaching the existing changed-line and same-hunk gates.
+
+The repair applies to every candidate citation, including `breaks`. An
+informational caveat records candidate ID, field, original citation and restored
+citation; the adjudicator receives those diagnostics alongside the canonical
+candidates. Claims are never rewritten, and the contract explicitly requires
+rejecting a claim that depends on omitted text or whitespace being absent.
+Adjudicator evidence and publication still call strict `cite()`, not repair.
+
+The cost is deliberate: a very short fragment, even punctuation, can be repaired
+on the physical line it actually names. That is no proof of a defect, and the
+adjudicator still has to disprove the whole claim against full source. Requiring
+word boundaries or permitting only whitespace clipping would miss #12's comma
+and mid-sentence quote. Unrestricted substring matching was rejected because it
+could discard whole lines and launder an anchor. Reporting without repairing was
+rejected because the acceptance criterion requires the findings to reach
+adjudication. Repair diagnostics duplicate source text in the adjudicator input
+and retained diagnostics; they can increase tokens and credits when triggered.
+
+No candidate-envelope or retained-record schema version changed; the factory
+probe's schema mirror therefore needs no edit. The published inline body is
+unchanged. F6's marker/fence parser, C5 eligibility and all runtime APIs are
+untouched. L1 remains pending; no upstream source was copied.
+
+### Controlled evidence at the implementation checkpoint
+
+All twelve recorded controlled suites passed before editing. After implementing,
+`smoke-findings`, `smoke-review`, `smoke-preview`, `smoke-retention` and
+`smoke-publish-later` pass; `git diff --check` passes.
+
+`scripts/q6-citation-fixture.mjs` reconstructs the original reviewer claims and
+source excerpts with relocated line numbers and self-contained synthetic diffs.
+It is not a full historical-review replay. Original outputs were recovered from
+the local reviewer sessions identified in that file, and the source excerpts
+were compared byte for byte with reviewed heads `03b7463` (#11), `5569605`
+(#12) and `ae2c55c` (#4), not guessed from this roadmap's prose.
+
+`smoke-findings.mjs` establishes that #11's location and after, and #12's breaks
+and evidence, are repaired and reach controlled adjudication, while #4's
+inserted-space fabrication never reaches it. It covers clipping either or both
+ends of every candidate citation, refused interior edits and omitted lines,
+unchanged-line and wrong-hunk refusals after repair, and exact-only adjudicator
+citations. `smoke-review.mjs` carries repaired quotes and original/restored
+diagnostics through the actual adjudicator prompt, selection, preview and a
+retained-record disk round trip. Scripted acceptance and rejection both work:
+repair does not decide the claim.
+
+The first disk-round-trip test failed because its synthetic session workspace
+did not have the session ID as basename; the fixture was corrected to obey the
+existing store guard, and the guard is unchanged.
+
+The installed review will explicitly use **balanced**, because Q6 adds no mode
+and balanced is the default topology. Exactly that one review is authorized;
+no further inference probe or rerun is authorized.
+
+## Exact next increment
+
+**Finish Q6's pull request and its one installed balanced review, save verbatim
+reviewer outputs before analysis, fix real findings, and record the outcome.**
+No next implementation is authorized after Q6. Ask the user before C5.
 
 **`C5` remains open, and still needs the user's go-ahead: eligibility for a
 discarded output.**
