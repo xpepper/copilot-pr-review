@@ -3850,8 +3850,12 @@ COPILOT_SDK_PATH="$(ls -d "$HOME"/.copilot/pkg/*/"$(copilot --version | sed -n '
 node scripts/smoke-factory.mjs
 
 # Adds the two structured-output subagents. Spends Copilot credits; it needs
-# explicit authorization in the session that runs it.
-PR_REVIEW_F5_MODEL=claude-sonnet-5 ... node scripts/smoke-factory.mjs --spend
+# explicit authorization in the session that runs it. Set the same two paths as
+# above, plus the model.
+PR_REVIEW_F5_MODEL=claude-sonnet-5 \
+COPILOT_CLI_PATH="$(command -v copilot)" \
+COPILOT_SDK_PATH="$(ls -d "$HOME"/.copilot/pkg/*/"$(copilot --version | sed -n 's/.*CLI \([0-9][0-9.]*[0-9]\).*/\1/p')"/copilot-sdk)" \
+node scripts/smoke-factory.mjs --spend
 ```
 
 The inference half ran once, on 2026-09-08, authorized in that session, against
@@ -4060,6 +4064,69 @@ reviewers to emit the envelope between two explicit markers and extracting
 between them. It needs no experimental API and is stronger than an unwrap, but
 it is a larger change to the reviewer contract than `F5` was asked to propose.
 
+### Pull request #6 and its review
+
+`F5` landed on branch `f5-structured-output-spike` and pull request #6. The
+installed plugin reviewed it once, in **balanced** mode, named explicitly rather
+than taken as the default: `F5` changes no mode, so the default topology is the
+right one to exercise, and quick would have dropped two specialists for no
+reason.
+
+```sh
+gh pr checkout 6
+copilot plugin install "$(pwd)"
+COPILOT_CLI_PATH="$(command -v copilot)" \
+COPILOT_SDK_PATH="$(ls -d "$HOME"/.copilot/pkg/*/"$(copilot --version | sed -n 's/.*CLI \([0-9][0-9.]*[0-9]\).*/\1/p')"/copilot-sdk)" \
+node scripts/dogfood-review.mjs 6 --balanced --all --no-comment
+```
+
+Reviewed head `2c725bd`, base `ccb0094`, three files, 848 additions and one
+deletion. Five reviewers plus one adjudicator, every tier from saved personal
+configuration:
+
+| Reviewer | Tier | Model | Effort | Outcome |
+| --- | --- | --- | --- | --- |
+| correctness | heavy | `gpt-5.6-terra` | high | invalid candidate output |
+| contracts | heavy | `gpt-5.6-terra` | high | completed |
+| security | heavy | `gpt-5.6-terra` | high | completed |
+| performance-resources | heavy | `gpt-5.6-terra` | high | no usable output |
+| overview | light | `gpt-5.6-luna` | high | completed |
+| evidence-validator | heavy | `gpt-5.6-terra` | high | completed |
+
+Coverage was **incomplete**, so this is not a clean-review claim. Reviewers made
+37 confined tool calls and 36 reads. Two reads were rejected by the permission
+handler, one from `correctness` and one from `performance-resources`; those are
+the first read denials any live review has produced, and they landed on the two
+reviewers that then failed. No tool denial occurred. Cost: **79.238565 credits**.
+Nothing was published.
+
+Two findings were validated, both P2, both real, and both fixed on the branch:
+
+- `overview:1`: the `--spend` reproduction command recorded above put a literal
+  `...` between the environment assignment and `node`, so a shell would try to
+  execute `...`. The command now sets both paths explicitly.
+- `contracts:2`: the increments table said `F5` was Completed while the "Exact
+  next increment" section still instructed the next agent to carry out `F5`. That
+  section is now rewritten.
+
+Nothing was rejected as a false positive. Four diagnostics kept coverage
+incomplete: `correctness`'s invalid output, `performance-resources`'s empty
+output, and two candidates rejected at the evidence boundary for citations that
+did not match a supplied context window, from `contracts` and `overview`. One
+coverage gap and two informational caveats recorded that the probe's live
+runtime results cannot be verified from the captured diff alone, which is
+accurate: they are reproducible only by running the probe.
+
+**One diagnostic is direct evidence about `F5`'s own recommendation.**
+`correctness` was discarded with `invalid candidate output: SyntaxError:
+Unexpected token 'I', "I'll trace"... is not valid JSON`. That is a GPT-family
+reviewer emitting prose before its JSON, not a fence. The narrowly specified
+fence unwrap this increment recommends would **not** have recovered it. So the
+fallback is narrower than the problem: it addresses the Claude-family fence seen
+on pull request #5 and leaves prose-prefixed output failing exactly as it does
+today. That strengthens the case for the marker-delimited variant noted above,
+and it is a fact the user should weigh when making the choice.
+
 ### Remaining limitations
 
 - Evidence is macOS arm64, Copilot CLI 1.0.83 and its bundled SDK, Node 26.1.0,
@@ -4073,101 +4140,60 @@ it is a larger change to the reviewer contract than `F5` was asked to propose.
 
 ## Exact next increment
 
-**`F5`: settle how reviewer output stops depending on a model family's
-willingness to emit bare JSON.** Pull request #5's review, recorded above,
-showed `claude-sonnet-5` wrapping its candidates in a ```` ```json ```` fence, so
-`envelope` rejected the whole output. Frame the defect correctly before working
-on it: it is **not** specific to full mode or the medium tier. The same parser
-handles specialist candidates and adjudicator decisions, so a Claude-family
-*heavy* tier would lose every reviewer's output and every adjudication decision
-too. Full mode only exposed it first, because the medium tier was the first place
-a Claude model was ever configured for a live run. Three separate instructions
-already tell the reviewer to return plain JSON with no markdown fences, and the
-model ignored all three, so strengthening the prompt is not a fix on its own.
+**The next step is a user decision, not an implementation.** `F5` is complete:
+it established that structured reviewer output is unusable on Copilot CLI
+1.0.83, and it recorded a recommendation. Do not repeat it, and do not relax
+`envelope` on your own authority.
 
-The user chose to research a structural answer before considering a parser
-change. **Do not relax `envelope` in this increment**, and do not migrate any
-reviewer to a new runtime surface in it either. `F5` produces evidence and a
-recommendation, nothing else.
+The recommendation is the narrow fence unwrap, recorded in full above with its
+cost against the `SCOPE.md` decision to drop malformed-output extraction. Pull
+request #6's own review then produced evidence that qualifies it: a GPT-family
+reviewer was discarded for emitting prose before its JSON, which a fence unwrap
+would not have recovered. So there are three options, and the user picks one:
 
-What is already known, from reading the installed SDK at `1.0.83`, and what still
-has to be demonstrated rather than inferred:
+1. **`F6`, the narrow fence unwrap.** Strip one opening fence and its matching
+   closing fence, only when they wrap the entire response. No prose stripping,
+   no substring search, no brace matching, no repair. Everything after the parse
+   is unchanged. It fixes the Claude-family fence and nothing else.
+2. **`F6`, marker-delimited reviewer output.** Ask reviewers to emit the
+   envelope between two explicit markers and extract between them, as the CLI
+   runtime's own `schema` implementation does. It needs no experimental API,
+   covers prose-prefixed output as well as fences, and is a larger change to the
+   reviewer contract than `F5` was asked to propose.
+3. **Change nothing.** Leave `envelope` strict, keep `README.md`'s
+   recommendation of GPT-family reviewer tiers, and treat a Claude-family tier
+   as unsupported until the runtime surface changes.
 
-- `SessionConfig` and `MessageOptions` carry **no** output-schema or
-  response-format option, so the stdio `createSession` path selected at `F3`
-  cannot constrain output today. Confirmed by reading `types.d.ts`.
-- The only structured-output surface is the experimental Agent Factories API:
-  `ctx.agent(prompt, options)` accepts `label`, `schema`, `model`, `agent`,
-  `reasoningEffort` and `contextTier`, and **with `schema` it resolves to the
-  parsed JSON value instead of the subagent's final text**. That would remove
-  the fence problem at its source. `SCOPE.md` permits experimental CLI APIs where
-  they are needed to deliver core behaviour.
-- Four things make that trade unclear, and `F5` exists to settle them:
-  1. **Tool confinement.** Reviewers depend on the `view`/`grep`/`glob` grant
-     confined to the verified checkout by a permission handler. Whether a
-     factory-owned subagent can be given exactly that grant, and nothing more, is
-     unknown. If it cannot, the option is dead: `R1` and `F4` are not negotiable.
-  2. **An implicit retry.** The documentation states a `schema` call retries once
-     on a parse or match failure, so it may spawn twice and both spawns count
-     toward `maxTotalSubagents`. That is an unrequested extra charge, and it sits
-     next to the settled decisions that there are no timeouts and that fallbacks
-     are explicit and bounded. Measure it; do not assume it is free.
-  3. **Failure semantics.** A failing subagent resolves to `null` rather than
-     throwing. Incomplete coverage must stay visible as incomplete; a `null` that
-     silently becomes an empty result would be exactly the clean-review claim this
-     project refuses to make.
-  4. **Code structure.** A factory `run` body is emitted verbatim into a
-     generated module, closes over nothing, and cannot use static imports. The
-     current orchestration spans `review.mjs`, `fixture.mjs`, `findings.mjs` and
-     others. Establish whether they are reachable by dynamic `await import(...)`
-     from that body before assuming a migration is even shaped like the current
-     code.
-- The schema subset is structural, not a validator: it ignores
-  `additionalProperties`, `pattern`, lengths, formats and numeric ranges. Every
-  existing exact-key, citation, quote and changed-line check therefore stays,
-  whatever `F5` concludes. Structured output would replace `JSON.parse`, not the
-  evidence boundary.
+Whichever is chosen is a behavioural change to `findings.mjs`, so it lands on its
+own branch and pull request and is reviewed with this plugin once, exactly like
+every other increment.
 
-Acceptance criteria:
+`M2`, deep mode, still depends on that decision. Deep uses one integrated heavy
+reviewer considering the whole pull request, with all substantiated severities,
+and rejects conflicting mode flags. Deep means holistic review, not a larger
+parallel one and not a fourth effort level. Building it first would add a fifth
+mode on top of an output path known to fail for a whole model family.
 
-- A small, reversible probe under `scripts/` demonstrates the answer to each of
-  the four questions above on this host, against a Claude-family model, because
-  that is the family that exposed the defect. Declarations and documentation are
-  not evidence; `AGENTS.md` requires demonstration.
-- The probe spends inference, so it needs **explicit authorization in that
-  session**. None carries over. Ask before running it, and say what it will cost.
-- `ROADMAP.md` records the outcome and a recommendation: adopt structured output
-  in a named follow-up increment, or fall back to the narrowly specified fence
-  unwrap, which strips one opening fence and its matching closing fence only when
-  they wrap the entire response and changes nothing else. If the recommendation
-  is the fallback, say plainly what it costs against the `SCOPE.md` decision to
-  drop malformed-output extraction, and leave the choice to the user.
-- No shipped behaviour changes in `F5`. `envelope` is untouched, no reviewer
-  moves, no mode changes, no configuration key, no fallback, no timeout, no
-  safeguard, no reviewer shell tool and no gate override. Keep `L1` pending and
-  copy no upstream source.
-- The increment still lands on its own branch and pull request and is reviewed
-  with this plugin once, because it changes `scripts/`. That review is authorized
-  by the workflow; nothing else that spends credits is.
+Until the decision lands, `--full` remains usable but wasteful with a
+Claude-family medium tier, and `README.md` says so. Prefer GPT-family models for
+reviewer tiers.
 
-`M2`, deep mode, now depends on `F5`. Deep uses one integrated heavy reviewer
-considering the whole pull request, with all substantiated severities, and
-rejects conflicting mode flags. Deep means holistic review, not a larger parallel
-one and not a fourth effort level. Building it before `F5` would add a fifth mode
-on top of an output path that is known to fail for a whole model family.
+Do not revisit the Agent Factories surface without new information from GitHub.
+Three separate blockers were demonstrated on CLI 1.0.83, and all three would
+have to change: the feature flag, the extension-only factory registration, and
+the confined tool grant that leaks `skill` and `sql`. A new CLI version is new
+information; a new reading of the same documentation is not.
 
-Until `F5` lands, `--full` remains usable but wasteful with a Claude-family
-medium tier, and `README.md` says so. Prefer GPT-family models for reviewer
-tiers.
-
-Two older observations remain open and separately authorizable. No review of any
-mode has run against a substantial code diff, so review quality is still
+Three older observations remain open and separately authorizable. No review of
+any mode has run against a substantial code diff, so review quality is still
 undemonstrated; every live run so far reviewed this project's own
-documentation-heavy pull requests. And the changed-line anchoring rule has now
-twice discarded a true finding whose citations were merely mis-anchored, on pull
-requests #4 and #5; a later increment should decide how a candidate can anchor on
-the changed line that causes a breakage while citing the unchanged line it
-breaks.
+documentation-heavy pull requests. The changed-line anchoring rule has now
+discarded true findings on pull requests #4 and #5, and rejected two more
+candidates for mis-anchored citations on #6; a later increment should decide how
+a candidate can anchor on the changed line that causes a breakage while citing
+the unchanged line it breaks. And pull request #6 produced the first live read
+denials, on the two reviewers that then failed; whether a rejected read derails a
+reviewer is worth a look before the next live run.
 
 Keep `L1` pending and copy no upstream source. Land every increment on its own
 branch and pull request, review that pull request with this plugin before asking
