@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { assertReviewableCheckout } from "./checkout.mjs";
+import { assertReviewableCheckout, verifyFlag } from "./checkout.mjs";
 import {
   ambientAssignment, describeFallback, describeTier, requireUsableProject, resolveFallback, resolveTier,
   resolvedAssignment,
@@ -28,7 +28,7 @@ export function parseReviewArgs(args) {
   for (const token of tokens) {
     if (seen.has(token)) throw new Error(`Duplicate review argument: ${token}`);
     seen.add(token);
-    if ([...modeFlags, captureOnlyFlag, "--comment", "--no-comment", "--all"].includes(token)) continue;
+    if ([...modeFlags, captureOnlyFlag, verifyFlag, "--comment", "--no-comment", "--all"].includes(token)) continue;
     if (token.includes("=")) {
       const [key, value, extra] = token.split("=");
       if (!settingKeys.includes(key) || !value || extra !== undefined || key in settings) {
@@ -48,19 +48,23 @@ export function parseReviewArgs(args) {
   // Capture-only is the diagnostic path that stops after the bound snapshot, so
   // it takes no mode, posting, selection or model argument of its own.
   if (seen.has(captureOnlyFlag)) {
-    const conflicting = [...chosen, ...["--comment", "--no-comment", "--all"].filter((flag) => seen.has(flag)),
+    const conflicting = [...chosen, ...["--comment", "--no-comment", "--all", verifyFlag].filter((flag) => seen.has(flag)),
       ...Object.keys(settings)];
     if (conflicting.length) {
       throw new Error(`${captureOnlyFlag} captures the target without reviewing it, ` +
         `so it cannot be combined with ${conflicting.join(", ")}.`);
     }
-    return { mode: undefined, captureOnly: true, captureArgs, settings, all: false, comment: false, noComment: false };
+    return { mode: undefined, captureOnly: true, captureArgs, settings,
+      all: false, comment: false, noComment: false, verify: false };
   }
   const mode = chosen.length ? modeForFlag(chosen[0]) : reviewMode(defaultModeId);
   const { policy } = postingAuthority({ comment: seen.has("--comment"), noComment: seen.has("--no-comment") });
   return {
     mode: mode.id, captureOnly: false, captureArgs, settings,
     all: seen.has("--all"), comment: policy.comment, noComment: policy.noComment,
+    // Verification opts the run into the stricter checkout profile. It selects a
+    // gate, never a mode or a posting authority, so it constrains no other option.
+    verify: seen.has(verifyFlag),
   };
 }
 

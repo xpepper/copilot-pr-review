@@ -33,11 +33,12 @@ const fullMode = reviewModes.full;
 const deepMode = reviewModes.deep;
 const options = parseReviewArgs("1 --quick --no-comment");
 assert.deepEqual(options, { mode: "quick", captureOnly: false, captureArgs: "1", settings: {},
-  all: false, comment: false, noComment: true });
+  all: false, comment: false, noComment: true, verify: false });
 assert.deepEqual(parseReviewArgs("  1 --major-only --no-comment  "), options);
 assert.deepEqual(parseReviewArgs("2 --quick --no-comment --include-drafts heavyModel=other heavyEffort=low"),
   { mode: "quick", captureOnly: false, captureArgs: "2 --include-drafts",
-    settings: { heavyModel: "other", heavyEffort: "low" }, all: false, comment: false, noComment: true });
+    settings: { heavyModel: "other", heavyEffort: "low" }, all: false, comment: false, noComment: true,
+    verify: false });
 assert.deepEqual(parseReviewArgs("1 --major-only --all --no-comment"), { ...options, all: true });
 assert.deepEqual(parseReviewArgs("1 --quick"), { ...options, noComment: false });
 assert.deepEqual(parseReviewArgs("1 --quick --all --comment"), { ...options, all: true, comment: true, noComment: false });
@@ -60,15 +61,29 @@ assert.deepEqual(parseReviewArgs("1 --deep --all --comment"),
 assert.equal(parseReviewArgs("2 --deep --no-comment --include-drafts").captureArgs, "2 --include-drafts");
 assert.deepEqual(parseReviewArgs("1 --deep --no-comment heavyModel=other heavyEffort=low"),
   { ...options, mode: "deep", settings: { heavyModel: "other", heavyEffort: "low" } });
+// V1a: --verify opts a run into the stricter preflight. It is orthogonal to the
+// mode and posting flags, changes no other parsed option, and runs nothing: the
+// flag decides which checkout profile the gate applies, and nothing else.
+assert.deepEqual(parseReviewArgs("1 --quick --no-comment --verify"), { ...options, verify: true });
+assert.deepEqual(parseReviewArgs("1 --verify"), { ...balancedOptions, noComment: false, verify: true });
+assert.deepEqual(parseReviewArgs("1 --deep --verify --all --comment"),
+  { ...options, mode: "deep", all: true, comment: true, noComment: false, verify: true });
+assert.deepEqual(parseReviewArgs("2 --full --verify --no-comment --include-drafts"),
+  { ...options, mode: "full", captureArgs: "2 --include-drafts", verify: true });
+// The flag reaches the review, never target capture: the captured target is the
+// same one an ordinary review of that PR captures.
+assert.equal(parseReviewArgs("2 --verify --include-drafts").captureArgs, "2 --include-drafts");
+assert.throws(() => parseTargetArgs("2 --verify"), /Unsupported/);
+
 // Capture-only keeps the diagnostic capture path reachable without a reviewer.
 assert.deepEqual(parseReviewArgs("1 --capture-only"), { mode: undefined, captureOnly: true, captureArgs: "1",
-  settings: {}, all: false, comment: false, noComment: false });
+  settings: {}, all: false, comment: false, noComment: false, verify: false });
 assert.equal(parseReviewArgs("2 --capture-only --include-drafts").captureArgs, "2 --include-drafts");
 for (const args of [
   "1 --quick --major-only --no-comment", "1 --quick --balanced --no-comment", "1 --balanced --major-only",
   "1 --quick --quick --no-comment", "1 --quick --no-comment --no-comment",
   "1 --quick --no-comment --comment", "1 --balanced --no-comment --comment",
-  "1 --quick --no-comment --verify", "1 --quick --no-comment --all --all",
+  "1 --quick --no-comment --verify --verify", "1 --quick --no-comment --all --all",
   "1 --quick --no-comment heavyModel=", "1 --quick --no-comment heavyEffort=low=high",
   "1 --quick --no-comment heavyModel=heavy heavyModel=other",
   "1 --quick --no-comment lightModel=other", "0 --quick --no-comment",
@@ -80,7 +95,7 @@ for (const args of [
   "1 --deep --no-comment lightModel=other", "1 --deep --no-comment mediumModel=other",
   "1 --capture-only --deep",
   "1 --capture-only --quick", "1 --capture-only --balanced", "1 --capture-only --full",
-  "1 --capture-only --all",
+  "1 --capture-only --all", "1 --capture-only --verify", "1 --verify --capture-only",
   "1 --capture-only --no-comment", "1 --capture-only heavyModel=heavy", "1 --capture-only --capture-only",
 ]) assert.throws(() => parseReviewArgs(args),
   /mutually exclusive|Duplicate|Invalid|Unsupported|integer|Conflicting|cannot be combined/, args);

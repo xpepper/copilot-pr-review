@@ -7,6 +7,11 @@ import { reviewModes } from "./modes.mjs";
 const execute = promisify(execFile);
 const shaPattern = /^[0-9a-f]{40}$/;
 
+// Verification opts a run into a stricter profile of the same gate. The flag is
+// declared beside the gate it selects, so the parser and the checkout agree on
+// what it means: a checkout safeguards could run in, not a review mode.
+export const verifyFlag = "--verify";
+
 export async function runGit(args, cwd, { signal } = {}) {
   signal?.throwIfAborted();
   if (typeof cwd !== "string" || !isAbsolute(cwd)) {
