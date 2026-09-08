@@ -750,6 +750,12 @@ assert.match(unshared.result.diagnostics.at(-1).message, /shared changed-source 
 assert.match(candidateFormat(policy), /"breaks"/);
 assert.match(candidateFormat(policy), /anchor the location on the changed code/i);
 assert.match(validationInstructions(policy), /breaks/);
+// The relaxed null introduction side moved a deterministic check onto the
+// adjudicator, so the adjudicator has to be told that it is a claim to test.
+// The live balanced review of pull request #12 found it missing.
+assert.match(validationInstructions(policy), /A null before claims this change removed nothing/);
+assert.match(validationInstructions(policy), /reject a replacement presented as a pure addition or deletion/);
+assert.match(validationInstructions(policy), /EVERY assertion the candidate makes is supported, in its prose and in its citations alike/);
 console.log("PASS Q5: a changed-line anchor can cite the code it breaks, and every citation refusal still fires");
 console.log("PASS strict candidates, exact provenance/changed lines, confidence/severity, and fail-closed malformed output");
 console.log("PASS mocked semantic rejection/uncertainty, explicit same-defect deduplication, distinct same-line issues and degraded retention");
