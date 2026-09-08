@@ -26,11 +26,9 @@ before you start.
 
 ## Recorded state
 
-- **Check whether pull request #11 has been merged before you branch.** It
-  completed `C4` and was left open for the user to merge. If it is merged, start
-  from a clean `main`; if it is not, do **not** continue working on its branch
-  `c4-no-configurable-effort` and do not open a second increment on top of it
-  without asking. Nothing should be uncommitted either way.
+- **You are starting on a clean `main` with no increment in flight.** `main` is
+  the squash merge of pull request #11, which completed `C4`. Nothing should be
+  uncommitted and no increment branch should be open. Branch from `main`.
 - Pull requests #3, #4 and #5 delivered `M1`, #6 delivered `F5`, #7 delivered
   `F6`, #8 delivered `M2`, #10 delivered `C3`, #11 delivered `C4`. Read
   `git log` and the pull requests rather than looking for hashes from them:
@@ -38,9 +36,9 @@ before you start.
   `main`.
 - Pull requests #1 and #2 are synthetic publication playgrounds from P4 and P5.
   **Never merge them**, and never republish to them.
-- `M1`, `F5`, `F6`, `M2`, `C3` and `C4` are Completed. **`C5` is the next
-  increment and it needs the user's explicit go-ahead before you start it.**
-  `L1` stays pending.
+- `M1`, `F5`, `F6`, `M2`, `C3` and `C4` are Completed. **`Q5` is the next
+  increment**, chosen by the user on 2026-09-08 over `C5`, which stays open and
+  still needs their go-ahead. `Q6` follows `Q5`. `L1` stays pending.
 - Eight live reviews of this repository's own pull requests exist: #3 and #4
   balanced, #5 full, #6 balanced, #7 full, #8 deep, #10 balanced, #11 full. All
   eight are spent. **Any review you run needs its own authorization; none of
@@ -106,12 +104,12 @@ The full review cost 269.135657 credits, ran six reviewers across three model
 families plus the adjudicator, and reported **incomplete** coverage on three
 execution failures. Four things in it matter to you.
 
-- **The one real defect was discarded by the changed-line anchoring rule**, for
-  the fourth time on this project and the second time in a row on the overview
-  reviewer's finding. It was recovered by reading the raw timeline, not from the
-  review's own output. Save the verbatim reviewer output before you analyse
-  anything; that is now twice that this step was the only way a true finding
-  survived.
+- **The one real defect was discarded by the evidence boundary**, for the fourth
+  time on this project and the second time in a row on the overview reviewer's
+  finding. Its quote was right except for two leading spaces, which is `Q6`. It
+  was recovered by reading the raw timeline, not from the review's own output.
+  Save the verbatim reviewer output before you analyse anything; that is now
+  twice that this step was the only way a true finding survived.
 - **A reviewer settled `completed` having emitted no envelope at all.**
   `correctness` returned one sentence of thinking-style prose. This is the `C5`
   case, not an `F6` unwrap failure: there was no envelope to unwrap, so it is not
@@ -125,26 +123,53 @@ execution failures. Four things in it matter to you.
   requested path with `realpathSync` and rejects anything that throws, so a path
   that simply **does not exist** is refused exactly like one outside the reviewed
   checkout. Both denied reviewers had asked for a path that does not exist. It is
-  recorded in `ROADMAP.md` as a candidate increment after `C5`. It moves a
+  recorded in `ROADMAP.md` as an open observation, not an increment. It moves a
   confinement boundary, so it needs its own increment and its own review, and the
   safe direction is that an absent path stays refused with an accurate reason.
 
-## The next increment: `C5`, and ask first
+## The next increment: `Q5`
 
-**Do not start `C5` without the user's explicit go-ahead.** `ROADMAP.md`'s "Exact
-next increment" section states it in full.
+**Implement `Q5`, and only `Q5`, unless the user says otherwise.**
+`ROADMAP.md`'s "Exact next increment" section states it in full, with the table
+of every true finding the evidence boundary has discarded and which refusal did
+it. Read that table before you touch `findings.mjs`.
 
-A reviewer whose output the evidence boundary cannot parse settles as
-`completed`, so it never becomes eligible for its tier's one fallback attempt,
-while a reviewer that returns nothing does. Five of this project's eight live
-reviews were incomplete for exactly that reason. It is a product decision as much
-as a change: the retry decision has to move across the evidence boundary,
-`completed` changes meaning for every mode whether or not a fallback is
-configured, and a second reviewer run costs real credits.
+A candidate anchored on a changed line must be able to cite the code that change
+breaks, including unchanged code and code in another hunk. Today
+`candidate()` requires one hunk to contain the location **and** both introduction
+citations, so the common shape "this changed line breaks that other code" cannot
+be expressed at all. That single rule has discarded three true findings, on pull
+requests #4, #5 and #10, including the best finding in #10's review.
 
-If the user declines `C5`, the other open items in that section are the
-changed-line anchoring rule, the read-denial reason above, `V1`/`V2` safeguards,
-and `D1` documentation. Ask which; do not pick one silently.
+**Do not call this "the anchoring rule" and fix both gates at once.** Two
+different refusals in `findings.mjs` have each discarded a true finding, and only
+the first is `Q5`:
+
+- `Q5`: "Introduction citations and location must identify the same changed
+  hunk", which cost #4, #5 and #10.
+- `Q6`: "Citation does not exactly match a supplied context window", which cost
+  #11, where the quote was right except for two leading spaces on its first line.
+  **`Q6` has real counter-evidence**: on #4 that same check stopped a
+  0.99-confidence fabrication whose claimed defect was itself about a space the
+  reviewer had invented in its own quote. Keep exact matching as the acceptance
+  path; report or repair a near-miss from the cited line range rather than
+  relaxing the comparison. Do not fold `Q6` into `Q5`.
+
+The acceptance criterion for `Q5`: a candidate anchored on a changed line can
+cite the code that change breaks and reach adjudication, while every refusal that
+stops an unbound, out-of-window or fabricated citation still fires unchanged.
+Reconstruct the three recorded rejections as controlled fixtures rather than
+trusting a prose description of them. A candidate envelope change touches the
+reviewer prompt, the adjudicator instructions, `findings.mjs` and
+`retention.mjs` together; **ask the user before changing the retained record's
+schema version**, which tracks publication authority rather than candidate shape.
+
+`C5` remains open and still needs the user's explicit go-ahead. A reviewer whose
+output the evidence boundary cannot parse settles as `completed`, so it never
+becomes eligible for its tier's one fallback attempt, while a reviewer that
+returns nothing does. Five of this project's eight live reviews were incomplete
+for exactly that reason. Do not start it, and do not fold any part of it into
+`Q5`.
 
 Keep the evidence boundary exactly as it is, keep `L1` pending, copy no upstream
 source, and update `README.md` if the change is user-visible.
@@ -267,13 +292,14 @@ tool; never weaken a gate to make the run pass.
 - Cold `session.resume` of retained command-only records remains unsupported.
   Do not invent transcript recovery. The adjudicator remains zero-tool and
   citations remain restricted to captured diff/context evidence.
-- Four older observations remain open and separately authorizable. The oldest is
-  still the largest: **no review of any mode has ever run against a substantial
-  code diff**, and pull request #10 is still the closest at 984 additions over 12
-  files. The changed-line anchoring rule has now discarded four true findings.
-  Read denials have landed on the failing reviewers on two of eight reviews, with
-  the mechanism identified above. And a reviewer can settle `completed` having
-  produced no envelope at all, which is the `C5` case.
+- Older observations are listed in `ROADMAP.md` with their current status. The
+  oldest is still the largest and still open: **no review of any mode has ever run
+  against a substantial code diff**, and pull request #10 is still the closest at
+  984 additions over 12 files. The four discarded true findings are now `Q5` and
+  `Q6`. Read denials have landed on the failing reviewers on two of eight
+  reviews, with the mechanism identified above, and that one is still an
+  observation rather than an increment. A reviewer settling `completed` having
+  produced no envelope at all is the `C5` case.
 - Two sessions once worked on the same branch at the same time, and the second
   wrote a handoff from a stale premise. If that happens again, rebase rather
   than force-push, and say so in your report.
