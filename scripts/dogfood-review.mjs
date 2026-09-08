@@ -11,6 +11,7 @@ import { realpathSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { runGit } from "../extensions/pr-review/checkout.mjs";
+import { reviewModes } from "../extensions/pr-review/modes.mjs";
 import { runGh } from "../extensions/pr-review/target.mjs";
 
 const sdkPath = process.env.COPILOT_SDK_PATH;
@@ -58,13 +59,18 @@ try {
   assert.equal(extension?.status, "running", "Install the current checkout before reviewing with it");
   console.log(`Running: ${extension.id}`);
 
+  // Each mode labels its evidence with its own increment prefix, so the prefixes
+  // are derived from the modes themselves: a hardcoded list silently waits for
+  // an evidence line a newly added mode never emits.
+  const evidencePrefixes = [...new Set(Object.values(reviewModes)
+    .map((mode) => `${mode.evidencePrefix} evidence: `))];
   const review = Promise.withResolvers();
   const settled = Promise.withResolvers();
   const unsubscribe = session.on((event) => {
     if (!["session.info", "session.error"].includes(event.type)) return;
     const message = event.data.message;
     console.log(message);
-    for (const prefix of ["Q3 evidence: ", "M1 evidence: "]) {
+    for (const prefix of evidencePrefixes) {
       if (message.startsWith(prefix)) review.resolve(JSON.parse(message.slice(prefix.length)));
     }
     if (message.startsWith("P2 evidence: ")) settled.resolve();
