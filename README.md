@@ -168,7 +168,8 @@ and checked against actual usage. The parent model is unchanged.
 exclusive. The existing draft/closed overrides still apply to reviewing, not
 inline publication. Every mode accepts `--comment`, `--no-comment`, or neither;
 the posting flags conflict. Authorized selections can publish, as described
-below. `--verify` remains unsupported. Personal and
+below. `--verify` opts into a stricter preflight, described under its own
+heading below; it executes nothing. Personal and
 explicitly trusted project configuration are applied; fallback models are not.
 
 Dispatch returns after acceptance so cancellation remains available during capture
@@ -192,7 +193,9 @@ the following hold:
 - the PR head has not moved since capture;
 - no tracked file is modified or staged.
 
-Untracked files are reported as a warning, not a refusal. There is no override
+Untracked files are reported as a warning, not a refusal. A `--verify` run adds
+two more conditions to this same gate, described under "The verification
+preflight" below. There is no override
 flag and no degraded diff-only fallback: a refused review reports
 `coverage: "not-started"`, `disposition: "refused"`, starts no reviewer session
 and no owned runtime, and tells you to run `gh pr checkout NUMBER` (and, for a
@@ -269,6 +272,57 @@ not part of the retained inspection record.
 Manual cancellation stops owned work without a review timeout; a pending host
 confirmation UI may remain visible, but a late answer cannot resume cancelled
 capture.
+
+### The verification preflight (V1a)
+
+```text
+/pr-review 123 --verify --no-comment
+/pr-review 123 --deep --verify --all --no-comment
+```
+
+`--verify` is the opt-in for running this project's existing safeguards, such as
+its tests, compilation or linting, so that a reviewer's claims can be grounded
+in evidence rather than reading alone. **Nothing is executed yet.** This first
+slice is only the flag and the gate that a verification-enabled run must pass:
+no safeguard is discovered, none is presented for approval, none is run, and no
+reviewer receives safeguard output. A run that passes the preflight is an
+ordinary review of whichever mode it selected, and the timeline says so in
+those words, so the flag can never be mistaken for evidence that something
+verified the change.
+
+The preflight is the same revision gate every review already passes, with two
+conditions added:
+
+- the current branch is the pull request's head branch, so a detached `HEAD` at
+  the reviewed commit is refused even though the revision is right;
+- no path in the checkout is untracked.
+
+Both exist because safeguards would run commands in this checkout. Artifacts a
+test run leaves behind could not afterwards be told apart from files that were
+already lying there, and a detached `HEAD` is the reviewed revision without
+being a branch anything can land on. Ignored paths are not untracked files, so
+an ordinary working checkout with its dependencies and build output installed
+still passes. An untracked path warns during an ordinary review, exactly as it
+always has, and refuses only under `--verify`.
+
+A refusal names the flag that applied it, so a checkout that is perfectly
+reviewable without `--verify` does not look broken, and it repeats the flag in
+the command it suggests. Nothing is ever repaired automatically: the gate does
+not switch branches, pull, stash or clean, and the untracked refusal says to
+remove or ignore those paths yourself. A refused verification run reports
+`coverage: "not-started"` and `disposition: "refused"`, starts no reviewer
+session and no owned runtime, and spends nothing.
+
+`--verify` is orthogonal to the mode flags and to the posting flags. It cannot
+be combined with `--capture-only`, which stops before any reviewer and so
+reaches no preflight. It is deliberately not a configuration key: no saved
+personal setting and no trusted project file can turn verification on, which
+keeps the decision to run a repository's own commands an explicit one, made at
+the invocation. Posting authority grants nothing here either, and will not
+grant command approval when that part exists.
+
+Discovering safeguards, presenting the exact commands, obtaining approval and
+executing them are separate work that has not started.
 
 ### Balanced review mode (M1)
 

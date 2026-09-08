@@ -6301,90 +6301,165 @@ COPILOT_SDK_PATH="$(ls -d "$HOME"/.copilot/pkg/*/"$(copilot --version \
 node scripts/smoke-reviewer-tools.mjs
 ```
 
+## Completed increment: V1a
+
+**`V1a` adds `--verify` and the preflight a verification-enabled run must pass,
+and deliberately executes nothing.** It is the first slice of `V1`, the opt-in
+project safeguards in `SCOPE.md`. The boundary was discussed and approved before
+any code was written, as `C5`'s and `Q7`'s were.
+
+No safeguard is discovered, none is presented, none is approved, and none is
+run. No reviewer receives safeguard output, and no reviewer's input changes at
+all: the system message and prompts of a verification-enabled run are exactly an
+ordinary review's, which `scripts/smoke-review.mjs` asserts directly. A run that
+passes the preflight is an ordinary review of its selected mode, and it says so
+in the timeline in those words, because a flag named `--verify` must never be
+readable as evidence that something verified the change.
+
+### The five choices settled before implementation
+
+| Choice | Settled as | Why |
+|---|---|---|
+| Untracked files | Refuse, under `--verify` only | Safeguards write artifacts into the checkout; afterwards nothing can tell those apart from files that were already there. Ordinary review still warns. |
+| Branch identity | Refuse a detached `HEAD` and any branch other than the captured head ref | `SCOPE.md` requires the current branch to match. A detached `HEAD` is the reviewed revision without being a branch anything can land on. |
+| Where the gate lives | One gate, stricter profile | A single place decides whether a checkout may be used at all. The ordinary profile runs exactly the commands it ran before. |
+| Flag interactions | Orthogonal to mode and posting flags; refused with `--capture-only`; not a configuration key | Capture-only starts no reviewer and reaches no preflight. Keeping it off the configuration keys means no saved or trusted-project setting can turn verification on. |
+| A passing preflight | An ordinary review, stated plainly in the run | With nothing to discover, the only risk is that the flag reads as evidence. The run denies it explicitly. |
+
+`SCOPE.md`'s third condition, a clean working tree, and its head-SHA condition
+were already enforced for every review, which is why this slice is an addition
+to an existing gate rather than a new one.
+
+### What the gate does
+
+`assertReviewableCheckout` takes a `verify` flag. When it is set, and only then,
+it asks `git symbolic-ref --quiet --short HEAD` for the current branch and
+compares it to `snapshot.pull.head.ref`, and it refuses on any untracked path.
+The order narrows from identity to cleanliness: repository, head SHA, branch,
+tracked-file cleanliness, untracked paths, remote head. A modified tracked file
+therefore still outranks an untracked one.
+
+Three no-inference facts this increment established, all reproduced locally:
+
+- `git symbolic-ref --quiet --short HEAD` prints the branch when attached and
+  exits non-zero with empty output when detached, so it answers the question
+  directly. `rev-parse --abbrev-ref HEAD` answers `HEAD` in both the detached
+  case and, in principle, for a branch of that name; git refuses to create such
+  a branch, but `symbolic-ref` needs no such argument to be correct.
+- `git status --porcelain=v1 --untracked-files=normal`, which the gate already
+  ran, never lists ignored paths. An ordinary working checkout with its
+  dependencies and build output installed passes the untracked condition.
+- `gh pr checkout NUMBER` names the local branch after the head branch by
+  documented default, including for a fork, so the ordinary workflow satisfies
+  the branch condition. Its `--detach` and `--branch` options do not, by design.
+
+**No retained-record schema changed and no version was bumped.** `retainedRecord`
+picks a fixed outcome key list that does not include `verify`, so the flag stays
+out of the record; `scripts/smoke-review.mjs` asserts that it does. It appears in
+the run's logged evidence JSON and in the `R1 checkout:` line. The record's
+version tracks publication authority, and verification changes none: it decides
+whether a review may start, not what may be published.
+
+### Validation
+
+The twelve controlled suites pass, as they did at each checkpoint, and
+`git diff --check` is clean. Tests were written first and confirmed red for the
+right reason at each of the three implementation commits.
+
+`scripts/smoke-checkout.mjs` drives the profile against real throwaway git
+checkouts: a clean checkout on the head branch passes and reports its branch; a
+detached `HEAD` at the reviewed commit refuses verification **and still passes
+an ordinary review**; a differently named branch at the reviewed commit refuses;
+an untracked file refuses verification while an ordinary review still only
+warns; an ignored path does not refuse; and a modified tracked file still
+refuses first. It also asserts the checkout is byte-identical after each
+refusal, so the gate demonstrably switches, stashes and cleans nothing.
+
+`scripts/smoke-review.mjs` covers the run: the flag parses and is orthogonal to
+every mode and posting flag, `--capture-only` refuses it, each of the three new
+refusals stops the run with `coverage: "not-started"` and zero reviewer sessions
+while the same checkout still passes an ordinary review, and a passing preflight
+starts the mode's reviewers, logs the branch it confirmed, and states that no
+safeguard ran.
+
+`scripts/smoke-reviewer-tools.mjs` was not run and was not required: `V1a` does
+not touch `read-only.mjs`.
+
+### Remaining limitations
+
+- **A branch name is not a lineage.** The gate proves the current branch carries
+  the pull request's head branch name, not that it is that branch. Head SHA
+  identity is what actually binds the revision, and it was already enforced.
+- **A `gh pr checkout --detach` or `--branch other-name` workflow is refused**
+  under `--verify`, and correctly so, but it is a real friction for anyone who
+  uses one. The message names both the expected and the current branch.
+- **Nothing about safeguard execution is demonstrated, because nothing executes.**
+  The flag's whole purpose is still ahead of it.
+- The branch and untracked conditions have no live evidence of refusing a real
+  reviewer run, beyond the installed-plugin dispatch recorded below.
+
 ## Exact next increment
 
-**`C5` is complete and merged from pull request #14.** Its one authorized
-installed review ran in balanced mode, cost 110.736851 credits and is recorded
-above. That authorization is spent: do not rerun it. Nothing about `C5` should
-be redone or widened; the four choices recorded in its table are settled.
+**`V1a` is complete on its own branch and pull request, recorded above.** Its
+boundary was approved before implementation, and it deliberately executes
+nothing. The five choices recorded in its table are settled; do not reopen them
+and do not widen the flag.
 
-**`Q7` is complete on its own branch and pull request, recorded above.** Its
-boundary was approved before implementation, and the confinement defect it found
-was folded in on the user's explicit instruction rather than scheduled
-separately.
+**`Q7` and `C5` are complete and merged, from pull requests #15 and #14.** Their
+authorizations are spent. Nothing about either should be redone or widened.
 
-### The next increment is `V1a`: the verification preflight gate
+### The next increment is `V1b`: safeguard discovery and presentation
 
-**`V1a` is the next increment. It still needs the user's go-ahead before
-implementation, and it must not begin with code.** It touches a gate, so discuss
-the boundary and present it first, as `C5` and `Q7` did.
+**`V1b` is the next increment. It still needs the user's go-ahead before
+implementation, and it must not begin with code.** It is the second slice of
+`V1`, and like `V1a` it must be discussed and presented first, because the slice
+after it executes pull-request controlled code.
 
-`V1` in `SCOPE.md`, the opt-in project safeguards, is the last agreed v1
-capability that has not been started, and the only remaining implementation work
-of any size. It is far too large for one increment: it spans a flag, a stricter
-preflight, safeguard discovery, command approval, execution of pull-request
-controlled code, and feeding results to reviewers. `V1a` is the first slice, and
-deliberately the one that executes nothing.
+**`V1b` is discovery and presentation, and nothing else.** A verification-enabled
+run that passes `V1a`'s preflight finds this project's existing safeguard
+commands, shows the user the exact commands it would run, and stops. No approval
+prompt, no execution, and still no change to what any reviewer receives.
 
-**`V1a` is the `--verify` flag and its preflight refusal, and nothing else.** No
-discovery, no approval prompt, no command execution, no change to what any
-reviewer receives. A verification-enabled run either passes the preflight and
-proceeds as an ordinary review of that mode, or stops before any reviewer
-starts.
-
-`SCOPE.md` requires all three of these before reviewers start on a
-verification-enabled run: the current branch matches the pull request's head
-branch, local `HEAD` equals the captured head SHA, and the working tree is
-clean. It also forbids ever switching branches, pulling, stashing or cleaning to
-satisfy the gate.
-
-**Two of those three already hold for every review.**
-`assertReviewableCheckout` in `checkout.mjs` refuses unless local `HEAD` equals
-the captured head and no tracked file is modified or staged, and it also refuses
-if the remote head moved after capture. What it does **not** check is branch
-identity: it never reads the current branch name, so a detached `HEAD` at the
-right commit passes today. Untracked files warn rather than refuse. `V1a` is
-therefore a small, well-bounded addition to an existing gate rather than a new
-one, which is why it is the right first slice.
+`SCOPE.md` requires that discovery find **existing** commands, present them
+exactly, run in the current checkout using already installed dependencies,
+install nothing, use no auto-fix option, and invent no safeguard script. It also
+records that these commands execute pull-request controlled code, that this is
+not a sandbox, and that publication flags and saved automatic-posting settings
+never bypass command approval.
 
 Settle these before writing code, and give the user a recommendation for each:
 
-- **Untracked files.** Ordinary review lets them warn, because they cannot be
-  mistaken for modified reviewed code. Safeguards execute in the checkout and
-  can read them. Recommend refusing on untracked files for `--verify` only,
-  leaving ordinary review exactly as it is.
-- **Branch identity.** How the current branch is read and compared against the
-  pull request's head branch, and whether a detached `HEAD` at the correct commit
-  is a refusal. `SCOPE.md` says the branch must match, so recommend refusing.
-- **Where the gate lives.** A verification profile inside
-  `assertReviewableCheckout`, or a separate preflight beside it. Recommend one
-  gate with a stricter profile, so there is a single place that decides whether a
-  checkout may be used.
-- **Flag interactions.** Whether `--verify` is orthogonal to the mode flags and
-  to the posting flags. `SCOPE.md` says posting authority never bypasses command
-  approval, which `V1a` does not reach yet; recommend orthogonal, and say so.
-- **What a passing preflight does in `V1a`.** With no discovery yet, a
-  verification-enabled run that passes the gate is an ordinary review. Say
-  plainly in the run output that no safeguard ran, so the flag cannot be mistaken
-  for evidence that one did.
+- **Where commands come from.** A package manifest's scripts, a task runner's
+  file, a CI workflow, or a fixed list of well-known ones. Recommend the
+  narrowest source that needs no interpretation of intent, and say plainly which
+  projects it would find nothing in.
+- **What "existing" excludes.** A script that installs, migrates, deploys,
+  formats in place or takes an auto-fix flag is not a safeguard. Recommend
+  refusing to present such a command at all rather than presenting it with a
+  warning.
+- **What is presented.** The exact argv, the directory, and where it came from,
+  so the user can judge it before the increment that runs it exists. Recommend
+  presenting nothing the plugin could not later run verbatim.
+- **Whether discovery reads the checkout or the captured revision.** The
+  preflight has already proven they are the same commit. Recommend the checkout,
+  and say why that is safe only because `V1a` refuses otherwise.
+- **What a run does after presenting.** With no approval step yet, recommend
+  proceeding as an ordinary review and saying, as `V1a` does, that nothing ran.
 
-Acceptance is: `--verify` parses, is displayed with the effective settings, and
-is recorded in the run; a verification-enabled run refuses before any reviewer
-starts when the branch does not match, when `HEAD` does not match, or when the
-tree is not clean, with a message that names the failed condition and never
-offers to fix it automatically; ordinary review behaviour is byte-identical to
-today; nothing is discovered and no command is executed; and the controlled
-suites cover each refusal and the pass-through. It needs no inference beyond the
-increment's single authorized pull-request review.
+Acceptance is: a verification-enabled run that passes the preflight presents the
+discovered commands and their source, presents nothing outside the agreed
+sources, changes no reviewer input, executes nothing, and the controlled suites
+cover discovery against fixture projects including one with no safeguards at
+all. Ordinary review behaviour stays byte-identical.
 
-The rest of `V1` stays unscheduled. Do not start discovery, approval or
-execution in the same increment: executing pull-request controlled code is the
-largest safety boundary in this project, and it deserves its own discussion,
-its own tests and its own review.
+**Do not pull approval or execution into `V1b`.** Executing pull-request
+controlled code is the largest safety boundary in this project and needs its own
+increment, discussion, tests and review.
+
 
 ### Recorded, not scheduled
 
-These stay open and none is scheduled. Do not start one instead of `V1a`
+These stay open and none is scheduled. Do not start one instead of `V1b`
 without the user saying so.
 
 - **A review against a substantial code diff**, the oldest and largest open
@@ -6399,9 +6474,9 @@ without the user saying so.
   #14's reviewers named about `C3` and `C5`. That is a deliberate credit
   decision, because a discarded output would then spend a second attempt.
 - `L1` remains pending; copy no upstream source.
-- **The rest of `V1`** after `V1a`: safeguard discovery and presentation, then
-  command approval and execution with its evidence. Each needs its own
-  increment.
+- **The rest of `V1`** after `V1b`: command approval, then execution of
+  pull-request controlled code with its evidence. Each needs its own increment,
+  its own discussion and its own review.
 
 `F6`'s marker contract has live evidence from five of six reviewers on #7, both
 sessions on #8, every session on #10, on #11 every session that produced an
