@@ -4685,11 +4685,92 @@ corrected rather than the code.
 
 The other eleven controlled suites still pass unchanged.
 
+### Execution boundary
+
+- The fallback is one extra attempt for **one** reviewer, run in place while the
+  other reviewers continue. Nothing is restarted, no other reviewer is touched,
+  and a reviewer gets at most one fallback attempt whatever happens to it.
+- **Only that reviewer's own execution failure is eligible**, meaning the attempt
+  settled `incomplete`: a session error, a shutdown before completion, no usable
+  output, a forbidden tool call, or usage that did not match the assignment.
+  Cancellation is never eligible, and an aborted signal stops a fallback that has
+  not started.
+- **Elapsed time is never eligible**, because nothing imposes a deadline. A hung
+  reviewer never settles, so it is never replaced; that is the constraint
+  `SCOPE.md` states, and it falls out of the design rather than being checked for.
+- Setup refusals stay refusals. An unusable explicit assignment, a runtime that
+  does not retain the assignment, a checkout it will not point at, or a tool set
+  it will not enforce still refuses before any reviewer starts, and no fallback
+  substitutes for it. The fallback answers a failure during execution, not an
+  invalid configuration.
+- A fallback attempt is prepared exactly like a primary one: its own session, its
+  own catalog validation, the same retained-assignment check, the same working
+  directory and the same confined tool set. A fallback that cannot start leaves
+  the reviewer with the attempt that actually ran, and says why.
+- The adjudicator resolves the heavy tier like any other reviewer, so its own
+  explicit failure is eligible for that tier's one fallback attempt too.
+
+### Evidence boundary
+
+The evidence boundary itself is unchanged: the marker contract and its unwrap,
+the exact-key check, the schema version and review-key binding, the citation,
+quote and changed-line gates, adjudication, deduplication, selection, retention
+and the publication gates never learned about fallbacks. What changed is what a
+reviewer record says about how it was produced.
+
+- A recovered reviewer's record describes the attempt that produced its result,
+  and keeps the failed one in `fallbackFrom`. **A fallback is never invisible**:
+  without that field the record would show one completed reviewer on a model
+  nobody configured as its primary.
+- Coverage adds a non-blocking `caveat` naming both assignments and the primary
+  failure, so a recovered reviewer reports completed coverage and still says what
+  happened. When the fallback also fails, the reviewer stays incomplete and both
+  failures are reported.
+- Retention validates the new field as an attempt: the same shape as a reviewer
+  minus the label, its status must be `incomplete`, and it must not repeat the
+  assignment that just failed. The optional field does not change the record
+  schema version, which tracks publication authority.
+
+### Controlled evidence
+
+Test-first throughout. The execution assertions failed first on a reviewer that
+stayed incomplete with no second session, and the evidence assertions on the
+missing caveat and on retention rejecting the unknown `fallbackFrom` key.
+
+All twelve controlled suites pass, and `git diff --check` is clean:
+
+```sh
+for s in findings review selection retention preview publication publish-later \
+         checkout config context fixture target; do node scripts/smoke-$s.mjs; done
+git diff --check
+```
+
+New demonstrations, none of which start inference or touch the network:
+
+- Assignment: a configured tier fallback reaches every reviewer on that tier and
+  no other, so a heavy fallback never reaches balanced's light overview reviewer;
+  the light tier's own fallback follows the light tier's effort; deep's single
+  integrated reviewer carries the heavy fallback; an unusable fallback refuses
+  the review before anything starts; and one made identical by configuration or
+  by an invocation flag is not offered.
+- Execution: a failed reviewer recovered by its fallback reports completed
+  coverage, one extra session, the fallback's model on the record and the primary
+  failure in `fallbackFrom`, while the other reviewers keep their own model and
+  are not retried. A fallback that also fails leaves the reviewer incomplete with
+  both failures and still only one extra session. A fallback that cannot start
+  creates no session and leaves the primary attempt as the outcome. A completed
+  reviewer and a cancelled run start no fallback at all. The adjudicator's own
+  failure gets its tier's one attempt.
+- Evidence: a retained record round-trips both attempts, drops the live policy
+  object from the failed one, keeps completed coverage, renders the caveat, and
+  is rejected when the failed attempt claims to have completed or been cancelled,
+  when it repeats the surviving assignment, when it carries a label, or when it
+  loses its model.
+
 ### Still to do in this increment
 
-Reviewer assignment, the single fallback attempt during execution, its evidence
-in the retained record and coverage report, user documentation, and the pull
-request review that is this increment's real integration test.
+User documentation, and the pull request review that is this increment's real
+integration test.
 
 ## Exact next increment
 

@@ -9,6 +9,18 @@ export function coverageDiagnostics(outcome) {
       kind: "coverage-gap", message: `Legacy unclassified issue (kept incomplete): ${message}`,
     })))];
   for (const reviewer of [...(outcome.reviewers ?? []), ...(outcome.adjudicator ? [outcome.adjudicator] : [])]) {
+    // A reviewer its fallback recovered has complete coverage, but the attempt
+    // that failed is still part of how this review was produced, so it is
+    // reported rather than hidden by the recovery.
+    if (reviewer.fallbackFrom) {
+      const effort = (value) => value ?? "(not configurable)";
+      diagnostics.push({ kind: "caveat", message:
+        `${reviewer.label}: primary model=${reviewer.fallbackFrom.model} ` +
+        `reasoning=${effort(reviewer.fallbackFrom.reasoningEffort)} failed ` +
+        `(${reviewer.fallbackFrom.error}); the one configured fallback attempt, model=${reviewer.model} ` +
+        `reasoning=${effort(reviewer.reasoningEffort)}, ` +
+        `${reviewer.status === "completed" ? "completed this reviewer" : "also failed"}.` });
+    }
     if (reviewer.status !== "completed" &&
         !diagnostics.some((entry) => entry.kind === "execution-failure" && entry.message.startsWith(`${reviewer.label}:`))) {
       diagnostics.push({

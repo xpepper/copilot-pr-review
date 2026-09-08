@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { assertReviewableCheckout } from "./checkout.mjs";
 import {
-  ambientAssignment, describeTier, requireUsableProject, resolveTier, resolvedAssignment,
+  ambientAssignment, describeFallback, describeTier, requireUsableProject, resolveFallback, resolveTier,
+  resolvedAssignment,
 } from "./config.mjs";
 import { reviewAssignments, validateModelAssignment } from "./fixture.mjs";
 import { finishSelection } from "./selection.mjs";
@@ -79,7 +80,22 @@ export async function reviewerAssignments(parent, mode, flags, configuration) {
     const resolution = resolveTier(tier, { settings, origins, ambient: context.ambient, flags });
     const assignment = resolvedAssignment(resolution);
     validateModelAssignment(assignment, context.models);
-    tiers.set(tier, { resolution, assignment });
+    // A configured fallback is an explicit assignment too, so it is resolved and
+    // validated here, before any reviewer starts, rather than at the moment one
+    // has already failed. An unusable one refuses the review like any other
+    // explicit setting; it is never dropped, which would leave the failure it
+    // was configured for uncovered.
+    const fallbackResolution = resolveFallback(resolution, { settings, origins });
+    let fallback;
+    if (fallbackResolution && !fallbackResolution.identical) {
+      fallback = resolvedAssignment(fallbackResolution);
+      validateModelAssignment(fallback, context.models);
+      fallback.origin = {
+        model: fallbackResolution.model.source,
+        reasoningEffort: fallbackResolution.reasoningEffort.source,
+      };
+    }
+    tiers.set(tier, { resolution, assignment, fallback });
   }
   return mode.reviewers.map(({ label, tier }) => ({
     label, tier, ...tiers.get(tier).assignment,
@@ -88,17 +104,31 @@ export async function reviewerAssignments(parent, mode, flags, configuration) {
       reasoningEffort: tiers.get(tier).resolution.reasoningEffort.source,
       tier: describeTier(tiers.get(tier).resolution),
     },
+    ...(tiers.get(tier).fallback ? { fallback: structuredClone(tiers.get(tier).fallback) } : {}),
   }));
 }
 
 export function describeAssignments(mode, assignments) {
+  const withFallback = assignments.filter(({ fallback }) => fallback);
   return [
     `Effective reviewer assignments: ${mode.id} mode, ${assignments.length} reviewer(s); ` +
       `findings policy: ${describePolicy(mode.policy)}.`,
-    ...assignments.map((assignment) =>
+    ...assignments.flatMap((assignment) => [
       `  ${assignment.label} [${assignment.tier}]: model=${assignment.model ?? "(unset)"} ` +
       `[${assignment.origin.model}] reasoning=${assignment.reasoningEffort ?? "(not configurable)"} ` +
-      `[${assignment.origin.reasoningEffort}]`),
+      `[${assignment.origin.reasoningEffort}]`,
+      ...(assignment.fallback ? [`    ${describeFallback({
+        model: { value: assignment.fallback.model, source: assignment.fallback.origin.model },
+        reasoningEffort: {
+          value: assignment.fallback.reasoningEffort, source: assignment.fallback.origin.reasoningEffort,
+        },
+      })}`] : []),
+    ]),
+    withFallback.length
+      ? `Configured fallbacks: ${withFallback.length} of ${assignments.length} reviewer(s) have one; each gets ` +
+        "at most one attempt, only after its own explicit failure. Elapsed time never triggers one, so a hung " +
+        "reviewer waits indefinitely."
+      : "Configured fallbacks: none; a reviewer that fails stays incomplete coverage.",
     "Reviewer count and concurrency follow the selected mode; no reviewer has started yet.",
   ].join("\n");
 }
