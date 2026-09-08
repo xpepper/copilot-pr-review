@@ -236,10 +236,27 @@ const session = await joinSession({
         case "declare": {
           const custom = await session.rpc.agent.list({});
           const all = await session.rpc.agent.list({ includeBuiltInAgents: true });
+          // The declared grant is not evidence that the runtime enforces it.
+          // Selecting the agent and reading the runtime's own tool metadata is,
+          // and costs no inference.
+          const offered = async () => {
+            await session.rpc.tools.initializeAndValidate();
+            const { tools } = await session.rpc.tools.getCurrentMetadata();
+            return tools.map((tool) => tool.name).sort();
+          };
+          const before = await offered();
+          const previous = (await session.rpc.agent.getCurrent())?.name ?? null;
+          await session.rpc.agent.select({ name: "f5-confined-reviewer" });
+          const enforced = await offered();
+          if (previous) await session.rpc.agent.select({ name: previous });
+          else await session.rpc.agent.deselect();
           await report("declare", {
             customAgents: custom.agents?.map(({ name, id, tools, source }) => ({ name, id, tools, source })) ?? null,
             builtInAgentCount: all.agents?.length ?? null,
             confined: all.agents?.find((entry) => entry.name === "f5-confined-reviewer") ?? null,
+            defaultAgentToolCount: before.length,
+            defaultAgentTools: before,
+            confinedAgentTools: enforced,
           });
           return;
         }
@@ -286,7 +303,7 @@ async function settle(run) {
     terminal: detail.terminal,
     agents: detail.agents.map(({ label, agentType, status, requestedModel, resolvedModel, activeMs }) =>
       ({ label, agentType, status, requestedModel, resolvedModel, activeMs })),
-    progress: detail.progress?.lines?.map((line) => line.text ?? line.message ?? line) ?? null,
+    progress: detail.progress?.records?.map((line) => `${line.kind}: ${line.text}`) ?? null,
     toolEventLog: [...toolEventLog],
   };
 }

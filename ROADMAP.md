@@ -46,7 +46,7 @@ posting them.
 | C2 | Completed | Explicit per-directory trust gates `.copilot/pr-review/config.json` overrides; untrusted files ignored unparsed, self-trust impossible, precedence and revocation demonstrated below. | C1; [Configuration trust](SCOPE.md#models-configuration-and-execution) |
 | R1 | Completed | Verified-checkout reads and matching-head harnesses demonstrated. One authorized live quick review used unchanged source without denials; prior coverage gaps disappeared, but no additional finding was produced. GPT's `rg` alias is supported without widening the grant. | F4, Q3; [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | M1 | Completed | Balanced is the default with its four heavy specialists, light overview reviewer and three-finding P3/nit cap. `--full` adds a medium conventions/maintainability reviewer and presents every qualifying severity with no minor cap. Demonstrated by controlled probes, no-inference installed dispatch, and live reviews of this repository's own pull requests #3, #4 and #5; #5 ran all three tiers on distinct models. A Claude-family medium model's fenced output is a recorded open defect. | Q4, C1; [Modes](SCOPE.md#review-modes-and-findings) |
-| F5 | Pending | Decide how reviewer output stops depending on a model family's willingness to emit bare JSON. Establish by demonstration whether the runtime can return parsed structured output for a reviewer, at what cost to the confined tool grant, coverage reporting and credits; recommend adopt or fall back. No reviewer is migrated in F5. | M1, F3; [Technical feasibility](SCOPE.md#technical-uncertainties-and-proposed-sequence) |
+| F5 | Completed | Structured output is demonstrated unusable on CLI 1.0.83: the factory surface is behind a CLI feature flag and reachable only from a joined foreground session, a joining extension cannot register the permission handler that confines reviewer reads, and a custom agent's declared `view`/`grep`/`glob` grant leaks `skill` and `sql`. Retry cost, `null` failure semantics and module reach measured below. Recommendation recorded: fall back to a narrow fence unwrap, with its cost stated and the choice left to the user. No reviewer was migrated. | M1, F3; [Technical feasibility](SCOPE.md#technical-uncertainties-and-proposed-sequence) |
 | M2 | Pending | Deep uses one holistic reviewer; reject conflicting mode flags. | F5, M1; [Modes](SCOPE.md#review-modes-and-findings) |
 | C3 | Pending | Explicit optional fallback with at most one eligible retry per failed reviewer; no timers or silent substitutions. | C1, Q3; [Fallbacks/execution](SCOPE.md#models-configuration-and-execution) |
 | C4 | Pending | A tier whose resolved model supports no configurable reasoning effort resolves to no effort instead of inheriting one, so such a model can serve a tier. An explicit effort is still validated and never silently lowered. | C1; [Configuration](SCOPE.md#models-configuration-and-execution) |
@@ -3832,24 +3832,33 @@ it afterwards.
   verified by the twelve controlled suites only. They were not reviewed by the
   plugin, because the increment's single authorized review is spent.
 
-## F5 checkpoint: the structured-output surface, without inference
+## Completed increment: F5
 
-`F5` is a feasibility spike. It changes no shipped behaviour: `envelope` is
-untouched, no reviewer moved, no mode, configuration key, fallback, timeout,
-safeguard, reviewer shell tool or gate override was added, `L1` stays pending
+`F5` is a feasibility spike. It changed no shipped behaviour: `envelope` is
+untouched, no reviewer moved, and no mode, configuration key, fallback, timeout,
+safeguard, reviewer shell tool or gate override was added. `L1` stays pending
 and no upstream source was copied.
 
 Probe: `scripts/smoke-factory.mjs`, which writes `scripts/f5-factory-extension.mjs`
 into throwaway workspaces the CLI discovers for one session each. Nothing is
-installed, and the shipped plugin is not modified or reinstalled to run it.
-Without `--spend` the probe starts no subagent and spends no inference. This
-section records that half; the inference half is below it.
+installed, and the shipped plugin is neither modified nor reinstalled to run it.
+Without `--spend` the probe starts no subagent and spends no inference.
 
 ```sh
 COPILOT_CLI_PATH="$(command -v copilot)" \
 COPILOT_SDK_PATH="$(ls -d "$HOME"/.copilot/pkg/*/"$(copilot --version | sed -n 's/.*CLI \([0-9][0-9.]*[0-9]\).*/\1/p')"/copilot-sdk)" \
 node scripts/smoke-factory.mjs
+
+# Adds the two structured-output subagents. Spends Copilot credits; it needs
+# explicit authorization in the session that runs it.
+PR_REVIEW_F5_MODEL=claude-sonnet-5 ... node scripts/smoke-factory.mjs --spend
 ```
+
+The inference half ran once, on 2026-09-08, authorized in that session, against
+`claude-sonnet-5`, the model whose fenced output exposed the defect on pull
+request #5. It cost **15.870500 credits**: 11.661620 for the confined
+structured-output reviewer and 4.208880 for the forced schema failure. Those are
+the runtime's own `consumed.nanoAiu` figures, not estimates.
 
 ### The surface is not reachable from this plugin on CLI 1.0.83
 
@@ -3862,17 +3871,16 @@ answers every `session.factory.*` call with `Agent factories are not available
 for this session`. The runtime reads the flag from the CLI process's own
 environment: starting the CLI with `COPILOT_CLI_ENABLED_FEATURE_FLAGS=agent_factories`
 makes the same call succeed, and `enableExperimentalMode` turns out to be
-irrelevant either way. Passing `expAssignments` with the feature named does
-**not** open it and in fact closes it again when combined with the flag. The
-probe forces the flag on for its own child runtime so the remaining questions
-can be answered at all; that is a local configuration, not one a user of this
-plugin could reach.
+irrelevant either way. Passing `expAssignments` naming the feature does **not**
+open it, and closes it again when combined with the flag. The probe forces the
+flag on for its own child runtime so the four questions can be answered at all.
+That is a local configuration, not one a user of this plugin could reach.
 
 **A plugin cannot register a factory on a runtime it owns.** The shipped
 reviewers run on a runtime this plugin starts as an SDK client, whose
-environment the plugin does control, so the flag would not be a blocker there.
-It cannot be used: `client.resumeSessionForExtension(...)` with a factory handle
-is refused with `Only an extension connection can register factories`. Factories
+environment the plugin does control, so the flag would not block it there. That
+path is closed: `client.resumeSessionForExtension(...)` with a factory handle is
+refused with `Only an extension connection can register factories`. Factories
 register only through `joinSession`, which attaches to the **user's foreground
 session**, whose CLI environment the plugin does not set.
 
@@ -3880,44 +3888,108 @@ Together those mean the structured-output surface cannot be reached in
 production today by any path this plugin controls, whatever the four questions
 below answer.
 
-### Q1: tool confinement
+### Q1: tool confinement. No
 
-Half demonstrated, and the demonstrated half is negative.
+Demonstrated negative, on three independent points.
 
 **An extension cannot register a session permission handler at all.** A
-`joinSession` option bisection ran four one-option extensions in one session:
-a control, one passing `factories`, one passing `customAgents`, and one passing
+`joinSession` option bisection ran four one-option extensions in one session: a
+control, one passing `factories`, one passing `customAgents`, and one passing
 `onPermissionRequest`. The first three reached their `joined` marker and the CLI
 reported them `running`. The fourth logged `start` and never logged `joined`:
 `joinSession` never settles, and the CLI reports the extension `failed`. The
 shipped reviewers confine reads with exactly such a handler
 (`readingReviewerPolicy` in `read-only.mjs`), so on this surface the confinement
-point would have to move to the session host, which for a plugin is the user's
-interactive CLI and its own approval flow, not code this project owns.
+point moves to the session host, which for a plugin is the user's interactive
+CLI and its own approval flow, not code this project owns.
 
-**A custom agent does register with exactly the declared grant.** An extension
-passing `customAgents: [{ name: "f5-confined-reviewer", tools: ["view", "grep",
-"glob"], ... }]` loads, and `session.agent.list({ includeBuiltInAgents: true })`
-reports that agent with `tools` exactly `["view", "grep", "glob"]`. That is the
-declaration; whether the runtime enforces it on a factory-owned subagent, and
-whether an out-of-checkout read is actually refused, needs a real subagent and
-is recorded in the inference half.
+**A custom agent's declared tool list is not the grant the runtime enforces.**
+The probe extension registers `customAgents: [{ name: "f5-confined-reviewer",
+tools: ["view", "grep", "glob"] }]`. `session.agent.list` echoes exactly those
+three. Selecting that agent and reading the runtime's own tool metadata, the
+same instrument `assertReviewerTools` uses, reports **five**:
 
-### Q4: code structure
+| Agent | Tools the runtime offers |
+| --- | --- |
+| default | 25, including `bash`, `create`, `edit`, `task`, `web_fetch`, `sql`, `skill` |
+| `f5-confined-reviewer` | `glob`, `grep`, `skill`, `sql`, `view` |
 
-Fully demonstrated, and the premise in the earlier plan was wrong.
+`skill` and `sql` were never granted and are not read-only in the sense `F4`
+established: `skill` loads and runs instruction bundles, and `sql` is a data
+access tool. The restriction is real, since 20 of 25 tools do disappear, but it
+is not exact, and `assertReviewerTools` would refuse to start a review against
+that set. `R1` and `F4` are not negotiable, so this alone ends the option.
+
+**Host-side path confinement does work, for whoever is the host.** In the
+inference run the subagent called `view` twice. The harness's own permission
+handler approved `checkout/src/cart.js` and rejected the file outside the
+checkout, and the subagent reported the refusal as a `caveat` limitation. So the
+confinement mechanism itself is sound on this surface; the plugin just is not
+the party that gets to apply it.
+
+One gap: the run detail reported the subagent's `agentType` as
+`general-purpose` even though the call passed `agent: "f5-confined-reviewer"`,
+so the probe did not confirm that the custom agent's grant reached the subagent
+rather than the session default. The subagent used no shell or write tool and
+reported none available, but that is its own account, not runtime evidence. The
+leak measured above settles the question either way.
+
+### Q2: the implicit retry. Cheaper than documented, and wasted
+
+The documentation states that a `schema` call "retries once on a parse or match
+failure, so it may spawn twice, and both spawns count toward
+`maxTotalSubagents`". That was **not** reproduced.
+
+The probe forces a guaranteed schema failure with a deliberately unsatisfiable
+schema: `verdict: { allOf: [{ type: "string" }, { type: "integer" }] }`. `allOf`
+is honoured structurally and no value is both, so no attempt can match. The run
+consumed `subagents: 1` and reported `totalSpawnedAgentCount: 1`. The retry is
+not a second spawn and does not consume a second `maxTotalSubagents` slot; the
+CLI runtime carries a schema-repair message path, which is consistent with a
+further turn inside the same subagent, though the run detail does not expose
+that directly.
+
+The cost is not the spawn count, it is the waste. The failing run still charged
+**4.208880 credits** and returned nothing at all. A reviewer whose output fails
+the schema is billed for its whole turn and yields no candidate, no limitation
+and no reason.
+
+### Q3: failure semantics. `null` is the only signal, and it carries no reason
+
+Demonstrated, and worse than the roadmap assumed.
+
+The forced failure resolved `null`, so a factory body can tell failure from an
+empty result and keep coverage incomplete. Nothing else reports it:
+
+- the run envelope settled `status: "completed"`, with `error`, `failure` and
+  `reason` all absent;
+- `terminal` carried only a `resultPreview`;
+- the agent summary reported the failed subagent's `status` as `"completed"`;
+- progress records carry only the factory's own `phase` and `log` lines, since
+  `FactoryLogLineKind` is exactly `"log" | "phase"`, so no runtime failure
+  reason reaches them either.
+
+Incomplete coverage therefore stays visible only because the orchestrator writes
+it that way. The shipped reviewers today record a specific reason for every
+incomplete reviewer, from `runReviewer`'s error text; on this surface that reason
+does not exist. A migration would have to degrade every schema failure to an
+unexplained "reviewer produced no usable output", which is weaker reporting than
+the current `envelope` rejection, whose diagnostic at least names the parse
+error.
+
+### Q4: code structure. Yes, and the premise was wrong
 
 The "emitted verbatim into a generated module, closes over nothing, cannot use
 static imports" constraint belongs to the `factories_manage` authoring path,
 where a model writes a factory into a session-scoped extension at runtime. An
 **extension-authored** factory is an ordinary closure: the SDK calls
-`definition.run(context)` directly in the extension process.
+`definition.run(context)` directly, in the extension process.
 
 The probe's factory body demonstrated all of it in a run that spawned no
 subagent and spent nothing, `consumed: { subagents: 0, nanoAiu: 0 }`:
 
-- It read a module-scope constant defined in the extension outside the body, and
-  saw a statically imported binding, so the body does close over its module.
+- It read a module-scope constant defined outside the body and saw a statically
+  imported binding, so the body does close over its module.
 - It dynamically imported `modes.mjs`, `findings.mjs`, `read-only.mjs`,
   `review.mjs` and `fixture.mjs` from the shipped extension, with no failures,
   and called into them: `reviewMode("balanced")`, `describePolicy`,
@@ -3925,11 +3997,79 @@ subagent and spent nothing, `consumed: { subagents: 0, nanoAiu: 0 }`:
   and `readOnlyTools`.
 - It replayed the defect `F5` exists to settle, through the shipped parser and
   with no inference: the plain envelope produced no diagnostic, and the same
-  envelope wrapped in a ```` ```json ```` fence produced
+  envelope inside a ```` ```json ```` fence produced
   `probe: invalid candidate output: SyntaxError: Unexpected token '`'`.
 
-So orchestration code being reachable is not an obstacle. `F5`'s fourth question
-is answered yes.
+Orchestration code being reachable is not an obstacle. `F5`'s fourth question is
+answered yes.
+
+### What structured output would have bought
+
+Worth recording, because it is the one clearly positive result. With
+`schema` set to the shipped candidate envelope, `claude-sonnet-5` returned a
+parsed object, not text: `schemaVersion: 2`, the supplied `reviewKey`, one P1
+candidate with a full citation set quoting the file it read, and three `caveat`
+limitations recording the refusals. `JSON.stringify` of that value feeds the
+existing `envelope` unchanged. The fence problem does disappear at the source on
+this surface, for the same model that caused it.
+
+The mechanism is worth noting for whatever fix is chosen: the CLI runtime
+implements `schema` by instructing the model to put a single JSON value between
+two explicit markers, telling it that the text between them must be raw JSON
+with "no code fences, no comments, no trailing prose", and then extracting
+between the markers. Structured output here is delimiter-based extraction, not
+constrained decoding.
+
+### Recommendation: fall back to the narrow fence unwrap
+
+Adopting structured output is not viable on CLI 1.0.83, and the blocking reason
+is not the retry or the failure semantics. It is that the surface cannot be
+reached, and that even with the gate forced open the confined `view`/`grep`/
+`glob` grant cannot be held exactly, while the permission handler that confines
+reads cannot be registered at all. `F4` and `R1` are not negotiable, so this
+option is closed until GitHub ships per-subagent tool grants and an
+extension-registrable permission handler, and lifts the feature flag.
+
+The recommendation is therefore the fallback: a follow-up increment that strips
+one opening fence and its matching closing fence, only when they wrap the entire
+response, and changes nothing else. No prose stripping, no substring search, no
+brace matching, no repair. Everything after the parse stays exactly as it is:
+the exact-key check, the schema version and review-key binding, the citation,
+quote and changed-line gates, adjudication, deduplication and the findings
+policy.
+
+**What that costs, plainly.** `SCOPE.md` drops "experimental malformed-output
+finding extraction" from v1, and a fence unwrap sits next to that line. The
+distinction it relies on is that the dropped item is mining a non-conforming
+response for findings, whereas an unwrap removes a known, exactly delimited
+wrapper and then parses as strictly as before: a response with prose around the
+fence, a truncated object, or two fenced blocks still fails whole, as today. The
+distinction is real but it is a matter of degree, and the boundary cannot be
+defended on principle. The next model that adds one sentence before the fence
+will produce the same wasted review and the same request to tolerate a little
+more. Three separate instructions already tell reviewers to emit no fences and
+`claude-sonnet-5` ignored all three, so prompt strengthening is not an
+alternative.
+
+**The choice is the user's.** If that cost is unacceptable, the alternative that
+keeps `SCOPE.md` intact is to leave `envelope` strict, keep the README's
+recommendation of GPT-family reviewer tiers, and treat a Claude-family tier as
+unsupported until the runtime surface changes. A third shape exists and is not
+the recommendation: adopt the runtime's own technique in our prompts, asking
+reviewers to emit the envelope between two explicit markers and extracting
+between them. It needs no experimental API and is stronger than an unwrap, but
+it is a larger change to the reviewer contract than `F5` was asked to propose.
+
+### Remaining limitations
+
+- Evidence is macOS arm64, Copilot CLI 1.0.83 and its bundled SDK, Node 26.1.0,
+  on this host and account. The feature flag's default may differ elsewhere.
+- The inference half ran once, on one model, on a four-line fixture. It measures
+  the surface, not review quality.
+- Whether the custom agent's grant applied to the factory subagent itself was
+  not confirmed; see the gap noted under `Q1`.
+- The one-retry behaviour was measured only through spawn counts and charges.
+  The probe did not observe the repair turn directly.
 
 ## Exact next increment
 
