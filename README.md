@@ -215,7 +215,8 @@ bug detection. See the R1 evidence in [ROADMAP.md](ROADMAP.md).
 
 Reviewers return strict JSON candidates with severity, confidence, location,
 exact source quotations, concrete triggering conditions, expected/actual behavior,
-and before/after evidence of introduction. Raw candidate output remains untrusted;
+before/after evidence of introduction, and optionally a citation of the code that
+change breaks. Raw candidate output remains untrusted;
 only findings surviving the Q4 boundary below appear in the final findings view.
 Candidate output may quote PR source; full captured input is not dumped into the
 parent timeline.
@@ -412,10 +413,19 @@ threshold, not calibrated certainty.
 Code checks every cited path, side, line range and verbatim quotation against Q2's
 captured context windows and blob/revision provenance. The primary location must
 span at most ten lines in a diff hunk and include an actually added or removed
-line, not merely nearby unchanged code. Before/after evidence must describe the
-same hunk, citing changed code where present; a null side is allowed only when
-the hunk has no removals/additions on that side, including pure insertions and
-deletions with unchanged context. Renamed paths retain their
+line, not merely nearby unchanged code. Before/after evidence must describe that
+location's own hunk, citing changed code where present; either side may be null,
+which claims this change replaced or added nothing there and leaves the
+adjudicator to settle whether that is true.
+
+A candidate may also cite the code its changed line breaks, in an optional
+`breaks` citation, so the common report "this changed line breaks that other
+code" no longer has to mis-anchor its introduction to be expressed. That citation
+carries no anchoring rule of its own: it may be unchanged code, code in another
+hunk, or code in another changed file, though it is still bound, in-window and
+exactly quoted like every other citation. It is displayed and retained with the
+finding, and it is a claim the adjudicator must prove from source, never evidence
+that the claim holds. Renamed paths retain their
 separate base/head identities. Unsupported citations and missing evidence remain
 visible coverage issues, not silent filtering into a clean result.
 
@@ -448,8 +458,9 @@ does not itself merge anything. The strongest accepted severity/confidence repor
 is displayed, with original reports and reviewer attribution retained. Different
 causal change evidence is conservatively left unresolved rather than silently merged.
 
-The final view presents title, severity, location/revision, confidence, trigger,
-expected/actual behavior, introduction, and validation reasoning. Rejections and
+The final view presents title, severity, location/revision, confidence, any cited
+broken code, trigger, expected/actual behavior, introduction, and validation
+reasoning. Rejections and
 unresolved limitations remain visible. Malformed candidates do not discard valid
 siblings, and a failed specialist does not discard validated findings from its
 successful peers. Non-textual changes are explicitly uncovered. Empty findings,
@@ -655,7 +666,9 @@ surviving validated findings may still be selected and authorized.
 Code constructs `commit_id`, literal `event: "COMMENT"`, a concise coverage
 summary, and inline comments from canonical selected findings only. The comment
 preserves severity, trigger, expected/actual behavior, introduction, confidence
-and reviewer attribution. Source quotations, provenance and captured changed
+and reviewer attribution; a finding's broken-code citation stays in the terminal
+view and the retained record rather than being repeated in the comment. Source
+quotations, provenance and captured changed
 hunks are checked again before preview. Head/base anchors use RIGHT/LEFT;
 multi-line ranges include `start_line` and `start_side`. Renamed-file base
 citations map to the current diff path; deleted files keep the old path.
@@ -1295,7 +1308,8 @@ revision-bound context assembly, and quick/balanced/full/deep orchestration
 without a runtime, including mode parsing, all four reviewer topologies, tier
 resolution, the balanced minor-finding cap, and full's and deep's uncapped
 policy. The findings probe exercises strict
-schema/provenance gates, changed-line anchors, renamed/added/deleted files,
+schema/provenance gates, changed-line anchors, the broken-code citation and the
+citation refusals that still apply to it, renamed/added/deleted files,
 pure insertion/deletion context, cross-file deduplication, and degraded coverage. Its semantic
 accept/reject decisions are explicit test doubles, not live-model evidence.
 The context probe covers

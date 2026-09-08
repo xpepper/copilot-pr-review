@@ -114,6 +114,8 @@ const candidateEnvelopeSchema = () => ({
           introduction: { type: "string" },
           before: { anyOf: [citationSchema(), { type: "null" }] },
           after: { anyOf: [citationSchema(), { type: "null" }] },
+          // Optional in the shipped envelope too, so this mirror stays exact.
+          breaks: { anyOf: [citationSchema(), { type: "null" }] },
           evidence: { type: "array", items: citationSchema() },
         },
       },

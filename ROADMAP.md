@@ -51,7 +51,7 @@ posting them.
 | M2 | Completed | `--deep` runs one integrated heavy reviewer over the whole pull request and presents every substantiated severity; a second mode flag is refused. Demonstrated by the twelve controlled suites, the installed no-inference dispatch, and the live deep review of pull request #8, which reached completed coverage on 68.27393 credits and found two real defects in its own documentation. | F6, M1; [Modes](SCOPE.md#review-modes-and-findings) |
 | C3 | Completed | A tier may carry one optional fallback assignment, used for one extra attempt for the one reviewer whose own execution failed. No timer, no whole-review restart, no silent substitution, and no cross-tier inheritance. Demonstrated by the twelve controlled suites, two installed no-inference probes, and the live balanced review of pull request #10, which cost 233.19659 credits, completed all six sessions and found one real documentation defect. No fallback attempt has run live. | C1, Q3; [Fallbacks/execution](SCOPE.md#models-configuration-and-execution) |
 | C4 | Completed | A tier whose resolved model supports no configurable reasoning effort resolves to no effort instead of inheriting one, so such a model can serve a tier; the same rule covers a tier's fallback model. An explicit effort is still validated and never silently lowered, and a capable model still inherits and is still refused. Demonstrated by the twelve controlled suites, two installed no-inference probes, and the live full review of pull request #11, which cost 269.135657 credits, reported incomplete coverage on three execution failures, and found one real defect in this increment's own display. | C1; [Configuration](SCOPE.md#models-configuration-and-execution) |
-| Q5 | Pending | A candidate anchored on a changed line may cite the code that change breaks, including unchanged code and another hunk, instead of being refused for naming a different hunk from its introduction citations. Three true findings have been lost to that one rule, on pull requests #4, #5 and #10. Every refusal that stops an unbound or fabricated citation must still fire. | Q4; [Modes/findings](SCOPE.md#review-modes-and-findings) |
+| Q5 | In flight | A candidate anchored on a changed line may cite the code that change breaks, including unchanged code and another hunk, instead of being refused for naming a different hunk from its introduction citations. Three true findings have been lost to that one rule, on pull requests #4, #5 and #10. Every refusal that stops an unbound or fabricated citation must still fire. | Q4; [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | Q6 | Pending | A citation that differs from its bound source only by leading or trailing whitespace stops silently discarding the whole finding. Pull request #11's only true finding was lost to two spaces of indentation. Weighed against pull request #4, where the same exact-match check stopped a 0.99-confidence fabrication whose claim was itself about whitespace. | Q5; [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | C5 | Pending | A completed reviewer whose output the evidence boundary discards becomes eligible for its tier's one fallback attempt, as an empty response already is. Found by pull request #10's overview reviewer and discarded by the evidence boundary's same-hunk rule. Needs the user's go-ahead: it moves the retry decision across the evidence boundary. | C3, Q4; [Fallbacks/execution](SCOPE.md#models-configuration-and-execution) |
 | V1 | Pending | `--verify` enforces matching branch/SHA/cleanliness before reviewers and presents discovered existing commands for approval. | Q1; [Safeguards](SCOPE.md#optional-project-safeguards) |
@@ -5270,6 +5270,151 @@ review. It is recorded below as the next candidate after `C5`.
   is read as "no configurable effort" rather than as "unreadable". No observed
   model produces that shape, and separating the two would need a second notion of
   the catalog beside `reasoningEfforts`.
+
+## Increment in flight: Q5
+
+**A candidate anchored on a changed line can now cite the code that change
+breaks.** The citation is optional, it is called `breaks`, and it carries no
+anchoring rule of its own: it may name unchanged code, code in another hunk, or
+code in another changed file. Everything that makes a citation trustworthy still
+applies to it, because it goes through the same `cite()` the location and the
+evidence array go through.
+
+This section records the implementation and the controlled evidence. **The
+increment is not demonstrated until the installed plugin has reviewed its own
+pull request**, and this section says so until that has happened.
+
+### The rule that cost three findings, and what replaced it
+
+`candidate()` in `findings.mjs` required one hunk to contain the location and
+both introduction citations at once:
+
+```js
+if (!file.hunks.some((hunk) => withinHunk(location, hunk) &&
+    (before ? withinHunk(before, hunk) : !hunkHasChanges(file, hunk, "base")) &&
+    (after ? withinHunk(after, hunk) : !hunkHasChanges(file, hunk, "head")))) {
+```
+
+That one condition carried two separate demands. The first is that a supplied
+introduction citation describes the location's own edit, which is right and is
+kept. The second is that `before: null` or `after: null` is a claim about the
+whole hunk rather than about the changed lines the candidate points at, and that
+is what discarded pull request #5's finding. The condition is now:
+
+```js
+if (!file.hunks.some((hunk) => withinHunk(location, hunk) &&
+    (!before || withinHunk(before, hunk)) && (!after || withinHunk(after, hunk)))) {
+```
+
+A supplied introduction citation is still bound to the location's hunk, still to
+its own side and file, and still has to reach changed code rather than nearby
+unchanged context. A null side is now the reviewer's claim that this change
+replaced or added nothing there, and the adjudicator settles it, as it settles
+every other assertion in the candidate.
+
+### The shape chosen, and the two that were not
+
+The roadmap left three shapes open. The chosen one is the first: a separate
+optional citation beside `before`/`after`, because it is the only one that lets
+the code a change breaks be **unchanged** code, which is what pull request #10's
+discarded finding needed.
+
+- Widening `before`/`after` to any changed hunk in the file was rejected. It
+  would accept the two mis-anchored candidates literally, but an introduction
+  pair drawn from two unrelated edits no longer describes one edit, which is the
+  only thing those two citations exist to pin. The report those candidates were
+  reaching for is expressible now without giving that up.
+- Reporting the near-miss and leaving the rule alone was rejected against the
+  stated acceptance criterion, which requires the candidate to reach
+  adjudication rather than to be recoverable from the timeline afterwards.
+
+The root cause of all three losses was that a reviewer with something to say
+about "this changed line breaks that other code" had nowhere to put the second
+half, so it put it in `before`/`after`. The reviewer contract now says where it
+goes, and says explicitly to anchor the location on the changed code rather than
+on the code that change breaks.
+
+### The three recorded rejections, reconstructed
+
+`scripts/target-fixture.mjs` gains a two-hunk file, `breakage.js`, whose changed
+line 5 breaks unchanged line 9 and whose second hunk changes line 17.
+`smoke-findings.mjs` composes it with the existing `total.js` fixture, so a
+candidate can cite another changed file as well. Each recorded rejection is
+reconstructed from that fixture rather than from prose:
+
+| Recorded on | Reconstructed shape | Now |
+| --- | --- | --- |
+| #4, #10 | Location in one hunk, introduction citations in another | Still refused, with the same message |
+| #4, #10 | The same claim, anchored on the changed line, citing the other hunk in `breaks` | Reaches adjudication |
+| #5 | `before: null` on a hunk that does remove base-side lines | Reaches adjudication |
+
+The first row is the point worth being plain about: the mis-anchored candidates
+as recorded are still rejected, and the finding each was reaching for is now
+expressible in a well-formed candidate. This increment does not accept a
+mis-anchored introduction; it removes the reason a reviewer had to write one.
+
+### What did not change
+
+- **Every citation refusal still fires on the new field.** Unbound provenance, a
+  path outside the binding, a range outside a supplied context window, a
+  fabricated quote, an extra or missing key, and an invalid side are each
+  asserted against `breaks` in `smoke-findings.mjs`.
+- **The exact-match check is untouched.** `Q6` is a different refusal with its
+  own counter-evidence, and folding it in here would have relaxed the check that
+  stopped pull request #4's 0.99-confidence fabrication.
+- **The retained record's schema version is unchanged.** It tracks publication
+  authority, not candidate shape. The field is optional in `retention.mjs`, so a
+  record that carries none, or omits the key, still validates and reloads.
+- **The published inline comment is unchanged.** The citation is displayed in the
+  terminal findings view and kept in the retained record; the comment body still
+  carries the same fields it did, so the P3/P4 publication payload contract is
+  untouched.
+- **Deduplication is no stricter and no looser.** `sharedChangedEvidence` now
+  reads `breaks` alongside `before`, `after` and `evidence`, which keeps the
+  behaviour identical to citing the same lines in `evidence`, where a reviewer
+  had to put them before. Shared changed source stays necessary and never
+  sufficient; the adjudicator still has to name the duplicate and explain it.
+
+### Controlled evidence
+
+All twelve controlled suites pass, and `git diff --check` is clean. The new
+coverage is:
+
+- `smoke-findings.mjs`: the broken-code citation accepted against unchanged code
+  outside every hunk, changed code in another hunk on either side, and both
+  unchanged and changed code in another changed file; the citation optional
+  whether nulled or omitted, and normalized to an explicit `null` on the
+  finding; the citation refusals listed above; the two reconstructed rejections; the
+  introduction citations still bound to the location's hunk, side and file; and
+  deduplication carried by a shared broken-code citation and refused without one.
+- `smoke-review.mjs`: the reviewer contract of every mode names the new citation
+  and tells reviewers what to anchor on, and a controlled quick run carries a
+  citation of unchanged code outside the hunk from reviewer output through
+  adjudication, selection, preview and the retained record.
+- `smoke-retention.mjs`: a retained finding keeps the citation across a store
+  round trip, a record that carries none or omits the key still validates, and
+  every mutation of the citation is refused as unbound or malformed.
+
+The controlled suites use test doubles for every model decision. They prove the
+plumbing and the gates, not that a live reviewer will use the new citation.
+
+### Remaining limitations
+
+- **No live reviewer has used it.** Whether a real reviewer stops mis-anchoring
+  its introduction now that there is somewhere else to put the second half of
+  its claim is exactly what the pull-request review of this increment tests, and
+  a single review is one sample either way.
+- **The code a change breaks must still be inside a captured context window.**
+  Context is assembled only for changed files, within a radius of the hunks, so
+  a victim in an unchanged file cannot be cited at all. That boundary predates
+  this increment and is unchanged by it; a reviewer that needs it has to report
+  the gap in `limitations` instead.
+- **A null introduction side is now a model claim rather than a code check.**
+  The old rule was coarse, and it discarded a true finding for it, but it did
+  stop a reviewer from calling a replacement a pure addition. That check is now
+  the adjudicator's, and the adjudicator is fallible.
+- **The published comment does not carry the citation**, so a reader on GitHub
+  sees the broken code only insofar as the finding's prose names it.
 
 ## Exact next increment
 

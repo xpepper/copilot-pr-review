@@ -8,7 +8,10 @@ import {
 } from "../extensions/pr-review/findings.mjs";
 import { formatCoverage, presentationDiagnostics } from "../extensions/pr-review/coverage.mjs";
 import { reviewModes } from "../extensions/pr-review/modes.mjs";
-import { blobSha, validationBaseSource, validationHeadSource, validationDiff } from "./target-fixture.mjs";
+import {
+  blobSha, breakageBaseSource, breakageDiff, breakageHeadSource,
+  validationBaseSource, validationDiff, validationHeadSource,
+} from "./target-fixture.mjs";
 
 const policy = reviewModes.quick.policy;
 const baseText = validationBaseSource;
@@ -75,7 +78,7 @@ for (const mutate of [
   (c) => { c.location.startLine = 0; }, (c) => { c.location.endLine = 3.5; },
   (c) => { c.location.quote = "  return cents - quantity;"; },
   (c) => { c.location = citation("head", 1); },
-  (c) => { c.before = null; }, (c) => { c.before = citation("head"); },
+  (c) => { c.before = citation("head"); },
   (c) => { c.before = citation("base", 1); },
   (c) => { c.evidence = []; }, (c) => { c.evidence[0].quote += "\n"; },
   (c) => { c.location.ref = binding.head; },
@@ -556,6 +559,198 @@ for (const raw of [
   assert.match(inline.diagnostics[0].message, /invalid candidate output/);
 }
 console.log("PASS the delimited output contract, its deterministic unwrap, and fail-whole for everything else");
+// Q5: a candidate anchored on a changed line can cite the code that change
+// breaks, in `breaks`, which may be unchanged code, code in another hunk, or
+// code in another changed file. The three true findings the same-changed-hunk
+// rule discarded, on pull requests #4, #5 and #10, are reconstructed below from
+// their recorded shapes rather than from a description of them.
+const breakageSource = breakageDiff + validationDiff;
+const breakageSnapshot = {
+  repository,
+  pull: { id: "PR_2", number: 2, changedFiles: 2, head: { sha: "b".repeat(40) }, base: { sha: "a".repeat(40) } },
+  diff: breakageSource, diffSha256: createHash("sha256").update(breakageSource).digest("hex"),
+};
+const revisionOf = (path, head) => path === "breakage.js"
+  ? head ? breakageHeadSource : breakageBaseSource
+  : head ? headText : baseText;
+const breakageContext = await assembleContext(breakageSnapshot, {
+  gh: async (args) => {
+    const request = /contents\/([^?]+)\?ref=([0-9a-f]{40})/.exec(args[5]);
+    const path = decodeURIComponent(request[1]);
+    const text = revisionOf(path, request[2] === "b".repeat(40));
+    return JSON.stringify({
+      type: "file", path, encoding: "base64", sha: blobSha(text),
+      size: Buffer.byteLength(text), content: Buffer.from(text).toString("base64"),
+    });
+  },
+});
+const breakageBinding = reviewBinding(breakageSnapshot, breakageContext);
+const breakageBoundary = evidenceBoundary(breakageSnapshot, breakageContext, breakageBinding);
+const at = (path, side, startLine, endLine = startLine) => ({
+  path, side, startLine, endLine,
+  quote: revisionOf(path, side === "head").split("\n").slice(startLine - 1, endLine).join("\n"),
+});
+const breakageFile = breakageBoundary.files.find((entry) => entry.newPath === "breakage.js");
+assert.equal(breakageFile.hunks.length, 2, "The fixture keeps two separate hunks in one changed file");
+assert.deepEqual(breakageFile.changed.head, [5, 17]);
+assert(!breakageFile.hunks.some((hunk) => hunk.newStart <= 9 && 9 < hunk.newStart + hunk.newLines),
+  "Line 9 is unchanged code outside every hunk, and still inside a supplied context window");
+assert(breakageFile.hunks[0].oldText.length > 0, "The anchoring hunk does remove base-side lines");
+
+const breaker = {
+  title: "Free shipping no longer applies at the threshold", severity: "P2", confidence: 0.94,
+  location: at("breakage.js", "head", 5), trigger: "shipping(5000)",
+  expected: "An order exactly at the threshold ships free, per the unchanged comment on line 1",
+  actual: "shipping(5000) now charges 500 cents, so every order exactly at the threshold is billed",
+  introduction: "The changed comparison excludes the boundary its unchanged callers still assume.",
+  before: at("breakage.js", "base", 5), after: at("breakage.js", "head", 5),
+  breaks: at("breakage.js", "head", 9), evidence: [at("breakage.js", "head", 1)],
+};
+const breakageReviewer = (candidates, changes = {}) => ({
+  label: "correctness", status: "completed",
+  result: JSON.stringify({
+    schemaVersion: 2, reviewKey: reviewKey(breakageBinding), candidates, limitations: [],
+  }), ...changes,
+});
+const breakageDecision = (id, changes = {}) => ({
+  candidateId: id, verdict: "accept", allClaimsSupported: true,
+  reason: "The unchanged caller reads the changed predicate, and the base revision admitted the boundary.",
+  evidence: [at("breakage.js", "head", 1)], duplicateOf: null, ...changes,
+});
+const adjudicateBreakage = (candidates, decisions) => {
+  const gathered = collectCandidates([breakageReviewer(candidates)], breakageBoundary, policy);
+  const decided = decisions ?? gathered.candidates.map((entry) => breakageDecision(entry.id));
+  return {
+    gathered,
+    result: adjudicateCandidates(gathered, {
+      status: "completed", result: JSON.stringify({
+        schemaVersion: 2, reviewKey: reviewKey(breakageBinding), decisions: decided, limitations: [],
+      }),
+    }, breakageBoundary, policy),
+  };
+};
+for (const [victim, description] of [
+  [at("breakage.js", "head", 9), "unchanged code outside every hunk"],
+  [at("breakage.js", "head", 17), "changed code in another hunk of the same file"],
+  [at("breakage.js", "base", 17), "the base side of another hunk"],
+  [at("total.js", "head", 1), "unchanged code in another changed file"],
+  [at("total.js", "head", 3), "changed code in another changed file"],
+]) {
+  const cited = adjudicateBreakage([{ ...breaker, breaks: victim }]);
+  assert.deepEqual(cited.gathered.diagnostics, [], `A candidate may cite ${description}`);
+  assert.equal(cited.result.findings.length, 1, `A candidate citing ${description} reaches adjudication`);
+  assert.equal(cited.result.findings[0].breaks.blobSha, blobSha(revisionOf(victim.path, victim.side === "head")));
+  assert.equal(cited.result.findings[0].breaks.ref, breakageBinding[victim.side]);
+}
+const displayed = formatFindings({
+  validation: adjudicateBreakage([breaker]).result, complete: true, mode: "quick",
+});
+assert.match(displayed, /Breaks: breakage\.js:9-9 \(head\)/);
+
+// The citation is optional, whether the reviewer omits it or nulls it, and the
+// finding carries `breaks: null` either way rather than an absent key.
+for (const candidates of [[{ ...breaker, breaks: null }], [(() => {
+  const omitted = structuredClone(breaker);
+  delete omitted.breaks;
+  return omitted;
+})()]]) {
+  const optional = adjudicateBreakage(candidates);
+  assert.equal(optional.result.findings.length, 1, "The broken-code citation is optional");
+  assert.equal(optional.result.findings[0].breaks, null);
+  assert(!formatFindings({ validation: optional.result, complete: true }).includes("Breaks:"),
+    "A finding that cites no broken code displays no broken-code line");
+}
+
+// Every citation refusal still fires on the new field: unbound provenance, an
+// out-of-window range, a fabricated quote and a malformed citation object.
+for (const [invalid, expected] of [
+  [{ ...at("breakage.js", "head", 9), path: "../breakage.js" }, /outside bound source provenance/],
+  [{ ...at("breakage.js", "head", 9), path: "shipping.js" }, /outside bound source provenance/],
+  [{ ...at("breakage.js", "head", 9), startLine: 40, endLine: 40 }, /does not exactly match a supplied context window/],
+  [{ ...at("breakage.js", "head", 9), quote: "  return qualifies(subtotal) ? 0 : 501;" }, /does not exactly match/],
+  [{ ...at("breakage.js", "head", 9), quote: " return qualifies(subtotal) ? 0 : 500;" }, /does not exactly match/],
+  [{ ...at("breakage.js", "head", 9), ref: breakageBinding.head }, /Citation: expected exactly/],
+  [{ path: "breakage.js", side: "head", startLine: 9, endLine: 9 }, /Citation: expected exactly/],
+  ["breakage.js:9", /Citation: expected exactly/],
+  [{ ...at("breakage.js", "head", 9), side: "RIGHT" }, /Invalid citation side, range, or quote/],
+]) {
+  const refused = collectCandidates([breakageReviewer([{ ...breaker, breaks: invalid }])],
+    breakageBoundary, policy);
+  assert.equal(refused.candidates.length, 0, `Refuse a broken-code citation: ${JSON.stringify(invalid).slice(0, 60)}`);
+  assert.match(refused.diagnostics[0].message, expected);
+}
+
+// Reconstructed rejection, pull requests #4 and #10: the introduction citations
+// named one changed hunk while the location named another. That refusal is
+// unchanged, and the finding it discarded is now expressible instead by
+// anchoring on the changed code and citing what it breaks.
+const misanchored = collectCandidates([breakageReviewer([{
+  ...breaker, location: at("breakage.js", "head", 17), breaks: null,
+}])], breakageBoundary, policy);
+assert.equal(misanchored.candidates.length, 0);
+assert.match(misanchored.diagnostics[0].message, /Introduction citations and location must identify the same changed hunk/);
+const reanchored = adjudicateBreakage([{ ...breaker, breaks: at("breakage.js", "head", 17) }]);
+assert.equal(reanchored.result.findings.length, 1,
+  "The same claim, anchored on the changed line and citing the other hunk, reaches adjudication");
+
+// Reconstructed rejection, pull request #5: a null introduction side on a hunk
+// that does change that side is no longer refused. The adjudicator still has to
+// establish introduction; code no longer discards the candidate for it.
+for (const introduction of [{ before: null }, { after: null }, { before: null, after: null }]) {
+  const partial = adjudicateBreakage([{ ...breaker, ...introduction }]);
+  assert.deepEqual(partial.gathered.diagnostics, [],
+    `A null introduction citation is accepted: ${Object.keys(introduction).join("+")}`);
+  assert.equal(partial.result.findings.length, 1);
+}
+const nullIntroduction = collectCandidates([reviewer([{ ...structuredClone(candidate), before: null }])],
+  boundary, policy);
+assert.deepEqual(nullIntroduction.diagnostics, [], "The single-hunk fixture accepts a null before as well");
+assert.equal(nullIntroduction.candidates.length, 1);
+
+// A supplied introduction citation is still bound to the location's own hunk,
+// still on its own side and file, and still has to reach the changed code.
+for (const [mutate, expected] of [
+  [(c) => { c.before = at("breakage.js", "base", 17); }, /identify the same changed hunk/],
+  [(c) => { c.after = at("breakage.js", "head", 17); }, /identify the same changed hunk/],
+  [(c) => { c.before = at("breakage.js", "head", 5); }, /same file's captured before\/after revisions/],
+  [(c) => { c.after = at("total.js", "head", 3); }, /same file's captured before\/after revisions/],
+  [(c) => { c.before = at("breakage.js", "base", 4); }, /cite the changed code, not only nearby unchanged lines/],
+  [(c) => { c.location = at("breakage.js", "head", 9); }, /not an anchor on changed lines/],
+]) {
+  const invalid = structuredClone(breaker);
+  mutate(invalid);
+  const refused = collectCandidates([breakageReviewer([invalid])], breakageBoundary, policy);
+  assert.equal(refused.candidates.length, 0);
+  assert.match(refused.diagnostics[0].message, expected);
+}
+
+// The broken-code citation is a supporting citation for deduplication, exactly
+// as it would be if the same lines had been cited in `evidence`: shared changed
+// source stays necessary, and never sufficient, for one report to merge into
+// another.
+const downstream = {
+  ...breaker, title: "The summary separator changed with the threshold",
+  location: at("breakage.js", "head", 17), before: at("breakage.js", "base", 17),
+  after: at("breakage.js", "head", 17), breaks: null, evidence: [at("breakage.js", "head", 16)],
+};
+const merged = adjudicateBreakage([{ ...breaker, breaks: at("breakage.js", "head", 17) }, downstream],
+  [breakageDecision("correctness:1"),
+    breakageDecision("correctness:2", { duplicateOf: "correctness:1", evidence: [at("breakage.js", "head", 17)] })]);
+assert.equal(merged.result.findings.length, 1, "A shared broken-code citation can carry a duplicate decision");
+assert.equal(merged.result.duplicates.length, 1);
+const unshared = adjudicateBreakage([{ ...breaker, breaks: null }, downstream],
+  [breakageDecision("correctness:1"),
+    breakageDecision("correctness:2", { duplicateOf: "correctness:1", evidence: [at("breakage.js", "head", 17)] })]);
+assert.equal(unshared.result.findings.length, 1);
+assert.equal(unshared.result.duplicates.length, 0);
+assert.match(unshared.result.diagnostics.at(-1).message, /shared changed-source evidence/);
+
+// Both output contracts name the new citation, so a reviewer is asked for it and
+// the adjudicator is told what it is and that it proves nothing on its own.
+assert.match(candidateFormat(policy), /"breaks"/);
+assert.match(candidateFormat(policy), /anchor the location on the changed code/i);
+assert.match(validationInstructions(policy), /breaks/);
+console.log("PASS Q5: a changed-line anchor can cite the code it breaks, and every citation refusal still fires");
 console.log("PASS strict candidates, exact provenance/changed lines, confidence/severity, and fail-closed malformed output");
 console.log("PASS mocked semantic rejection/uncertainty, explicit same-defect deduplication, distinct same-line issues and degraded retention");
 console.log("PASS renamed/added/deleted files, insertion/deletion context, and shared-cause cross-file deduplication");

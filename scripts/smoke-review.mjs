@@ -458,6 +458,9 @@ function harness({
                 candidates: withCandidate && candidateFrom.includes(i) ? [{
                   title: `Keep value at 1 (${mode.reviewers[i].label})`, severity, confidence: 0.9,
                   location: cite("head"), before: cite("base"), after: cite("head"),
+                  // Unchanged code outside the only hunk: the shape Q5 exists for.
+                  breaks: { path: "example.js", side: "head", startLine: 2, endLine: 2,
+                    quote: 'export const label = "fixture";' },
                   trigger: "Read value", expected: "1", actual: "2",
                   introduction: "The constant changed", evidence: [cite("base")],
                 }] : [],
@@ -838,6 +841,8 @@ for (const mode of [quickMode, balancedMode]) {
   assert.match(instructions, /Never audit the repository at large or report pre-existing issues/);
   assert.match(instructions, /Every citation must come from the supplied binding paths and context windows/);
   assert.match(instructions, /cannot modify anything, run commands or safeguards/);
+  assert.match(instructions, /Anchor the location on the changed code you are reporting/);
+  assert.match(instructions, /Breaks cites the code this change breaks/);
   assert.match(instructions, mode === quickMode
     ? /This quick review presents P0-P2 findings only/
     : /This balanced review presents P0-P2 findings, plus at most 3 P3\/nit finding\(s\)/);
@@ -854,6 +859,8 @@ for (const shared of [
   /Never audit the repository at large or report pre-existing issues/,
   /Every citation must come from the supplied binding paths and context windows/,
   /cannot modify anything, run commands or safeguards/,
+  /Anchor the location on the changed code you are reporting/,
+  /Breaks cites the code this change breaks/,
 ]) assert.match(deepInstructions, shared, "Deep keeps the evidence boundary of every other mode");
 assert.match(deepInstructions, /This deep review presents P0-P2 findings, plus every substantiated P3\/nit finding/);
 assert.match(deepInstructions, /"severity":"P0\|P1\|P2\|P3\|nit"/);
@@ -926,6 +933,14 @@ for (const [flags, all] of ["--no-comment", "--comment", ""].flatMap((flag) => [
   assert.equal(report.selection.status, "selected");
   assert.deepEqual(report.selection.findingIds, report.validation.findings.map((finding) => finding.id));
   assert.equal(report.selection.findingIds.length, 1);
+  // Q5: the reviewer anchored on the one changed line and cited unchanged code
+  // outside the hunk as what it breaks. That citation survives the whole run.
+  assert.deepEqual(report.validation.findings[0].breaks, {
+    path: "example.js", side: "head", startLine: 2, endLine: 2,
+    quote: 'export const label = "fixture";',
+    ref: report.binding.head, blobSha: report.binding.paths[0].sources[0].blobSha,
+  });
+  assert.match(formatFindings(report), /Breaks: example\.js:2-2 \(head\)/);
   assert.equal(h.sessions.length, 4, "Selection starts no new reviewer sessions");
   assert.equal(h.client.starts, 1);
   assert.equal(h.client.stops, 1);

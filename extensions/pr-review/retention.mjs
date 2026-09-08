@@ -110,7 +110,8 @@ function validation(value, target, policy) {
   const candidates = new Set();
   for (const finding of value.findings) {
     object(finding, ["id", "reviewer", "title", "severity", "confidence", "location", "trigger",
-      "expected", "actual", "introduction", "before", "after", "evidence", "reportedBy", "candidateIds", "validation"]);
+      "expected", "actual", "introduction", "before", "after", "evidence", "reportedBy", "candidateIds",
+      "validation"], ["breaks"]);
     for (const key of ["id", "reviewer", "title", "trigger", "expected", "actual", "introduction"]) text(finding[key]);
     requireValue(!ids.has(finding.id), "duplicate canonical finding ID");
     ids.add(finding.id);
@@ -130,6 +131,9 @@ function validation(value, target, policy) {
         requireValue(finding[side].side === (side === "before" ? "base" : "head"), "introduction side mismatch");
       }
     }
+    // The code a finding breaks is optional and unanchored, but it is still a
+    // citation bound to this reviewed revision.
+    if (finding.breaks !== undefined && finding.breaks !== null) citation(finding.breaks, target);
     requireValue(Array.isArray(finding.evidence) && finding.evidence.length, "missing evidence");
     finding.evidence.forEach((entry) => citation(entry, target));
     object(finding.validation, ["kind", "allClaimsSupported", "reason", "evidence"]);

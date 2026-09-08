@@ -103,6 +103,39 @@ try {
     invalid.digest = reviewKey(invalid.outcome);
     assert.throws(() => validateRecord(invalid, sessionId), /Invalid retained result/);
   }
+  // Q5: a finding may cite the code its changed line breaks. The retained record
+  // keeps that citation and binds it to the reviewed revision like any other,
+  // and a record that carries none, or omits the field entirely, still reloads.
+  assert.equal(record.outcome.validation.findings[0].breaks, null,
+    "A finding that cited no broken code retains an explicit null, not an absent key");
+  const breaking = structuredClone(record);
+  breaking.outcome.validation.findings[0].breaks =
+    structuredClone(record.outcome.validation.findings[0].evidence[0]);
+  breaking.digest = reviewKey(breaking.outcome);
+  validateRecord(breaking, sessionId);
+  store.write(breaking);
+  assert.deepEqual((await sessionStore(parent)).read(), breaking,
+    "A reloaded finding keeps the broken-code citation exactly");
+  const absent = structuredClone(record);
+  delete absent.outcome.validation.findings[0].breaks;
+  absent.digest = reviewKey(absent.outcome);
+  validateRecord(absent, sessionId);
+  for (const mutate of [
+    (r) => { r.outcome.validation.findings[0].breaks.ref = "c".repeat(40); },
+    (r) => { r.outcome.validation.findings[0].breaks.blobSha = "d".repeat(40); },
+    (r) => { r.outcome.validation.findings[0].breaks.path = "other.js"; },
+    (r) => { r.outcome.validation.findings[0].breaks.side = "base"; },
+    (r) => { r.outcome.validation.findings[0].breaks.quote += "\nextra"; },
+    (r) => { delete r.outcome.validation.findings[0].breaks.quote; },
+    (r) => { r.outcome.validation.findings[0].breaks.startLine = 0; },
+  ]) {
+    const invalid = structuredClone(breaking);
+    mutate(invalid);
+    invalid.digest = reviewKey(invalid.outcome);
+    assert.throws(() => validateRecord(invalid, sessionId), /Invalid retained result/);
+  }
+  store.write(record);
+
   const corrupt = structuredClone(record);
   corrupt.outcome.validation.findings[0].actual += " corrupted";
   assert.throws(() => validateRecord(corrupt, sessionId), /digest/);
