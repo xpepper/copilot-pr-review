@@ -89,8 +89,9 @@ tiers.
 
 **Ask, and do not choose for them.** Whichever they pick is a behavioural change
 to `findings.mjs` and lands as `F6` on its own branch and pull request, reviewed
-once with this plugin. `M2`, deep mode, still depends on that decision; do not
-start it first.
+once with this plugin. The increments table carries `F6` as **Blocked on a user
+decision**, and `M2` now depends on `F6` rather than on `F5`, so do not read
+`F5` being Completed as clearance to start deep mode.
 
 ## Running the real integration test
 
