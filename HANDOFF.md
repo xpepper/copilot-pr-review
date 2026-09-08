@@ -2,133 +2,168 @@
 
 Read `AGENTS.md`, `SCOPE.md` and `ROADMAP.md`, then inspect git state, open pull
 requests and implementation before editing. Scope is authoritative; the roadmap
-records demonstrated evidence and the exact next increment. Do not rely on this
+records demonstrated evidence and the open work. Do not rely on this
 conversation or reopen settled decisions.
 
 ## Recorded state
 
-This handoff is prepared for a fresh session on **clean `main` after the
-user-authorized merge of pull request #14**. Confirm the merge, branch and
-working-tree state before proceeding; if #14 is still open, report the unfinished
-merge rather than starting another increment. The only other open pull requests
-should be the synthetic playground ones, #1 and #2, which must never be merged or
-republished.
+This handoff is prepared on branch **`q7-absent-path-refusal`**, pull request
+**#15**, branched from `main` at `bf7d390`, the squash merge of #14. Confirm
+whether #15 is still open or has been merged before proceeding; if it is merged,
+start from clean `main` and reconcile against git history. The only other open
+pull requests should be the synthetic playground ones, #1 and #2, which must
+never be merged or republished. **Merging #15 is the user's decision.**
 
-`C5` is complete. Its branch was `c5-discarded-output-eligibility`, from `main`
-at `58deae8` (the squash merge of #13). Implementation checkpoint `2bddb6c` was
-reviewed with the installed plugin once, at head `761e01c`; `190004d` recorded
-that review. The later checkpoints, including this handoff, change documentation
-only and were not reviewed again. A squash merge need not retain those individual
-commits as ancestors of `main`; use #14 and git history to reconcile state. No
-uncommitted work or increment in flight is intended to remain.
+`Q7` is complete. Its boundary was discussed and approved before any code was
+written, which is now the expected sequence for an increment that touches a
+gate. The implementation checkpoint `ca955b4` was reviewed once with the
+installed plugin. `4db18e1` fixes the two findings that review produced;
+`0df867d` and `a3be435` record evidence, and this handoff is documentation only.
+**Nothing after `ca955b4` has been reviewed again**, and this increment's single
+authorization is spent.
 
-`C5` makes a discarded reviewer output an eligible failed attempt. An attempt
-that settled `completed` is demoted to `incomplete`, and so becomes eligible for
-its tier's one configured fallback, **if and only if `envelope()` throws on its
-output**. If `envelope()` returns, the attempt stays `completed` whatever becomes
-of the candidates inside it. The check is an optional `verifyResult` callback on
-`runAttempt`, beside the existing usage-mismatch demotion, supplied by
-`review.mjs` as `envelopeVerifier(...)` for the specialists and for the
-adjudicator on its own `decisions` field. It is the same `envelope()` call
-collection makes, exported as a predicate, never a weaker gate.
+## What `Q7` settled
 
-The four choices the user approved before implementation are settled and must be
-preserved: the adjudicator is in scope; an envelope whose every candidate is
-refused is **not** eligible; a well-formed envelope bound to the wrong review key
-**is** eligible, with no carve-out; and demotion never depends on a fallback
-being configured. Do not move the check into `findings.mjs` and do not extend
-eligibility below the envelope. Both were considered and rejected with reasons in
-the roadmap, the second decisively: there is no timeout, so a hung reviewer never
-settles, and validating after the batch would let one hung reviewer block every
-other reviewer's fallback indefinitely.
+**An absent path is refused as absent, not as an escape.** The path stays
+refused, no reviewer gains a read it did not have, and only the reason changes.
+The reason is given only for a request that would have been inside the root had
+it existed: an absolute path, lexically under the root before any filesystem
+call, whose nearest existing entry still resolves inside the root. Everything
+else keeps the mute refusal it had, because saying that a path outside the root
+does not exist would report on the host filesystem.
 
-Keep a candidate refused at the evidence boundary, an envelope reporting no
-candidate, and a `Q6` quote repair distinct from an unusable envelope. None of
-them is a failure and none is ever retried. `Q5` and `Q6` remain settled and
-answer the discarded-true-finding problem by fixing the gate, which is a
-different repair from retrying a reviewer; do not merge the two. No
-retained-record key, status vocabulary or schema version changed for `C5`;
-`C3`'s invariants already described the shape. Ask before changing the
-retained-record schema version: it tracks publication authority, not candidate
-shape.
+Six choices are settled and must be preserved: the out-of-root refusal stays
+mute; the two refusals are recorded apart as `read` and `read-absent`; the
+message names the path **as it was requested**, never a normalized form; the
+walk climbs only past an entry that is genuinely missing; a relative path keeps
+its previous approval behaviour and never receives the absent reason; and the
+live probe asserts a stable substring rather than a whole sentence.
+
+**No retained-record schema changed and no version was bumped.**
+`retainedRecord` picks a reviewer key list that excludes `policy`, so read
+denials never enter the record. They appear in the run's logged evidence JSON.
+Ask before changing the retained-record schema version: it tracks publication
+authority, not candidate shape.
+
+## The confinement defect this increment found
+
+`fs.realpathSync` collapses `..` textually before it resolves symlinks; the
+operating system does not, and neither does the `open()` the read tool performs.
+A checkout containing a symlink to a directory, plus a decoy of the same
+relative name inside the root, was enough to have the handler approve one path
+while the reviewer read another, outside the checkout, recorded in the evidence
+as an in-root read. The checkout is the pull request head, so a pull request can
+supply both halves. The fix, `6575e9e`, resolves with the operating system
+resolver. It was found while implementing `Q7`, and the user explicitly
+authorized folding it into this increment rather than scheduling it separately.
+
+**Do not revert to `fs.realpathSync` anywhere in `read-only.mjs`**, and do not
+replace the `lstat` check in `absentInsideRoot` with a `stat` or a plain resolve:
+both exist to stop the refusal from saying where a symlink points.
 
 ## Review of record and remaining limits
 
-`C5`'s single authorized review used explicit **balanced** mode, because it adds
-no mode and balanced is the default topology. It cost **110.736851 credits**.
-Four heavy reviewers ran `gpt-5.6-terra`/high; overview ran `gpt-5.6-luna`/high.
-All five completed and every envelope parsed. There were 42 tool calls and 42
+`Q7`'s single authorized review used explicit **balanced** mode, the default
+topology, because the increment adds no mode. It cost **106.509803 credits**.
+Four heavy reviewers ran `gpt-5.6-terra`/high, overview ran `gpt-5.6-luna`/high,
+the adjudicator ran `gpt-5.6-terra`. There were 36 tool calls and 36 confined
 reads, with **no permission denial and no tool denial**.
 
-Coverage is **INCOMPLETE**: one coverage gap and three informational caveats,
-with **zero execution failures**. There were zero candidates, so no adjudicator
-session ran, and no findings, withheld findings or publication. This is not a
-clean-review claim. No defect candidate was proposed, so no implementation fix
-followed. Do not weaken a gate or rerun to obtain a positive result.
+Coverage is **INCOMPLETE**: three execution failures, zero coverage gaps, five
+informational caveats, and two accepted P2 findings. This is not a clean-review
+claim. Both findings were real defects in the new code and both are fixed, with
+tests confirmed red against the reviewed implementation. One reviewer claim was
+rejected with reasons and recorded as rejected: the described existence oracle
+does not reproduce, because the reviewed implementation answered with the absent
+reason whether or not the external target existed. The underlying defect it
+pointed at was real and is fixed.
 
-**What the run does not show matters as much as what it does.** No reviewer was
-demoted, because every envelope parsed, so the demotion path is controlled-only
-evidence. **No tier had a configured fallback**, so no fallback attempt could
-have started even had one been demoted; the `C3` execution path `C5` feeds
-remains live-unobserved, as it was before that increment. Zero candidates means
-the adjudicator never ran, so the `decisions` verifier is controlled-only too.
-The narrower live result is real and worth keeping: the verifier ran on five real
-outputs, on the execution seam, and demoted none, so it does not reject
-well-formed live output that collection then accepts.
-`performance-resources` reported the runtime-cost gap and `contracts` the
-live-fallback caveat; both are preserved as reported.
+**`C5`'s demotion fired live for the first time.** The `overview` reviewer
+returned invalid JSON, `envelopeVerifier` threw, and an attempt that had settled
+`completed` was demoted to `incomplete`. No tier had a configured fallback, so
+none started. That closes half of `C5`'s live gap. **The other half is
+unchanged**: no live review has ever had a fallback configured, so no fallback
+has ever started from a demotion.
+
+What the run does not show: no reviewer was refused an absent path, so `Q7`'s
+own behaviour has no live evidence. The reason is demonstrated to reach the tool
+result's model-facing text on the real runtime, by no-inference probe. What a
+reviewer does with it is model behaviour and is unproven. `Q7` removes a
+plausible cause of the reviewer failures on #6, #11 and #13; it does not
+establish causation, and a later clean run would not either.
 
 The complete timeline was saved before analysis, outside the checkout, as
-`c5-review-timeline.log` in the originating session's scratchpad, alongside
-`c5-review-evidence.json` and the five `c5-<reviewer>-verbatim.txt` strings.
-They stay local. The retained review is bound to originating session
-`13aa9f39-f66d-491b-bd5a-05be35833afb`; the roadmap records its invocation,
-review key, charges and exact reproduction command.
+`q7-review-timeline.log` in the originating session's scratchpad, alongside
+`q7-review-evidence.json` and the per-reviewer verbatim strings. They stay
+local. The roadmap records the invocation, binding, charges and reproduction.
 
 ## Exact next step
 
-**The next increment is `Q7`: an absent path is refused as absent, not as an
-escape.** Read "The next increment is `Q7`" under "Exact next increment" in the
-roadmap; it is authoritative and fuller than this summary.
+**There is no next increment chosen. Ask the user which one to start; do not
+pick one.** The roadmap lists what is open under "Recorded, not scheduled": a
+review against a substantial code diff, a live review with a fallback
+configured, a live review in which a reviewer is refused an absent path, `L1`,
+and `V1`. None is scheduled or authorized.
 
-**Discuss the boundary and present it before writing code, then wait for the
-user's explicit approval.** That sequence worked for `C5` and is now expected for
-any increment that touches a gate. Merging #14 is not authorization to implement
-`Q7` or to spend credits.
+If #15 is still open, the useful work is whatever the user asks about it, not a
+new increment.
 
-`insideRoot` in `read-only.mjs` resolves a requested path with `realpathSync` and
-returns `undefined` when that throws, so the permission handler rejects a path
-that simply does not exist inside the reviewed checkout exactly as it rejects one
-outside it, and the reviewer is told it may only read inside the checkout. That
-has landed on a reviewer that then failed on **#6, #11 and #13**; on #13 the
-`contracts` reviewer searched a nonexistent root-level `findings.mjs` and then
-produced no usable output. Temporal association does not prove causation, and the
-roadmap has never claimed it does.
+## Validation and runtime caveats
 
-**The safe direction is fixed in advance: an absent path stays refused. Only the
-reason changes.** `Q7` must not widen what any reviewer may read. The hard part
-is that the distinction must not leak: telling a reviewer that a path outside the
-root does not exist would report on the host filesystem, which is what
-confinement exists to prevent. The absent-path reason may only be given for a
-request that would have been inside the root had it existed, decided without
-resolving or stating anything outside the root. Weigh lexical containment before
-any filesystem call, the symlink case that `realpathSync` is there for, whether
-`permissionDenials` should record the two kinds separately and what that does to
-`smoke-reviewer-tools.mjs` and the retained record, and whether relative, empty
-and non-string paths keep their current refusal.
+The twelve controlled suites (`node scripts/smoke-<name>.mjs`) are findings,
+review, selection, retention, preview, publication, publish-later, checkout,
+config, context, fixture and target. They require no inference or network. All
+twelve pass at this handoff, as they did at each checkpoint. `git diff --check`
+is clean.
 
-`C5` did not fix this and is not a fix for it: it makes a reviewer that fails
-after such a denial eligible for a configured fallback, which is a different
-attempt with the same misleading refusal.
+`scripts/smoke-reviewer-tools.mjs`, the confinement probe outside that twelve,
+must be run and reported for any increment touching `read-only.mjs`. It spends
+no inference and sends no prompt, but it needs a live runtime connection, so it
+needs `COPILOT_CLI_PATH` and `COPILOT_SDK_PATH`:
 
-**Do not start another increment instead.** A review against a substantial code
-diff, a live review with a fallback configured, `L1` and `V1` are all recorded
-as open in the roadmap and none is scheduled or authorized.
+```sh
+COPILOT_CLI_PATH="$(command -v copilot)" \
+COPILOT_SDK_PATH="$(ls -d "$HOME"/.copilot/pkg/*/"$(copilot --version \
+  | sed -n 's/.*CLI \([0-9][0-9.]*[0-9]\).*/\1/p')"/copilot-sdk)" \
+node scripts/smoke-reviewer-tools.mjs
+```
+
+It passes at this handoff, including the assertions that reads outside the
+checkout are denied, that an absent in-root read is refused as absent, and that
+a dangling symlink in the checkout keeps the mute refusal.
+
+`Q7`'s controlled cases live in `scripts/smoke-fixture.mjs`, which drives the
+permission handler against a real temporary checkout containing a symlink out of
+it, a symlink within it, dangling symlinks, and a decoy file. Its escape
+regression asserts first that the request really opens a file outside the
+checkout, then that the handler refuses it. Keep that ordering: without the
+first assertion the test can pass while testing nothing.
+
+**Never add a timeout, deadline or stuck-reviewer heuristic.** `SCOPE.md`
+forbids review timeouts, and both `C3` and `C5` depend on their absence.
+
+No runtime API changed. CLI 1.0.83 remains the recorded runtime. Derive the SDK
+path from `copilot --version`. Consult the installed SDK and current official
+documentation before adopting new APIs. Do not revisit Agent Factories without a
+new CLI version. Do not widen `F6`'s marker unwrap or reintroduce substring
+matching. The three no-inference runtime facts `Q7` established are recorded in
+the roadmap: every path reaching the permission handler is already absolute,
+absolute paths arrive verbatim, and a rejection's `feedback` reaches the
+model-facing tool result while flipping `resultType` from `rejected` to
+`denied`.
+
+The personal config probe fails its first assertion if personal
+`pr-review/config.json` exists. Move it aside only if running that probe, restore
+it afterwards, and verify the restore with `shasum -a 256`. That file was not
+moved or edited in the `Q7` session.
+
+Cold resume of command-only records remains unsupported. The adjudicator is
+zero-tool; citations remain limited to captured diff/context windows.
 
 ## For a future authorized increment
 
 Work on its own branch and pull request. Commit and push first; check out that
-pull request head before installing. Only after that increment is authorized:
+pull request head before installing.
 
 ```sh
 gh pr checkout NUMBER
@@ -143,8 +178,7 @@ Choose the mode explicitly and justify it; balanced is the default when no other
 topology is required. Capture the complete stdout timeline outside the checkout
 and save original reviewer strings before analyzing. Do not modify the working
 tree while reviewers read it. There is no timeout: a quiet timeline is not a
-hang. Wait for completion or explicit manual cancellation.
-`copilot -p "/pr-review NUMBER"` starts an ambient model turn and is not a
+hang. `copilot -p "/pr-review NUMBER"` starts an ambient model turn and is not a
 substitute for command dispatch. Findings stay local; no publishing is
 authorized.
 
@@ -152,60 +186,14 @@ The standing workflow authorizes exactly one review per increment pull request,
 not reruns, extra probes, or `scripts/smoke-factory.mjs --spend`. Historical
 reviews are already spent and carry no authorization forward.
 
-## Validation and runtime caveats
-
-The twelve controlled suites (`node scripts/smoke-<name>.mjs`) are findings,
-review, selection, retention, preview, publication, publish-later, checkout,
-config, context, fixture and target. They require no inference or network. All
-twelve passed before `C5` editing, at the reviewed implementation checkpoint, and
-again after the documentation commits. `git diff --check` is clean.
-
-`Q7` will also touch `scripts/smoke-reviewer-tools.mjs`, the confinement probe
-outside that twelve. It spends no inference and sends no prompt, but it needs a
-live runtime connection, so it must be run with the same `COPILOT_CLI_PATH` and
-`COPILOT_SDK_PATH` settings the review dispatch uses, and it must be run and
-reported for that increment. It passed unchanged at this handoff, including
-"reads outside the reviewed checkout are denied by the permission handler",
-which is the assertion `Q7` must keep true while changing only the reason.
-
-`C5`'s focused additions are in `smoke-review.mjs`, whose harness now scripts
-reviewer prose, a wrong-key envelope, a refused candidate beside a valid one and
-a fallback that returns prose, and in `smoke-findings.mjs`, which holds
-`envelopeVerifier` to exactly the corpus `collectCandidates` accepts and
-discards. Keep those equivalence assertions: `envelope()` now has two callers
-that must stay identical.
-
-**Never add a timeout, deadline or stuck-reviewer heuristic.** `SCOPE.md` forbids
-review timeouts, and both `C3` and `C5` depend on their absence: elapsed time is
-never a fallback trigger, and `C5` sits beside the reviewer precisely because a
-hung reviewer never settles.
-
-No runtime API was changed. CLI 1.0.83 remains the recorded runtime. Derive the
-SDK path from `copilot --version`; old packages remain installed. Consult the
-installed SDK and current official documentation before adopting new APIs. Do not
-revisit Agent Factories without a new CLI version. Do not widen `F6`'s marker
-unwrap or reintroduce substring matching; #14 added five more well-formed
-envelopes to its live evidence and changed nothing about it.
-
-The personal config probe fails its first assertion if personal
-`pr-review/config.json` exists. Move it aside only if running that probe, restore
-it afterwards, and verify the restore with `shasum -a 256`. It requires a second
-non-ambient model with configurable effort and a model with none. That file was
-not moved or edited in the `C5` session.
-
-Cold resume of command-only records remains unsupported. The adjudicator is
-zero-tool; citations remain limited to captured diff/context windows.
-
 ## Landing and handoff
 
 Follow `AGENTS.md`: meaningful validated checkpoint commits, a named increment
 branch and pull request, never direct `main` pushes, no force-push or amended
 published history. Merging remains the user's decision. Preserve unrelated
 changes. Inspect enumerations and counts when extending a concept. Update
-`README.md` for user-visible behaviour; `C5` did, under "Discarded output is a
-failed attempt (C5)", and it also corrected the `C3` section that still promised
-the asymmetry `C5` closed. `Q7` changes a user-visible refusal message and will
-need its own README update.
+`README.md` for user-visible behaviour; `Q7` did, under "An absent path is
+refused as absent (Q7)" and in the confinement paragraph above it.
 
 Finish implementation, validation and roadmap evidence first. Rewrite
 `HANDOFF.md` as the final repository file edit before the session-ending commit,
