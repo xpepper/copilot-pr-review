@@ -936,8 +936,10 @@ plus draft and closed fixture PRs so that no reviewer ever starts.
 ```
 
 A repository may carry `.copilot/pr-review/config.json`, a record of the same
-shape as the personal file: `{"schemaVersion": 1, "settings": {...}}` with the
-same seven keys and no others. It is read **only** when the personal store holds
+shape as the personal file: `{"schemaVersion": 1, "settings": {...}}` carrying
+the same configuration keys as the personal store and no others, which since
+`C3` means the six tier keys, the six optional fallback keys, and
+`autoPostReviews`. It is read **only** when the personal store holds
 an explicit trust record for that exact working directory. Without one the file
 is located but never parsed, never merged, and reported as ignored in every
 configuration report and before every review.
@@ -1046,7 +1048,9 @@ legitimate fallback.
 Fallbacks have no invocation flag, like the light and medium tiers before them:
 `/pr-review-config` is the only place to set them. A `heavyModel=` flag overrides
 the tier's own assignment for that invocation while the configured fallback
-stays as saved.
+stays as saved. An explicitly trusted project's file may carry the fallback keys
+like any other configuration key, and they layer the same way, so trusting a
+repository lets it choose which model answers a failed reviewer.
 
 Which reviewers get one follows the tier, so it follows the mode. A heavy
 fallback covers quick's three specialists, balanced's and full's four heavy
@@ -1064,6 +1068,17 @@ informational caveat naming both assignments and the primary failure, and the
 retained record keeps the failed attempt beside the one that produced the
 result. A recovered reviewer reports completed coverage; a fallback that fails
 too leaves the reviewer incomplete with both failures recorded.
+
+One limitation worth knowing before you configure a fallback. Eligibility is
+tied to how the reviewer's **execution** settled, not to whether its output
+turned out usable. A reviewer that returns text the evidence boundary cannot
+parse counts as completed execution, so it gets no fallback even though its
+output is discarded and its coverage is lost. An empty response does get one,
+because that fails during execution. The asymmetry matters here: discarded
+output is the most common way a reviewer has failed in this project's own live
+reviews. Closing it is tracked as increment `C5` in [ROADMAP.md](ROADMAP.md),
+because the retry decision then has to move to the evidence boundary, after every
+reviewer has settled, rather than staying beside the reviewer that failed.
 
 Reproduce the controlled probes:
 
