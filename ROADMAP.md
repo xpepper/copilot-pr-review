@@ -49,8 +49,9 @@ posting them.
 | F5 | Completed | Structured output is demonstrated unusable on CLI 1.0.83: the factory surface is behind a CLI feature flag and reachable only from a joined foreground session, a joining extension cannot register the permission handler that confines reviewer reads, and a custom agent's declared `view`/`grep`/`glob` grant leaks `skill` and `sql`. Retry cost, `null` failure semantics and module reach measured below. Recommendation recorded: fall back to a narrow fence unwrap, with its cost stated and the choice left to the user. No reviewer was migrated. | M1, F3; [Technical feasibility](SCOPE.md#technical-uncertainties-and-proposed-sequence) |
 | F6 | Completed | Reviewer output survives a model that wraps it. Reviewers and the adjudicator are asked for the envelope between two explicit markers, and code unwraps that delimiter pair, then one fence that wraps the whole response; markers and fences count only when they are the whole line, so payload text is never a wrapper. Everything after the parse is unchanged, and a table below pins what is still discarded whole. Demonstrated by the full-mode review of pull request #7, which discarded four reviewers on a substring-counting defect it also reported; that defect is fixed and the captured outputs replayed. | F5; [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | M2 | Completed | `--deep` runs one integrated heavy reviewer over the whole pull request and presents every substantiated severity; a second mode flag is refused. Demonstrated by the twelve controlled suites, the installed no-inference dispatch, and the live deep review of pull request #8, which reached completed coverage on 68.27393 credits and found two real defects in its own documentation. | F6, M1; [Modes](SCOPE.md#review-modes-and-findings) |
-| C3 | Pending | Explicit optional fallback with at most one eligible retry per failed reviewer; no timers or silent substitutions. | C1, Q3; [Fallbacks/execution](SCOPE.md#models-configuration-and-execution) |
-| C4 | Pending | A tier whose resolved model supports no configurable reasoning effort resolves to no effort instead of inheriting one, so such a model can serve a tier. An explicit effort is still validated and never silently lowered. | C1; [Configuration](SCOPE.md#models-configuration-and-execution) |
+| C3 | Completed | A tier may carry one optional fallback assignment, used for one extra attempt for the one reviewer whose own execution failed. No timer, no whole-review restart, no silent substitution, and no cross-tier inheritance. Demonstrated by the twelve controlled suites, two installed no-inference probes, and the live balanced review of pull request #10, which cost 233.19659 credits, completed all six sessions and found one real documentation defect. No fallback attempt has run live. | C1, Q3; [Fallbacks/execution](SCOPE.md#models-configuration-and-execution) |
+| C4 | Pending | A tier whose resolved model supports no configurable reasoning effort resolves to no effort instead of inheriting one, so such a model can serve a tier. An explicit effort is still validated and never silently lowered. Since C3 the same defect blocks a fallback model that advertises no effort. | C1; [Configuration](SCOPE.md#models-configuration-and-execution) |
+| C5 | Pending | A completed reviewer whose output the evidence boundary discards becomes eligible for its tier's one fallback attempt, as an empty response already is. Found by pull request #10's overview reviewer and discarded by the changed-line anchoring rule. | C3, Q4; [Fallbacks/execution](SCOPE.md#models-configuration-and-execution) |
 | V1 | Pending | `--verify` enforces matching branch/SHA/cleanliness before reviewers and presents discovered existing commands for approval. | Q1; [Safeguards](SCOPE.md#optional-project-safeguards) |
 | V2 | Pending | Execute only approved existing safeguards with installed dependencies; show evidence and artifacts without autofix or checkout manipulation. | V1; [Safeguards](SCOPE.md#optional-project-safeguards) |
 | D1 | Pending | Document configuration, modes, incomplete coverage, cancellation, publication, cache, and safeguards with reproducible end-to-end examples. | Remaining v1 items; [Release boundary](SCOPE.md#priority-and-release-boundary) |
@@ -2204,8 +2205,9 @@ resolution in `extension.mjs`. Exercises: `scripts/smoke-config.mjs` and
 
 - A repository may carry `.copilot/pr-review/config.json`, a record of the same
   shape as the personal file, `{"schemaVersion": 1, "settings": {...}}`, with the
-  same seven keys and no others. Its own schema version is tracked separately
-  from the personal record's.
+  same configuration keys as the personal store and no others: the seven of `C2`,
+  and the six optional fallback keys `C3` added. Its own schema version is
+  tracked separately from the personal record's.
 - It is read **only** when the personal store holds an explicit trust record for
   that exact working directory. Without one the file is located but never parsed,
   never merged, and reported as ignored by `/pr-review-config show` and by the
@@ -4619,52 +4621,405 @@ installed runtime to demonstrate deep mode itself.
   family checking itself, which is weaker than the cross-model check a mixed-tier
   mode gets.
 
+## Completed increment: C3
+
+Implementation: the optional fallback assignment in
+`extensions/pr-review/config.mjs`, its resolution and display in `review.mjs`,
+the single attempt in `fixture.mjs`, and its evidence in `coverage.mjs` and
+`retention.mjs`. Probes: `scripts/smoke-config.mjs`, `smoke-review.mjs`,
+`smoke-retention.mjs` and `smoke-config-runtime.mjs`. No upstream source was
+copied. No timeout, safeguard, reviewer shell tool, gate override, mode or
+interactive menu was added, and no user checkout was altered to satisfy the
+revision gate. `L1` remains pending.
+
+### Configuration boundary
+
+- Six new keys, `<tier>FallbackModel` and `<tier>FallbackEffort` for light,
+  medium and heavy, alongside the six primary tier keys and `autoPostReviews`.
+  They layer exactly like the others: invocation flags, then a trusted project's
+  file, then personal settings.
+- **A fallback never inherits from another tier.** Unset means this tier has no
+  fallback, not that a neighbouring tier can stand in for it. That is the whole
+  point of "optional fallbacks start unset and must be configured explicitly":
+  cross-tier inheritance would hand a tier a fallback nobody configured for it.
+- An unset `<tier>FallbackEffort` follows that tier's own effective effort,
+  reported as source `primary`, and the resulting pair is then validated like any
+  other explicit assignment. An effort the fallback model cannot support is
+  refused, never lowered; the fix is to set `<tier>FallbackEffort` explicitly.
+- `<tier>FallbackEffort` without `<tier>FallbackModel` configures nothing, so
+  storing that pair is refused. One that arrives anyway, from a hand-edited file
+  or a project file changed after it was trusted, stays inert and is reported in
+  the configuration display rather than guessed at.
+- A fallback that resolves to exactly this tier's own model **and** effort is not
+  a fallback; it is reported `NOT OFFERED` and is never attempted. The same model
+  at a different effort still is one.
+- Fallbacks have no invocation flag, like `lightModel` and `mediumModel` before
+  them. They are configuration only.
+- The configuration report prints a `fallback:` line for every tier, so an unset
+  one is visibly unset, and states the attempt policy: at most one attempt, only
+  for a reviewer whose own execution failed explicitly, never a whole-review
+  restart, and never triggered by elapsed time.
+
+### Controlled evidence: the configuration surface
+
+Test-first: every assertion below was written first and failed on the missing
+`resolveFallback` and `orphanFallbackEfforts` exports and on the missing display
+lines. One of them caught a wrong expectation in the test itself, which was
+corrected rather than the code.
+
+`node scripts/smoke-config.mjs` passes, with no network and no inference:
+
+- Fallbacks start unset; configuring a tier does not configure a fallback for it;
+  a light fallback is not inherited by heavy and a heavy fallback is not
+  inherited by light.
+- An unset fallback effort follows the tier's effective effort, including one set
+  by an invocation flag; an explicit one is used as configured; a trusted
+  project's fallback keeps its own origin label.
+- The identical-to-primary case, including one an invocation flag creates.
+- Refusals that change nothing: an unavailable, disabled, `auto` or compound
+  fallback model; an unsupported explicit fallback effort; a tier effort the
+  fallback model cannot support; a fallback model advertising no configurable
+  effort at all (the case `C4` exists to allow); an orphan fallback effort; and
+  the same check on a non-heavy tier.
+- The display shows one `fallback:` line per tier, the configured line with its
+  origins, `NOT OFFERED`, `UNUSABLE`, and the orphan note, plus the attempt
+  policy prose; the help text carries the same policy.
+- Storing, replacing and clearing a fallback pair through `/pr-review-config`,
+  with every refusal leaving the stored file byte-identical.
+
+### Execution boundary
+
+- The fallback is one extra attempt for **one** reviewer, run in place while the
+  other reviewers continue. Nothing is restarted, no other reviewer is touched,
+  and a reviewer gets at most one fallback attempt whatever happens to it.
+- **Only that reviewer's own execution failure is eligible**, meaning the attempt
+  settled `incomplete`: a session error, a shutdown before completion, no usable
+  output, a forbidden tool call, or usage that did not match the assignment.
+  Cancellation is never eligible, and an aborted signal stops a fallback that has
+  not started.
+- **Elapsed time is never eligible**, because nothing imposes a deadline. A hung
+  reviewer never settles, so it is never replaced; that is the constraint
+  `SCOPE.md` states, and it falls out of the design rather than being checked for.
+- Setup refusals stay refusals. An unusable explicit assignment, a runtime that
+  does not retain the assignment, a checkout it will not point at, or a tool set
+  it will not enforce still refuses before any reviewer starts, and no fallback
+  substitutes for it. The fallback answers a failure during execution, not an
+  invalid configuration.
+- A fallback attempt is prepared exactly like a primary one: its own session, its
+  own catalog validation, the same retained-assignment check, the same working
+  directory and the same confined tool set. A fallback that cannot start leaves
+  the reviewer with the attempt that actually ran, and says why.
+- The adjudicator resolves the heavy tier like any other reviewer, so its own
+  explicit failure is eligible for that tier's one fallback attempt too.
+
+### Evidence boundary
+
+The evidence boundary itself is unchanged: the marker contract and its unwrap,
+the exact-key check, the schema version and review-key binding, the citation,
+quote and changed-line gates, adjudication, deduplication, selection, retention
+and the publication gates never learned about fallbacks. What changed is what a
+reviewer record says about how it was produced.
+
+- A recovered reviewer's record describes the attempt that produced its result,
+  and keeps the failed one in `fallbackFrom`. **A fallback is never invisible**:
+  without that field the record would show one completed reviewer on a model
+  nobody configured as its primary.
+- Coverage adds a non-blocking `caveat` naming both assignments and the primary
+  failure, so a recovered reviewer reports completed coverage and still says what
+  happened. When the fallback also fails, the reviewer stays incomplete and both
+  failures are reported.
+- Retention validates the new field as an attempt: the same shape as a reviewer
+  minus the label, its status must be `incomplete`, and it must not repeat the
+  assignment that just failed. The optional field does not change the record
+  schema version, which tracks publication authority.
+
+### Controlled evidence: assignment, execution and retention
+
+Test-first throughout. The execution assertions failed first on a reviewer that
+stayed incomplete with no second session, and the evidence assertions on the
+missing caveat and on retention rejecting the unknown `fallbackFrom` key.
+
+All twelve controlled suites pass, and `git diff --check` is clean:
+
+```sh
+for s in findings review selection retention preview publication publish-later \
+         checkout config context fixture target; do node scripts/smoke-$s.mjs; done
+git diff --check
+```
+
+New demonstrations, none of which start inference or touch the network:
+
+- Assignment: a configured tier fallback reaches every reviewer on that tier and
+  no other, so a heavy fallback never reaches balanced's light overview reviewer;
+  the light tier's own fallback follows the light tier's effort; deep's single
+  integrated reviewer carries the heavy fallback; an unusable fallback refuses
+  the review before anything starts; and one made identical by configuration or
+  by an invocation flag is not offered.
+- Execution: a failed reviewer recovered by its fallback reports completed
+  coverage, one extra session, the fallback's model on the record and the primary
+  failure in `fallbackFrom`, while the other reviewers keep their own model and
+  are not retried. A fallback that also fails leaves the reviewer incomplete with
+  both failures and still only one extra session. A fallback that cannot start
+  creates no session and leaves the primary attempt as the outcome. A completed
+  reviewer and a cancelled run start no fallback at all. The adjudicator's own
+  failure gets its tier's one attempt.
+- Evidence: a retained record round-trips both attempts, drops the live policy
+  object from the failed one, keeps completed coverage, renders the caveat, and
+  is rejected when the failed attempt claims to have completed or been cancelled,
+  when it repeats the surviving assignment, when it carries a label, or when it
+  loses its model.
+
+### User-visible documentation
+
+`README.md` gains a "Configured fallback models (C3)" section stating the whole
+policy: one extra attempt for the one reviewer that failed, what is eligible and
+what is not, that elapsed time never is, that fallbacks start unset and never
+inherit across tiers, that they have no invocation flag, which reviewers a tier's
+fallback covers in each mode, and what the timeline, the coverage report and the
+retained record show when one is used. The C1 key list now names all six new
+keys, the invocation-flag paragraph says there is no fallback flag, and the
+runtime boundary names the capability. The extension's own `help` and `status`
+text carry the same policy in short form.
+
+### Installed-plugin evidence
+
+The extension was reinstalled with `copilot plugin install "$(pwd)"` at the
+branch head before each probe. Neither probe sent a model prompt, so neither
+spent Copilot credits. CLI 1.0.83 with its bundled SDK, Node.js 26.1.0,
+macOS arm64.
+
+`smoke-runtime.mjs --targets --startup` passed unchanged. It dispatches all four
+modes against a skipped draft and asserts their assignment displays; this
+increment adds a line to that display only when a fallback is configured, and
+that probe configures none, so its expectations are unchanged.
+
+`smoke-config-runtime.mjs` was extended with the C3 surface and passed against
+the **installed** plugin with the child-only controlled `gh` fixture:
+
+- Native refusals that left the stored file byte-identical: an unavailable
+  fallback model, an unsupported explicit fallback effort, and a fallback effort
+  with no fallback model.
+- `heavyFallbackModel=<alternate> heavyFallbackEffort=<effort>` stored exactly
+  those two keys beside the existing settings. After an extension reload, `show`
+  reported the heavy fallback line with `configured:heavy` origins, `(none)` for
+  the other two tiers, and the fallback policy prose including the sentence that
+  elapsed time alone never triggers one. The reloaded process therefore read the
+  stored file rather than run memory.
+- A real `/pr-review 2 --deep --no-comment` invocation displayed the fallback
+  under the `integrated [heavy]` reviewer and the summary line `Configured
+  fallbacks: 1 of 1 reviewer(s) have one`. PR 2 is the fixture draft, so it is
+  skipped and no reviewer ever starts.
+- A real `/pr-review 2 --balanced --no-comment` invocation displayed `Configured
+  fallbacks: 4 of 5 reviewer(s) have one` and exactly four fallback lines, so the
+  light overview reviewer really does resolve a tier with no fallback.
+- `unset heavyFallbackModel heavyFallbackEffort` restored the rest of the saved
+  configuration byte for byte.
+
+Two notes for whoever runs that probe next. It does **not** refuse when a
+personal `<copilot-config-home>/pr-review/config.json` already exists, as
+`HANDOFF.md` claimed; it fails its first assertion, which expects `not created
+yet`. Move the file aside and restore it afterwards. This session did, and
+verified the restore with `shasum -a 256`: digest
+`30794150a3db740f7dcf6f9d7a5a827d3729c5599f7456f582af735d3f297ea9`, mode `0600`,
+before and after. The probe also now needs a **second** usable subscription
+model, one that is not the ambient model and advertises a configurable reasoning
+effort, because a fallback identical to the tier's own assignment is not offered.
+
+The other installed probes were last rerun on pull requests #5 and #7.
+`smoke-reviewer-tools.mjs` and `smoke-retention-runtime.mjs` exercise reviewer
+tool confinement and retained-record reload, neither of which this increment
+changes; the fallback attempt reuses the same session preparation they cover.
+
+### Live inference: the balanced review of pull request #10
+
+`C3` landed on branch `c3-fallback-models` and pull request #10. The installed
+plugin reviewed it once, in **balanced** mode, named explicitly rather than taken
+as the default. Balanced because this increment changes no mode, so the honest
+choice is the topology users get by default, and because it exercises two tiers:
+four heavy specialists and the light overview reviewer.
+
+```sh
+gh pr checkout 10
+copilot plugin install "$(pwd)"
+COPILOT_CLI_PATH="$(command -v copilot)" \
+COPILOT_SDK_PATH="$(ls -d "$HOME"/.copilot/pkg/*/"$(copilot --version | sed -n 's/.*CLI \([0-9][0-9.]*[0-9]\).*/\1/p')"/copilot-sdk)" \
+node scripts/dogfood-review.mjs 10 --balanced --all --no-comment
+```
+
+Reviewed head `6ce2a76`, base `3f24920`, twelve files, 89151 diff bytes, 984
+additions and 88 deletions. Five reviewers plus one adjudicator, all from saved
+personal configuration:
+
+| Reviewer | Tier | Model | Effort | Reads | Outcome | Credits |
+| --- | --- | --- | --- | --- | --- | --- |
+| correctness | heavy | `gpt-5.6-terra` | high | 18 | completed | 57.14420 |
+| contracts | heavy | `gpt-5.6-terra` | high | 21 | completed | 53.84692 |
+| security | heavy | `gpt-5.6-terra` | high | 9 | completed | 41.80955 |
+| performance-resources | heavy | `gpt-5.6-terra` | high | 5 | completed | 39.93555 |
+| overview | light | `gpt-5.6-luna` | high | 32 | completed | 7.77092 |
+| evidence-validator | heavy | `gpt-5.6-terra` | high | 0 | completed | 32.68945 |
+
+Every session completed and every output parsed, so **the `F6` marker contract
+now has live evidence from a third run**, and this one is the widest: six
+sessions across two model families in one review. Eighty-five reads and
+seventy-nine confined tool calls, **no permission denial and no tool denial**.
+Cost: **233.19659 credits**. Nothing was published.
+
+Coverage was **incomplete**, on six blocking issues: four coverage gaps and two
+candidates rejected at the evidence boundary. One finding was validated and
+selected, nothing was withheld, nothing was rejected by the adjudicator as a
+false positive, and one informational caveat was recorded.
+
+**The four coverage gaps are all the same true observation**, reported
+independently by correctness, contracts, security and performance-resources: the
+fallback execution path has controlled coverage only, and no installed-runtime
+review has ever watched a reviewer actually fall back. That is exactly right, and
+it is recorded as this increment's first remaining limitation rather than argued
+with. It is also a fair test of the consolidation rule added earlier: the four
+were **not** consolidated, because they share no backticked identifier.
+
+**Findings, and what changed.**
+
+- `correctness:1` / `contracts:2`, P3 at confidence 0.99, deduplicated into one
+  finding reported by both: the trusted-project section still said a project file
+  carries "the same seven keys and no others", while this increment made the
+  supported set thirteen. Fixed in `README.md` and in `C2`'s roadmap section, by
+  deriving the sentence from the key list rather than restating its size. This is
+  the fourth time a stale enumeration has been the defect a review of this
+  project found, and the first time it was a **count** rather than a list.
+
+**Rejected at the evidence boundary, and what that cost.** Both of the overview
+reviewer's candidates were discarded before adjudication, neither for being
+wrong:
+
+- `overview:2` was the same key-count defect the two heavy reviewers found, with
+  a citation that did not exactly match a supplied context window. No loss: the
+  finding survived through the other two.
+- `overview:1` was a **P2 at confidence 0.95 that nothing else found**, discarded
+  because its introduction citations and its location did not identify the same
+  changed hunk. Its substance is real and is recorded below and as increment
+  `C5`. This is the third pull request on which the changed-line anchoring rule
+  has thrown away a true finding, and the first on which it threw away the most
+  valuable one in the review.
+
+### Remaining limitations
+
+- **No fallback attempt has ever run live.** Four reviewers said so in their own
+  words, and they are right. The attempt, its second session, its confinement,
+  its usage check and its recovery are demonstrated only against test doubles;
+  the installed evidence covers the configuration and display surface. A live
+  demonstration needs a reviewer that fails on demand in a real run, which
+  nothing in this repository can arrange without weakening a gate.
+- **A discarded output is not eligible, and that is the most common real
+  failure.** Eligibility is tied to how the reviewer's execution settled. A
+  reviewer that returns text the evidence boundary cannot parse settles as
+  `completed`, so it gets no fallback, even though its output is discarded and
+  its coverage is lost; an empty response does get one, because it fails during
+  execution. Four of this project's own live reviews were incomplete for exactly
+  the reason a fallback cannot answer. `overview:1` found this and the anchoring
+  rule discarded it; it is increment `C5`, and it was deliberately not fixed
+  here, because the retry decision has to move across the evidence boundary this
+  increment deliberately did not touch: envelope validation happens in
+  `findings.mjs` after every reviewer has settled, so the attempt would run after
+  the batch rather than beside the reviewer that failed, collection would have to
+  run twice, and what `completed` means would change for every mode whether or
+  not a fallback is configured. That is its own increment, with its own tests and
+  its own live review.
+- A setup failure still fails the whole review rather than one reviewer. If
+  `createSession` or one of the assignment checks throws while reviewers are
+  being prepared, no reviewer starts and no fallback applies. That is deliberate,
+  but it means a transient failure at preparation time is not covered.
+- A fallback identical to the tier's own assignment is dropped rather than
+  refused at configuration time, so `show` is the only place that says so. A user
+  who configures one and never runs `show` sees `NOT OFFERED` only in the
+  pre-execution report.
+- The fallback effort inherits the tier's own effort when unset, so a fallback
+  model advertising no configurable effort at all cannot serve a tier that has
+  one. That is the same defect `C4` exists to fix, now on a second surface.
+- One run is one sample. That this review reached completed execution on all six
+  sessions says nothing about how often a reviewer fails in general, and
+  therefore nothing about how often a fallback would fire.
+
+
 ## Exact next increment
 
-**`M2` is complete.** `--deep` runs one integrated heavy reviewer over the whole
-pull request, presents every substantiated severity, and refuses a second mode
-flag. Pull request #8's deep review demonstrated it end to end and reached
-completed coverage, the first of this project's own increment pull requests to do
-so. It found two real defects in its own documentation; both are fixed above.
-Pull request #8 is merged, and `main` carries it.
+**`C3` is complete.** A tier may carry one optional fallback assignment, used for
+one extra attempt for the one reviewer whose own execution failed. Pull request
+#10's balanced review demonstrated the configuration and display surface end to
+end on the installed plugin; the attempt itself rests on the controlled suites,
+because no reviewer failed during that run.
 
-Every mode in `SCOPE.md`'s table now exists, so the next increment leaves the
-mode surface. Two candidates are ready, and `C3` is the smaller one.
+**Take `C4` next: a tier whose model supports no configurable effort.** It is
+small, fully specified, blocked by nothing, and needs no product decision. Such a
+tier should resolve to **no** effort rather than inheriting one, so a model like
+`claude-haiku-4.5` can serve it. An explicit effort is still validated and never
+silently lowered, and an inherited effort is still refused rather than dropped
+when the model does support efforts; the change is that a model advertising
+**none** stops inheriting an effort it cannot hold.
 
-**`C3`, configured fallback models.** At most one configured fallback attempt per
-eligible failed reviewer, never a whole-review restart, never a timer, and never
-a silent substitution. Optional fallbacks start unset and must be configured
-explicitly. `SCOPE.md`'s "Models, configuration, and execution" section is the
-requirement, and `C1`'s tier layering and `smoke-config.mjs` are the shape to
-extend. Note the constraint that makes this delicate: elapsed time alone must
-never trigger a fallback, so a hung reviewer waits indefinitely and only an
-explicit failure is eligible.
+`C3` gave `C4` a second surface with the same defect, and both should be fixed
+together: a fallback model that advertises no configurable effort is refused
+today because the tier's own effective effort carries over to it, which the C3
+controlled evidence above records as a test case. Expect to touch `resolveField`
+and `resolveFallback` in `config.mjs`, `tierValidation` and
+`validateModelAssignment`, and the assertions in `smoke-config.mjs` that pin the
+current refusals. Note that `reviewAssignments` already fills an unset effort
+from the runtime's resolved default and revalidates it, so check what the
+installed runtime reports for such a model before assuming `undefined` survives.
 
-**`C4`, a tier whose model supports no configurable effort.** Such a tier should
-resolve to no effort rather than inheriting one, so that model can serve the
-tier. An explicit effort is still validated and never silently lowered.
+**Then `C5`, and ask before starting it: eligibility for a discarded output.**
+Pull request #10's overview reviewer found it, at P2 and confidence 0.95, and the
+changed-line anchoring rule discarded it. A reviewer whose output the evidence
+boundary cannot parse settles as `completed`, so it never becomes eligible for
+its tier's one fallback attempt, while a reviewer that returns nothing does. Four
+of this project's own seven live reviews were incomplete for exactly the reason a
+fallback cannot answer, so this is the increment that decides whether `C3` is
+useful in practice rather than only correct.
+
+It is deliberately not a small increment, and it is a product decision as much as
+a change, which is why it needs its own authorization:
+
+- The retry decision has to move across the evidence boundary. Envelope
+  validation lives in `findings.mjs` and runs in `collectCandidates` after every
+  reviewer has settled, so the attempt would start after the batch rather than
+  beside the reviewer that failed, and collection would have to run twice.
+- What `completed` means changes for every mode, whether or not a fallback is
+  configured, so coverage classification, the retained record's reviewer status
+  and `smoke-retention.mjs`'s invariants all move with it.
+- A second reviewer run on a large diff costs real credits. On #10 a single heavy
+  reviewer cost between 39 and 58 of the 233 credits the review spent.
+
+One shape worth weighing first: `reviewAssignments` already turns a `completed`
+attempt into an `incomplete` one when reported usage does not match the
+assignment. An optional `verifyResult` hook on the same seam, passed from
+`review.mjs` with the review key, would keep the retry beside the reviewer and
+out of `findings.mjs`. That is a design to evaluate, not a decision already
+taken.
 
 Three older observations remain open and separately authorizable, and one of them
-is now the oldest thing here. **No review of any mode has ever run against a
-substantial code diff.** All six live reviews read this project's own
-documentation-heavy pull requests, and #8's two findings were both documentation
-defects. Review quality on real code is undemonstrated, and no amount of further
-mode work will change that. Second, the changed-line anchoring rule has discarded
-true findings on pull requests #4 and #5 and rejected two mis-anchored candidates
-on #6; a later increment should decide how a candidate can anchor on the changed
-line that causes a breakage while citing the unchanged line it breaks. Third,
-pull request #6's read denials landed on the two reviewers that then failed;
-neither #7 nor #8 had a denial at all, so that one may have been specific to #6.
+is still the oldest thing here. **No review of any mode has ever run against a
+substantial code diff**, though pull request #10 is the closest yet: 984
+additions over 12 files, most of it real logic rather than prose. Second, the
+changed-line anchoring rule has discarded true findings on pull requests #4 and
+#5 and rejected two mis-anchored candidates on #6; a later increment should
+decide how a candidate can anchor on the changed line that causes a breakage
+while citing the unchanged line it breaks. Third, pull request #6's read denials
+landed on the two reviewers that then failed; #7, #8 and #10 had no denial at
+all, so that one may have been specific to #6.
 
-`F6`'s marker contract now has live evidence from two separate runs: five of six
-reviewers on #7, and both sessions on #8. Do not reintroduce substring matching
-and do not widen the unwrap.
+`F6`'s marker contract now has live evidence from three separate runs: five of
+six reviewers on #7, both sessions on #8, and every session on #10. Do not
+reintroduce substring matching and do not widen the unwrap.
 
 Do not revisit the Agent Factories surface without new information from GitHub.
 Three separate blockers were demonstrated on CLI 1.0.83, and all three would
 have to change: the feature flag, the extension-only factory registration, and
 the confined tool grant that leaks `skill` and `sql`. A new CLI version is new
 information; a new reading of the same documentation is not.
+
+Do not add a timeout, a deadline or a "stuck reviewer" heuristic to make
+fallbacks fire more often. `SCOPE.md` forbids review timeouts, and `C3` depends
+on their absence: elapsed time is never a fallback trigger.
 
 Keep `L1` pending and copy no upstream source. Land every increment on its own
 branch and pull request, review that pull request with this plugin before asking

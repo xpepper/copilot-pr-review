@@ -38,6 +38,23 @@ function identity(value) {
   requireValue(uuid.test(value.invocationId), "invalid invocation ID");
   text(value.sessionId);
 }
+function attempt(value) {
+  text(value.model);
+  requireValue(["completed", "incomplete", "cancelled"].includes(value.status), "invalid reviewer state");
+  for (const key of ["error", "reasoningEffort", "sessionId"]) if (value[key] !== undefined) text(value[key]);
+  for (const key of ["startedAt", "completedAt"]) {
+    if (value[key] !== undefined) requireValue(value[key] === null || Number.isFinite(value[key]), "invalid reviewer timing");
+  }
+  if (value.usage !== undefined) {
+    requireValue(Array.isArray(value.usage), "invalid usage attribution");
+    for (const usage of value.usage) {
+      object(usage, [], ["model", "reasoningEffort", "isByok"]);
+      if (usage.model !== undefined) text(usage.model);
+      if (usage.reasoningEffort !== undefined) text(usage.reasoningEffort);
+      requireValue(usage.isByok === undefined || typeof usage.isByok === "boolean", "invalid provider attribution");
+    }
+  }
+}
 function repository(value) {
   object(value, ["id", "host", "nameWithOwner"], ["url"]);
   Object.values(value).forEach(text);
@@ -153,7 +170,8 @@ function validation(value, target, policy) {
   requireValue([...candidates].every((id) => ids.has(id) || excluded.has(id)), "unaccounted duplicate alias");
 }
 
-const reviewerKeys = ["label", "model", "reasoningEffort", "sessionId", "status", "error", "usage", "startedAt", "completedAt"];
+const attemptKeys = ["model", "reasoningEffort", "sessionId", "status", "error", "usage", "startedAt", "completedAt"];
+const reviewerKeys = ["label", ...attemptKeys, "fallbackFrom"];
 const outcomeKeys = ["invocation", "binding", "mode", "noComment", "complete", "reviewComplete",
   "executionComplete", "coverage", "cancelled", "error", "cleanupErrors", "disposition", "reason", "selection", "preview", "publication"];
 
@@ -165,8 +183,15 @@ const publicationSchemaVersion = (outcome) =>
 
 export function retainedRecord(outcome) {
   const result = pick(outcome, outcomeKeys);
-  result.reviewers = (outcome.reviewers ?? []).map((reviewer) => pick(reviewer, reviewerKeys));
-  if (outcome.adjudicator) result.adjudicator = pick(outcome.adjudicator, reviewerKeys);
+  // A reviewer that fell back keeps the failed attempt, reduced to the same
+  // fields, so the record never presents the fallback as the only thing that ran.
+  const reviewerRecord = (reviewer) => {
+    const record = pick(reviewer, reviewerKeys);
+    if (reviewer.fallbackFrom) record.fallbackFrom = pick(reviewer.fallbackFrom, attemptKeys);
+    return record;
+  };
+  result.reviewers = (outcome.reviewers ?? []).map(reviewerRecord);
+  if (outcome.adjudicator) result.adjudicator = reviewerRecord(outcome.adjudicator);
   if (outcome.validation) {
     result.validation = {
       ...pick(outcome.validation, ["complete", "findings", "rejected", "issues", "diagnostics", "capped"]),
@@ -217,20 +242,16 @@ export function validateRecord(record, sessionId) {
   requireValue(Array.isArray(value.reviewers), "missing reviewer coverage");
   for (const reviewer of [...value.reviewers, ...(value.adjudicator ? [value.adjudicator] : [])]) {
     object(reviewer, ["label", "model", "status"], reviewerKeys);
-    text(reviewer.label); text(reviewer.model);
-    requireValue(["completed", "incomplete", "cancelled"].includes(reviewer.status), "invalid reviewer state");
-    for (const key of ["error", "reasoningEffort", "sessionId"]) if (reviewer[key] !== undefined) text(reviewer[key]);
-    for (const key of ["startedAt", "completedAt"]) {
-      if (reviewer[key] !== undefined) requireValue(reviewer[key] === null || Number.isFinite(reviewer[key]), "invalid reviewer timing");
-    }
-    if (reviewer.usage !== undefined) {
-      requireValue(Array.isArray(reviewer.usage), "invalid usage attribution");
-      for (const usage of reviewer.usage) {
-        object(usage, [], ["model", "reasoningEffort", "isByok"]);
-        if (usage.model !== undefined) text(usage.model);
-        if (usage.reasoningEffort !== undefined) text(usage.reasoningEffort);
-        requireValue(usage.isByok === undefined || typeof usage.isByok === "boolean", "invalid provider attribution");
-      }
+    text(reviewer.label);
+    attempt(reviewer);
+    if (reviewer.fallbackFrom !== undefined) {
+      object(reviewer.fallbackFrom, ["model", "status"], attemptKeys);
+      attempt(reviewer.fallbackFrom);
+      // Only an explicit failure is eligible for a fallback, and a fallback is
+      // never the assignment that just failed.
+      requireValue(reviewer.fallbackFrom.status === "incomplete", "fallback replaced an attempt that had not failed");
+      requireValue(reviewer.fallbackFrom.model !== reviewer.model ||
+        reviewer.fallbackFrom.reasoningEffort !== reviewer.reasoningEffort, "fallback repeated the failed assignment");
     }
   }
   if (value.complete) requireValue(value.reviewers.length === mode.reviewers.length &&
@@ -335,7 +356,8 @@ export async function inspectRetained(parent) {
     ...(value.publication?.cancelRequested ? ["Cancellation was requested after dispatch; it cannot undo a remote write."] : []),
     ...(value.preview?.request ? [JSON.stringify(value.preview.request, null, 2)] : []),
     formatFindings(value),
-    ...value.reviewers.map((reviewer) => `${reviewer.label}: ${reviewer.status}${reviewer.error ? `; ${reviewer.error}` : ""}`),
+    ...value.reviewers.map((reviewer) => `${reviewer.label}: ${reviewer.status}${reviewer.error ? `; ${reviewer.error}` : ""}` +
+      (reviewer.fallbackFrom ? ` (one configured fallback attempt on ${reviewer.model}, after ${reviewer.fallbackFrom.model} failed)` : "")),
     ...[value.error, value.reason, value.selection.error, value.preview?.error, value.publication?.error, ...value.cleanupErrors].filter(Boolean),
     "No findings or completed execution is not a clean-review claim.",
   ].join("\n\n"), { level: value.complete ? "info" : "error" });

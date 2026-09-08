@@ -253,6 +253,62 @@ try {
     "Unsetting the medium tier leaves the rest of the saved configuration untouched");
   console.log("PASS the saved medium tier drives the full conventions reviewer without inference");
 
+  // --- C3: the optional per-tier fallback assignment --------------------------
+  // A fallback must differ from the tier's own resolved assignment, or it is not
+  // a fallback at all, so this needs a second usable subscription model.
+  const alternate = list.find((model) => model.id !== current.modelId && !model.id.includes("/") &&
+    model.id !== "auto" && (!model.policy || model.policy.state === "enabled") &&
+    (model.capabilities?.supports?.reasoning_effort ?? []).length);
+  assert(alternate, "This probe needs a second subscription model with a configurable reasoning effort");
+  const alternateEffort = alternate.capabilities.supports.reasoning_effort[0];
+  const beforeFallback = readFileSync(filename, "utf8");
+  for (const [args, expected] of [
+    ["heavyFallbackModel=definitely-not-a-model", /Unavailable or disabled Copilot-subscription model/],
+    [`heavyFallbackModel=${alternate.id} heavyFallbackEffort=definitely-not-an-effort`, /Unsupported reasoning effort/],
+    ["heavyFallbackEffort=" + alternateEffort, /heavyFallbackEffort is set but heavyFallbackModel is not/],
+  ]) {
+    const result = await run(session, args);
+    assert.match(result.error ?? "", expected, args);
+    assert.equal(readFileSync(filename, "utf8"), beforeFallback, `A refused fallback update writes nothing: ${args}`);
+  }
+  const setFallback = await run(session, `heavyFallbackModel=${alternate.id} heavyFallbackEffort=${alternateEffort}`);
+  assert.equal(setFallback.error, undefined, `fallback set failed: ${setFallback.error}`);
+  assert.deepEqual(JSON.parse(readFileSync(filename, "utf8")).settings, {
+    lightModel: current.modelId, lightEffort: other, autoPostReviews: true,
+    heavyFallbackModel: alternate.id, heavyFallbackEffort: alternateEffort,
+  });
+  await reload(session);
+  const withFallback = await show(session);
+  assert(withFallback.includes(
+    `    fallback: model=${alternate.id} [configured:heavy] reasoning=${alternateEffort} [configured:heavy]`),
+  `The reloaded extension reports the stored heavy fallback: ${withFallback}`);
+  assert.equal(withFallback.split("\n").filter((line) => line === "    fallback: (none)").length, 2,
+    "A heavy fallback is not shared with the light or medium tier");
+  assert.match(withFallback, /Fallback models are optional and start unset/);
+  assert.match(withFallback, /elapsed time alone never triggers a fallback/);
+  // Deep resolves the heavy tier only, so its one reviewer is the one that
+  // carries this fallback, displayed before anything starts.
+  const deepAssignments = (await quickRun(session, "2 --deep --no-comment")).find((message) =>
+    message.startsWith("Effective reviewer assignments:"));
+  assert(deepAssignments, "A deep review displays its per-reviewer assignments before execution");
+  assert(deepAssignments.includes(
+    `    fallback: model=${alternate.id} [configured:heavy] reasoning=${alternateEffort} [configured:heavy]`),
+  `The deep reviewer carries the saved heavy fallback: ${deepAssignments}`);
+  assert.match(deepAssignments,
+    /Configured fallbacks: 1 of 1 reviewer\(s\) have one; each gets at most one attempt, only after its own explicit failure\./);
+  assert.match(deepAssignments, /Elapsed time never triggers one/);
+  // The light overview reviewer resolves a tier with no fallback of its own.
+  const balancedFallback = (await quickRun(session, "2 --balanced --no-comment")).find((message) =>
+    message.startsWith("Effective reviewer assignments:"));
+  assert.match(balancedFallback, /Configured fallbacks: 4 of 5 reviewer\(s\) have one/);
+  assert.equal(balancedFallback.split("\n").filter((line) => line.startsWith("    fallback: ")).length, 4,
+    "Only the four heavy specialists carry the heavy tier's fallback");
+  const unsetFallback = await run(session, "unset heavyFallbackModel heavyFallbackEffort");
+  assert.equal(unsetFallback.error, undefined, `fallback unset failed: ${unsetFallback.error}`);
+  assert.equal(readFileSync(filename, "utf8"), beforeFallback,
+    "Clearing the fallback pair restores the rest of the saved configuration byte for byte");
+  console.log("PASS the saved heavy fallback reaches exactly its own reviewers, and every refusal writes nothing");
+
   writeFileSync(filename, JSON.stringify({ schemaVersion: configSchemaVersion,
     settings: { heavyModel: "definitely-not-a-model" } }), { mode: 0o600 });
   const refused = await run(session, "2 --quick --no-comment", "pr-review");

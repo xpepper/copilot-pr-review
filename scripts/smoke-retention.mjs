@@ -112,6 +112,50 @@ try {
   }
   console.log("PASS strict schemas, corruption, attribution, session/PR/head/digest binding and canonical-only selection");
 
+  // A reviewer its configured fallback recovered retains both attempts: the one
+  // that produced the result, and the failed one it replaced.
+  const recovered = await retentionFixture(sessionId);
+  recovered.reviewers[0] = {
+    ...recovered.reviewers[0], model: "fallback-model",
+    usage: [{ model: "fallback-model", reasoningEffort: "high", isByok: false }],
+    fallbackFrom: {
+      model: "controlled-model", reasoningEffort: "high", sessionId: randomUUID(),
+      status: "incomplete", error: "Reviewer session shut down before completion.",
+      usage: [], startedAt: 1, completedAt: 2,
+      policy: { permissionDenials: [], toolDenials: [], reads: [], toolCalls: [] },
+    },
+  };
+  const fallbackRecord = retainedRecord(recovered);
+  validateRecord(fallbackRecord, sessionId);
+  assert.equal(fallbackRecord.outcome.reviewers[0].model, "fallback-model");
+  assert.equal(fallbackRecord.outcome.reviewers[0].fallbackFrom.model, "controlled-model");
+  assert(!("policy" in fallbackRecord.outcome.reviewers[0].fallbackFrom),
+    "The retained record keeps no live policy object, for a fallback attempt either");
+  assert.equal(fallbackRecord.outcome.complete, true,
+    "A recovered reviewer completes its coverage; the failed attempt is a caveat, not a blocker");
+  const caveats = formatCoverage(fallbackRecord.outcome);
+  assert.match(caveats, /Informational caveat: correctness: primary model=controlled-model reasoning=high failed/);
+  assert.match(caveats, /completed this reviewer\./);
+  store.write(fallbackRecord);
+  await inspectRetained(parent);
+  assert(messages.at(-2).includes("correctness: completed (one configured fallback attempt on fallback-model, " +
+    "after controlled-model failed)"), "Inspection names the attempt that ran and the one it replaced");
+  for (const mutate of [
+    // A fallback never replaces an attempt that did not fail, and never repeats
+    // the assignment that just failed.
+    (r) => { r.outcome.reviewers[0].fallbackFrom.status = "completed"; },
+    (r) => { r.outcome.reviewers[0].fallbackFrom.status = "cancelled"; },
+    (r) => { r.outcome.reviewers[0].fallbackFrom.model = "fallback-model"; },
+    (r) => { r.outcome.reviewers[0].fallbackFrom.label = "correctness"; },
+    (r) => { delete r.outcome.reviewers[0].fallbackFrom.model; },
+  ]) {
+    const invalid = structuredClone(fallbackRecord);
+    mutate(invalid);
+    invalid.digest = reviewKey(invalid.outcome);
+    assert.throws(() => validateRecord(invalid, sessionId), /Invalid retained result/);
+  }
+  console.log("PASS a recovered reviewer retains both attempts, and a fallback that replaced nothing is rejected");
+
   for (const mixed of [false, true]) {
     const value = await retentionFixture(sessionId, {
       reviewerLimitations: [{ kind: "caveat", reason: "External library internals not audited.", impact: null }],

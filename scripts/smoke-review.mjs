@@ -212,6 +212,57 @@ assert.equal(deepDescription.split("\n").filter((line) => line.startsWith("  "))
 assert(!/\[light\]|\[medium\]/.test(deepDescription), "Deep resolves no light or medium tier");
 await assert.rejects(reviewerAssignments(parentModels, deepMode, { heavyModel: "missing" }, layered),
   /No substitution/, "An unusable heavy assignment refuses the deep review");
+// A configured tier fallback rides along with every reviewer that resolves that
+// tier, and with no other reviewer. It is resolved and validated before any
+// reviewer starts, so an unusable one refuses the review instead of surfacing
+// only once something has already failed.
+const fallbackSettings = {
+  heavyModel: "heavy", heavyEffort: "high", heavyFallbackModel: "other", heavyFallbackEffort: "low",
+};
+const fallbackConfig = {
+  effective: { settings: fallbackSettings, origins: {} },
+  ambient: { model: "heavy", reasoningEffort: "high" }, models: catalog,
+};
+const withFallback = (settings, flags = {}, mode = quickMode) => reviewerAssignments(parentModels, mode, flags,
+  { ...fallbackConfig, effective: { settings: { ...fallbackSettings, ...settings }, origins: {} } });
+const quickFallback = await withFallback({});
+assert(quickFallback.every((a) => a.model === "heavy" && a.reasoningEffort === "high"));
+assert.deepEqual(quickFallback.map(({ fallback }) => fallback), Array(3).fill({
+  model: "other", reasoningEffort: "low",
+  origin: { model: "configured:heavy", reasoningEffort: "configured:heavy" },
+}), "Every reviewer on the configured tier carries that tier's one fallback");
+const balancedFallback = await withFallback({}, {}, balancedMode);
+assert.equal(balancedFallback.at(-1).label, "overview");
+assert.equal(balancedFallback.at(-1).fallback, undefined,
+  "A heavy fallback never reaches the light reviewer; fallbacks do not inherit across tiers");
+assert(balancedFallback.slice(0, 4).every(({ fallback }) => fallback.model === "other"));
+const lightFallback = await withFallback({ lightModel: "other", lightEffort: "low", lightFallbackModel: "heavy" },
+  {}, balancedMode);
+assert.deepEqual(lightFallback.at(-1).fallback,
+  { model: "heavy", reasoningEffort: "low", origin: { model: "configured:light", reasoningEffort: "primary" } },
+  "The light tier's own fallback follows the light tier's effort");
+assert.deepEqual((await withFallback({}, {}, deepMode)).map(({ label, fallback }) => [label, fallback.model]),
+  [["integrated", "other"]]);
+// A fallback that resolves to the reviewer's own assignment is not offered,
+// whether the configuration or an invocation flag made it identical.
+assert.equal((await withFallback({ heavyModel: "other", heavyEffort: "low" }))[0].fallback, undefined);
+assert.equal((await withFallback({}, { heavyModel: "other", heavyEffort: "low" }))[0].fallback, undefined);
+// An unusable explicit fallback refuses the review; nothing is substituted for
+// it and it is not quietly dropped, which would leave a failure uncovered.
+for (const settings of [
+  { heavyFallbackModel: "missing" }, { heavyFallbackModel: "disabled" }, { heavyFallbackModel: "plain" },
+  { heavyFallbackEffort: "high" }, { heavyFallbackEffort: "max" },
+]) await assert.rejects(withFallback(settings), /No substitution/, JSON.stringify(settings));
+const fallbackDescription = describeAssignments(balancedMode, balancedFallback);
+assert.match(fallbackDescription,
+  /\n {2}correctness \[heavy\]: model=heavy \[configured:heavy\] reasoning=high \[configured:heavy\]\n {4}fallback: model=other \[configured:heavy\] reasoning=low \[configured:heavy\]\n/);
+assert.equal(fallbackDescription.split("\n").filter((line) => line.startsWith("    fallback: ")).length, 4);
+assert.match(fallbackDescription,
+  /\nConfigured fallbacks: 4 of 5 reviewer\(s\) have one; each gets at most one attempt, only after its own explicit failure\./);
+assert.match(fallbackDescription, /Elapsed time never triggers one/);
+assert.match(describeAssignments(quickMode, assignments), /\nConfigured fallbacks: none;/);
+assert(!describeAssignments(quickMode, assignments).includes("fallback: model="));
+console.log("PASS configured tier fallbacks reach exactly their own reviewers, refuse when unusable, and are displayed");
 console.log("PASS mode parsing/defaulting, capture-only, all four topologies, tier resolution and origin reporting");
 
 function fakeGh() {
@@ -239,8 +290,8 @@ const checkoutGit = async (args, cwd, { signal } = {}) => {
 };
 
 function harness({
-  failure, controller = new AbortController(), withCandidate = false, acceptCandidate = false, limitations = [],
-  mode = reviewModes.quick, severity = "P2", candidateFrom = [0],
+  failure, fallbackFailure, controller = new AbortController(), withCandidate = false, acceptCandidate = false,
+  limitations = [], mode = reviewModes.quick, severity = "P2", candidateFrom = [0],
 } = {}) {
   const messages = [];
   const sessions = [];
@@ -257,11 +308,15 @@ function harness({
     async forceStop() { this.forces++; },
     async createSession(config) {
       assert.equal(config.enableConfigDiscovery, false);
-      const validating = sessions.length === reviewerCount;
+      // A fallback attempt creates one more session of the same kind, so the two
+      // kinds are told apart by the instructions they carry rather than by count.
+      const validating = config.systemMessage?.content === validationInstructions(mode.policy);
       assert.deepEqual(config.systemMessage, {
         mode: "append", content: validating ? validationInstructions(mode.policy) : reviewInstructions(mode),
       });
+      const fallbackAttempt = sessions.filter((s) => s.validating === validating).length >= (validating ? 1 : reviewerCount);
       if (validating && failure === "validator-setup") throw new Error("validator setup failed");
+      if (fallbackAttempt && fallbackFailure === "setup") throw new Error("fallback setup failed");
       // Specialists hold the confined read-only set; the adjudicator still holds
       // nothing and decides only on the captured evidence it is given.
       assert.deepEqual(config.availableTools, validating ? [] : readOnlyToolFilters);
@@ -276,7 +331,7 @@ function harness({
       const index = sessions.length;
       const session = {
         sessionId: `reviewer-${index}`, model: config.model, reasoningEffort: config.reasoningEffort,
-        prompt: undefined, aborts: 0,
+        prompt: undefined, aborts: 0, validating, fallbackAttempt,
         rpc: {
           model: {
             async list() { return { list: failure === "catalog" ? [] : catalog }; },
@@ -312,6 +367,10 @@ function harness({
           this.emit("assistant.turn_start");
           if (validating) {
             const input = JSON.parse(prompt.split("\n").at(-1));
+            if (failure === "validator-error" && !fallbackAttempt) {
+              this.emit("session.error", { message: "adjudicator failed after start" });
+              return;
+            }
             if (failure === "validator-tool-call") {
               this.emit("tool.execution_start", { toolName: "view", arguments: { path: "example.js" } });
             }
@@ -335,6 +394,24 @@ function harness({
             }) });
             this.emit("assistant.usage", {
               model: config.model, reasoningEffort: config.reasoningEffort ?? "low", isByok: false,
+            });
+            this.emit("session.idle");
+            return;
+          }
+          // A fallback attempt starts only after its own reviewer has already
+          // failed, so it settles on its own rather than with the first batch.
+          if (fallbackAttempt) {
+            await new Promise(setImmediate);
+            if (fallbackFailure === "run") {
+              this.emit("session.error", { message: "fallback failed too" });
+              return;
+            }
+            const input = JSON.parse(this.prompt.split("\n").at(-1));
+            this.emit("assistant.message", { content: JSON.stringify({
+              schemaVersion: 2, reviewKey: input.reviewKey, limitations: [], candidates: [],
+            }) });
+            this.emit("assistant.usage", {
+              model: this.model, reasoningEffort: this.reasoningEffort ?? "low", isByok: false,
             });
             this.emit("session.idle");
             return;
@@ -455,6 +532,110 @@ for (const failure of [undefined, "reviewer", "reads", "usage", "missing-usage",
   }
   if (failure === "cleanup") assert.equal(h.client.forces, 1);
 }
+
+// A configured fallback is one extra attempt for the one reviewer that failed.
+// It never restarts the review, never touches another reviewer, and never fires
+// on cancellation or on elapsed time.
+const withFallbackAssignments = () => assignments.map((assignment) => ({
+  ...assignment,
+  fallback: {
+    model: "other", reasoningEffort: "low",
+    origin: { model: "configured:heavy", reasoningEffort: "configured:heavy" },
+  },
+}));
+{
+  const h = harness({ failure: "reviewer" });
+  const report = await executeReviewRun(h.parent, h.client, options, withFallbackAssignments(), {
+    controller: h.controller, gh: fakeGh(), git: checkoutGit,
+  });
+  validateRecord(retainedRecord(report), h.parent.sessionId);
+  assert.equal(report.coverage, "completed", "A reviewer recovered by its fallback completes its coverage");
+  assert.equal(report.reviewers.length, 3, "A fallback replaces one attempt, not the reviewer set");
+  assert.equal(h.sessions.length, 4, "Exactly one extra session: the single fallback attempt");
+  const recovered = report.reviewers[0];
+  assert.equal(recovered.label, "correctness");
+  assert.equal(recovered.model, "other");
+  assert.equal(recovered.reasoningEffort, "low");
+  assert.equal(recovered.status, "completed");
+  // The failed primary attempt stays in the record; recovery never hides it.
+  assert.equal(recovered.fallbackFrom.model, "heavy");
+  assert.equal(recovered.fallbackFrom.reasoningEffort, "high");
+  assert.equal(recovered.fallbackFrom.status, "incomplete");
+  assert.match(recovered.fallbackFrom.error, /failed after output/);
+  assert.equal(recovered.fallbackFrom.sessionId, "reviewer-0");
+  assert(report.reviewers.slice(1).every((r) => r.status === "completed" && r.model === "heavy" &&
+    r.fallbackFrom === undefined), "No other reviewer is retried or reassigned");
+  assert(h.messages.some((m) => /correctness: falling back once after an explicit failure/.test(m)));
+  assert(h.messages.some((m) => /only fallback attempt/.test(m)));
+  assert(h.messages.some((m) => /Reviewer correctness \(configured fallback\): completed/.test(m)));
+  assert(h.messages.some((m) => /Informational caveat: correctness: primary model=heavy reasoning=high failed/.test(m)),
+    "The recovered reviewer still reports the primary failure as a caveat");
+  const stored = retainedRecord(report).outcome.reviewers[0];
+  assert.equal(stored.model, "other");
+  assert.deepEqual(Object.keys(stored.fallbackFrom).sort(),
+    ["completedAt", "error", "model", "reasoningEffort", "sessionId", "startedAt", "status", "usage"]);
+}
+{
+  // The one attempt is the only attempt: a fallback that fails too leaves the
+  // reviewer incomplete, with both failures recorded and nothing retried.
+  const h = harness({ failure: "reviewer", fallbackFailure: "run" });
+  const report = await executeReviewRun(h.parent, h.client, options, withFallbackAssignments(), {
+    controller: h.controller, gh: fakeGh(), git: checkoutGit,
+  });
+  validateRecord(retainedRecord(report), h.parent.sessionId);
+  assert.equal(report.coverage, "incomplete");
+  assert.equal(h.sessions.length, 4, "One fallback attempt, never a second");
+  assert.equal(report.reviewers[0].status, "incomplete");
+  assert.equal(report.reviewers[0].model, "other");
+  assert.match(report.reviewers[0].error, /fallback failed too/);
+  assert.match(report.reviewers[0].fallbackFrom.error, /failed after output/);
+  assert(h.messages.some((m) => /Informational caveat: correctness: primary model=heavy reasoning=high failed .* also failed/.test(m)));
+  assert(report.reviewers.slice(1).every((r) => r.status === "completed"));
+}
+{
+  // A fallback that cannot even start is reported on the reviewer it was for,
+  // and the primary failure it was answering is still the reviewer's outcome.
+  const h = harness({ failure: "reviewer", fallbackFailure: "setup" });
+  const report = await executeReviewRun(h.parent, h.client, options, withFallbackAssignments(), {
+    controller: h.controller, gh: fakeGh(), git: checkoutGit,
+  });
+  validateRecord(retainedRecord(report), h.parent.sessionId);
+  assert.equal(report.coverage, "incomplete");
+  assert.equal(h.sessions.length, 3, "A fallback that fails to start creates no session");
+  assert.equal(report.reviewers[0].model, "heavy", "The reviewer keeps the attempt that actually ran");
+  assert.equal(report.reviewers[0].fallbackFrom, undefined);
+  assert.match(report.reviewers[0].error, /failed after output.*fallback setup failed/s);
+  assert(report.reviewers.slice(1).every((r) => r.status === "completed"));
+}
+for (const failure of [undefined, "cancel"]) {
+  // Nothing but this reviewer's own explicit failure starts a fallback: not a
+  // completed reviewer, and not a cancellation.
+  const h = harness({ failure });
+  const report = await executeReviewRun(h.parent, h.client, options, withFallbackAssignments(), {
+    controller: h.controller, gh: fakeGh(), git: checkoutGit,
+  });
+  validateRecord(retainedRecord(report), h.parent.sessionId);
+  assert.equal(h.sessions.length, 3, `No fallback attempt after ${failure ?? "a completed run"}`);
+  assert(report.reviewers.every((r) => r.fallbackFrom === undefined && r.model === "heavy"));
+  assert(!h.messages.some((m) => /falling back once/.test(m)));
+}
+{
+  // The adjudicator resolves the heavy tier like any other reviewer, so its own
+  // explicit failure is eligible for that tier's one fallback attempt too.
+  const h = harness({ failure: "validator-error", withCandidate: true });
+  const report = await executeReviewRun(h.parent, h.client, options, withFallbackAssignments(), {
+    controller: h.controller, gh: fakeGh(), git: checkoutGit,
+  });
+  validateRecord(retainedRecord(report), h.parent.sessionId);
+  assert.equal(h.sessions.length, 5, "Three reviewers, the adjudicator, and its one fallback attempt");
+  assert.equal(report.adjudicator.label, "evidence-validator");
+  assert.equal(report.adjudicator.model, "other");
+  assert.equal(report.adjudicator.status, "completed");
+  assert.match(report.adjudicator.fallbackFrom.error, /adjudicator failed after start/);
+  assert(report.reviewers.every((r) => r.status === "completed" && r.fallbackFrom === undefined));
+  assert.equal(report.coverage, "completed");
+}
+console.log("PASS one fallback attempt per explicitly failed reviewer, never on cancellation and never a restart");
 
 for (const failure of [undefined, "reviewer", "cancel", "cleanup", "validator-malformed", "validator-setup"]) {
   const limitations = [{ kind: "caveat", reason: "External dependency internals not audited.", impact: null }];

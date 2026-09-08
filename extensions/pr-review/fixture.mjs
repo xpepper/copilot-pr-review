@@ -101,63 +101,83 @@ export async function reviewFixture(parent, client, settings, {
   return { ...report, experiment };
 }
 
+// One reviewer session, created and proven to hold the assignment it was given.
+// A fallback attempt is prepared exactly the same way, so nothing about its
+// model, tools, working directory or catalog is checked any less.
+async function prepareReviewer(client, assignment, { systemMessage, access, signal, attempt }) {
+  const refusal = attempt === "fallback" ? "The fallback was not retried." : "No review started.";
+  signal.throwIfAborted();
+  const policy = reviewerEvidence(access);
+  const session = await client.createSession({
+    model: assignment.model,
+    reasoningEffort: assignment.reasoningEffort,
+    ...(systemMessage ? { systemMessage } : {}),
+    ...(access ? readingReviewerPolicy(policy, access.root) : reviewerPolicy(policy)),
+  });
+  signal.throwIfAborted();
+  // The owned runtime uses local CLI authentication; validate its own catalog too.
+  const catalog = (await session.rpc.model.list()).list;
+  validateModelAssignment(assignment, catalog);
+  const current = await session.rpc.model.getCurrent();
+  if (current.modelId !== assignment.model ||
+      (assignment.reasoningEffort !== undefined && current.reasoningEffort !== assignment.reasoningEffort)) {
+    throw new Error(`Runtime did not retain the explicit assignment for ${assignment.label}. ${refusal}`);
+  }
+  // An unset effort uses the runtime's resolved default, which must also be displayed and checked.
+  assignment.reasoningEffort = current.reasoningEffort;
+  validateModelAssignment(assignment, catalog);
+  if (access) {
+    // Reads resolve against the reviewed checkout, not the extension's cwd.
+    const moved = await session.rpc.metadata.setWorkingDirectory({ workingDirectory: access.root });
+    if (realpathSync(moved.workingDirectory) !== access.root) {
+      throw new Error(`Runtime did not point reviewer ${assignment.label} at the reviewed checkout ${access.root}. ${refusal}`);
+    }
+    await assertReviewerTools(session, readOnlyTools);
+  } else {
+    await assertNoReviewerTools(session);
+  }
+  return { session, policy };
+}
+
+// What a failed primary attempt leaves behind on the reviewer that fell back.
+// The record's own model and status describe the attempt that produced its
+// result, so the attempt that did not is kept here rather than overwritten.
+const failedAttempt = (record) => ({
+  model: record.model, reasoningEffort: record.reasoningEffort, sessionId: record.sessionId,
+  status: record.status, error: record.error, usage: record.usage,
+  startedAt: record.startedAt, completedAt: record.completedAt, policy: record.policy,
+});
+
 export async function reviewAssignments(parent, client, assignments, {
   signal, prompt, intro, outputLabel, systemMessage, access,
   probeTools = false, injectFailure = false,
 }) {
   const log = (message, level = "info") => parent.log(message, { level });
-  const sessions = [];
-  const policies = [];
+  const prepared = [];
   const enforcement = [];
   for (const assignment of assignments) {
     signal.throwIfAborted();
-    const policy = reviewerEvidence(access);
-    const session = await client.createSession({
-      model: assignment.model,
-      reasoningEffort: assignment.reasoningEffort,
-      ...(systemMessage ? { systemMessage } : {}),
-      ...(access ? readingReviewerPolicy(policy, access.root) : reviewerPolicy(policy)),
-    });
-    sessions.push(session);
-    policies.push(policy);
-    signal.throwIfAborted();
-    // The owned runtime uses local CLI authentication; validate its own catalog too.
-    const catalog = (await session.rpc.model.list()).list;
-    validateModelAssignment(assignment, catalog);
-    const current = await session.rpc.model.getCurrent();
-    if (current.modelId !== assignment.model ||
-        (assignment.reasoningEffort !== undefined && current.reasoningEffort !== assignment.reasoningEffort)) {
-      throw new Error(`Runtime did not retain the explicit assignment for ${assignment.label}. No review started.`);
-    }
-    // An unset effort uses the runtime's resolved default, which must also be displayed and checked.
-    assignment.reasoningEffort = current.reasoningEffort;
-    validateModelAssignment(assignment, catalog);
-    if (access) {
-      // Reads resolve against the reviewed checkout, not the extension's cwd.
-      const moved = await session.rpc.metadata.setWorkingDirectory({ workingDirectory: access.root });
-      if (realpathSync(moved.workingDirectory) !== access.root) {
-        throw new Error(`Runtime did not point reviewer ${assignment.label} at the reviewed checkout ${access.root}. No review started.`);
-      }
-      await assertReviewerTools(session, readOnlyTools);
-    } else {
-      await assertNoReviewerTools(session);
-    }
+    const ready = await prepareReviewer(client, assignment, { systemMessage, access, signal, attempt: "primary" });
+    prepared.push(ready);
     if (probeTools) {
-      enforcement.push({ label: assignment.label, probes: await probeForbiddenTools(session) });
+      enforcement.push({ label: assignment.label, probes: await probeForbiddenTools(ready.session) });
     }
   }
   signal.throwIfAborted();
   await log(intro);
   for (const assignment of assignments) {
-    await log(`Assignment ${assignment.label}: model=${assignment.model} reasoning=${assignment.reasoningEffort ?? "(not configurable)"}`);
+    await log(`Assignment ${assignment.label}: model=${assignment.model} reasoning=${assignment.reasoningEffort ?? "(not configurable)"}` +
+      (assignment.fallback ? `; configured fallback model=${assignment.fallback.model} ` +
+        `reasoning=${assignment.fallback.reasoningEffort ?? "(not configurable)"}, used at most once if this ` +
+        "reviewer's own execution fails" : ""));
   }
-  const outcomes = await Promise.allSettled(assignments.map(async (assignment, index) => {
-    await log(`Reviewer ${assignment.label}: starting`);
-    const evidence = await runReviewer(sessions[index], prompt(assignment), {
+  const runAttempt = async (assignment, ready, display, index) => {
+    await log(`Reviewer ${display}: starting`);
+    const evidence = await runReviewer(ready.session, prompt(assignment), {
       signal,
       injectFailure: injectFailure && index === 0,
-      onActive: () => log(`Reviewer ${assignment.label}: active`),
-      toolCalls: access ? policies[index].toolCalls : undefined,
+      onActive: () => log(`Reviewer ${display}: active`),
+      toolCalls: access ? ready.policy.toolCalls : undefined,
     });
     if (evidence.status === "completed" && (!evidence.usage.length || evidence.usage.some((usage) =>
       usage.model !== assignment.model ||
@@ -168,10 +188,46 @@ export async function reviewAssignments(parent, client, assignments, {
       evidence.error = "Actual model/reasoning/subscription usage did not match the assignment.";
     }
     await log(evidence.status === "completed"
-      ? `Reviewer ${assignment.label}: completed\n${outputLabel}:\n${evidence.result}`
-      : `Reviewer ${assignment.label}: ${evidence.status}; incomplete coverage. ${evidence.error}`,
+      ? `Reviewer ${display}: completed\n${outputLabel}:\n${evidence.result}`
+      : `Reviewer ${display}: ${evidence.status}; incomplete coverage. ${evidence.error}`,
     evidence.status === "completed" ? "info" : "error");
-    return { ...assignment, ...evidence, policy: policies[index] };
+    return { ...assignment, ...evidence, policy: ready.policy };
+  };
+  // The one configured fallback attempt for one reviewer, after that reviewer's
+  // own execution failed. It replaces neither the review nor any other reviewer,
+  // and it is prepared and checked exactly as the primary attempt was.
+  const runFallback = async (assignment, primary) => {
+    const fallback = {
+      label: assignment.label, tier: assignment.tier,
+      model: assignment.fallback.model, reasoningEffort: assignment.fallback.reasoningEffort,
+      origin: assignment.fallback.origin,
+    };
+    await log(`Reviewer ${assignment.label}: falling back once after an explicit failure. Primary ` +
+      `model=${primary.model} reasoning=${primary.reasoningEffort ?? "(not configurable)"} failed: ${primary.error} ` +
+      `Configured fallback model=${fallback.model} reasoning=${fallback.reasoningEffort ?? "(not configurable)"}. ` +
+      "This is its only fallback attempt; no other reviewer is affected and the review is not restarted.", "error");
+    let ready;
+    try {
+      ready = await prepareReviewer(client, fallback, { systemMessage, access, signal, attempt: "fallback" });
+    } catch (error) {
+      // The reviewer keeps the attempt that actually ran, and says why the
+      // configured answer to that failure never started.
+      const message = `Configured fallback ${fallback.model} could not start: ${String(error)}`;
+      await log(`Reviewer ${assignment.label}: ${message}`, "error");
+      return { ...primary, error: `${primary.error} ${message}` };
+    }
+    return {
+      ...await runAttempt(fallback, ready, `${assignment.label} (configured fallback)`),
+      fallbackFrom: failedAttempt(primary),
+    };
+  };
+  const outcomes = await Promise.allSettled(assignments.map(async (assignment, index) => {
+    const primary = await runAttempt(assignment, prepared[index], assignment.label, index);
+    // A fallback answers this reviewer's own explicit failure and nothing else.
+    // Cancellation is not one, and neither is elapsed time: nothing here imposes
+    // a deadline, so a reviewer that never settles is never replaced.
+    if (!assignment.fallback || primary.status !== "incomplete" || signal.aborted) return primary;
+    return runFallback(assignment, primary);
   }));
   const reviewers = [];
   for (const [index, outcome] of outcomes.entries()) {
