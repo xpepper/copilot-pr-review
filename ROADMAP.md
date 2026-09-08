@@ -6005,15 +6005,16 @@ only and have not been reviewed again.
 
 ### Remaining limitations
 
-- **No live run has demoted an attempt.** Every reviewer on #14 completed and
-  every envelope parsed, so the demotion path is demonstrated only by the
-  controlled suites, with scripted reviewer output. What #14 does establish is
-  the narrower converse: the verifier ran live on five real outputs and demoted
-  none of them, so the predicate does not reject well-formed model output that
-  collection then accepts.
+- **No live run had demoted an attempt at this checkpoint.** Every reviewer on
+  #14 completed and every envelope parsed, so the demotion path was demonstrated
+  only by the controlled suites, with scripted reviewer output. What #14 does
+  establish is the narrower converse: the verifier ran live on five real outputs
+  and demoted none of them, so the predicate does not reject well-formed model
+  output that collection then accepts. `Q7`'s review of #15 later demoted a live
+  attempt, recorded under that increment; nothing here about #14 changes.
 - **No live run has started a fallback from a demotion, and none could have.**
-  No tier had a configured fallback on #14, and the project has never configured
-  one for any live review, so the whole `C3` execution path `C5` feeds remains
+  No tier had a configured fallback on #14 or on #15, and the project has never
+  configured one for any live review, so the whole `C3` execution path `C5` feeds remains
   live-unobserved. #11 is still the only run where one would have fired. Whether
   a real model that emitted prose once produces a usable envelope on a different
   assignment is therefore still unestablished, and the reviewers on #14 said so
