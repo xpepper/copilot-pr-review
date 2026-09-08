@@ -26,14 +26,13 @@ before you start.
 
 ## Recorded state
 
-- `main` is the squash merge of pull request #6, which completed `F5`. Pull
-  requests #3, #4 and #5 delivered `M1` before it. Those branches are deleted and
-  their individual commits are not ancestors of `main`, so read `git log` and the
-  pull requests rather than looking for hashes from them.
-- **Pull request #7 is open and unmerged: it is `F6`, on branch
-  `f6-reviewer-output-contract`, and this handoff lives on it.** It carries two
-  commits, the implementation and the fix its own review produced. Nothing is
-  uncommitted. Merging is the user's call.
+- **You are starting on `main`, with no increment in flight.** `main` is the
+  squash merge of pull request #7, which completed `F6`. Pull requests #3, #4 and
+  #5 delivered `M1`, and #6 delivered `F5`, before it. Those branches are deleted
+  and their individual commits are not ancestors of `main`, so read `git log` and
+  the pull requests rather than looking for hashes from them.
+- Nothing is uncommitted and no increment branch is open. Branch from `main` for
+  `M2`.
 - Pull requests #1 and #2 are synthetic publication playgrounds from P4 and P5.
   **Never merge them**, and never republish to them.
 - `M1`, `F5` and `F6` are Completed. `M2` is next and is no longer blocked.
@@ -74,13 +73,32 @@ the first real evidence for that number; report it as such.
 
 ## The next increment is `M2`, deep mode
 
-Deep uses one integrated heavy reviewer considering the whole pull request,
-presents all substantiated severities, and rejects conflicting mode flags. Deep
-means holistic review, not a larger parallel review and not an ascending fourth
-effort level. Reviewer count and concurrency follow the selected mode. Keep the
-evidence boundary exactly as it is, keep `L1` pending, and copy no upstream
-source. Branch from `main` if pull request #7 is merged; if it is still open, its
-branch `f6-reviewer-output-contract` carries this handoff and `F6`'s evidence.
+Read the mode table in `SCOPE.md` under "Review modes and findings" as the
+requirement, and `ROADMAP.md`'s `M1` sections for how the three existing modes
+were built and demonstrated. `M2` is done when all of this holds:
+
+- `--deep` selects **one integrated heavy reviewer** that considers the whole
+  pull request, rather than the parallel specialists of the other modes.
+- Its findings policy presents **all substantiated severities**.
+- Mode flags stay mutually exclusive: a second mode flag is refused, as
+  `--quick`, `--balanced` and `--full` already are.
+- Reviewer count and concurrency follow the selected mode, and the effective
+  assignment display names the deep reviewer before anything starts.
+- Deep means **holistic** review. It is not a larger parallel review, not a
+  sixth specialist, and not an ascending fourth reasoning effort.
+
+The modes live in `extensions/pr-review/modes.mjs`, which owns each mode's `id`,
+`flag`, `label`, reviewer list and findings policy; `review.mjs` turns that into
+assignments and instructions. `scripts/smoke-review.mjs`, `smoke-findings.mjs`
+and `smoke-checkout.mjs` carry the per-mode assertions the existing modes added,
+including refusal loops that read `mode.label` and `mode.flag` rather than
+literals. Extend those rather than inventing a parallel test path.
+
+Keep the evidence boundary exactly as it is: the marker contract and its unwrap,
+the exact-key check, the schema version and review-key binding, the citation,
+quote and changed-line gates, adjudication, deduplication and the findings
+policy. Keep `L1` pending and copy no upstream source. Update `README.md` for the
+new mode, since it is user-visible.
 
 ## Running the real integration test
 
@@ -95,8 +113,9 @@ node scripts/dogfood-review.mjs NUMBER --all --no-comment
 Name the mode deliberately. Without a mode flag the runner takes the default,
 balanced. Say in `ROADMAP.md` which mode you used and why; `F6` used full because
 full is the only mode that assigns the medium tier, and the saved medium model is
-the one whose output started the whole problem. `M2` will have its own obvious
-answer, since deep is the mode it adds.
+the one whose output started the whole problem. For `M2` the obvious answer is
+`--deep`, since exercising the mode it adds is the point, and it is also the
+cheapest topology in the tool: one reviewer plus the adjudicator.
 
 Derive the SDK path instead of pinning a version. Old packages under
 `~/.copilot/pkg/` are never pruned, so a pinned path keeps resolving after a
