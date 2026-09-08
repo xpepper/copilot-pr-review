@@ -380,6 +380,16 @@ cancellation. The retained schema holds a deep record to deep's own topology, so
 a one-reviewer record cannot claim balanced or full coverage. Mode flags remain
 mutually exclusive, and balanced remains the default.
 
+Deep was demonstrated by the live review of this project's own pull request #8,
+its first run. One `gpt-5.6-terra` reviewer at high effort made 11 confined reads
+with no denials, and the run cost 68.27393 reported AI credits, the cheapest
+review this project has run. It is also the first review of one of this
+project's own increment pull requests to reach **completed** coverage: the
+single reviewer and the adjudicator both emitted the `F6` markers on their own
+lines, and both parsed. It returned two validated findings, both real
+documentation defects in this pull request, which were fixed on the branch.
+See [ROADMAP.md](ROADMAP.md).
+
 ### Grounded findings and deduplication (Q4)
 
 No extra flag is required. After the selected mode's specialists finish, code
@@ -1118,9 +1128,10 @@ node scripts/smoke-runtime.mjs
 ```
 
 The pure probes exercise fixture guards/lifecycle, PR capture/gates,
-revision-bound context assembly, and quick/balanced/full orchestration without a
-runtime, including mode parsing, all three reviewer topologies, tier resolution,
-the balanced minor-finding cap and full's uncapped policy. The findings probe exercises strict
+revision-bound context assembly, and quick/balanced/full/deep orchestration
+without a runtime, including mode parsing, all four reviewer topologies, tier
+resolution, the balanced minor-finding cap, and full's and deep's uncapped
+policy. The findings probe exercises strict
 schema/provenance gates, changed-line anchors, renamed/added/deleted files,
 pure insertion/deletion context, cross-file deduplication, and degraded coverage. Its semantic
 accept/reject decisions are explicit test doubles, not live-model evidence.
@@ -1142,7 +1153,7 @@ that the bound context carries the served blob identities instead. It also
 captures a fixture PR that then advances, and asserts the next capture stops
 explicitly rather than reviewing the moved head against the captured diff.
 Its capture dispatches all use `--capture-only`. With `--startup` it also
-dispatches a skipped draft in quick, balanced and full modes, asserting the
+dispatches a skipped draft in quick, balanced, full and deep modes, asserting the
 displayed per-reviewer assignments, that no reviewer starts, and a settled
 `coverage: "not-started"` result without inference.
 The harness asserts read-only requests, no model turns, and no source changes.

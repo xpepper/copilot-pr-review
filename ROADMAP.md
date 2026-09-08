@@ -48,7 +48,7 @@ posting them.
 | M1 | Completed | Balanced is the default with its four heavy specialists, light overview reviewer and three-finding P3/nit cap. `--full` adds a medium conventions/maintainability reviewer and presents every qualifying severity with no minor cap. Demonstrated by controlled probes, no-inference installed dispatch, and live reviews of this repository's own pull requests #3, #4 and #5; #5 ran all three tiers on distinct models. A Claude-family medium model's fenced output is a recorded open defect. | Q4, C1; [Modes](SCOPE.md#review-modes-and-findings) |
 | F5 | Completed | Structured output is demonstrated unusable on CLI 1.0.83: the factory surface is behind a CLI feature flag and reachable only from a joined foreground session, a joining extension cannot register the permission handler that confines reviewer reads, and a custom agent's declared `view`/`grep`/`glob` grant leaks `skill` and `sql`. Retry cost, `null` failure semantics and module reach measured below. Recommendation recorded: fall back to a narrow fence unwrap, with its cost stated and the choice left to the user. No reviewer was migrated. | M1, F3; [Technical feasibility](SCOPE.md#technical-uncertainties-and-proposed-sequence) |
 | F6 | Completed | Reviewer output survives a model that wraps it. Reviewers and the adjudicator are asked for the envelope between two explicit markers, and code unwraps that delimiter pair, then one fence that wraps the whole response; markers and fences count only when they are the whole line, so payload text is never a wrapper. Everything after the parse is unchanged, and a table below pins what is still discarded whole. Demonstrated by the full-mode review of pull request #7, which discarded four reviewers on a substring-counting defect it also reported; that defect is fixed and the captured outputs replayed. | F5; [Modes/findings](SCOPE.md#review-modes-and-findings) |
-| M2 | In flight | Deep uses one holistic reviewer; reject conflicting mode flags. Implemented and demonstrated by the controlled suites; not demonstrated until the installed plugin has reviewed its own pull request. | F6, M1; [Modes](SCOPE.md#review-modes-and-findings) |
+| M2 | Completed | `--deep` runs one integrated heavy reviewer over the whole pull request and presents every substantiated severity; a second mode flag is refused. Demonstrated by the twelve controlled suites, the installed no-inference dispatch, and the live deep review of pull request #8, which reached completed coverage on 68.27393 credits and found two real defects in its own documentation. | F6, M1; [Modes](SCOPE.md#review-modes-and-findings) |
 | C3 | Pending | Explicit optional fallback with at most one eligible retry per failed reviewer; no timers or silent substitutions. | C1, Q3; [Fallbacks/execution](SCOPE.md#models-configuration-and-execution) |
 | C4 | Pending | A tier whose resolved model supports no configurable reasoning effort resolves to no effort instead of inheriting one, so such a model can serve a tier. An explicit effort is still validated and never silently lowered. | C1; [Configuration](SCOPE.md#models-configuration-and-execution) |
 | V1 | Pending | `--verify` enforces matching branch/SHA/cleanliness before reviewers and presents discovered existing commands for approval. | Q1; [Safeguards](SCOPE.md#optional-project-safeguards) |
@@ -4383,7 +4383,7 @@ demonstrated, and rerunning the review needs its own authorization.
 - A model that emits neither markers nor a wrapper is unaffected: today's
   passing reviewers keep passing on exactly the path they use now.
 
-## Increment M2: deep mode, pending its live review
+## Completed increment: M2
 
 Implementation: `extensions/pr-review/modes.mjs`, `review.mjs` and
 `extension.mjs` wording. Probes: `scripts/smoke-review.mjs`,
@@ -4434,11 +4434,6 @@ declaration, tier, policy or consumer behaviour change.
 
 ### Controlled evidence
 
-**This increment is not demonstrated yet.** The controlled suites use test
-doubles, and the section below is what they prove. The installed no-inference
-probe and the live review of this increment's own pull request are recorded
-after them; until those exist, deep mode is implemented, not delivered.
-
 Test-first: every assertion below was added before the implementation and failed
 on the missing `reviewModes.deep` export, `--deep` being rejected as an
 unsupported target argument, and the missing holistic wording. Setting deep's
@@ -4475,8 +4470,8 @@ New demonstrations, all without inference or network access:
   framing, and the deep prompt names its one reviewer and carries the
   whole-change focus. Quick, balanced and full still say `specialist` and still
   scope a null result to the assigned focus.
-- A settled deep run through `executeReviewRun`: one specialist session plus one
-  adjudicator, both on the heavy tier, `M2 binding:` and `M2 evidence:` markers,
+- A settled deep run through `executeReviewRun`: one integrated reviewer session
+  plus one adjudicator, both on the heavy tier, `M2 binding:` and `M2 evidence:` markers,
   one accepted `nit` finding presented with `capped` empty, selection of it, and
   a proposed body reading `Deep review: 1 selected validated finding(s)`.
 - Findings policy at unit level: two minor candidates from the single
@@ -4491,42 +4486,185 @@ New demonstrations, all without inference or network access:
   (`Deep review refused ...`, `rerun /pr-review 12 --deep`), on the same evidence
   as quick, balanced and full.
 
+### Installed-plugin evidence
+
+The extension was reinstalled with `copilot plugin install "$(pwd)"` at the pull
+request head before the probe, and again before the review. No probe below sent
+a model prompt.
+
+`smoke-runtime.mjs --targets --startup` passed. The draft-skip loop now
+dispatches **four** modes and asserts for each a settled `coverage:
+"not-started"` result, one assignment line per reviewer (three, five, six and
+one), and that no reviewer started. For `--deep` it additionally asserts the
+`integrated [heavy]` line with a resolved model, effort and origin, the
+findings-policy text `P0-P2 findings, plus every substantiated P3/nit finding`,
+and that the display contains no `[light]` or `[medium]` line at all.
+
+`123 --deep --no-comment` left the unsupported-arguments list, because it now
+parses; `--verify` took its place there, since `V1` is still pending. New
+installed rejections without inference: `--balanced --deep`, `--deep
+--major-only`, `--capture-only --deep`, `--deep --no-comment --comment`, `--deep
+... mediumModel=missing-m2-model`, `--deep ... heavyModel=missing-m2-model` and
+`--deep ... heavyEffort=invalid-effort`. Each returns an explicit command error
+and starts no reviewer.
+
+The other installed probes were last rerun on pull requests #5 and #7. This
+increment adds a mode declaration and reads a flag in two instruction strings;
+`smoke-reviewer-tools.mjs` and `smoke-retention-runtime.mjs` exercise neither.
+
+### A defect this increment found in the dogfood runner
+
+`scripts/dogfood-review.mjs` waited for a hardcoded `Q3 evidence: ` or `M1
+evidence: ` line before reporting an outcome. Deep labels its evidence `M2`, so
+the runner would have printed the entire review timeline, including the findings,
+and then waited forever on a promise nothing could resolve. It was found by
+reading the runner before spending anything, not by the review.
+
+The fix derives the prefixes from the mode declarations, so the runner now waits
+for whatever prefix the mode it dispatched actually emits, and a future mode
+cannot desynchronise it. The same class of drift appeared twice more in this
+increment and both were fixed here: the configuration inspector's tier note named
+quick, balanced and full only, and `smoke-config.mjs` now asserts that the note
+names every declared mode.
+
+### Live inference: the deep review of pull request #8
+
+`M2` landed on branch `m2-deep-mode` and pull request #8. The installed plugin
+reviewed it once, in **deep** mode, named explicitly rather than taken as the
+default. Deep is the mode this increment adds, so exercising it is the point,
+and it is also the cheapest topology in the tool: one reviewer plus the
+adjudicator.
+
+```sh
+gh pr checkout 8
+copilot plugin install "$(pwd)"
+COPILOT_CLI_PATH="$(command -v copilot)" \
+COPILOT_SDK_PATH="$(ls -d "$HOME"/.copilot/pkg/*/"$(copilot --version | sed -n 's/.*CLI \([0-9][0-9.]*[0-9]\).*/\1/p')"/copilot-sdk)" \
+node scripts/dogfood-review.mjs 8 --deep --all --no-comment
+```
+
+Reviewed head `8fd8348`, base `88e3768`, twelve files, 52846 diff bytes. One
+reviewer plus one adjudicator, both from saved personal configuration:
+
+| Reviewer | Tier | Model | Effort | Reads | Outcome |
+| --- | --- | --- | --- | --- | --- |
+| integrated | heavy | `gpt-5.6-terra` | high | 11 | completed |
+| evidence-validator | heavy | `gpt-5.6-terra` | high | 0 | completed |
+
+Coverage was **completed**, which no earlier review of this project's own
+increment pull requests had reached: #3, #4, #5, #6 and #7 were all incomplete,
+four of them because a reviewer's output was discarded. Eleven confined tool
+calls and eleven reads, no permission denial and no tool denial. Two findings
+were validated and selected, nothing was withheld, nothing was rejected as a
+false positive, there were no coverage gaps and one informational caveat. Cost:
+**68.27393 credits**, the cheapest review this project has run, against 124.2079
+for six full reviewers on a four-file pull request and 276.266849 for six on a
+thirteen-file one. Nothing was published.
+
+**The `F6` contract held, live, on a second run.** Both sessions emitted the
+envelope between the markers, each on its own line, and both parsed. That is the
+first live evidence since `F6`'s fix that the marker contract works on a fresh
+run rather than only on replayed strings, though one `gpt-5.6-terra` reviewer and
+one adjudicator is a narrower test than #7's six models.
+
+**What the reviewer read.** It opened with two `rg` searches for the renamed
+field and the mode declarations, then read `review.mjs`, `retention.mjs`,
+`checkout.mjs`, `findings.mjs`, `extension.mjs` and `retained-run.mjs`, in
+ranges, and searched for the specialist wording across the repository. That is a
+reviewer using the checkout to establish how the renamed field is consumed
+everywhere, which is exactly what the whole-change assignment asks for and what a
+per-file specialist has no reason to do.
+
+**Findings, and what changed.** Both were accepted and both were real defects in
+this pull request's own documentation. Neither is a code defect, which is the
+same limitation every live review here has had: this remains a
+documentation-heavy pull request.
+
+- `integrated:1`, P3 at confidence 0.98, on the roadmap's increments table: the
+  change marked `M2` in flight while the `Exact next increment` section still
+  told the next agent to implement deep mode. Fixed: that section is rewritten
+  below.
+- `integrated:2`, nit at confidence 0.96, on the new `M2` controlled-evidence
+  section: it described the settled deep run as `one specialist session plus one
+  adjudicator`, contradicting the mode boundary a few paragraphs above, which
+  exists precisely to distinguish deep's integrated reviewer from a specialist.
+  Fixed: it now says one integrated reviewer session.
+
+Nothing was rejected as a false positive, and no gate was weakened. The one
+informational caveat is honest and worth keeping: the reviewer noted that it
+could only read the captured diff and checkout, and could not execute the
+installed runtime to demonstrate deep mode itself.
+
+### Remaining limitations
+
+- Deep's holistic instruction is a prompt, and a prompt is a request. That the
+  reviewer actually read across files is visible in its eleven reads on this run;
+  whether a holistic reviewer systematically finds cross-cutting defects that the
+  parallel specialists miss is not demonstrated by one run on a
+  documentation-heavy pull request, and cannot be until a review of any mode runs
+  against a substantial code diff.
+- One run is one sample. Completed coverage here does not establish that deep
+  reaches completed coverage in general; it establishes that it did once, with
+  one reviewer whose single output parsed.
+- Deep is the cheapest mode in this project's records, but the comparison is
+  across different diffs, not a controlled one. Cost scales with the diff as well
+  as the reviewer count, and no two of these reviews reviewed the same pull
+  request.
+- Deep resolves the heavy tier only, so a configured light or medium tier has no
+  effect on it. That is the declared topology, not an oversight, but it does mean
+  `--deep` ignores two thirds of the personal configuration.
+- The adjudicator is a separate session on the same tier and, in deep, on the
+  same model as the reviewer. It is not the same session and does not see the
+  reviewer's reasoning, so this is not self-adjudication, but it is one model
+  family checking itself, which is weaker than the cross-model check a mixed-tier
+  mode gets.
+
 ## Exact next increment
 
-**`F6` is complete.** The user chose both the marker contract and the
-deterministic unwrap. Pull request #7's full-mode review demonstrated the contract
-half working on five of six reviewers, `claude-sonnet-5` included, and found a
-real defect in the unwrap half, which is fixed and replayed above. Merging #7 is
-the user's call.
+**`M2` is complete.** `--deep` runs one integrated heavy reviewer over the whole
+pull request, presents every substantiated severity, and refuses a second mode
+flag. Pull request #8's deep review demonstrated it end to end and reached
+completed coverage, the first of this project's own increment pull requests to do
+so. It found two real defects in its own documentation; both are fixed above.
+Merging #8 is the user's call.
 
-The next increment is **`M2`, deep mode**. Deep uses one integrated heavy reviewer
-considering the whole pull request, presents all substantiated severities, and
-rejects conflicting mode flags. Deep means holistic review, not a larger parallel
-one and not a fourth effort level. It was blocked behind `F6` because building a
-fifth mode on an output path that discarded whole reviewers would have multiplied
-the failure; that block is now lifted.
+Every mode in `SCOPE.md`'s table now exists, so the next increment leaves the
+mode surface. Two candidates are ready, and `C3` is the smaller one.
 
-One thing `F6` leaves for whoever runs the next live review: the fix is verified
-by controlled suites and by replaying pull request #7's captured outputs, not by
-a second live run. The next review of any increment is the first live evidence
-that five of six reviewers really do survive, and it should be reported as such.
+**`C3`, configured fallback models.** At most one configured fallback attempt per
+eligible failed reviewer, never a whole-review restart, never a timer, and never
+a silent substitution. Optional fallbacks start unset and must be configured
+explicitly. `SCOPE.md`'s "Models, configuration, and execution" section is the
+requirement, and `C1`'s tier layering and `smoke-config.mjs` are the shape to
+extend. Note the constraint that makes this delicate: elapsed time alone must
+never trigger a fallback, so a hung reviewer waits indefinitely and only an
+explicit failure is eligible.
+
+**`C4`, a tier whose model supports no configurable effort.** Such a tier should
+resolve to no effort rather than inheriting one, so that model can serve the
+tier. An explicit effort is still validated and never silently lowered.
+
+Three older observations remain open and separately authorizable, and one of them
+is now the oldest thing here. **No review of any mode has ever run against a
+substantial code diff.** All six live reviews read this project's own
+documentation-heavy pull requests, and #8's two findings were both documentation
+defects. Review quality on real code is undemonstrated, and no amount of further
+mode work will change that. Second, the changed-line anchoring rule has discarded
+true findings on pull requests #4 and #5 and rejected two mis-anchored candidates
+on #6; a later increment should decide how a candidate can anchor on the changed
+line that causes a breakage while citing the unchanged line it breaks. Third,
+pull request #6's read denials landed on the two reviewers that then failed;
+neither #7 nor #8 had a denial at all, so that one may have been specific to #6.
+
+`F6`'s marker contract now has live evidence from two separate runs: five of six
+reviewers on #7, and both sessions on #8. Do not reintroduce substring matching
+and do not widen the unwrap.
 
 Do not revisit the Agent Factories surface without new information from GitHub.
 Three separate blockers were demonstrated on CLI 1.0.83, and all three would
 have to change: the feature flag, the extension-only factory registration, and
 the confined tool grant that leaks `skill` and `sql`. A new CLI version is new
 information; a new reading of the same documentation is not.
-
-Three older observations remain open and separately authorizable. No review of
-any mode has run against a substantial code diff, so review quality is still
-undemonstrated; every live run so far reviewed this project's own
-documentation-heavy pull requests. The changed-line anchoring rule has now
-discarded true findings on pull requests #4 and #5, and rejected two more
-candidates for mis-anchored citations on #6; a later increment should decide how
-a candidate can anchor on the changed line that causes a breakage while citing
-the unchanged line it breaks. And pull request #6 produced the first live read
-denials, on the two reviewers that then failed; whether a rejected read derails a
-reviewer is worth a look before the next live run.
 
 Keep `L1` pending and copy no upstream source. Land every increment on its own
 branch and pull request, review that pull request with this plugin before asking
