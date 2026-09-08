@@ -707,8 +707,10 @@ for (const failure of ["prose", "wrong-key"]) {
   // The reason the output was discarded survives demotion instead of being
   // replaced by a generic incomplete-execution message.
   assert.match(report.reviewers[0].error, failure === "prose" ? /Unexpected token/ : /Wrong schema version or review binding/);
-  assert(h.messages.some((m) => /Execution failure: correctness: incomplete/.test(m)), failure);
-  assert(h.messages.some((m) => (failure === "prose" ? /Unexpected token/ : /review binding/).test(m)), failure);
+  assert(h.messages.some((m) => new RegExp(
+    `Execution failure: correctness: incomplete specialist execution;[^\n]*${
+      failure === "prose" ? "Unexpected token" : "Wrong schema version or review binding"}`).test(m)),
+  `Demotion carries the reason the output was discarded into coverage: ${failure}`);
 }
 {
   // The one reviewer that failed is retried, and its siblings are untouched:

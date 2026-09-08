@@ -5707,6 +5707,235 @@ only; they have not been reviewed again. The user subsequently authorized
 merging #13 and chose a C5 boundary discussion, not implementation, for the
 next fresh session.
 
+## Completed increment: C5
+
+`C5` makes a discarded reviewer output an eligible failed attempt. It landed on
+branch `c5-discarded-output-eligibility`. The boundary was discussed and
+approved before any code was written, in the session the user reserved for that
+discussion on 2026-09-08; the four choices it named are recorded below with the
+answers the user gave.
+
+### The asymmetry it closes
+
+A reviewer that finished its turn settled `completed` however unusable its
+output turned out to be, because `runReviewer` only asked whether a nonempty
+message arrived before the session went idle. Envelope validation then ran much
+later, in `collectCandidates`, after every reviewer had settled. A reviewer
+whose output could not be parsed was therefore reported as an execution failure
+by the coverage report and as `completed` by its own record, so it could never
+become eligible for its tier's one configured fallback, while a reviewer that
+returned nothing at all could.
+
+Pull request #11 showed both halves in one run. `correctness` settled
+`completed` on one sentence of thinking-style prose and got nothing;
+`contracts` settled `incomplete` on no usable output and would have been
+eligible had a fallback been configured. Two reviewers lost the same way,
+separated only by how the runtime reported the end of the attempt.
+
+### The boundary, and the four choices behind it
+
+**Eligibility is the envelope gate itself, and stops there.** An attempt that
+settled `completed` is demoted to `incomplete`, and so becomes eligible for one
+configured fallback attempt, if and only if `envelope()` throws on its output.
+If `envelope()` returns, the attempt stays `completed` whatever becomes of the
+candidates inside it.
+
+Everything `envelope()` checks is the reviewer's compliance with a format this
+tool specified: the marker pair, the fence unwrap, JSON parsing, the exact key
+set, the schema version, the review-key binding, the result arrays and the
+limitation entries. Everything below it, meaning `candidate()` and adjudication,
+is judgment about the reviewed change. Retrying compliance is legitimate.
+Retrying judgment runs a model again until the gate accepts something, which
+manufactures findings, and it is the direction `SCOPE.md` closed when it dropped
+experimental malformed-output finding extraction from v1.
+
+That distinction also keeps `C5` clear of `Q5` and `Q6`. On #10 the overview
+reviewer's P2 at confidence 0.95 was discarded by the changed-line anchoring
+rule. That was a semantic refusal, and the correct repair was to fix the rule,
+which `Q5` and `Q6` did. A retry would have papered over a gate defect instead
+of fixing it. The two repairs answer different failures and must not be mixed.
+
+Four choices were put to the user before implementation, and all four were
+approved as recommended:
+
+| Choice | Decision | Why |
+| --- | --- | --- |
+| The adjudicator's own discarded decisions | In scope, on the `decisions` field | A malformed adjudication accepts no candidate, which is the most expensive discard in the system |
+| An envelope whose every candidate is refused | Not eligible | Indistinguishable at one attempt from retrying a single refusal; `Q5`/`Q6` answer this by fixing the gate |
+| A well-formed envelope bound to the wrong review key | Eligible, with no carve-out | Nothing usable survives it, so it is structural like any other envelope failure |
+| Whether demotion requires a configured fallback | Demote always | The attribution is wrong either way, and gating it would make a recorded status depend on another user's configuration |
+
+### Where the check sits, and why not at the evidence boundary
+
+The retry decision did **not** move into `findings.mjs`. `reviewAssignments`
+takes an optional `verifyResult` callback, applied in `runAttempt` immediately
+after the existing usage-mismatch demotion, and `review.mjs` supplies it as
+`envelopeVerifier(reviewKey(binding), "candidates")` for the specialists and
+`envelopeVerifier(boundary.key, "decisions")` for the adjudicator. The verifier
+is the same `envelope()` call collection makes, exported as a predicate; it is
+never a weaker gate, and `smoke-findings.mjs` holds it to exactly the corpus
+collection accepts and discards.
+
+Two reasons decided the placement, and the second is decisive:
+
+- The hook needs only the review key, which `reviewPrompt` already computes
+  before any reviewer starts, so nothing was hoisted or restructured and
+  `fixture.mjs` stays evidence-agnostic. The `F2` fixture path passes no hook.
+- **There is no timeout, so a hung reviewer never settles.** Validating in
+  `collectCandidates` would mean no retry could start until `Promise.allSettled`
+  resolved, so one hung reviewer would block every *other* reviewer's fallback
+  indefinitely. Beside the reviewer, each fallback fires as soon as its own
+  attempt settles, independent of its siblings. The roadmap's own earlier
+  sketch of running collection twice was rejected for this reason.
+
+`envelope()` therefore parses twice, once as an eligibility predicate and once
+in collection. It is pure and deterministic, spends nothing, and keeps the
+evidence boundary the single authority on what any of it means.
+
+### What did not change
+
+- The evidence boundary itself. The marker contract and its unwrap, the exact
+  key set, the schema-version and review-key checks, the citation, quote and
+  changed-line gates, `Q5`'s same-hunk rule, `Q6`'s clipped-quote repair,
+  adjudication, deduplication, selection, retention and the publication gates
+  are all untouched. No gate was weakened to make a retry fire.
+- The one-configured-fallback limit. A reviewer still gets at most one extra
+  attempt whatever happens, the review is never restarted, no other reviewer is
+  affected, and a fallback that fails leaves the reviewer incomplete with both
+  failures recorded. A fallback attempt is now verified exactly like the primary
+  it answers, and that is still its only attempt.
+- Cancellation. A cancelled attempt settles `cancelled`, never `incomplete`, so
+  the verifier never runs on it and no fallback starts. Elapsed time still
+  triggers nothing: no timeout, deadline or stuck-reviewer heuristic was added.
+- Confinement. `read-only.mjs` is untouched; the absent-path denial observation
+  stays open and unaddressed.
+- **The retained record.** No key, no status vocabulary and no record schema
+  version changed. `C3`'s invariants already describe this shape exactly: a
+  demotion produces the `incomplete` status `fallbackFrom` requires, and a
+  successful fallback produces the all-reviewers-completed state `complete`
+  requires. No reviewer's raw output was ever retained, on the primary or on
+  `fallbackFrom`, and `C5` does not add it: only the reason the output was
+  discarded travels, in the attempt's error.
+
+### What changes for coverage
+
+Review-level coverage was **already** `INCOMPLETE` in every one of these cases,
+because `collectCandidates` already pushed a blocking `execution-failure` for an
+unparseable envelope. `C5` does not change the headline coverage word on a
+failure. What it changes is attribution and recovery:
+
+- The reviewer's own status becomes `incomplete`, and `executionComplete`
+  becomes false where both previously said the attempt had completed.
+- The reason the output was discarded is carried in the attempt's error, so
+  demotion does not replace the specific parse failure with a generic
+  incomplete-execution message.
+- A successful fallback can now turn a review that would have been `INCOMPLETE`
+  into a `completed` one. That is what `C5` buys.
+
+### Controlled evidence
+
+Test-first throughout. The acceptance assertions failed first on a reviewer that
+settled `completed` with prose, which is the recorded #11 shape, and the
+equivalence assertions failed before the verifier existed.
+
+All twelve controlled suites pass and `git diff --check` is clean. None of them
+starts inference or touches the network:
+
+```sh
+for s in findings review selection retention preview publication publish-later \
+         checkout config context fixture target; do node scripts/smoke-$s.mjs; done
+git diff --check
+```
+
+New demonstrations in `smoke-review.mjs`, on a harness extended with reviewer
+prose, a wrong-key envelope, a refused candidate beside a valid one, and a
+fallback attempt that returns prose too:
+
+- Demotion without a fallback, for prose and for a wrong review key: the
+  reviewer settles `incomplete`, no extra session is created, `executionComplete`
+  is false, the specific parse reason reaches the coverage report, and the other
+  reviewers still complete and are adjudicated.
+- Useful sibling candidates survive another reviewer's fallback with their ids
+  and content intact, and reach the adjudicator unchanged. Exactly one extra
+  session is created, and no other reviewer is retried or reassigned.
+- A candidate refused inside a valid envelope demotes nothing and retries
+  nothing, and the valid sibling in that same envelope is still collected and
+  adjudicated. An envelope whose every candidate is refused likewise starts no
+  attempt, and still blocks completed coverage.
+- A fallback that fails leaves the reviewer incomplete in all three shapes: a
+  setup refusal that creates no session and keeps the attempt that ran, a run
+  failure, and a fallback whose own output is discarded for the same reason as
+  the primary's. None of them gets a third attempt.
+- Cancellation demotes nothing and starts no fallback.
+- A valid envelope reporting no candidate is a completed attempt in quick,
+  balanced, full and deep alike, and starts neither an adjudicator nor a
+  fallback.
+- Demotion and recovery behave the same in all four modes, and a demoted
+  reviewer falls back on its own tier: balanced's light `overview` and full's
+  medium `conventions-maintainability` each recover on their own tier's
+  configured fallback, never on the heavy one.
+- A `Q6` repair leaves the attempt completed and starts no fallback.
+- The adjudicator's own discarded decisions are eligible: one fallback attempt
+  recovers it, and when that attempt is discarded too, no candidate is accepted
+  and coverage stays incomplete.
+
+New demonstrations in `smoke-findings.mjs`, which prove the predicate is the
+gate rather than a copy of it:
+
+- The verifier accepts exactly the seven envelope shapes `collectCandidates`
+  can use, and rejects exactly the nine it discards whole plus the three that
+  fail the post-parse gates.
+- It does not throw on an envelope carrying a candidate below the confidence
+  bar, a candidate with a severity the mode does not admit, a candidate anchored
+  off the changed lines, a valid candidate beside a refused one, or no candidate
+  at all, while collection still refuses each of those candidates.
+- The adjudicator's field is checked as its own contract: a candidates envelope
+  is refused on the decisions field and the reverse, and prose and a wrong
+  review key are refused on both.
+
+### Cost
+
+Fallbacks start unset, so **a user with no configured fallback spends nothing
+extra**; they get corrected attribution only. A fallback attempt re-sends the
+full prompt and is a complete second review pass, so it costs roughly what the
+primary cost rather than less.
+
+| Tier | Recorded per-reviewer charge | Runs |
+| --- | --- | --- |
+| Heavy | 28.36 to 57.14 credits | #10, #11, #13 |
+| Light overview | 5.49 to 7.77 credits | #10, #11, #13 |
+| Medium `claude-sonnet-5` | 92.93905 credits | #11 |
+
+The worst case is bounded by `C3` and unchanged by `C5`: at most one extra
+attempt per reviewer plus one for the adjudicator, so seven in full mode and six
+in balanced. Against this project's own history, a configured heavy fallback
+would have added roughly 30 credits to #13's 134.753239, and would have fired
+twice on #11 for roughly 70 credits against 269.135657. `C5` adds no instruction
+text and no prompt tokens to any primary attempt.
+
+### Remaining limitations
+
+- **No live run has exercised this.** Every demonstration above is controlled,
+  with scripted reviewer output. Whether a real model that emitted prose once
+  produces a usable envelope on a different assignment is not established by any
+  of it, and cannot be until a live review discards an output while a fallback
+  is configured. Do not read the controlled evidence as evidence about model
+  behaviour.
+- The project has never configured a fallback for a live review, so the whole
+  `C3` execution path, which `C5` now feeds, remains live-unobserved. #11 is
+  still the only run where one would have fired.
+- Demotion is a visible change for a user with no fallback configured: a
+  reviewer that previously read `completed` now reads `incomplete`. That is more
+  accurate, and it is documented, but it is a behaviour change rather than a
+  pure addition.
+- `envelope()` runs twice per attempt. That is deliberate and costs no credits,
+  but it does mean a future change to the envelope contract has two callers that
+  must stay identical; the equivalence assertions in `smoke-findings.mjs` exist
+  to catch a divergence.
+- The absent-path read denial recorded on #6, #11 and #13 is untouched and still
+  open. `C5` makes a reviewer that fails after such a denial eligible for a
+  fallback, which is not the same as fixing the denial.
+
 ## Exact next increment
 
 **Q6 is complete on pull request #13; the user has authorized its merge.**
