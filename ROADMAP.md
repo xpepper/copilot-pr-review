@@ -5913,17 +5913,115 @@ would have added roughly 30 credits to #13's 134.753239, and would have fired
 twice on #11 for roughly 70 credits against 269.135657. `C5` adds no instruction
 text and no prompt tokens to any primary attempt.
 
+### Installed balanced review of pull request #14
+
+The installed plugin reviewed `C5`'s own pull request once, in **balanced** mode
+named explicitly. Balanced is the default topology and `C5` adds no mode, so no
+other topology was required; full would have added a medium reviewer without
+putting the change on a seam balanced does not already cross.
+
+```sh
+gh pr checkout 14
+copilot plugin install "$(pwd)"
+COPILOT_CLI_PATH="$(command -v copilot)" \
+COPILOT_SDK_PATH="$(ls -d "$HOME"/.copilot/pkg/*/"$(copilot --version \
+  | sed -n 's/.*CLI \([0-9][0-9.]*[0-9]\).*/\1/p')"/copilot-sdk)" \
+node scripts/dogfood-review.mjs 14 --balanced --all --no-comment
+```
+
+Reviewed head `761e01c`, base `58deae8`, seven files, 666 additions and 152
+deletions. Five reviewers from saved personal configuration, and **no configured
+fallback on any tier**:
+
+| Reviewer | Tier, actual model, effort | Settled | Tool calls | Reads | Denials | Credits |
+| --- | --- | --- | --- | --- | --- | --- |
+| correctness | heavy, `gpt-5.6-terra`, high | completed | 4 | 4 | 0 | 24.630630 |
+| contracts | heavy, `gpt-5.6-terra`, high | completed | 10 | 10 | 0 | 28.570110 |
+| security | heavy, `gpt-5.6-terra`, high | completed | 8 | 8 | 0 | 29.858490 |
+| performance-resources | heavy, `gpt-5.6-terra`, high | completed | 4 | 4 | 0 | 23.664930 |
+| overview | light, `gpt-5.6-luna`, high | completed | 16 | 16 | 0 | 4.012691 |
+
+Per-reviewer reported nano-AIU charges sum to **110.736851 credits**, the
+runtime's own figure. There were 42 tool calls and 42 reads, 24 `view`, 17 `rg`
+and one `glob`, with **no permission denial and no tool denial**, as on #10 and
+#12. All recorded usage matched the assignments. Runtime reviewer events ran
+from 17:09:29.690Z to 17:10:33.736Z. No timeout or intervention was applied and
+the working tree was untouched throughout. Nothing was published.
+
+**Coverage is INCOMPLETE**, on one coverage gap and three informational caveats,
+with **zero execution failures**. There were zero candidates, so no adjudicator
+session ran, and nothing was accepted, rejected, deduplicated or capped. This is
+not a clean-review claim.
+
+**What this run does and does not demonstrate about `C5`.**
+
+- Every reviewer completed and every envelope parsed, so **the demotion path was
+  never taken**. The run shows that `C5` does not break the ordinary path; it
+  does not show a live demotion.
+- The verifier nevertheless ran live on five real reviewer outputs, on the
+  execution seam, before collection saw any of them, and demoted none. Every one
+  carried the marker pair exactly once and parsed. That is real evidence for one
+  specific risk: the predicate does not reject well-formed live model output that
+  collection then accepts. It is a sixth run of live evidence for `F6`'s marker
+  contract, across two model families.
+- **No fallback was configured on any tier**, so no fallback attempt could have
+  started even had a reviewer been demoted. The `C3` execution path `C5` feeds
+  remains live-unobserved, exactly as before this increment.
+- Zero candidates means the adjudicator never ran, so `envelopeVerifier` on the
+  `decisions` field is controlled-only evidence.
+
+**The reviewers said the same thing about the gap, and they are right.**
+`performance-resources` recorded the one coverage gap: the captured context
+holds controlled assertions but no runtime trace or workload with a configured
+fallback, so latency, peak concurrent-session count and the credit charge when
+several unusable outputs trigger their fallbacks cannot be assessed from the
+supplied evidence. `contracts` recorded the matching caveat: the checkout and
+harness changes establish the verifier's source-level integration but cannot
+establish how a live runtime behaves after a malformed primary output triggers a
+configured fallback. `correctness` noted that the controlled assertions were
+present but not executed by the review, and `security` limited itself to the
+captured diff and checkout. All four are preserved as reported. They are not
+relabelled to make the review complete, and they agree with the limitations this
+increment already recorded for itself.
+
+**No defect candidate was proposed**, so no finding was fixed and none was
+rejected by hand, and no implementation changed in response. Zero findings is
+never a clean-review claim, and the coverage gap outranks the passing controlled
+suites as a statement about what is still unknown.
+
+The complete timeline was saved before analysis, outside the checkout, in
+`c5-review-timeline.log` in this session's scratchpad, alongside
+`c5-review-evidence.json` and the five original `c5-<reviewer>-verbatim.txt`
+strings taken from the timeline's structured evidence. They stay local. The
+retained review is bound to originating session
+`13aa9f39-f66d-491b-bd5a-05be35833afb`, invocation
+`cfe6ad3e-fcde-4040-8030-5bf7c90a440d`, with review key
+`6df48c4664395458cb89865de3d538837b74f895a902b4a04780e3d3eeca0bdf`.
+
+CLI 1.0.83 was used with its derived bundled SDK. No other credit-spending
+probe, factory invocation or rerun was performed, and the personal configuration
+file was not moved or edited. The commits after this review change documentation
+only and have not been reviewed again.
+
 ### Remaining limitations
 
-- **No live run has exercised this.** Every demonstration above is controlled,
-  with scripted reviewer output. Whether a real model that emitted prose once
-  produces a usable envelope on a different assignment is not established by any
-  of it, and cannot be until a live review discards an output while a fallback
-  is configured. Do not read the controlled evidence as evidence about model
+- **No live run has demoted an attempt.** Every reviewer on #14 completed and
+  every envelope parsed, so the demotion path is demonstrated only by the
+  controlled suites, with scripted reviewer output. What #14 does establish is
+  the narrower converse: the verifier ran live on five real outputs and demoted
+  none of them, so the predicate does not reject well-formed model output that
+  collection then accepts.
+- **No live run has started a fallback from a demotion, and none could have.**
+  No tier had a configured fallback on #14, and the project has never configured
+  one for any live review, so the whole `C3` execution path `C5` feeds remains
+  live-unobserved. #11 is still the only run where one would have fired. Whether
+  a real model that emitted prose once produces a usable envelope on a different
+  assignment is therefore still unestablished, and the reviewers on #14 said so
+  themselves. Do not read the controlled evidence as evidence about model
   behaviour.
-- The project has never configured a fallback for a live review, so the whole
-  `C3` execution path, which `C5` now feeds, remains live-unobserved. #11 is
-  still the only run where one would have fired.
+- The adjudicator's half is controlled-only. #14 produced zero candidates, so no
+  adjudicator session ran and `envelopeVerifier` on the `decisions` field has
+  never been exercised live.
 - Demotion is a visible change for a user with no fallback configured: a
   reviewer that previously read `completed` now reads `incomplete`. That is more
   accurate, and it is documented, but it is a behaviour change rather than a
@@ -5938,13 +6036,17 @@ text and no prompt tokens to any primary attempt.
 
 ## Exact next increment
 
-**`C5` is complete on pull request #14, and its installed review is the open
-question.** The controlled evidence is in "Completed increment: C5" above. The
-increment changes behaviour under `extensions/`, so `AGENTS.md` treats it as
-undemonstrated until the installed plugin has reviewed its own pull request
-once; that review spends credits and needs the user's explicit go-ahead. If it
-has not run, say so plainly rather than describing the controlled suites as the
-increment's verification of record.
+**`C5` is complete on pull request #14, whose merge is the user's decision.**
+Its one authorized installed review ran in balanced mode, cost 110.736851
+credits and is recorded above. Coverage was INCOMPLETE on one coverage gap and
+three caveats, with zero execution failures, zero candidates and no adjudicator
+session. That authorization is spent: do not rerun it, and do not review the
+later documentation-only commits.
+
+**The live gap the review names is the honest state of this increment.** No live
+run has demoted an attempt, none has started a fallback from one, and no tier
+has ever had a fallback configured for a live review. Say that plainly rather
+than describing the controlled suites as proof of live behaviour.
 
 **Nothing about `C5` should be redone or widened.** Its boundary was discussed
 and approved before implementation, and the four choices recorded in its table
