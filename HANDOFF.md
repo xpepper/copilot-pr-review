@@ -27,152 +27,117 @@ before you start.
 ## Recorded state
 
 - **You are starting on a clean `main` with no increment in flight.** `main` is
-  the squash merge of pull request #11, which completed `C4`. Nothing should be
+  the squash merge of pull request #12, which completed `Q5`. Nothing should be
   uncommitted and no increment branch should be open. Branch from `main`.
 - Pull requests #3, #4 and #5 delivered `M1`, #6 delivered `F5`, #7 delivered
-  `F6`, #8 delivered `M2`, #10 delivered `C3`, #11 delivered `C4`. Read
-  `git log` and the pull requests rather than looking for hashes from them:
-  merged ones are squashed, so their individual commits are not ancestors of
-  `main`.
+  `F6`, #8 delivered `M2`, #10 delivered `C3`, #11 delivered `C4`, #12 delivers
+  `Q5`. Read `git log` and the pull requests rather than looking for hashes from
+  them: merged ones are squashed, so their individual commits are not ancestors
+  of `main`.
 - Pull requests #1 and #2 are synthetic publication playgrounds from P4 and P5.
   **Never merge them**, and never republish to them.
-- `M1`, `F5`, `F6`, `M2`, `C3` and `C4` are Completed. **`Q5` is the next
-  increment**, chosen by the user on 2026-09-08 over `C5`, which stays open and
-  still needs their go-ahead. `Q6` follows `Q5`. `L1` stays pending.
-- Eight live reviews of this repository's own pull requests exist: #3 and #4
-  balanced, #5 full, #6 balanced, #7 full, #8 deep, #10 balanced, #11 full. All
-  eight are spent. **Any review you run needs its own authorization; none of
-  these carry over.**
+- `M1`, `F5`, `F6`, `M2`, `C3`, `C4` and `Q5` are Completed. **`Q6` is the next
+  increment.** `C5` stays open and still needs the user's explicit go-ahead.
+  `L1` stays pending.
+- Nine live reviews of this repository's own pull requests exist: #3 and #4
+  balanced, #5 full, #6 balanced, #7 full, #8 deep, #10 balanced, #11 full, #12
+  balanced. All nine are spent. **Any review you run needs its own
+  authorization; none of these carry over.**
 
-## What `C4` settled, so you do not redo it
+## What `Q5` settled, so you do not redo it
 
-A tier whose resolved model advertises no configurable reasoning effort resolves
-to **no** effort instead of inheriting one, so a model like `claude-haiku-4.5`
-can serve a tier. Read "Completed increment: C4" in `ROADMAP.md` before you touch
-`config.mjs` or `fixture.mjs`.
+A candidate anchored on a changed line carries an optional `breaks` citation for
+the code that change breaks. Read "Completed increment: Q5" in `ROADMAP.md`
+before you touch `findings.mjs` or `retention.mjs`.
 
-- **Only an effort chosen somewhere else is replaced.** An effort set for this
-  tier itself, by an invocation flag, by personal settings or by a trusted
-  project's file, stays and is validated, so it is refused rather than dropped,
-  substituted or lowered. `chosenForThisTier` in `config.mjs` is that list, and
-  it is a positive list of the three explicit origins on purpose.
-- **A model that does advertise efforts is untouched.** An inherited effort such
-  a model cannot support still refuses the review. Nothing about nearest-tier
-  inheritance, the heavier-tier tie-break or flag precedence changed.
-- **A model the catalog does not offer drops nothing.** That case is refused on
-  the model itself, so no conclusion is drawn about its effort.
-- The origin `model` renders as `reasoning=(not configurable) [model]` and is
-  reported **whenever the model is the reason**, including when no layer offered
-  an effort to drop. The first attempt returned early in that case, and pull
-  request #11's review caught it; do not reintroduce that early return.
-- `C3`'s fallback surface carries the same rule, because an unset
-  `<tier>FallbackEffort` follows the tier's own effort and that is an inherited
-  origin like any other.
-- **The model catalog is a required argument** of `resolveTier` and
-  `resolveFallback`. Do not give it a default: without it a caller would silently
-  get the old behaviour, and a tier would run at a different effort than the one
-  displayed.
-- **No configuration key was added**, and none is needed. There is still no way
-  to say "this tier takes no effort" for a model that *does* support efforts;
-  nobody has asked for one, and the `gpt-5.6` family exposes `none` as a value.
-- The installed runtime represents "no configurable effort" by **omitting**
-  `reasoning_effort` from `capabilities.supports`, and a session created on such a
-  model reports no `reasoningEffort` at all. Both are asserted in
-  `smoke-config-runtime.mjs`. Do not add a second notion of the catalog beside
-  `reasoningEfforts` on the strength of a hypothetical malformed entry; pull
-  request #11's rejected P2 argued for exactly that.
+- **The new citation carries no anchoring rule of its own.** It may name
+  unchanged code, code in another hunk, or code in another changed file. It is
+  still bound, in-window and exactly quoted, because it goes through the same
+  `cite()` as every other citation. Do not add an anchoring rule to it.
+- **It is optional, absent or null.** `candidate()` normalizes it to an explicit
+  `null` on the finding, and `retention.mjs` accepts a record that omits the key.
+  The retained record's schema version was deliberately not changed: it tracks
+  publication authority, not candidate shape.
+- **A supplied `before`/`after` citation still belongs to the location's own
+  hunk**, on its own side and file, and still has to reach changed code. That
+  refusal fires unchanged, and the mis-anchored candidates from #4 and #10 are
+  still refused with the same message. `Q5` removed the reason a reviewer had to
+  write one; it did not accept one.
+- **A null introduction side is now a claim, not a code check.** It used to be
+  refused whenever the location's hunk changed that side at all, which discarded
+  #5's finding. The adjudicator is now told what a null side claims and to test
+  it against the captured diff. Do not restore the code check without also
+  restoring what it cost.
+- **Deduplication reads the new citation** alongside `before`, `after` and
+  `evidence`, which keeps behaviour identical to citing the same lines in
+  `evidence`, where a reviewer had to put them before.
+- **The published inline comment body was deliberately not changed.** The
+  citation appears in the terminal findings view and the retained record only.
+- Widening `before`/`after` to any changed hunk in the file was considered and
+  rejected: an introduction pair drawn from two unrelated edits stops describing
+  one edit, which is the only thing those two citations exist to pin.
 
-## What `C3` settled, which still stands
+## What pull request #12's review found, so you inherit it
 
-A tier may carry `<tier>FallbackModel` and `<tier>FallbackEffort`, and that pair
-buys **one extra attempt, for the one reviewer whose own execution failed**.
+The balanced review cost 137.274102 credits, completed all five reviewers, hit no
+read or tool denial across 41 tool calls, and ran **no adjudication pass**,
+because its one candidate never reached one. Three things in it matter to you.
 
-- **Elapsed time never triggers a fallback**, because nothing imposes a deadline.
-  Never add a timer, a deadline, a heartbeat or a "stuck reviewer" heuristic.
-  `SCOPE.md` forbids it and the design depends on it.
-- **Fallbacks never inherit across tiers**, unlike a tier's own model and effort.
-  Only the fallback effort falls back, to the tier's own effective effort.
-- Only that reviewer's own execution failure is eligible. Cancellation is not,
-  and neither is an unusable explicit assignment, which still refuses the review
-  before anything starts.
-- A recovered reviewer keeps the failed attempt in `fallbackFrom` and reports it
-  as a coverage caveat. Never reduce a record to the attempt that succeeded.
+- **A live reviewer used the new citation on the first pull request that offered
+  it**, citing code eleven lines away in a different hunk, and no `Q5` refusal
+  fired on it. That is one candidate in one review; nothing has yet shown one
+  accepted through adjudication and presented as a finding.
+- **The exact-citation match discarded it anyway**, over the trailing comma on
+  the last line of that very citation. A second citation in the same candidate
+  began its first line mid-sentence. This is `Q6`.
+- **The finding was true and it was about `Q5` itself.** Relaxing the null
+  introduction side moved a deterministic check onto the adjudicator, and the
+  adjudicator contract never said so: its acceptance rule enumerated the
+  candidate's prose fields only. Fixed inside the same increment, with
+  controlled assertions on the contract text, after the review.
 
-## What pull request #11's review found, so you inherit it
+## The next increment: `Q6`
 
-The full review cost 269.135657 credits, ran six reviewers across three model
-families plus the adjudicator, and reported **incomplete** coverage on three
-execution failures. Four things in it matter to you.
-
-- **The one real defect was discarded by the evidence boundary**, for the fourth
-  time on this project and the second time in a row on the overview reviewer's
-  finding. Its quote was right except for two leading spaces, which is `Q6`. It
-  was recovered by reading the raw timeline, not from the review's own output.
-  Save the verbatim reviewer output before you analyse anything; that is now
-  twice that this step was the only way a true finding survived.
-- **A reviewer settled `completed` having emitted no envelope at all.**
-  `correctness` returned one sentence of thinking-style prose. This is the `C5`
-  case, not an `F6` unwrap failure: there was no envelope to unwrap, so it is not
-  evidence against the marker contract.
-- **A reviewer failed in exactly the way a `C3` fallback covers.** `contracts`
-  settled `incomplete` with no usable output. No fallback was configured, so none
-  was attempted. `C3`'s standing limitation is now "would have fired here"
-  rather than "never observed".
-- **The read denials landed on the two reviewers that then failed, again**, and
-  this run shows the mechanism: `insideRoot` in `read-only.mjs` resolves a
-  requested path with `realpathSync` and rejects anything that throws, so a path
-  that simply **does not exist** is refused exactly like one outside the reviewed
-  checkout. Both denied reviewers had asked for a path that does not exist. It is
-  recorded in `ROADMAP.md` as an open observation, not an increment. It moves a
-  confinement boundary, so it needs its own increment and its own review, and the
-  safe direction is that an absent path stays refused with an accurate reason.
-
-## The next increment: `Q5`
-
-**Implement `Q5`, and only `Q5`, unless the user says otherwise.**
+**Implement `Q6`, and only `Q6`, unless the user says otherwise.**
 `ROADMAP.md`'s "Exact next increment" section states it in full, with the table
-of every true finding the evidence boundary has discarded and which refusal did
-it. Read that table before you touch `findings.mjs`.
+of every candidate the evidence boundary has discarded and which refusal did it.
+Read that table before you touch `findings.mjs`.
 
-A candidate anchored on a changed line must be able to cite the code that change
-breaks, including unchanged code and code in another hunk. Today
-`candidate()` requires one hunk to contain the location **and** both introduction
-citations, so the common shape "this changed line breaks that other code" cannot
-be expressed at all. That single rule has discarded three true findings, on pull
-requests #4, #5 and #10, including the best finding in #10's review.
+`cite()` requires `source.lines.slice(startLine - 1, endLine).join("\n") !== quote`
+to be false, so a quote must match its bound source byte for byte. Every
+remaining row in that table is this one check, and it has now discarded two true
+findings at opposite ends of a quote: #11 lost two **leading** spaces on the
+first line, #12 a **trailing** comma on the last.
 
-**Do not call this "the anchoring rule" and fix both gates at once.** Two
-different refusals in `findings.mjs` have each discarded a true finding, and only
-the first is `Q5`:
+**Weigh it against its own counter-evidence, which is real.** On #4 that same
+check stopped `contracts:2` at confidence 0.99, where the reviewer had introduced
+a space into its own quote and the claimed defect was about that space.
+Normalizing whitespace would have let that fabrication through. **Keep exact
+matching as the acceptance path**, and report or repair a near-miss from the
+cited line range instead of relaxing the comparison. One shape worth weighing
+first, not a decision already taken: re-derive the quote from the bound source
+and line range, then require the reviewer's quote to be a contiguous span of it.
+That would recover #11 and #12 and still refuse #4, whose quote is not a span of
+anything in the source. Weigh its own cost: a span rule lets a reviewer quote a
+fragment while naming a wider line range, so whatever survives has to keep the
+anchor honest.
 
-- `Q5`: "Introduction citations and location must identify the same changed
-  hunk", which cost #4, #5 and #10.
-- `Q6`: "Citation does not exactly match a supplied context window", which cost
-  #11, where the quote was right except for two leading spaces on its first line.
-  **`Q6` has real counter-evidence**: on #4 that same check stopped a
-  0.99-confidence fabrication whose claimed defect was itself about a space the
-  reviewer had invented in its own quote. Keep exact matching as the acceptance
-  path; report or repair a near-miss from the cited line range rather than
-  relaxing the comparison. Do not fold `Q6` into `Q5`.
-
-The acceptance criterion for `Q5`: a candidate anchored on a changed line can
-cite the code that change breaks and reach adjudication, while every refusal that
-stops an unbound, out-of-window or fabricated citation still fires unchanged.
-Reconstruct the three recorded rejections as controlled fixtures rather than
-trusting a prose description of them. A candidate envelope change touches the
-reviewer prompt, the adjudicator instructions, `findings.mjs` and
-`retention.mjs` together; **ask the user before changing the retained record's
-schema version**, which tracks publication authority rather than candidate shape.
+The acceptance criterion: both recorded near-misses reach adjudication while the
+recorded fabrication still does not, reconstructed as controlled fixtures rather
+than trusted from this description. A near-miss can now appear on any citation a
+candidate carries, including `breaks`.
 
 `C5` remains open and still needs the user's explicit go-ahead. A reviewer whose
 output the evidence boundary cannot parse settles as `completed`, so it never
 becomes eligible for its tier's one fallback attempt, while a reviewer that
-returns nothing does. Five of this project's eight live reviews were incomplete
-for exactly that reason. Do not start it, and do not fold any part of it into
-`Q5`.
+returns nothing does. Five of this project's live reviews were incomplete for
+exactly that reason. Do not start it, and do not fold any part of it into `Q6`.
+It moves the retry decision across the evidence boundary and changes what
+`completed` means for every mode.
 
-Keep the evidence boundary exactly as it is, keep `L1` pending, copy no upstream
-source, and update `README.md` if the change is user-visible.
+Keep the evidence boundary's other refusals exactly as they are, keep `L1`
+pending, copy no upstream source, and update `README.md` if the change is
+user-visible.
 
 ## Running the real integration test
 
@@ -186,10 +151,11 @@ node scripts/dogfood-review.mjs NUMBER --all --no-comment
 
 Name the mode deliberately. Without a mode flag the runner takes the default,
 balanced. Say in `ROADMAP.md` which mode you used and why. `C3` used `--balanced`
-because it changed no mode and balanced is the default topology. `M2` used
-`--deep` because deep was the mode it added and is the cheapest topology. `C4`
-used `--full` because it changed the shared tier-resolution seam and full is the
-only mode that resolves all three tiers.
+because it changed no mode and balanced is the default topology; `Q5` used
+`--balanced` for the same reason. `M2` used `--deep` because deep was the mode it
+added and is the cheapest topology. `C4` used `--full` because it changed the
+shared tier-resolution seam and full is the only mode that resolves all three
+tiers.
 
 Derive the SDK path instead of pinning a version. Old packages under
 `~/.copilot/pkg/` are never pruned, so a pinned path keeps resolving after a
@@ -210,8 +176,12 @@ It refuses to run unless local `HEAD` is the pull request head with a clean
 tree, refuses `--comment`, prints the whole plugin timeline, and reports the
 settled outcome with the runtime's credit figure. `copilot -p "/pr-review N"` is
 not a substitute: prompt mode starts an ambient model turn instead of
-dispatching the command. The run takes tens of minutes; do not treat a quiet
-timeline as a hang. #11's full run took roughly forty minutes.
+dispatching the command. **Runtime varies widely and a quiet timeline is not a
+hang.** #11's full run took roughly forty minutes; #12's balanced run finished in
+98 seconds of process wall time, with the runtime's own event timestamps putting
+all five reviewers between 17:50:48 and 17:52:03, and two of them still active
+long after the other three had settled. No timeout is imposed by design, so
+waiting is the only correct response.
 
 Do not modify the working tree while a review is running: the reviewer is
 reading that checkout live.
@@ -223,11 +193,11 @@ denials, and the reported credits. The per-reviewer `policy.toolCalls`,
 evidence record carry the read evidence, and `billing` carries the charge; the
 per-reviewer figures sum to the reported total, so check that they do.
 **Save the reviewers' verbatim output from the timeline before you analyse
-anything.** `F6`'s diagnosis, `M2`'s marker evidence, `C3`'s and `C4`'s all came
-from those strings, and on #10 and #11 the timeline was the only place the
-review's one true finding survived. Fix real findings on the same branch and say
-which you rejected and why. A refusal or failure is a defect report about the
-tool; never weaken a gate to make the run pass.
+anything.** `F6`'s diagnosis, `M2`'s marker evidence, `C3`'s, `C4`'s and `Q5`'s
+all came from those strings, and on #10, #11 and #12 the timeline was the only
+place the review's one true finding survived. Fix real findings on the same
+branch and say which you rejected and why. A refusal or failure is a defect
+report about the tool; never weaken a gate to make the run pass.
 
 ## Runtime and validation caveats
 
@@ -240,34 +210,36 @@ tool; never weaken a gate to make the run pass.
 - Controlled suites (no inference/network): `node scripts/smoke-<name>.mjs` for
   `findings`, `review`, `selection`, `retention`, `preview`, `publication`,
   `publish-later`, `checkout`, `config`, `context`, `fixture`, `target`. All
-  twelve passed on pull request #11, as did `git diff --check`. Re-run them
+  twelve passed on pull request #12, as did `git diff --check`. Re-run them
   before you start: they need no network and no inference.
 - Installed probes require both `COPILOT_CLI_PATH` and `COPILOT_SDK_PATH`, set
   the same derived way as the integration test above rather than pinned to a
-  version. No-inference probes: `smoke-runtime.mjs --targets --startup` and
-  `smoke-config-runtime.mjs` were both rerun on pull request #11 and passed,
-  twice each, once before the review and once after its finding was fixed.
+  version. `scripts/smoke-factory.mjs` without `--spend` was rerun on #12 and
+  reported `subagents: 0` and `nanoAiu: 0`. `smoke-runtime.mjs --targets
+  --startup` and `smoke-config-runtime.mjs` were last rerun on pull request #11.
   `smoke-runtime.mjs --targets --matching-checkout --startup`,
   `smoke-retention-runtime.mjs` and `smoke-reviewer-tools.mjs` with
   `PR_REVIEW_HEAVY_MODEL=gpt-5.6-terra` and with `claude-sonnet-5` were last
-  rerun on pull request #5; `F6`, `M2`, `C3` and `C4` changed nothing they
+  rerun on pull request #5; `F6`, `M2`, `C3`, `C4` and `Q5` changed nothing they
   exercise.
 - **`smoke-config-runtime.mjs` does not refuse when a personal
   `<copilot-config-home>/pr-review/config.json` exists.** It fails its first
   assertion, which expects `not created yet`. Move the file aside, run the probe,
   move it back, and verify the restore with `shasum -a 256`; a shell that dies
   mid-script can leave it moved away. On this host the digest is
-  `30794150a3db740f7dcf6f9d7a5a827d3729c5599f7456f582af735d3f297ea9`, mode `0600`.
-  The probe needs two things from the subscription: a second usable model that is
-  not the ambient one and advertises a configurable effort, which `C3` added, and
-  since `C4` a model that advertises **no** configurable effort. Today
-  `claude-haiku-4.5` is the only model in this subscription that does.
+  `30794150a3db740f7dcf6f9d7a5a827d3729c5599f7456f582af735d3f297ea9`, mode
+  `0600`. The probe needs two things from the subscription: a second usable model that is not the ambient one and advertises
+  a configurable effort, which `C3` added, and since `C4` a model that advertises
+  **no** configurable effort. Today `claude-haiku-4.5` is the only model in this
+  subscription that does.
 - `scripts/smoke-factory.mjs` is `F5`'s probe. Without `--spend` it starts no
   subagent and spends nothing, and it is a useful no-inference regression on the
   factory surface if you ever need to check whether the gate has lifted. With
   `--spend` it costs credits and needs explicit authorization.
-- Reviewing costs real credits and scales with the diff and the reviewer count:
-  269.135657 for six full reviewers on a 10-file, 563-addition pull request,
+- Reviewing costs real credits and scales with the diff, the reviewer count and
+  whether any candidate reaches adjudication: 137.274102 for five balanced
+  reviewers and no adjudication pass on a 9-file, 498-addition pull request,
+  269.135657 for six full reviewers on a 10-file, 563-addition one,
   233.19659 for five balanced reviewers on a 12-file, 984-addition one,
   68.27393 for one deep reviewer on a 12-file, 385-addition one, 79.238565 for
   five balanced reviewers on a 3-file, 848-addition one, 124.2079 for six full
@@ -282,24 +254,27 @@ tool; never weaken a gate to make the run pass.
 - Do not revisit the Agent Factories surface without new information from GitHub.
   `F5` demonstrated three independent blockers on CLI 1.0.83 and all three would
   have to change. A new CLI version is new information; a fresh reading of the
-  same documentation is not.
+  same documentation is not. `scripts/f5-factory-extension.mjs` mirrors the
+  shipped candidate schema, so it has to follow any envelope change.
 - Do not reintroduce substring matching in the `F6` marker unwrap and do not
-  widen it. It now has live evidence from four runs: five of six reviewers on #7,
-  both sessions on #8, all six sessions on #10, and on #11 every session that
-  produced an envelope at all, including `claude-sonnet-5` after paragraphs of
-  prose. #11's one unparsed output contained no envelope of any kind, so it is
-  not evidence against the unwrap.
+  widen it. It now has live evidence from five runs: five of six reviewers on #7,
+  both sessions on #8, all six sessions on #10, on #11 every session that
+  produced an envelope at all, and all five sessions on #12.
 - Cold `session.resume` of retained command-only records remains unsupported.
   Do not invent transcript recovery. The adjudicator remains zero-tool and
   citations remain restricted to captured diff/context evidence.
+- Never add a timeout, a deadline, a heartbeat or a "stuck reviewer" heuristic.
+  `SCOPE.md` forbids review timeouts and `C3` depends on their absence: elapsed
+  time is never a fallback trigger.
 - Older observations are listed in `ROADMAP.md` with their current status. The
-  oldest is still the largest and still open: **no review of any mode has ever run
-  against a substantial code diff**, and pull request #10 is still the closest at
-  984 additions over 12 files. The four discarded true findings are now `Q5` and
-  `Q6`. Read denials have landed on the failing reviewers on two of eight
-  reviews, with the mechanism identified above, and that one is still an
-  observation rather than an increment. A reviewer settling `completed` having
-  produced no envelope at all is the `C5` case.
+  oldest is still the largest and still open: **no review of any mode has ever
+  run against a substantial code diff**, and pull request #10 is still the
+  closest at 984 additions over 12 files. Read denials have landed on the
+  failing reviewers on two reviews, #6 and #11, with `insideRoot` in
+  `read-only.mjs` refusing an absent path exactly like one outside the checkout;
+  that is still an observation rather than an increment, and the safe direction
+  is that an absent path stays refused with an accurate reason. A reviewer
+  settling `completed` having produced no envelope at all is the `C5` case.
 - Two sessions once worked on the same branch at the same time, and the second
   wrote a handoff from a stale premise. If that happens again, rebase rather
   than force-push, and say so in your report.
@@ -317,12 +292,14 @@ Push the branch, open its pull request with `gh pr create`, run the integration
 test above, record the outcome, and leave merging to the user.
 
 Watch for one defect class that has now been the finding several reviews of this
-project produced: a list or a count that enumerates something you just extended.
-On `C3` it was a stale key count. On `C4` a draft roadmap sentence called the new
-origin label "a seventh" when it was the eighth, caught before pushing, and a
-stale "two live reviews" count in `README.md` was corrected in passing. Grep for
-enumerations of whatever you add, and for the numbers that describe them, before
-you push, and prefer deriving a sentence from the list over restating its size.
+project produced: **a list or a count that enumerates something you just
+extended.** On `C3` it was a stale key count. On `C4` a draft roadmap sentence
+called the new origin label "a seventh" when it was the eighth. On `Q5` it was
+the adjudicator's own acceptance rule, which enumerated the candidate's prose
+fields and so silently excluded both the new citation and the check that had just
+moved onto the adjudicator. Grep for enumerations of whatever you add, and for
+the numbers that describe them, before you push, and prefer deriving a sentence
+from the list over restating its size.
 
 Recent commits carry no attribution trailer, because those sessions were
 instructed to add none. Older commits carry `Co-authored-by: Copilot`. Follow

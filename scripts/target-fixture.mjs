@@ -59,6 +59,54 @@ const shippingDiff = [
   "-  return subtotal >= 5000 ? 0 : 500;", "+  return subtotal <= 5000 ? 0 : 500;", " }", "",
 ].join("\n");
 
+// Q5 fixture: two hunks far enough apart to stay separate, so a candidate can be
+// anchored on one changed line while the code that change breaks sits in the
+// other hunk, in unchanged code between them, or in another changed file.
+export const breakageBaseSource = [
+  "// Free shipping applies at or above the threshold.",
+  "export const threshold = 5000;",
+  "",
+  "export function qualifies(subtotal) {",
+  "  return subtotal >= threshold;",
+  "}",
+  "",
+  "export function shipping(subtotal) {",
+  "  return qualifies(subtotal) ? 0 : 500;",
+  "}",
+  "",
+  "export function label(subtotal) {",
+  "  return qualifies(subtotal) ? \"free\" : \"paid\";",
+  "}",
+  "",
+  "export function summary(subtotal) {",
+  "  return `${label(subtotal)}:${shipping(subtotal)}`;",
+  "}", "",
+].join("\n");
+export const breakageHeadSource = breakageBaseSource
+  .replace("subtotal >= threshold", "subtotal > threshold")
+  .replace("${label(subtotal)}:${shipping(subtotal)}", "${label(subtotal)} ${shipping(subtotal)}");
+export const breakageDiff = [
+  "diff --git a/breakage.js b/breakage.js",
+  `index ${blobSha(breakageBaseSource)}..${blobSha(breakageHeadSource)} 100644`,
+  "--- a/breakage.js", "+++ b/breakage.js",
+  "@@ -2,7 +2,7 @@",
+  " export const threshold = 5000;",
+  " ",
+  " export function qualifies(subtotal) {",
+  "-  return subtotal >= threshold;",
+  "+  return subtotal > threshold;",
+  " }",
+  " ",
+  " export function shipping(subtotal) {",
+  "@@ -14,5 +14,5 @@",
+  " }",
+  " ",
+  " export function summary(subtotal) {",
+  "-  return `${label(subtotal)}:${shipping(subtotal)}`;",
+  "+  return `${label(subtotal)} ${shipping(subtotal)}`;",
+  " }", "",
+].join("\n");
+
 const sources = new Map([
   ["a".repeat(40), baseSource],
   ["b".repeat(40), headSource],

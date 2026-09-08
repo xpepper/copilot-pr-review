@@ -50,12 +50,15 @@ export const candidateFormat = (policy) => [
   `"candidates":[{"title":"concise defect","severity":"${policy.severities.join("|")}","confidence":0.9,`,
   '"location":CITATION,"trigger":"concrete reachable condition","expected":"required behavior",',
   '"actual":"failing behavior and impact","introduction":"why this diff newly causes that failure",',
-  '"before":CITATION_OR_NULL,"after":CITATION_OR_NULL,"evidence":[CITATION]}],"limitations":[]}.',
+  '"before":CITATION_OR_NULL,"after":CITATION_OR_NULL,"breaks":CITATION_OR_NULL,',
+  '"evidence":[CITATION]}],"limitations":[]}.',
   citationFormat,
   "No extra fields. Cite only supplied context windows. Location must be a short changed-line range.",
-  "Before and after must cite the same changed hunk on their respective sides; cite removed/added lines when present.",
-  "Use null before ONLY when the hunk removes no lines, or null after ONLY when it adds no lines.",
-  "Unchanged hunk context does not count as an addition/removal; null after is valid for a deletion-only change.",
+  "Anchor the location on the changed code you are reporting, never on the code that change breaks.",
+  "Before and after must cite the location's own changed hunk on their respective sides; cite removed/added lines.",
+  "Use null before when this change replaced nothing on the base side, or null after when it added nothing.",
+  "Breaks cites the code this change breaks. It may be unchanged, in another hunk, or in another changed file.",
+  "Use null breaks when the defect is contained in the changed lines the location already anchors.",
   "Evidence must cite the actual contract, caller, or control/data flow establishing the trigger and impact.",
   "Do not mistake an assertion, a hypothetical caller, or the PR description for independent source evidence.",
   "Check language-operator semantics and the complete expression/control flow before claiming an effect.",
@@ -75,10 +78,15 @@ export const validationInstructions = (policy) => [
   "Independently trace each trigger, required contract, actual effect, and before/after behavior in the source.",
   "Actively disprove each claim: look for guards, unreachable conditions, intentional contract changes, and pre-existing failures.",
   "A valid quote or another reviewer's agreement is NOT proof of impact or of introduction by this diff.",
+  "A candidate's breaks citation only names the code it claims this change breaks, and may be unchanged code:",
+  "it is the claim you must disprove or confirm from source, never evidence that the claim holds.",
   "Reject false positives, pre-existing issues, speculative impact, inappropriate severity, and inflated confidence.",
   "Use uncertain when the supplied context cannot settle a claim. Never accept on the candidate's assertions alone.",
   "For accept, cite independent source evidence establishing the causal argument and explain it in reason.",
-  "Accept ONLY if EVERY assertion in the candidate's title, trigger, expected, actual, introduction, severity and confidence is supported.",
+  "Accept ONLY if EVERY assertion the candidate makes is supported, in its prose and in its citations alike:",
+  "title, trigger, expected, actual, introduction, severity, confidence, its breaks citation, and each null introduction side.",
+  "A null before claims this change removed nothing where the location is anchored; a null after claims it added nothing there.",
+  "Code does not check that claim: test it against the captured diff, and reject a replacement presented as a pure addition or deletion.",
   "If the core defect is real but any detail is false or overstated, reject the ENTIRE candidate and set allClaimsSupported=false.",
   "Do not accept with a caveat/correction in reason: the original candidate text is displayed unchanged. Finding editing is not implemented.",
   severityGuide(policy),
@@ -98,10 +106,12 @@ export const validationInstructions = (policy) => [
   "Shared evidence is necessary, but never sufficient: explain why cause, trigger AND impact match.",
 ].join("\n");
 
-function object(value, keys, label) {
-  if (!value || typeof value !== "object" || Array.isArray(value) ||
-      !isDeepStrictEqual(Object.keys(value).sort(), [...keys].sort())) {
-    throw new Error(`${label}: expected exactly ${keys.join(", ")}.`);
+function object(value, keys, label, optional = []) {
+  const present = value && typeof value === "object" && !Array.isArray(value) ? Object.keys(value) : undefined;
+  if (!present || !keys.every((key) => present.includes(key)) ||
+      !present.every((key) => keys.includes(key) || optional.includes(key))) {
+    throw new Error(`${label}: expected exactly ${keys.join(", ")}` +
+      `${optional.length ? `, and optionally ${optional.join(", ")}` : ""}.`);
   }
 }
 
@@ -217,7 +227,8 @@ const hunkHasChanges = (file, hunk, side) =>
 
 function sharedChangedEvidence(left, right, evidence, boundary) {
   const citations = (entry, extra = []) =>
-    [entry.before, entry.after, ...entry.evidence, ...(entry.validation?.evidence ?? []), ...extra].filter(Boolean);
+    [entry.before, entry.after, entry.breaks, ...entry.evidence,
+      ...(entry.validation?.evidence ?? []), ...extra].filter(Boolean);
   return citations(left).some((first) => citations(right, evidence).some((second) => {
     if (!overlappingEvidence(first, second)) return false;
     const file = boundary.files.find((entry) => (first.side === "base" ? entry.oldPath : entry.newPath) === first.path);
@@ -228,7 +239,7 @@ function sharedChangedEvidence(left, right, evidence, boundary) {
 
 function candidate(value, boundary, policy) {
   object(value, ["title", "severity", "confidence", "location", "trigger", "expected", "actual",
-    "introduction", "before", "after", "evidence"], "Candidate");
+    "introduction", "before", "after", "evidence"], "Candidate", ["breaks"]);
   for (const key of ["title", "trigger", "expected", "actual", "introduction"]) text(value[key], key);
   if (!policy.severities.includes(value.severity) ||
       typeof value.confidence !== "number" || !Number.isFinite(value.confidence) ||
@@ -249,9 +260,11 @@ function candidate(value, boundary, policy) {
       throw new Error("Introduction must compare the same file's captured before/after revisions.");
     }
   }
+  // The introduction pair still pins one edit: a supplied citation belongs to
+  // the location's own hunk. What that edit breaks is a separate claim with its
+  // own citation, so neither introduction side is forced to carry it.
   if (!file.hunks.some((hunk) => withinHunk(location, hunk) &&
-      (before ? withinHunk(before, hunk) : !hunkHasChanges(file, hunk, "base")) &&
-      (after ? withinHunk(after, hunk) : !hunkHasChanges(file, hunk, "head")))) {
+      (!before || withinHunk(before, hunk)) && (!after || withinHunk(after, hunk)))) {
     throw new Error("Introduction citations and location must identify the same changed hunk.");
   }
   for (const citation of [before, after].filter(Boolean)) {
@@ -260,8 +273,12 @@ function candidate(value, boundary, policy) {
       throw new Error("Introduction must cite the changed code, not only nearby unchanged lines.");
     }
   }
+  // The code the change breaks may be unchanged, in another hunk or in another
+  // changed file, so it carries no anchoring rule of its own; it is bound,
+  // in-window and exactly quoted like every other citation.
+  const breaks = value.breaks === undefined || value.breaks === null ? null : boundary.cite(value.breaks);
   if (!Array.isArray(value.evidence) || !value.evidence.length) throw new Error("Missing supporting source evidence.");
-  return { ...value, location, before, after, evidence: value.evidence.map(boundary.cite) };
+  return { ...value, location, before, after, breaks, evidence: value.evidence.map(boundary.cite) };
 }
 
 export function collectCandidates(reviewers, boundary, policy) {
@@ -424,6 +441,8 @@ export function formatFindings(outcome) {
     `[${finding.severity}] ${finding.title}`,
     `${finding.location.path}:${finding.location.startLine}-${finding.location.endLine} (${finding.location.side}, ` +
       `${finding.location.ref}); confidence ${finding.confidence}`,
+    ...(finding.breaks ? [`Breaks: ${finding.breaks.path}:${finding.breaks.startLine}-` +
+      `${finding.breaks.endLine} (${finding.breaks.side})`] : []),
     `When: ${finding.trigger}`,
     `Expected: ${finding.expected}`,
     `Actual: ${finding.actual}`,
