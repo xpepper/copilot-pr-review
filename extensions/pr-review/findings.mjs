@@ -110,24 +110,31 @@ function text(value, label) {
 }
 
 // The delimited payload, when the response carries the contract's marker pair
-// exactly once in order. Everything else is returned unchanged.
+// on their own lines, once each and in order. A marker is only a marker when it
+// is the whole line, exactly as the contract asks: marker text inside the JSON,
+// which every citation of these very lines carries, is payload rather than a
+// second wrapper. Anything else is returned unchanged.
+const markerLines = (lines, marker) => lines.filter((line) => line.trim() === marker).length;
+
 function delimited(raw) {
-  if (raw.split(outputStart).length !== 2 || raw.split(outputEnd).length !== 2) return raw;
-  const start = raw.indexOf(outputStart) + outputStart.length;
-  const end = raw.indexOf(outputEnd);
-  return end < start ? raw : raw.slice(start, end);
+  const lines = raw.split("\n");
+  if (markerLines(lines, outputStart) !== 1 || markerLines(lines, outputEnd) !== 1) return raw;
+  const start = lines.findIndex((line) => line.trim() === outputStart);
+  const end = lines.findIndex((line) => line.trim() === outputEnd);
+  return end < start ? raw : lines.slice(start + 1, end).join("\n");
 }
 
 // One opening fence and its matching closing fence, only when the pair wraps the
 // entire text and the opening fence carries at most a bare language label. A
-// second fence inside is not one wrapper, so it is left alone.
+// further fence line inside is not one wrapper, so it is left alone; a backtick
+// run inside a JSON string is payload, for the same reason a marker there is.
 function unfenced(raw) {
   const trimmed = raw.trim();
   if (!trimmed.startsWith("```") || !trimmed.endsWith("```")) return raw;
   const label = trimmed.indexOf("\n");
   if (label < 0 || /[\s`]/.test(trimmed.slice(3, label).trim())) return raw;
   const body = trimmed.slice(label + 1, -3);
-  return body.includes("```") ? raw : body;
+  return body.split("\n").some((line) => line.trim().startsWith("```")) ? raw : body;
 }
 
 function envelope(raw, key, field) {

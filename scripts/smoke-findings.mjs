@@ -508,6 +508,32 @@ const delimitedAdjudication = adjudicateCandidates(
   validator(undefined, { result: delimit("```json\n" + decisionsText() + "\n```") }), boundary, policy);
 assert.equal(delimitedAdjudication.findings.length, 1, "Unwrap the adjudicator's envelope the same way");
 assert.equal(delimitedAdjudication.complete, true);
+// A marker or a fence inside the JSON is payload, not a wrapper. The live full
+// review of pull request #7 discarded four of six reviewers on exactly this:
+// each had cited the source lines that define the markers, so counting marker
+// substrings rather than marker lines turned their own citations into a second
+// wrapper. Markers are matched only when they are the whole line, as the
+// contract asks, and a fence only when its run starts a line.
+const quoting = (text) => [{ ...candidate, title: `Marker text ${text} inside a payload` }];
+for (const raw of [
+  delimit(envelopeText(quoting(`${outputStart} and ${outputEnd}`))),
+  envelopeText(quoting(`${outputStart} and ${outputEnd}`)),
+  delimit(envelopeText(quoting(`${outputStart} twice ${outputStart}`))),
+  "```json\n" + envelopeText(quoting("a ``` fence run")) + "\n```",
+]) {
+  const payload = collectCandidates([reviewer([], { result: raw })], boundary, policy);
+  assert.deepEqual(payload.diagnostics, [], "Marker or fence text inside the JSON is payload");
+  assert.equal(payload.candidates.length, 1);
+}
+for (const raw of [
+  `${outputStart}${envelopeText()}${outputEnd}`,
+  `${outputStart} ${envelopeText()}\n${outputEnd}`,
+  `prose ${outputStart}\n${envelopeText()}\n${outputEnd} prose`,
+]) {
+  const inline = collectCandidates([reviewer([], { result: raw })], boundary, policy);
+  assert.equal(inline.candidates.length, 0, "A marker is a marker only when it is the whole line");
+  assert.match(inline.diagnostics[0].message, /invalid candidate output/);
+}
 console.log("PASS the delimited output contract, its deterministic unwrap, and fail-whole for everything else");
 console.log("PASS strict candidates, exact provenance/changed lines, confidence/severity, and fail-closed malformed output");
 console.log("PASS mocked semantic rejection/uncertainty, explicit same-defect deduplication, distinct same-line issues and degraded retention");

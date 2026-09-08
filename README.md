@@ -327,14 +327,19 @@ its JSON, the same way, so this was never specific to one model family.
 
 `F6` addresses both. Reviewers and the adjudicator are asked to put the JSON
 object between the markers `<<<PR_REVIEW_JSON>>>` and `<<<END_PR_REVIEW_JSON>>>`,
-the technique the CLI runtime's own structured output uses, and code then unwraps
-exactly that delimiter pair, plus one fence that wraps the whole response. Prose
-outside the markers is discarded unread instead of discarding the review.
+each alone on its line, the technique the CLI runtime's own structured output
+uses. Code then unwraps exactly that delimiter pair, plus one fence that wraps
+the whole response. Prose outside the markers is discarded unread instead of
+discarding the review. A marker counts only as a whole line, so marker text
+inside the JSON, which any citation of these lines carries, stays payload.
 
-Nothing else is recovered. A repeated or missing marker, a fence with prose after
-it, two fenced blocks, a truncated object, and a bare object preceded by prose
-with no markers each still discard the whole output, and every check after the
-parse is unchanged. `F5` investigated whether the runtime could return parsed
+The full-mode review of pull request #7 demonstrated it: five of six reviewers
+emitted the markers, `claude-sonnet-5` among them, with no fence anywhere.
+
+Nothing else is recovered. A repeated or missing marker, a marker sharing its
+line, a fence with prose after it, two fenced blocks, a truncated object, and a
+bare object preceded by prose with no markers each still discard the whole
+output, and every check after the parse is unchanged. `F5` investigated whether the runtime could return parsed
 structured output instead and found it unusable on Copilot CLI 1.0.83; that
 evidence, this increment's boundary, and the exact list of what still fails whole
 are in [ROADMAP.md](ROADMAP.md).

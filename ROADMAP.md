@@ -47,7 +47,7 @@ posting them.
 | R1 | Completed | Verified-checkout reads and matching-head harnesses demonstrated. One authorized live quick review used unchanged source without denials; prior coverage gaps disappeared, but no additional finding was produced. GPT's `rg` alias is supported without widening the grant. | F4, Q3; [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | M1 | Completed | Balanced is the default with its four heavy specialists, light overview reviewer and three-finding P3/nit cap. `--full` adds a medium conventions/maintainability reviewer and presents every qualifying severity with no minor cap. Demonstrated by controlled probes, no-inference installed dispatch, and live reviews of this repository's own pull requests #3, #4 and #5; #5 ran all three tiers on distinct models. A Claude-family medium model's fenced output is a recorded open defect. | Q4, C1; [Modes](SCOPE.md#review-modes-and-findings) |
 | F5 | Completed | Structured output is demonstrated unusable on CLI 1.0.83: the factory surface is behind a CLI feature flag and reachable only from a joined foreground session, a joining extension cannot register the permission handler that confines reviewer reads, and a custom agent's declared `view`/`grep`/`glob` grant leaks `skill` and `sql`. Retry cost, `null` failure semantics and module reach measured below. Recommendation recorded: fall back to a narrow fence unwrap, with its cost stated and the choice left to the user. No reviewer was migrated. | M1, F3; [Technical feasibility](SCOPE.md#technical-uncertainties-and-proposed-sequence) |
-| F6 | Implemented; pending its pull-request review | Reviewer output survives a model that wraps it. Reviewers and the adjudicator are asked for the envelope between two explicit markers, and code unwraps that delimiter pair, then one fence that wraps the whole response. Everything after the parse is unchanged, and a table below pins what is still discarded whole. The user chose both recorded options that change something. | F5; [Modes/findings](SCOPE.md#review-modes-and-findings) |
+| F6 | Completed | Reviewer output survives a model that wraps it. Reviewers and the adjudicator are asked for the envelope between two explicit markers, and code unwraps that delimiter pair, then one fence that wraps the whole response; markers and fences count only when they are the whole line, so payload text is never a wrapper. Everything after the parse is unchanged, and a table below pins what is still discarded whole. Demonstrated by the full-mode review of pull request #7, which discarded four reviewers on a substring-counting defect it also reported; that defect is fixed and the captured outputs replayed. | F5; [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | M2 | Pending | Deep uses one holistic reviewer; reject conflicting mode flags. | F6, M1; [Modes](SCOPE.md#review-modes-and-findings) |
 | C3 | Pending | Explicit optional fallback with at most one eligible retry per failed reviewer; no timers or silent substitutions. | C1, Q3; [Fallbacks/execution](SCOPE.md#models-configuration-and-execution) |
 | C4 | Pending | A tier whose resolved model supports no configurable reasoning effort resolves to no effort instead of inheriting one, so such a model can serve a tier. An explicit effort is still validated and never silently lowered. | C1; [Configuration](SCOPE.md#models-configuration-and-execution) |
@@ -4176,17 +4176,20 @@ Emit each marker exactly once. Text outside them is discarded unread, and a repe
 
 The unwrap is two ordered steps, both refusing to guess:
 
-- **Delimited payload.** If the response contains the opening marker exactly once
-  and the closing marker exactly once, and the closing one follows the opening
-  one, the text between them is the payload. Any other count or order returns the
-  response unchanged. `split(marker).length` counts occurrences, so a reviewer
-  that echoes a marker in its prose discards its own output rather than having a
-  fragment guessed for it.
+- **Delimited payload.** A marker counts only when it is the whole line, exactly
+  as the contract asks. If one line is the opening marker, one later line is the
+  closing marker, and each occurs once, the lines between them are the payload.
+  Any other count or order returns the response unchanged. Marker text inside the
+  JSON is payload, not a second wrapper, which matters because every citation of
+  the lines that define these markers carries them; the review of this increment's
+  own pull request demonstrated that the hard way, recorded below.
 - **One whole-response fence.** If what remains starts with ```` ``` ```` and
   ends with ```` ``` ````, the opening fence's info string is a bare label with
-  no whitespace or backtick, and no third fence occurs inside, one opening fence
-  and its matching closing fence are stripped. This runs after the marker step,
-  so it also removes a fence a model puts *inside* the markers.
+  no whitespace or backtick, and no further line inside starts a fence, one
+  opening fence and its matching closing fence are stripped. This runs after the
+  marker step, so it also removes a fence a model puts *inside* the markers, and
+  a backtick run inside a JSON string is payload for the same reason a marker
+  there is.
 
 Everything after that is untouched, and the controlled suites assert it: the
 exact-key check, the schema version and review-key binding, the citation, quote
@@ -4209,6 +4212,7 @@ pins each of these as a discarded output rather than a recovered one:
 | Two fenced blocks | Discarded |
 | An opening marker with no closing marker | Discarded |
 | A closing marker before the opening one | Discarded |
+| A marker sharing its line with prose or JSON | Discarded |
 | Two complete marker pairs | Discarded |
 | A truncated object between the markers | Discarded |
 | Nothing between the markers | Discarded |
@@ -4248,11 +4252,119 @@ for s in findings review selection retention preview publication publish-later \
 git diff --check
 ```
 
+The installed no-inference probe was rerun after the fix, against a plugin
+reinstalled from this checkout, and passed: `smoke-runtime.mjs --targets
+--startup` settled `--balanced` and `--full` dispatch and the owned-runtime
+start, ping and stop with no model turn, subagent or tool execution. The other
+installed probes were last rerun on pull request #5; this increment changes
+`findings.mjs` only, and none of them exercises it.
+
 Two pre-existing assertions are worth naming because they did not change
 outcome: a fenced `{}` and a fenced empty adjudication were already asserted to
 be discarded, and they still are. The unwrap now removes their fence, and the
 exact-key check then rejects the payload for the reason it always should have
 given.
+
+### Pull request #7 and its review
+
+`F6` landed on branch `f6-reviewer-output-contract` and pull request #7. The
+installed plugin reviewed it once, in **full** mode, named explicitly rather than
+taken as the default. Full is the only mode that assigns the medium tier, and the
+saved medium model is `claude-sonnet-5`, the model whose fenced output on pull
+request #5 started this whole line of work. Balanced would have exercised the new
+contract on GPT-family reviewers only and left the fence half untested.
+
+```sh
+gh pr checkout 7
+copilot plugin install "$(pwd)"
+COPILOT_CLI_PATH="$(command -v copilot)" \
+COPILOT_SDK_PATH="$(ls -d "$HOME"/.copilot/pkg/*/"$(copilot --version | sed -n 's/.*CLI \([0-9][0-9.]*[0-9]\).*/\1/p')"/copilot-sdk)" \
+node scripts/dogfood-review.mjs 7 --full --all --no-comment
+```
+
+Reviewed head `b8e5bc4`, base `a6f7c1c`, four files, 28002 diff bytes. Six
+reviewers plus one adjudicator, every tier from saved personal configuration:
+
+| Reviewer | Tier | Model | Effort | Reads | Outcome |
+| --- | --- | --- | --- | --- | --- |
+| correctness | heavy | `gpt-5.6-terra` | high | 3 | invalid candidate output |
+| contracts | heavy | `gpt-5.6-terra` | high | 7 | invalid candidate output |
+| security | heavy | `gpt-5.6-terra` | high | 0 | completed |
+| performance-resources | heavy | `gpt-5.6-terra` | high | 0 | completed |
+| overview | light | `gpt-5.6-luna` | high | 0 | invalid candidate output |
+| conventions-maintainability | medium | `claude-sonnet-5` | medium | 4 | invalid candidate output |
+| evidence-validator | heavy | `gpt-5.6-terra` | high | 0 | completed |
+
+Coverage was **incomplete**, so this is not a clean-review claim. Fourteen
+confined tool calls and fourteen reads, no permission denial and no tool denial,
+unlike pull request #6. One P2 was validated and selected; nothing was withheld,
+nothing was rejected as a false positive, there were no coverage gaps and one
+informational caveat. Cost: **124.2079 credits**. Nothing was published.
+
+**The contract half worked, on every model that was asked.** Five of the six
+reviewers put the envelope between the markers, on their own lines, including
+`claude-sonnet-5`, which emitted one line of prose (`Confirmed line numbers
+(114-119 = delimited function).`) and then a correctly delimited envelope with no
+fence anywhere. That is the failure from pull request #5 gone, and the
+prose-prefix failure from #6 tolerated, in the same run. The light reviewer
+`gpt-5.6-luna` ignored the markers and emitted a bare JSON object, which is
+exactly what the strict floor exists for.
+
+**The unwrap half was defective, and the review proved it by failing.** Four of
+six reviewers were discarded, all for one reason: `delimited` counted marker
+*substrings*, and this pull request adds the lines that define the markers, so a
+reviewer citing those lines carried the marker text inside its own JSON. The
+count then exceeded one, the wrapper was left in place, and `JSON.parse` rejected
+the response at its opening marker.
+
+`security:1`, P2 at confidence 0.93, is that defect, and the adjudicator accepted
+it with independent source evidence:
+
+> Rejecting marker text inside an otherwise valid review payload enables
+> PR-controlled review suppression. An untrusted PR adds either marker literal to
+> a changed source line, and a reviewer emits an otherwise valid marked envelope
+> whose required exact citation quotes that line using the literal text.
+
+Two further reviewers found the same defect independently, and both were
+discarded by it before adjudication could see them: `correctness` proposed
+"Require marker lines rather than marker substrings" (P3, 0.94) and `contracts`
+proposed "Enforce the advertised line boundaries for delimiter markers" (P3,
+0.96). `conventions-maintainability` reported it too, as a P2. Three of the four
+discarded reviewers were discarded by the very defect they were reporting.
+
+**What changed in response.** A marker now counts only when it is the whole
+line, which is what the contract already advertised and what the discarded
+candidates recommended. The fence check moved the same way: a further fence only
+disqualifies the wrapper when its backtick run starts a line, so a backtick run
+inside a JSON string is payload. `scripts/smoke-findings.mjs` gained cases for
+marker and fence text inside the payload, and for a marker sharing its line,
+which is now discarded; reverting to substring counting fails them.
+
+Nothing was rejected as a false positive, and no gate was weakened. The one
+finding was fixed rather than argued with.
+
+**Replaying the run against the fix.** The six reviewer outputs were saved
+verbatim from the run log and re-parsed by both the substring version and the
+line-exact one. No inference and no network: the strings are what the runtime
+returned.
+
+| Reviewer | Bare marker lines | Marker substrings | Substring parser | Line-exact parser |
+| --- | --- | --- | --- | --- |
+| performance-resources | 1 / 1 | 1 / 1 | parsed | parsed |
+| security | 1 / 1 | 1 / 1 | parsed | parsed |
+| contracts | 1 / 1 | 2 / 2 | discarded | parsed |
+| conventions-maintainability | 1 / 1 | 3 / 2 | discarded | parsed |
+| overview | 0 / 0 | 1 / 1 | discarded | parsed as a bare object |
+| correctness | 1 / 1 | 2 / 2 | discarded | discarded |
+
+Five of six parse under the fix, against two of six as reviewed. `correctness`
+stays discarded for an unrelated reason that is the strict floor working: its own
+JSON is malformed, ending `throw new Error(\"Expected result arrays.\"}]}]`. A
+truncated object must fail whole, and it does.
+
+That replay is verification of the fix, not a second live review. Whether the
+same six models would produce five usable outputs on a fresh run is not
+demonstrated, and rerunning the review needs its own authorization.
 
 ### Remaining limitations
 
@@ -4260,29 +4372,36 @@ given.
   behaviour. Whether reviewers actually emit the markers is only observable in a
   live run, and no model was ever asked for them before this increment.
 - The markers are literal text in an untrusted context. A pull request whose
-  content contains them cannot forge findings, because the review-key binding and
-  every citation gate are unchanged, but it can make a reviewer that quotes them
-  discard its own output. That is the conservative direction, and it is the same
-  outcome that reviewer would have had before this increment.
+  content contains them cannot forge findings: the review-key binding and every
+  citation gate are unchanged. It can no longer discard a reviewer that cites
+  them either, because a citation is a JSON string and cannot produce a bare
+  marker line. What remains is narrower: a reviewer that reproduces a marker as a
+  whole line in its own prose, outside the JSON, still discards its own output.
+- The fix for that defect is verified by the controlled suites and by replaying
+  the six captured reviewer outputs, not by a second live review. Rerunning the
+  review needs its own authorization.
 - A model that emits neither markers nor a wrapper is unaffected: today's
   passing reviewers keep passing on exactly the path they use now.
 
 ## Exact next increment
 
-**`F6` is implemented and its pull-request review is the step in front of it.**
-The user chose both the marker contract and the deterministic unwrap; the code,
-the boundary and the controlled evidence are recorded above. Until the installed
-plugin has reviewed `F6`'s own pull request once and that evidence is written
-here, `F6` is implemented, not demonstrated: no live run has ever asked a model
-for these markers.
+**`F6` is complete.** The user chose both the marker contract and the
+deterministic unwrap. Pull request #7's full-mode review demonstrated the contract
+half working on five of six reviewers, `claude-sonnet-5` included, and found a
+real defect in the unwrap half, which is fixed and replayed above. Merging #7 is
+the user's call.
 
-After that review lands, the next increment is **`M2`, deep mode**. Deep uses one
-integrated heavy reviewer considering the whole pull request, presents all
-substantiated severities, and rejects conflicting mode flags. Deep means holistic
-review, not a larger parallel one and not a fourth effort level. It was blocked
-behind `F6` because building a fifth mode on an output path that discarded whole
-reviewers would have multiplied the failure; that block is lifted once `F6`'s
-review is recorded.
+The next increment is **`M2`, deep mode**. Deep uses one integrated heavy reviewer
+considering the whole pull request, presents all substantiated severities, and
+rejects conflicting mode flags. Deep means holistic review, not a larger parallel
+one and not a fourth effort level. It was blocked behind `F6` because building a
+fifth mode on an output path that discarded whole reviewers would have multiplied
+the failure; that block is now lifted.
+
+One thing `F6` leaves for whoever runs the next live review: the fix is verified
+by controlled suites and by replaying pull request #7's captured outputs, not by
+a second live run. The next review of any increment is the first live evidence
+that five of six reviewers really do survive, and it should be reported as such.
 
 Do not revisit the Agent Factories surface without new information from GitHub.
 Three separate blockers were demonstrated on CLI 1.0.83, and all three would
