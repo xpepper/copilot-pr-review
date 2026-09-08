@@ -5415,7 +5415,11 @@ therefore did not run.
 | overview | light, `gpt-5.6-luna`, high | completed | 15 | 16 | none | 4.332922 |
 
 The run cost **137.274102 credits**, and the per-reviewer charges sum to exactly
-that. **No adjudication pass ran**, because the review's one candidate never
+that. It finished in 98 seconds of process wall time, and the runtime's own event
+timestamps put every reviewer's turn between 17:50:48 and 17:52:03, so a balanced
+run is not inherently slow; #11's full run took roughly forty minutes over a
+comparable diff. Runtime varies with the reviewers' own behaviour, not with the
+mode, which is one more reason no deadline is imposed on them. **No adjudication pass ran**, because the review's one candidate never
 reached it, which is why a balanced run over a diff this size cost less than
 pull request #10's. Every reviewer emitted a well-formed envelope between the
 `F6` markers, so that contract now has live evidence from five separate runs.
@@ -5558,8 +5562,10 @@ acceptance path**, and treat a near-miss as something to report or repair from
 the cited line range. A repair that re-derives the quote from the bound source and
 line range, then requires the reviewer's quote to be a contiguous span of it,
 would have recovered #11 and #12 while still refusing #4, because #4's quote is
-not a span of anything in the source. That is a design to evaluate, not a
-decision already taken; the acceptance criterion is that both recorded near-misses
+not a span of anything in the source. Weigh its own cost before adopting it: a
+span rule lets a reviewer quote a fragment while naming a wider line range, so
+whatever survives has to keep the anchor honest. That is a design to evaluate,
+not a decision already taken; the acceptance criterion is that both recorded near-misses
 reach adjudication while the recorded fabrication still does not, reconstructed as
 controlled fixtures rather than trusted from this description. Note that a
 near-miss can now appear on any citation a candidate carries, including `breaks`.
