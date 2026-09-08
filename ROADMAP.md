@@ -51,8 +51,8 @@ posting them.
 | M2 | Completed | `--deep` runs one integrated heavy reviewer over the whole pull request and presents every substantiated severity; a second mode flag is refused. Demonstrated by the twelve controlled suites, the installed no-inference dispatch, and the live deep review of pull request #8, which reached completed coverage on 68.27393 credits and found two real defects in its own documentation. | F6, M1; [Modes](SCOPE.md#review-modes-and-findings) |
 | C3 | Completed | A tier may carry one optional fallback assignment, used for one extra attempt for the one reviewer whose own execution failed. No timer, no whole-review restart, no silent substitution, and no cross-tier inheritance. Demonstrated by the twelve controlled suites, two installed no-inference probes, and the live balanced review of pull request #10, which cost 233.19659 credits, completed all six sessions and found one real documentation defect. No fallback attempt has run live. | C1, Q3; [Fallbacks/execution](SCOPE.md#models-configuration-and-execution) |
 | C4 | Completed | A tier whose resolved model supports no configurable reasoning effort resolves to no effort instead of inheriting one, so such a model can serve a tier; the same rule covers a tier's fallback model. An explicit effort is still validated and never silently lowered, and a capable model still inherits and is still refused. Demonstrated by the twelve controlled suites, two installed no-inference probes, and the live full review of pull request #11, which cost 269.135657 credits, reported incomplete coverage on three execution failures, and found one real defect in this increment's own display. | C1; [Configuration](SCOPE.md#models-configuration-and-execution) |
-| Q5 | In flight | A candidate anchored on a changed line may cite the code that change breaks, including unchanged code and another hunk, instead of being refused for naming a different hunk from its introduction citations. Three true findings have been lost to that one rule, on pull requests #4, #5 and #10. Every refusal that stops an unbound or fabricated citation must still fire. | Q4; [Modes/findings](SCOPE.md#review-modes-and-findings) |
-| Q6 | Pending | A citation that differs from its bound source only by leading or trailing whitespace stops silently discarding the whole finding. Pull request #11's only true finding was lost to two spaces of indentation. Weighed against pull request #4, where the same exact-match check stopped a 0.99-confidence fabrication whose claim was itself about whitespace. | Q5; [Modes/findings](SCOPE.md#review-modes-and-findings) |
+| Q5 | Completed | A candidate anchored on a changed line carries an optional `breaks` citation for the code that change breaks, which may be unchanged, in another hunk, or in another changed file, and which passes the same bound, in-window, exact-quote checks as every other citation. A supplied introduction citation still belongs to the location's own hunk; a null one is now a claim the adjudicator tests. Demonstrated by the twelve controlled suites, the reconstructed rejections from pull requests #4, #5 and #10, and the live balanced review of pull request #12, which cost 137.274102 credits, saw a reviewer use the new citation, and found one real defect in this increment's adjudicator contract. | Q4; [Modes/findings](SCOPE.md#review-modes-and-findings) |
+| Q6 | Pending | A citation that differs from its bound source by a near-miss at either end of the quote stops silently discarding the whole finding. Pull request #11's only true finding was lost to two leading spaces, and pull request #12's to a trailing comma on the last line of a `breaks` citation. Weighed against pull request #4, where the same exact-match check stopped a 0.99-confidence fabrication whose claim was itself about whitespace. | Q5; [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | C5 | Pending | A completed reviewer whose output the evidence boundary discards becomes eligible for its tier's one fallback attempt, as an empty response already is. Found by pull request #10's overview reviewer and discarded by the evidence boundary's same-hunk rule. Needs the user's go-ahead: it moves the retry decision across the evidence boundary. | C3, Q4; [Fallbacks/execution](SCOPE.md#models-configuration-and-execution) |
 | V1 | Pending | `--verify` enforces matching branch/SHA/cleanliness before reviewers and presents discovered existing commands for approval. | Q1; [Safeguards](SCOPE.md#optional-project-safeguards) |
 | V2 | Pending | Execute only approved existing safeguards with installed dependencies; show evidence and artifacts without autofix or checkout manipulation. | V1; [Safeguards](SCOPE.md#optional-project-safeguards) |
@@ -5271,7 +5271,7 @@ review. It is recorded below as the next candidate after `C5`.
   model produces that shape, and separating the two would need a second notion of
   the catalog beside `reasoningEfforts`.
 
-## Increment in flight: Q5
+## Completed increment: Q5
 
 **A candidate anchored on a changed line can now cite the code that change
 breaks.** The citation is optional, it is called `breaks`, and it carries no
@@ -5280,9 +5280,9 @@ code in another changed file. Everything that makes a citation trustworthy still
 applies to it, because it goes through the same `cite()` the location and the
 evidence array go through.
 
-This section records the implementation and the controlled evidence. **The
-increment is not demonstrated until the installed plugin has reviewed its own
-pull request**, and this section says so until that has happened.
+Pull request #12's balanced review demonstrated it end to end on the installed
+plugin, cost 137.274102 credits, and found one real defect in this increment's
+own adjudicator contract, which is fixed on the same branch.
 
 ### The rule that cost three findings, and what replaced it
 
@@ -5398,12 +5398,108 @@ coverage is:
 The controlled suites use test doubles for every model decision. They prove the
 plumbing and the gates, not that a live reviewer will use the new citation.
 
+### The live balanced review of pull request #12
+
+The increment's real integration test ran the installed plugin against its own
+pull request, 498 additions and 26 deletions over 9 files, at
+`55696057150cfadf033e2b717521615df04d3896`. **Balanced was named explicitly**,
+because `Q5` adds no mode and balanced is the default topology; the medium tier
+therefore did not run.
+
+| Reviewer | Tier, model, effort | Settled | Tool calls | Reads | Denials | Credits |
+| --- | --- | --- | --- | --- | --- | --- |
+| correctness | heavy, `gpt-5.6-terra`, high | completed | 10 | 10 | none | 41.555320 |
+| contracts | heavy, `gpt-5.6-terra`, high | completed | 4 | 4 | none | 30.170090 |
+| security | heavy, `gpt-5.6-terra`, high | completed | 9 | 9 | none | 33.204090 |
+| performance-resources | heavy, `gpt-5.6-terra`, high | completed | 3 | 3 | none | 28.011680 |
+| overview | light, `gpt-5.6-luna`, high | completed | 15 | 16 | none | 4.332922 |
+
+The run cost **137.274102 credits**, and the per-reviewer charges sum to exactly
+that. **No adjudication pass ran**, because the review's one candidate never
+reached it, which is why a balanced run over a diff this size cost less than
+pull request #10's. Every reviewer emitted a well-formed envelope between the
+`F6` markers, so that contract now has live evidence from five separate runs.
+**No reviewer was denied a read or a tool** on any of its calls.
+
+**`Q5` worked, and the exact-citation match discarded the result anyway.** The
+`correctness` reviewer reported one candidate, a P2 at confidence 0.88, and it
+used the new citation exactly as intended: its location was the changed
+comparison in `candidate()`, and its `breaks` citation named the adjudicator
+instructions eleven lines in a different hunk of the same file. No `Q5` refusal
+fired on it. It was rejected for `Q6`'s reason instead:
+
+```text
+correctness:1: rejected at evidence boundary: Error: Citation does not exactly match a supplied context window.
+```
+
+Two of its citations were near-misses, and `cite()` reaches them in order, so the
+new field is where the check bit:
+
+- `breaks`, `findings.mjs` head 78-88, dropped **the trailing comma of its last
+  line** and was otherwise byte-exact over eleven lines.
+- `evidence`, `README.md` head 416-419, began its first line at
+  `Before/after evidence must describe that`, dropping the sentence fragment
+  before it on the same line.
+
+Pull request #11's loss was two **leading** spaces. This one is a **trailing**
+character on the last line and a leading fragment on the first, so whatever
+`Q6` does has to repair or report a near-miss at either end of a quote, not
+just indentation.
+
+**The finding was true, and it was about this increment.** Relaxing the null
+introduction side moved a deterministic check onto the adjudicator, and the
+adjudicator was never told. Its acceptance rule enumerated the candidate's prose
+fields only, so a candidate whose `before: null` falsely presents a replacement
+as a pure addition could still be accepted, and the new citation sat outside that
+enumeration as well. The rule now covers the candidate's prose and its citations
+alike, states what a null introduction side claims, and says to test it against
+the captured diff. Fixed on this branch, with controlled assertions on the
+contract text, after the review.
+
+That is the enumeration defect class again: a list that stopped describing what
+it enumerates the moment something was added to what it describes. This time it
+was in the adjudicator's own acceptance rule, and it was caught by a review of
+the change that made it stale.
+
+The three informational caveats, from `contracts`, `security` and
+`performance-resources`, all say the same true thing: nothing in the captured
+diff could show them a live model actually using the new citation. This run
+answers exactly that, from outside the review.
+
+### Reproduction
+
+```sh
+for suite in findings review selection retention preview publication \
+  publish-later checkout config context fixture target; do
+  node "scripts/smoke-$suite.mjs" || break
+done
+git diff --check
+
+gh pr checkout 12
+copilot plugin install "$(pwd)"
+COPILOT_CLI_PATH="$(command -v copilot)" \
+COPILOT_SDK_PATH="$(ls -d "$HOME"/.copilot/pkg/*/"$(copilot --version \
+  | sed -n 's/.*CLI \([0-9][0-9.]*[0-9]\).*/\1/p')"/copilot-sdk)" \
+node scripts/dogfood-review.mjs 12 --balanced --all --no-comment
+```
+
+`scripts/smoke-factory.mjs` was also rerun without `--spend`, which spends
+nothing, after its mirror of the candidate schema gained the optional field. It
+reported `subagents: 0` and `nanoAiu: 0`, and the shipped modules still import
+from inside the factory body.
+
 ### Remaining limitations
 
-- **No live reviewer has used it.** Whether a real reviewer stops mis-anchoring
-  its introduction now that there is somewhere else to put the second half of
-  its claim is exactly what the pull-request review of this increment tests, and
-  a single review is one sample either way.
+- **One live reviewer used it, once.** Pull request #12's `correctness`
+  reviewer produced a well-formed candidate whose `breaks` citation named a
+  different hunk, which is the shape this increment exists for, and no `Q5`
+  refusal fired on it. One candidate in one review is one sample: it does not
+  say how often a reviewer will reach for the citation, and nothing has yet
+  shown one being accepted through adjudication and presented as a finding.
+- **The citation was still discarded, by `Q6`.** The exact-citation match
+  rejected the whole candidate over a missing trailing comma in that very
+  citation. Until `Q6` lands, a reviewer using the new field can lose its
+  finding for a byte, exactly as before.
 - **The code a change breaks must still be inside a captured context window.**
   Context is assembled only for changed files, within a radius of the hunks, so
   a victim in an unchanged file cannot be cited at all. That boundary predates
@@ -5411,29 +5507,28 @@ plumbing and the gates, not that a live reviewer will use the new citation.
   the gap in `limitations` instead.
 - **A null introduction side is now a model claim rather than a code check.**
   The old rule was coarse, and it discarded a true finding for it, but it did
-  stop a reviewer from calling a replacement a pure addition. That check is now
-  the adjudicator's, and the adjudicator is fallible.
+  stop a reviewer from calling a replacement a pure addition. The adjudicator is
+  now told to test that claim, after pull request #12's review found the contract
+  silent on it, and the adjudicator is fallible in a way the old check was not.
 - **The published comment does not carry the citation**, so a reader on GitHub
   sees the broken code only insofar as the finding's prose names it.
 
 ## Exact next increment
 
-**`C4` is complete.** A tier whose resolved model advertises no configurable
-reasoning effort resolves to no effort instead of inheriting one, on the tier
-surface and on `C3`'s fallback surface at once. An effort set for the tier itself
-is still validated and refused, and a model that does advertise efforts still
-inherits one and is still refused when it cannot support it. Pull request #11's
-full review demonstrated it end to end on the installed plugin, found one real
-defect in the increment's own display, and cost 269.135657 credits.
+**`Q5` is complete.** A candidate anchored on a changed line carries an optional
+`breaks` citation for the code that change breaks, which may be unchanged, in
+another hunk, or in another changed file. A supplied introduction citation still
+belongs to the location's own hunk; a null one is now a claim the adjudicator
+tests rather than a code check about the whole hunk. Pull request #12's balanced
+review demonstrated it end to end, cost 137.274102 credits, watched a live
+reviewer use the new citation on the first try, and found one real defect in this
+increment's own adjudicator contract.
 
-**Take `Q5` next: let a candidate cite the code its changed line breaks.** The
-user chose it over `C5` on 2026-09-08, because it is the one place where this
-tool silently throws away work that is correct.
-
-**Name the two gates separately; they are not one rule.** "The changed-line
-anchoring rule" has been used loosely here for a family of refusals in
-`candidate()` and `cite()` in `findings.mjs`. Two of them have each discarded a
-true finding, for different reasons, and only the first is `Q5`:
+**Take `Q6` next: stop discarding a whole finding over a near-miss quote.**
+`cite()` requires `source.lines.slice(startLine - 1, endLine).join("\n") !== quote`
+to be false, so a quote must match its bound source byte for byte. That check has
+now discarded two true findings and stopped one fabrication, and it is the only
+refusal still throwing away correct work:
 
 | Pull request | Candidate | Refusal | What it cost |
 | --- | --- | --- | --- |
@@ -5444,55 +5539,30 @@ true finding, for different reasons, and only the first is `Q5`:
 | #10 | overview:1 (P2, 0.95) | same changed hunk | true; the best finding in that review |
 | #10 | overview:2 | context-window match | duplicate; no loss |
 | #11 | overview:1 (P3, 0.93) | context-window match | true; the only finding in that review |
+| #12 | correctness:1 (P2, 0.88) | context-window match | true; fixed on the branch |
 
-`Q5` is the **same changed hunk** rule, which has cost three true findings:
+The same-changed-hunk rows are `Q5`, and they are closed. Every remaining row is
+this one check. **Weigh it against its own counter-evidence before you touch it.**
+On #11 the overview reviewer quoted `config.mjs` lines 223-224 correctly except
+that it dropped the two **leading** spaces of the first line, and the whole P3 was
+discarded. On #12 the `correctness` reviewer quoted eleven lines of `findings.mjs`
+byte-exactly except for the **trailing** comma on the last one, and its whole P2
+was discarded; a second citation in the same candidate began its first line
+mid-sentence. But on #4 that same check stopped `contracts:2` at confidence 0.99,
+where the reviewer had **introduced a space into its own quote** and the claimed
+defect was about that space. Normalizing whitespace would have let that
+fabrication through to adjudication.
 
-```js
-if (!file.hunks.some((hunk) => withinHunk(location, hunk) &&
-    (before ? withinHunk(before, hunk) : !hunkHasChanges(file, hunk, "base")) &&
-    (after ? withinHunk(after, hunk) : !hunkHasChanges(file, hunk, "head")))) {
-  throw new Error("Introduction citations and location must identify the same changed hunk.");
-}
-```
-
-The rule exists to prove *this diff introduced it*, by pinning the two sides of
-one hunk. The finding it cannot express is the common one: **this changed line
-breaks that other code**, where the other code is in a different hunk or is not
-changed at all. #4 and #10 failed because the introduction citation and the
-location named different hunks; #5 failed because the candidate passed
-`before: null` while its hunk does remove base-side lines.
-
-Shapes worth weighing, none of them decided:
-
-- An optional citation of the code the change breaks, beside `before`/`after`,
-  which may be unchanged and outside the location's hunk while `before`/`after`
-  still pin the introduction. This matches the problem statement most directly
-  and is the only shape that lets the *victim* be unchanged code.
-- Widening `before`/`after` to any changed hunk in the same file. Smaller, but it
-  still cannot cite unchanged code, which is what #10's finding needed.
-- Leaving the rule alone and reporting the near-miss so an agent reading the
-  timeline sees it. Cheapest, and it fixes recovery rather than the review.
-
-Whichever shape wins, the acceptance criterion is the same: a candidate anchored
-on a changed line can cite the code that change breaks and reach adjudication,
-while every refusal that stops an unbound, out-of-window or fabricated citation
-still fires unchanged. Reconstruct the three recorded rejections as controlled
-fixtures rather than trusting a prose description of them, and note that a
-candidate envelope change touches the reviewer prompt, the adjudicator
-instructions, `findings.mjs` and `retention.mjs` together. Ask the user before
-changing the retained record's schema version.
-
-**Then `Q6`, and weigh it against its own counter-evidence.** `cite()` requires
-`source.lines.slice(startLine - 1, endLine).join("\n") !== quote` to be false,
-so a quote must match its bound source byte for byte. On #11 the overview
-reviewer quoted `config.mjs` lines 223-224 correctly except that it dropped the
-two leading spaces of the first line only, and the whole P3 was discarded. But on
-#4 that same check stopped `contracts:2` at confidence 0.99, where the reviewer
-had **introduced a space into its own quote** and the claimed defect was about
-that space. Normalizing whitespace would have let that fabrication through to
-adjudication. So this is a real trade-off, not an oversight, and the safe
-direction is to keep exact matching as the acceptance path and treat a near-miss
-as something to report or repair from the cited line range, not to relax.
+So this is a real trade-off, not an oversight. **Keep exact matching as the
+acceptance path**, and treat a near-miss as something to report or repair from
+the cited line range. A repair that re-derives the quote from the bound source and
+line range, then requires the reviewer's quote to be a contiguous span of it,
+would have recovered #11 and #12 while still refusing #4, because #4's quote is
+not a span of anything in the source. That is a design to evaluate, not a
+decision already taken; the acceptance criterion is that both recorded near-misses
+reach adjudication while the recorded fabrication still does not, reconstructed as
+controlled fixtures rather than trusted from this description. Note that a
+near-miss can now appear on any citation a candidate carries, including `breaks`.
 
 **`C5` remains open, and still needs the user's go-ahead: eligibility for a
 discarded output.**
@@ -5500,7 +5570,7 @@ Pull request #10's overview reviewer found it, at P2 and confidence 0.95, and th
 changed-line anchoring rule discarded it. A reviewer whose output the evidence
 boundary cannot parse settles as `completed`, so it never becomes eligible for
 its tier's one fallback attempt, while a reviewer that returns nothing does. Five
-of this project's own eight live reviews were incomplete for exactly the reason a
+of this project's own live reviews were incomplete for exactly the reason a
 fallback cannot answer, so this is the increment that decides whether `C3` is
 useful in practice rather than only correct.
 
@@ -5538,18 +5608,19 @@ substantial code diff**, though pull request #10 is the closest so far at 984
 additions over 12 files, most of it real logic rather than prose. It is still
 separately authorizable and nobody has spent a review on it deliberately.
 
-Second, the evidence boundary has discarded four true findings, on pull requests
-#4, #5, #10 and #11, and rejected two mis-anchored candidates on #6. **This is no
-longer an open observation: it is increments `Q5` and `Q6` above**, split
-because two different refusals are responsible. Three of the four were lost to
-the same-changed-hunk rule and one to the exact citation match; the table is in
+Second, the evidence boundary has discarded a true finding on pull requests #4,
+#5, #10, #11 and #12, and rejected two mis-anchored candidates on #6. **This is
+no longer an open observation: it is increments `Q5` and `Q6` above**, split
+because two different refusals are responsible. The same-changed-hunk rows are
+`Q5` and are closed; the exact citation match is `Q6` and is not. The table is in
 "Exact next increment". On #10 and #11 the discarded finding was the overview
-reviewer's, and on #11 it was the only real defect in the review. Every time an
-agent recovered one it was by reading the raw timeline rather than the review's
-own output.
+reviewer's, and on #11 and #12 it was the only real defect in the review. Every
+time an agent recovered one it was by reading the raw timeline rather than the
+review's own output.
 
-Third, **read denials have now landed on the reviewers that then failed on two of
-eight reviews**, #6 and #11, and #11 shows a mechanism. `insideRoot` in
+Third, **read denials have landed on the reviewers that then failed on two
+reviews**, #6 and #11, and #11 shows a mechanism. No reviewer was denied a read
+or a tool on #12, whose five sessions made 41 tool calls between them. `insideRoot` in
 `read-only.mjs` resolves a requested path with `realpathSync` and rejects
 anything that throws, so a **path that simply does not exist** is denied exactly
 like one outside the reviewed checkout, and the reviewer is told it may only read
@@ -5565,11 +5636,11 @@ Fourth, a reviewer can settle `completed` having emitted no envelope at all, as
 the `C5` case above rather than a separate one, but #11 is the first run where
 the discarded output was empty of any structure rather than merely mis-shaped.
 
-`F6`'s marker contract now has live evidence from four separate runs: five of six
-reviewers on #7, both sessions on #8, every session on #10, and on #11 every
-session that produced an envelope at all, including the medium tier's
-`claude-sonnet-5` writing paragraphs of prose before the markers. #11's one
-unparsed output contained no envelope, wrapped or otherwise, so it is not
+`F6`'s marker contract now has live evidence from five separate runs: five of six
+reviewers on #7, both sessions on #8, every session on #10, on #11 every session
+that produced an envelope at all, including the medium tier's `claude-sonnet-5`
+writing paragraphs of prose before the markers, and every session on #12. #11's
+one unparsed output contained no envelope, wrapped or otherwise, so it is not
 evidence against the unwrap. Do not reintroduce substring matching and do not
 widen it.
 

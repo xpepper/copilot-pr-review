@@ -280,7 +280,7 @@ imposed, and incomplete coverage is still reported as incomplete.
 
 Balanced execution is demonstrated by controlled probes, no-inference installed
 dispatch, and the live balanced reviews of this project's own pull requests #3,
-#4, #6 and #10. Two of them are worth describing here. #3 ran five
+#4, #6, #10 and #12. Two of them are worth describing here. #3 ran five
 reviewers, made 89 confined reads with no denials, returned zero findings with
 incomplete coverage, and cost 414.14627 reported AI credits; its light reviewer
 inherited the heavy assignment because no light tier was saved. #4 did run a
@@ -425,7 +425,8 @@ carries no anchoring rule of its own: it may be unchanged code, code in another
 hunk, or code in another changed file, though it is still bound, in-window and
 exactly quoted like every other citation. It is displayed and retained with the
 finding, and it is a claim the adjudicator must prove from source, never evidence
-that the claim holds. Renamed paths retain their
+that the claim holds. A live reviewer used it on the first pull request that
+offered it, #12, citing code eleven lines away in a different hunk. Renamed paths retain their
 separate base/head identities. Unsupported citations and missing evidence remain
 visible coverage issues, not silent filtering into a clean result.
 
