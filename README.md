@@ -311,7 +311,10 @@ the command it suggests. Nothing is ever repaired automatically: the gate does
 not switch branches, pull, stash or clean, and the untracked refusal says to
 remove or ignore those paths yourself. A refused verification run reports
 `coverage: "not-started"` and `disposition: "refused"`, starts no reviewer
-session and no owned runtime, and spends nothing.
+session and no owned runtime, and spends nothing. Cancelling a run while the
+gate is still working is reported as the cancellation it was, never as a
+refused checkout, and the branch check reports a detached `HEAD` only when git
+actually answered that HEAD is not a symbolic ref.
 
 `--verify` is orthogonal to the mode flags and to the posting flags. It cannot
 be combined with `--capture-only`, which stops before any reviewer and so

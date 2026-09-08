@@ -6406,6 +6406,99 @@ demonstrates that the flag reaches the installed gate and is reported; the
 branch and untracked conditions themselves are covered by the controlled suites
 against real git checkouts. Neither probe spends Copilot credits.
 
+### Installed balanced review of pull request #16
+
+The one authorized review ran in explicit **balanced** mode, the default
+topology, because `V1a` adds no mode and changes a gate every review already
+passes through. It cost **152.816643 credits**: `contracts` 39.72552,
+`security` 32.78638, `correctness` 28.94156, the adjudicator 23.83625,
+`performance-resources` 23.20285 and `overview` 4.324083. Four heavy
+specialists ran `gpt-5.6-terra`/high, `overview` ran `gpt-5.6-luna`/high, and
+the adjudicator ran `gpt-5.6-terra`/high. Five reviewers came from saved
+personal configuration, and there was **no configured fallback on any tier**.
+
+Reviewed head `88400df`, base `5d9eb8c`, nine files, 612 additions and 108
+deletions. There were **38 tool calls and 39 confined reads, with no permission
+denial and no tool denial**: `contracts` 13, `overview` 12 calls against 13
+approved reads, `security` 9, `correctness` 4, and neither
+`performance-resources` nor the adjudicator read anything at all. A read is
+recorded when the permission handler approves it and a call when the runtime
+reports it, so the one reviewer whose output was discarded is also the only one
+whose two counts differ.
+
+Coverage is **INCOMPLETE**: two execution failures, zero coverage gaps and five
+informational caveats. One validated finding was accepted, at P2. It is real,
+and it is fixed on this branch. This is not a clean-review claim.
+
+**`C5`'s demotion fired live for the second time.** `overview` returned an
+envelope whose JSON was invalid at position 2137, and the attempt was demoted
+to `incomplete` with `Discarded unusable reviewer output`. No tier had a
+configured fallback, so no fallback attempt started. The gap `C5` and #15 both
+record is therefore unchanged: **no live run has ever started a fallback from a
+demotion**, because no live review has ever had one configured.
+
+The second execution failure is the one worth keeping. `contracts` found the
+same defect as `correctness`, independently, and titled it `Do not convert
+symbolic-ref failures into a detached-HEAD refusal`. It was **rejected at the
+evidence boundary** for a citation that did not exactly match a supplied
+context window, so it never reached adjudication. `Q6` separately repaired a
+clipped-end citation in `correctness:1`'s second evidence anchor, which did
+reach adjudication and was accepted. Two reviewers agreeing is not what saved
+the finding. One of them citing exactly is.
+
+Four reviewers filed the same shape of caveat, that no live runtime execution
+was available and the assessment is made from the captured source. All are
+preserved as reported and needed no change.
+
+### The finding, and what changed
+
+**`correctness:1`, P2, accepted and fixed.** The verification profile asked
+`git symbolic-ref --quiet --short HEAD` for the current branch inside a catch
+that discarded the error and set the branch to the empty string, which is the
+value that takes the detached-HEAD refusal path. Every rejection therefore
+became the same confident sentence, `this checkout has a detached HEAD at
+<sha>`, with no trace of what actually happened. The reviewer named
+cancellation as the case that matters: the probe is signal-aware, so an
+`AbortError` raised by cancelling the run was reported as a fact about the
+user's checkout.
+
+Three exit statuses were measured locally, not inferred, against a throwaway
+repository and Node's `execFile`:
+
+| Branch probe rejection | Reviewed implementation | After the fix |
+|---|---|---|
+| `symbolic-ref` exits 1, HEAD is not a symbolic ref | detached-HEAD refusal | detached-HEAD refusal |
+| Cancelled in flight, `AbortError`/`ABORT_ERR` | detached-HEAD refusal | propagates; the run reports the cancellation |
+| Any other failure, such as exit 128 outside a repository | detached-HEAD refusal | refused, naming the failure it actually got |
+
+Exit status 1 with empty output is the answer `--quiet` gives when HEAD is not a
+symbolic ref, and it is now the only rejection read as detached. The gate also
+no longer needs to guess: a cancelled probe observed nothing, so it propagates,
+and anything else is refused on the `head-branch` condition with the real error
+message rather than a diagnosis.
+
+**The runner stopped reporting a cancelled gate as a refused checkout.** The
+`catch` around `assertReviewableCheckout` returned `disposition: "refused"` for
+anything the gate threw, so even a propagated cancellation would have been
+reported as a checkout that is not the reviewed revision. It now re-throws once
+the signal is aborted, before logging anything, so the cancellation reaches the
+owned run and is reported as the cancellation it was. That catch is older than
+`V1a` and covers the gate's two `rev-parse` catches as well, which means the
+run is now truthful about a cancellation anywhere in the gate.
+
+The controlled double had to be corrected with the implementation.
+`scripts/smoke-review.mjs` modelled the detached case as an unlabelled `Error`,
+which real git does not produce; it now carries exit status 1, which is what
+the gate reads.
+
+Both fixes landed as one commit after the review, with tests confirmed red
+against the reviewed implementation at `88400df`: the cancelled probe became a
+`head-branch` refusal, and the run reported `disposition: "refused"`. The
+twelve controlled suites pass, `git diff --check` is clean, and both
+no-inference runtime probes pass again against the plugin reinstalled from the
+fixed checkout. **Those commits have not been reviewed again**; this
+increment's single authorization is spent.
+
 ### Remaining limitations
 
 - **A branch name is not a lineage.** The gate proves the current branch carries
@@ -6420,6 +6513,15 @@ against real git checkouts. Neither probe spends Copilot credits.
   runtime fixture refuses earlier, on the head condition. Only the controlled
   suites exercise the branch and untracked refusals, against real git checkouts
   but not through the real dispatch.
+- **No live run has been cancelled during the preflight.** The corrected
+  cancellation path is covered by the controlled suites only. What #16 observed
+  was the defect in the source, not a cancelled run.
+- **Called directly, the gate still shapes a cancellation during either
+  `rev-parse` as a refusal** carrying the abort message, rather than propagating
+  it the way the branch probe now does. Only the run is demonstrably truthful
+  about those two, because the runner re-throws once the signal is aborted.
+  Making the gate itself uniform is recorded, not done: those catches predate
+  `V1a` and no review has asked for them.
 
 ### Reproduction
 
