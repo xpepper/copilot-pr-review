@@ -7021,7 +7021,9 @@ The table refuses programs that install, escalate privilege, change the machine,
 move data over the network, drive version control, provision or deploy, or watch;
 any token that names an installing, migrating, deploying, publishing, creating,
 cleaning, serving, formatting or fixing verb; a set of write-in-place and watch
-flags; a placeholder word; and `vitest` in the bare form that watches by default.
+flags; a placeholder word; a shell keyword or builtin, which a wrapped construct
+can present as its own first line carrying no metacharacter at all; and `vitest`
+in the bare form that watches by default.
 Known holes, recorded rather than papered over:
 
 - **`node scripts/dogfood-review.mjs ...` passes every rule**, because its
@@ -7084,11 +7086,22 @@ copilot plugin install "$(pwd)"
 ```
 
 Expect discovery to find `node scripts/smoke-safeguards.mjs` and
-`node scripts/smoke-review.mjs` in `AGENTS.md`, and to refuse whatever else it
-reads: this repository's own `for` loop by shape, `copilot plugin install "$(pwd)"`
-by both its program and its `install` token, `gh pr create` by its program, and
-the wrapped dogfood command as uncited. Both suites finish in well under a
+`node scripts/smoke-review.mjs` in `AGENTS.md`. Both finish in well under a
 second and leave the checkout clean, which the artifact line should confirm.
+
+Most of what else it reads should be refused with the rule that refused it: this
+repository's own `for` loop by shape, or as a shell keyword if the pass reports
+only its first line; `copilot plugin install "$(pwd)"` by both its program and
+its `install` token; `gh pr create` by its program; and the wrapped dogfood
+command as uncited. **One more may legitimately be offered.** `HANDOFF.md` states
+`node scripts/smoke-runtime.mjs --targets` as a line of its own, below the two
+environment variables it needs, so the pass may report it and both gates accept
+it. That is the contract working rather than a defect: it is a runnable line this
+project declares. Decline it, and record that it was offered.
+
+A local simulation of both gates over `AGENTS.md`, `CLAUDE.md`, `HANDOFF.md` and
+`SCOPE.md` produced exactly those three offers and refused every other candidate
+line, which is evidence about the gates rather than about the discovery pass.
 
 ## Exact next increment
 
