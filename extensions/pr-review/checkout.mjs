@@ -60,9 +60,13 @@ export function refuseCheckout(condition, detail, number, mode = reviewModes.qui
 export const verificationNotice = [
   `Verification: ${verifyFlag} is set. This run additionally requires the pull request's head branch and a `,
   "tree with no untracked path, checked with the revision gate before any reviewer starts.",
-  "\nOnce it passes, this project's own instruction files are read and the safeguard commands they declare ",
-  "are presented. No command is approved or executed, and no reviewer receives one, so a passing preflight ",
-  "is still an ordinary review of the selected mode and this flag grounds no claim in it.",
+  "\nOnce it passes, this project's own instruction files are read, the safeguard commands they declare are ",
+  "presented, and you are asked which of them may run. Approval is per command, and it comes from that ",
+  "question alone: no flag and no configuration key grants it. Nothing is executed on that answer: ",
+  "it is recorded, no reviewer receives a command, and a passing preflight is still an ordinary review of ",
+  "the selected mode, so this flag grounds no claim in it.",
+  "\nThe list you are asked about is unfiltered. A command in it is one the discovery pass read out of a ",
+  "file, not one this tool has judged.",
 ].join("");
 
 function statusEntries(status) {

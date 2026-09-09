@@ -1131,7 +1131,8 @@ for (const [scenario, state, expected, fix] of [
   assert.match(opened, /"verify":true/);
   assert.match(opened, /"branch":"feature"/);
   assert.match(opened, /preflight passed on head branch feature/);
-  assert.match(opened, /No project safeguard is approved or executed/);
+  assert.match(opened, /no approved command is executed/);
+  assert.match(opened, /no reviewer receives safeguard output/);
   assert(gitCalls.some((args) => args[0] === "symbolic-ref"), "The branch is read from git, never assumed");
   // Verification changes no reviewer's input. The harness already asserts every
   // session's system message equals this mode's ordinary instructions, so the

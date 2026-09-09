@@ -5,7 +5,9 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { assertReviewableCheckout, refuseCheckout, runGit } from "../extensions/pr-review/checkout.mjs";
+import {
+  assertReviewableCheckout, refuseCheckout, runGit, verificationNotice,
+} from "../extensions/pr-review/checkout.mjs";
 import { reviewModes } from "../extensions/pr-review/modes.mjs";
 
 const temporary = [];
@@ -321,6 +323,20 @@ try {
     assert.match(dirtyVerify, new RegExp(`rerun /pr-review 7 ${mode.flag} --verify`));
   }
   console.log("PASS a verification refusal names the flag that caused it and the fix it never applies");
+
+  // The notice is what the flag says about itself before a run starts, so it
+  // must state V1c's boundary exactly: an approval is asked for and recorded,
+  // and nothing is executed on the strength of it.
+  assert.match(verificationNotice, /--verify/);
+  assert.match(verificationNotice, /head branch/);
+  assert.match(verificationNotice, /untracked/);
+  assert.match(verificationNotice, /approv/i);
+  assert.match(verificationNotice, /nothing is executed|no command is executed|nothing runs/i);
+  assert.match(verificationNotice, /ordinary review/);
+  // No exclusion rule exists yet, so the notice must not imply the offered list
+  // was filtered or judged by anything.
+  assert.match(verificationNotice, /unfiltered|not .*judged/i);
+  console.log("PASS the verification notice states that an approval is recorded and nothing is executed");
 } finally {
   for (const directory of temporary) rmSync(directory, { recursive: true, force: true });
 }

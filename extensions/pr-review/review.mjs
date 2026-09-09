@@ -333,8 +333,9 @@ export async function executeReviewRun(parent, client, options, assignments, {
         // ran, so the run says plainly that nothing did.
         (verify
           ? `\nV1a verification preflight passed on head branch ${access.branch}, with no untracked path. ` +
-            "No project safeguard is approved or executed, and no reviewer receives safeguard output; " +
-            "this is an ordinary review of the selected mode."
+            "A discovered command may be approved for a later increment to run, and no approved command is " +
+            "executed here; no reviewer receives safeguard output, and this is an ordinary review of the " +
+            "selected mode."
           : "") +
         (access.untracked.length
           ? `\nWarning: ${access.untracked.length} untracked file(s) are present and readable; they are not reviewed content.`
