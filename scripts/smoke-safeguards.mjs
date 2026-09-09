@@ -144,7 +144,7 @@ for (const [scenario, raw, expected] of [
   ["a path escaping the supplied set", body([{ command: "npm test", file: "../AGENTS.md" }]), /not (a )?(supplied|read)/i],
   // Discovered text reaches a terminal, so a command is one line of it.
   ["a newline in the command", body([{ command: "npm test\nrm -rf /", file: "AGENTS.md" }]), /single line|control/i],
-  ["an escape sequence in the command", body([{ command: "npm test[2J", file: "AGENTS.md" }]), /single line|control/i],
+  ["an escape sequence in the command", body([{ command: "npm test\u001b[2J", file: "AGENTS.md" }]), /single line|control/i],
   ["an over-long command", body([{ command: "x".repeat(maxCommandLength + 1), file: "AGENTS.md" }]), /length|long/i],
   ["too many commands", body(Array.from({ length: maxDiscoveredCommands + 1 },
     () => ({ command: "npm test", file: "AGENTS.md" }))), /at most|many/i],
