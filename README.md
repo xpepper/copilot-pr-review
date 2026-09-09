@@ -332,13 +332,17 @@ checkout and presents the safeguard commands they declare, each with the file it
 came from:
 
 ```text
-V1b safeguard discovery found 2 command(s) declared in this project's instructions.
+V1b safeguard discovery found 3 command(s) declared in this project's instructions.
   npm test  [declared in AGENTS.md]
   npm run typecheck  [declared in CONTRIBUTING.md]
+  npm install  [declared in AGENTS.md]  not offered: `install` is not a check: a safeguard never installs, migrates, deploys, publishes, creates, cleans, serves, formats in place or watches
 Read: AGENTS.md, CLAUDE.md, CONTRIBUTING.md. Skipped: ROADMAP.md (exceeds 65536 bytes).
-Nothing here has been approved and nothing has run. You are asked next which of these
-may run; this release executes none of them, no reviewer receives one, and this stays
-an ordinary review of the selected mode.
+2 of 3 can be run by this tool. The rest are not offered at all. A refusal is a rule about
+the kind of command it is, and passing those rules is never a judgement that a command is
+safe to run.
+Nothing here has run. You are asked next which of these may run in this checkout; an
+approved command runs before any reviewer starts, no reviewer receives its output, and
+this stays an ordinary review of the selected mode.
 ```
 
 The source is your project's own instructions, and only those. A package
@@ -354,9 +358,9 @@ A model reads the prose, and code decides what its answer may say. The schema,
 the binding, the command text and above all the file a command is attributed to
 are all checked before anything reaches your screen: a command can only cite a
 file this run actually read, and must be a single line without control
-characters. Nothing is filtered on top of that. Commands that install, rewrite
-files or watch are not excluded, because that exclusion belongs with the
-increment that can execute one.
+characters. Every command the pass read is reported, including one this tool
+refuses to run, because a command that vanished from the report could not be
+told apart from one your project never declared.
 
 Discovery is not a reviewer and is not part of review coverage. It holds no
 tool, is never given the checkout to read, and takes no configured fallback. A
@@ -371,7 +375,7 @@ checkout is the reviewed revision, which is why discovery never runs during an
 ordinary review. The files are read at the pull request's head, so a branch can
 change what they say. For this release that is accepted rather than mitigated:
 the tool is used on its author's own pull requests and those of their team, and
-nothing discovered can act until a later slice adds approval.
+nothing discovered can act until you approve it in that same run.
 
 ### Command approval (V1c)
 
@@ -379,11 +383,11 @@ With commands discovered, the run asks which of them may run, one choice per
 command, before any reviewer starts:
 
 ```text
-V1c safeguard approval: 1 of 2 discovered command(s) approved.
+V1c safeguard approval: 1 of 2 offered command(s) approved.
   npm test  [declared in AGENTS.md]
-Nothing ran. This release records an approval and executes no command; running one is a
-later increment with its own gate, its own discussion and its own review. No reviewer
-receives an approved command, and this stays an ordinary review of the selected mode.
+These run now, in this checkout, before any reviewer starts.
+Nothing else approves a command: there is no flag, no configuration key and no saved
+posting setting that can, and an approval does not outlive the run that recorded it.
 ```
 
 Approval is per command, so a fast check can be taken without the suite that
@@ -393,10 +397,9 @@ run, and the recorded answer keeps the order the commands were discovered in
 rather than the order you happened to pick them.
 
 The question sits between discovery and the reviewers rather than beside finding
-selection. That is where a later increment would have to run an approved command
-for its output to ground a reviewer's claim, so the gate is put where execution
-could follow it. The cost is that the run waits for you before any reviewer
-starts.
+selection. That is where an approved command has to run for its output to be
+able to ground a reviewer's claim, so the gate is put where execution follows
+it. The cost is that the run waits for you before any reviewer starts.
 
 Approval comes from that question and from nowhere else. There is no flag that
 approves everything, no personal setting and no trusted project file that
@@ -415,16 +418,74 @@ The approval does not outlive the run. It is not written to the retained result,
 so no schema version moves for it, and a publish-later of that result carries no
 approval and never could.
 
-**The offered list is unfiltered.** A command that installs, migrates, deploys,
-formats in place, auto-fixes or watches is offered like any other, and code does
-not check that a command really appears in the file it cites. Both belong to the
-increment that executes, where they guard a command someone could actually
-start. Here they would guard nothing, because nothing runs and the approval
-cannot outlive the run that recorded it. Watching is the sharp case for that
-increment: this tool imposes no review timeout by design, so an approved watch
-command would have nothing to end it.
+Only what this tool would actually run is offered. A command it refuses is
+already on your screen with the reason, and asking for permission it could not
+act on would be theatre.
 
-Executing an approved command is separate work that has not started.
+### Running an approved safeguard (V2a)
+
+An approved command runs immediately, in this checkout, before any reviewer
+starts:
+
+```text
+V2a safeguard execution: 2 approved command(s), 1 of which did not pass.
+  npm test  [declared in AGENTS.md]  passed, exit 0, 8214 ms
+    stdout:
+      142 passing
+  npm run typecheck  [declared in CONTRIBUTING.md]  failed, exit 2, 1190 ms
+    stderr:
+      src/session.ts(31,7): error TS2322: Type 'string' is not assignable to type 'number'.
+Running these left the checkout changed. Nothing was reverted, stashed or cleaned:
+  ?? tsconfig.tsbuildinfo
+No reviewer receives any of this, so a failed safeguard does not make this review's
+coverage incomplete and changes nothing about what the review found.
+```
+
+**This is not a sandbox.** The command is declared by the code under review, and
+it runs as you, in your checkout, with the dependencies you already have
+installed. Approve one only if you would run it yourself.
+
+There is no shell anywhere in the path. A command is split on whitespace and
+handed to the operating system as an argument list, so a line carrying anything
+only a shell could interpret is refused rather than run: a `&&` chain, a pipe, a
+redirect, a variable, a glob, a quoted argument, a loop. That refusal is what
+makes the rest of the rules worth anything, because against a shell a first word
+tells you nothing about what a line will do.
+
+On top of that, code refuses a command that is not a check at all: anything that
+installs, migrates, deploys, publishes, creates, cleans, serves, formats in place,
+auto-fixes or watches, and any program that changes the machine, moves data over
+the network, drives version control, or provisions and deploys. Watching is the
+sharp case, because this tool imposes no review timeout by design and an approved
+watch command would have nothing to end it. **The rule is a heuristic**, and
+surviving it is never a judgement that a command is safe. It will refuse checks
+that were perfectly reasonable, and a project can answer that by declaring the
+command as a plain single line.
+
+Code also checks that a command really appears in the file it cites, as a command
+of its own, so an invented command cannot borrow a real file's name. `npm run
+test` is not carved out of `npm run test:unit`.
+
+Commands run one at a time, in the order they were discovered. Output is captured
+with a bound per stream and the end of it is shown, which is where a failing
+suite says what failed; reaching the bound truncates the capture and says so, and
+never kills a command that is otherwise passing. Standard input is closed, so a
+command that stops to ask a question fails at once instead of waiting forever on
+a review that has no timeout to rescue it.
+
+One `git status --porcelain` afterwards reports what running project code left in
+your checkout. The preflight already proved the tree was clean, so anything named
+there was left by a safeguard. Nothing is reverted, stashed or cleaned.
+
+Cancelling the review kills the running command and every process it started,
+because a test runner's workers must not outlive the review that started them.
+There is no timer anywhere in this: only you end a running safeguard.
+
+A safeguard grounds no finding in this release. No reviewer receives its output,
+so a failing suite is reported loudly and still leaves the review's own coverage
+exactly as it was. Whether that output should reach a reviewer at all, and what
+the retained result should say about what ran, are the next slice's questions and
+are deliberately unanswered here.
 
 ### Balanced review mode (M1)
 
