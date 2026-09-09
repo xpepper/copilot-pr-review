@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   approveSafeguards, citationRefusal, collectInstructionFiles, commandRefusal, describeApproval,
-  describeDiscovery, discoveryEnvelope, discoveryInstructions, discoveryPrompt, instructionBudgetBytes,
-  instructionFileMaxBytes, maxCommandLength, maxDiscoveredCommands,
+  describeDiscovery, describeExecution, discoveryEnvelope, discoveryInstructions, discoveryPrompt,
+  executeSafeguards, instructionBudgetBytes, instructionFileMaxBytes, maxCommandLength,
+  maxDiscoveredCommands,
 } from "../extensions/pr-review/safeguards.mjs";
 import { outputEnd, outputStart } from "../extensions/pr-review/findings.mjs";
 
@@ -501,11 +502,225 @@ console.log("PASS a command is refused unless code can run it without a shell an
 }
 console.log("PASS a command must appear in the file it cites, as a whole command");
 
-// The gates decide what may run; nothing here runs anything yet. The module
-// still cannot spawn a process, which is what keeps that true until the
-// execution step deliberately changes it.
-assert.doesNotMatch(readFileSync(new URL("../extensions/pr-review/safeguards.mjs", import.meta.url), "utf8"),
-  /child_process|execFile|spawnSync|\bspawn\(/);
-console.log("PASS the gates decide what may run, and the module still cannot spawn a process");
+// V2a: execution. This is the first thing in this tool that runs pull-request
+// controlled code on the user's machine, so what it does and what it refuses to
+// do are both asserted here.
+
+const script = (root, name, body) => { writeFileSync(join(root, name), body); return `node ${name}`; };
+const fakeGit = (output = "") => async (args, cwd) => {
+  assert.deepEqual(args, ["status", "--porcelain"]);
+  assert.equal(typeof cwd, "string");
+  return output;
+};
+const approvalOf = (commands) => ({ status: "approved", approved: commands, offered: commands.length, refused: 0 });
+const run = (approved, options = {}) => executeSafeguards(approvalOf(approved), {
+  root: options.root, controller: options.controller ?? new AbortController(),
+  git: options.git ?? fakeGit(), ...options,
+});
+
+{
+  // A safeguard that passes, and one that fails, in the order they were
+  // approved. Both are reported with their exit status and their output, and a
+  // failing one never stops the next from running.
+  const root = project({});
+  const pass = script(root, "pass.mjs", "console.log('42 checks passed');");
+  const fail = script(root, "fail.mjs", "console.error('one check failed'); process.exit(3);");
+  const execution = await run([
+    { command: pass, file: "AGENTS.md" }, { command: fail, file: "AGENTS.md" },
+  ], { root });
+  assert.equal(execution.status, "failed", "One failed safeguard makes the whole execution failed");
+  assert.equal(execution.results.length, 2);
+  assert.equal(execution.results[0].status, "passed");
+  assert.equal(execution.results[0].code, 0);
+  assert.match(execution.results[0].stdout, /42 checks passed/);
+  assert.equal(execution.results[1].status, "failed");
+  assert.equal(execution.results[1].code, 3);
+  assert.match(execution.results[1].stderr, /one check failed/);
+  assert.deepEqual(execution.results.map(({ command }) => command), [pass, fail]);
+  assert(execution.results.every(({ milliseconds }) => Number.isInteger(milliseconds)));
+}
+{
+  // A command that is not there at all fails as itself rather than taking the
+  // run down with it.
+  const root = project({});
+  const execution = await run([{ command: "node no-such-check.mjs", file: "AGENTS.md" }], { root });
+  assert.equal(execution.status, "failed");
+  assert.equal(execution.results[0].status, "failed");
+  assert.notEqual(execution.results[0].code, 0);
+}
+{
+  // The gate is asserted again in the moment before the spawn, so an approved
+  // entry that could not pass it now is refused rather than run. Approval is
+  // the person's decision; this is the code's, and it is the one that spawns.
+  const root = project({});
+  const execution = await run([
+    { command: "mvn deploy", file: "AGENTS.md" },
+    { command: "npm test && npm run lint", file: "AGENTS.md" },
+  ], { root });
+  assert.equal(execution.status, "failed");
+  assert(execution.results.every(({ status }) => status === "refused"));
+  assert.match(execution.results[0].error, /deploy/i);
+  assert.match(execution.results[1].error, /shell/i);
+}
+{
+  // Nothing approved is nothing run, and no process is started to discover that.
+  for (const approval of [
+    { status: "none", approved: [], offered: 2, refused: 0 },
+    { status: "unavailable", approved: [], offered: 2, refused: 0 },
+    { status: "not-started", approved: [], offered: 0, refused: 0 },
+    { status: "failed", approved: [], offered: 2, refused: 0, error: "invalid answer" },
+  ]) {
+    const execution = await executeSafeguards(approval, {
+      root: project({}), controller: new AbortController(), git: fakeGit(),
+    });
+    assert.equal(execution.status, "not-started", approval.status);
+    assert.deepEqual(execution.results, []);
+  }
+}
+{
+  // Output is bounded rather than unbounded, and a bound that is reached is
+  // stated rather than hidden. Reaching it never kills a safeguard that is
+  // otherwise passing: a chatty suite is not a failing one.
+  const root = project({});
+  const chatty = script(root, "chatty.mjs", "for (let i = 0; i < 400; i++) console.log('x'.repeat(100));");
+  const execution = await run([{ command: chatty, file: "AGENTS.md" }], { root, captureBytes: 1024 });
+  assert.equal(execution.results[0].status, "passed");
+  assert.equal(execution.results[0].code, 0);
+  assert(execution.results[0].stdout.length <= 1024);
+  assert.deepEqual(execution.results[0].truncated, ["stdout"]);
+}
+{
+  // SCOPE.md asks for artifacts as well as evidence. Running project code can
+  // leave files behind, and the preflight has already proven the tree was clean,
+  // so one status read afterwards says exactly what running it changed. Nothing
+  // is cleaned, reverted or stashed.
+  const root = project({});
+  const writer = script(root, "writer.mjs", "console.log('wrote');");
+  const execution = await run([{ command: writer, file: "AGENTS.md" }],
+    { root, git: fakeGit("?? build.log\n M src/example.js\n") });
+  assert.deepEqual(execution.artifacts.paths, ["?? build.log", " M src/example.js"]);
+  const clean = await run([{ command: writer, file: "AGENTS.md" }], { root });
+  assert.deepEqual(clean.artifacts.paths, []);
+}
+{
+  // A status read that fails is reported, and does not turn a passing safeguard
+  // into a failing one.
+  const root = project({});
+  const writer = script(root, "writer.mjs", "console.log('wrote');");
+  const execution = await run([{ command: writer, file: "AGENTS.md" }], {
+    root, git: async () => { throw new Error("git is unavailable"); },
+  });
+  assert.equal(execution.status, "passed");
+  assert.match(execution.artifacts.error, /git is unavailable/);
+}
+{
+  // A run cancelled before execution starts nothing at all.
+  const controller = new AbortController();
+  controller.abort(new DOMException("cancelled before execution", "AbortError"));
+  const root = project({});
+  const marker = join(root, "should-not-exist");
+  const execution = await run([
+    { command: script(root, "touch.cjs", `require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'x');`),
+      file: "AGENTS.md" },
+  ], { root, controller });
+  assert.equal(execution.status, "cancelled");
+  assert.deepEqual(execution.results, []);
+  assert.throws(() => readFileSync(marker));
+}
+{
+  // Cancelling during a safeguard kills it, and every process it started with
+  // it. There is no timeout anywhere in this: the only thing that ends a
+  // running safeguard is the person who cancels the review.
+  const root = project({});
+  writeFileSync(join(root, "child.cjs"), "setTimeout(() => {}, 120000);");
+  writeFileSync(join(root, "parent.cjs"), [
+    "const { spawn } = require('node:child_process');",
+    "const { writeFileSync } = require('node:fs');",
+    "const child = spawn(process.execPath, ['child.cjs'], { cwd: __dirname, stdio: 'ignore' });",
+    `writeFileSync(${JSON.stringify(join(root, "child.pid"))}, String(child.pid));`,
+    "setTimeout(() => {}, 120000);",
+  ].join("\n"));
+  const controller = new AbortController();
+  const started = Date.now();
+  const pending = run([{ command: "node parent.cjs", file: "AGENTS.md" },
+    { command: "node parent.cjs", file: "AGENTS.md" }], { root, controller });
+  const pidFile = join(root, "child.pid");
+  for (let waited = 0; waited < 5000 && !existsSync(pidFile); waited += 25) {
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  const grandchild = Number(readFileSync(pidFile, "utf8"));
+  assert(Number.isInteger(grandchild) && grandchild > 0, "The safeguard really started a process of its own");
+  process.kill(grandchild, 0);
+  controller.abort(new DOMException("cancelled during execution", "AbortError"));
+  const execution = await pending;
+  assert.equal(execution.status, "cancelled");
+  assert.equal(execution.results[0].status, "cancelled");
+  assert.equal(execution.results.length, 1, "A cancelled run starts no further safeguard");
+  assert(Date.now() - started < 60000, "Cancellation does not wait for the safeguard to finish on its own");
+  let alive = true;
+  for (let waited = 0; waited < 5000 && alive; waited += 25) {
+    try { process.kill(grandchild, 0); await new Promise((resolve) => setTimeout(resolve, 25)); }
+    catch { alive = false; }
+  }
+  assert.equal(alive, false, "Cancelling kills the whole process group, not only the command itself");
+}
+console.log("PASS an approved safeguard runs, is bounded, is re-checked before it spawns, and is killable");
+
+// Presentation. What ran, what it said, and what it changed. It must never read
+// as a claim about the review's own coverage: a safeguard grounds no finding in
+// this increment, so a failing one cannot make the review less complete.
+{
+  const described = describeExecution({
+    status: "failed",
+    results: [
+      { command: "node check.mjs", file: "AGENTS.md", status: "passed", code: 0, milliseconds: 12,
+        stdout: "42 checks passed\n", stderr: "", truncated: [] },
+      { command: "node lint.mjs", file: "AGENTS.md", status: "failed", code: 3, milliseconds: 40,
+        stdout: "", stderr: "one check failed\n", truncated: [] },
+      { command: "mvn deploy", file: "AGENTS.md", status: "refused", error: "`deploy` is not a check" },
+    ],
+    artifacts: { paths: ["?? build.log"] },
+  });
+  assert.match(described, /^V2a safeguard execution/);
+  assert.match(described, /node check\.mjs/);
+  assert.match(described, /42 checks passed/);
+  assert.match(described, /one check failed/);
+  assert.match(described, /exit 3/);
+  assert.match(described, /\?\? build\.log/);
+  assert.match(described, /deploy` is not a check/);
+  // The rule this increment settled, in the text the user reads.
+  assert.match(described, /not review coverage|does not.*coverage/i);
+  assert.doesNotMatch(described, /incomplete coverage/i);
+  // A safeguard grounds no finding here, so nothing may suggest a reviewer saw it.
+  assert.doesNotMatch(described, /reviewer .*(saw|received|used)/i);
+}
+for (const [scenario, execution] of [
+  ["nothing approved", { status: "not-started", results: [] }],
+  ["a cancelled execution", { status: "cancelled", results: [
+    { command: "node check.mjs", file: "AGENTS.md", status: "cancelled", milliseconds: 5, stdout: "", stderr: "",
+      truncated: [] }] }],
+  ["output that was truncated", { status: "passed", results: [
+    { command: "node check.mjs", file: "AGENTS.md", status: "passed", code: 0, milliseconds: 5,
+      stdout: "x".repeat(100), stderr: "", truncated: ["stdout"] }] }],
+  ["artifacts that could not be read", { status: "passed", results: [], artifacts: { error: "git failed" } }],
+]) {
+  const described = describeExecution(execution);
+  assert.match(described, /^V2a safeguard execution/, scenario);
+  assert.doesNotMatch(described, /incomplete coverage/i, scenario);
+}
+assert.match(describeExecution({ status: "passed", results: [
+  { command: "node check.mjs", file: "AGENTS.md", status: "passed", code: 0, milliseconds: 5,
+    stdout: "x".repeat(100), stderr: "", truncated: ["stdout"] }] }), /truncat/i);
+assert.match(describeExecution({ status: "not-started", results: [] }), /nothing was approved|no command/i);
+console.log("PASS execution is presented with its evidence and its artifacts, and never as review coverage");
+
+// V2a executes, so the module may spawn. What it may never do is open a shell:
+// choice 3 is worth nothing if any path here can reach one.
+{
+  const source = readFileSync(new URL("../extensions/pr-review/safeguards.mjs", import.meta.url), "utf8");
+  assert.doesNotMatch(source, /shell:\s*true|execSync|spawnSync|\/bin\/(sh|bash)/);
+  assert.match(source, /\bspawn\b/, "V2a executes, so the module spawns exactly one kind of process");
+}
+console.log("PASS the safeguard module can spawn a process, and can never open a shell");
 
 for (const root of roots) rmSync(root, { recursive: true, force: true });

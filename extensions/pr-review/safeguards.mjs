@@ -1,3 +1,4 @@
+import { spawn } from "node:child_process";
 import { lstatSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { delimitedFormat, unwrapEnvelope } from "./findings.mjs";
@@ -177,7 +178,7 @@ export function discoveryEnvelope(raw, key, supplied) {
 // what it says cannot mean it here. Refusing such a line is what makes the
 // exclusions below worth anything: against `sh -c`, `npm test && npm install`
 // defeats any rule that reads the first word.
-const safeCharacter = /[A-Za-z0-9._:/=@+,-]/;
+const safeCharacter = /[A-Za-z0-9._:/=@+,_-]/;
 // `NUMBER`, `PATH`, `FILE`: an instruction file writes these where a real
 // argument goes, and running one literally is never what the project meant.
 const placeholderWord = /^[A-Z][A-Z0-9_]+$/;
@@ -463,4 +464,204 @@ export function describeApproval({ status, approved, offered, error }) {
     ...(status === "approved" ? approved.map((entry) => `  ${choiceTitle(entry)}`) : []),
     nothingExecuted,
   ].join("\n");
+}
+
+// V2a: execution. This is the first thing this tool does that is not a confined
+// read: an approved command runs in the checkout, as the person who started the
+// review, with the dependencies they already have installed. `SCOPE.md` is
+// explicit that this is not a sandbox.
+//
+// It sits where approval does, after discovery and before any reviewer starts,
+// because that is the placement `V1c` chose so that a later increment could let
+// what ran ground a reviewer's claim. Nothing here hands anything to a reviewer;
+// that decision is `V2b`'s, and it is deliberately not made by building the
+// plumbing for it early.
+
+// What one command may hold in memory per stream. Reaching it truncates the
+// capture and says so; it never kills the command, because a chatty suite is
+// not a failing one and killing it would report a defect that does not exist.
+export const outputCaptureBytes = 8 * 1024 * 1024;
+// What is shown on screen, taken from the end, which is where a failing suite
+// says what failed.
+export const displayedOutputCharacters = 2000;
+
+// The same overrides the target and checkout helpers already scrub, for the same
+// reason: an ambient variable must not be able to point a safeguard at another
+// repository or another index.
+export function safeguardEnvironment(base = process.env) {
+  const env = { ...base };
+  for (const key of ["GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_INDEX_FILE",
+    "GIT_CEILING_DIRECTORIES", "GH_REPO"]) delete env[key];
+  return env;
+}
+
+// One command, one process, no shell. `stdin` is closed rather than inherited,
+// so a command that stops to ask a question fails at once instead of waiting
+// forever on a review that has no timeout to rescue it.
+function spawnSafeguard(words, { root, signal, captureBytes, spawnProcess }) {
+  return new Promise((resolve) => {
+    const started = Date.now();
+    const captured = { stdout: [], stderr: [] };
+    const held = { stdout: 0, stderr: 0 };
+    const truncated = new Set();
+    let child;
+    let settled = false;
+    let cancelled = false;
+    let failure;
+    function onAbort() {
+      cancelled = true;
+      // The whole process group, not only the command: a test runner that
+      // spawned workers must not leave them behind when the review is cancelled.
+      try { if (child?.pid) process.kill(-child.pid, "SIGKILL"); }
+      catch { try { child?.kill("SIGKILL"); } catch { /* it is already gone */ } }
+    }
+    const finish = (code = null, terminatedBy = null) => {
+      if (settled) return;
+      settled = true;
+      signal?.removeEventListener("abort", onAbort);
+      resolve({
+        status: cancelled ? "cancelled" : failure || code !== 0 ? "failed" : "passed",
+        code, signal: terminatedBy,
+        stdout: Buffer.concat(captured.stdout).toString("utf8"),
+        stderr: Buffer.concat(captured.stderr).toString("utf8"),
+        truncated: [...truncated],
+        milliseconds: Date.now() - started,
+        ...(failure ? { error: failure } : {}),
+      });
+    };
+    try {
+      child = spawnProcess(words[0], words.slice(1), {
+        cwd: root, env: safeguardEnvironment(),
+        detached: true, stdio: ["ignore", "pipe", "pipe"],
+      });
+    } catch (error) {
+      failure = String(error);
+      finish();
+      return;
+    }
+    signal?.addEventListener("abort", onAbort, { once: true });
+    for (const stream of ["stdout", "stderr"]) {
+      // The pipe is always drained, even past the cap, so a command is never
+      // blocked writing into a reader that stopped listening.
+      child[stream]?.on("data", (chunk) => {
+        const room = captureBytes - held[stream];
+        if (room <= 0) { truncated.add(stream); return; }
+        if (chunk.length > room) {
+          truncated.add(stream);
+          captured[stream].push(chunk.subarray(0, room));
+          held[stream] = captureBytes;
+          return;
+        }
+        captured[stream].push(chunk);
+        held[stream] += chunk.length;
+      });
+    }
+    child.on("error", (error) => {
+      failure = String(error);
+      // A command that never started emits no close of its own to wait for.
+      if (!child.pid) finish();
+    });
+    child.on("close", (code, terminatedBy) => finish(code, terminatedBy));
+  });
+}
+
+// `SCOPE.md` asks for artifacts as well as evidence. The preflight already
+// proved the tree was clean, so one status read afterwards is an exact statement
+// of what running project code left behind. Nothing is reverted, stashed or
+// cleaned: saying what changed is the whole of the job.
+async function checkoutArtifacts(git, root) {
+  if (typeof git !== "function") return { paths: [], error: "the checkout could not be inspected" };
+  try {
+    const output = await git(["status", "--porcelain"], root, {});
+    return { paths: String(output).split("\n").filter((line) => line.trim().length) };
+  } catch (error) {
+    return { error: String(error?.message ?? error) };
+  }
+}
+
+// Only what a person approved in this run, one command at a time, in the order
+// they were discovered. Sequential rather than parallel because two safeguards
+// writing the same build directory is a defect report about this tool rather
+// than about the project.
+export async function executeSafeguards(approval, {
+  root, controller, git, captureBytes = outputCaptureBytes, spawnProcess = spawn,
+}) {
+  const signal = controller.signal;
+  const approved = approval?.status === "approved" && Array.isArray(approval.approved) ? approval.approved : [];
+  if (!approved.length) return { status: "not-started", results: [] };
+  if (signal.aborted) return { status: "cancelled", results: [] };
+  const results = [];
+  for (const entry of approved) {
+    if (signal.aborted) break;
+    // The gate again, in the moment before the spawn. Approval is the person's
+    // decision and this is the code's, and this is the one that starts a
+    // process, so it is the one that must be sure.
+    const refusal = commandRefusal(entry.command);
+    if (refusal) {
+      results.push({ ...entry, status: "refused", error: refusal });
+      continue;
+    }
+    results.push({
+      ...entry,
+      ...await spawnSafeguard(commandWords(entry.command), { root, signal, captureBytes, spawnProcess }),
+    });
+  }
+  const artifacts = await checkoutArtifacts(git, root);
+  return {
+    status: signal.aborted ? "cancelled"
+      : results.every(({ status }) => status === "passed") ? "passed" : "failed",
+    results, artifacts,
+  };
+}
+
+// A safeguard grounds no finding in this increment, so none of this may be
+// worded as though the review itself were affected by it. It is the project's
+// own check, run because a person asked for it and reported to that person.
+const notReviewCoverage = "No reviewer receives any of this, so a failed safeguard does not make this review's " +
+  "coverage incomplete and changes nothing about what the review found.";
+
+const tail = (text) => {
+  const trimmed = String(text ?? "").replace(/\s+$/, "");
+  if (!trimmed) return [];
+  const shown = trimmed.length > displayedOutputCharacters
+    ? trimmed.slice(-displayedOutputCharacters) : trimmed;
+  return shown.split("\n").map((line) => `      ${line}`);
+};
+
+function describeResult(result) {
+  if (result.status === "refused") {
+    return [`  ${choiceTitle(result)}  refused before it ran: ${result.error}`];
+  }
+  const detail = [
+    result.status,
+    result.signal ? `killed by ${result.signal}` : result.code === null ? undefined : `exit ${result.code}`,
+    `${result.milliseconds} ms`,
+  ].filter(Boolean).join(", ");
+  return [
+    `  ${choiceTitle(result)}  ${detail}`,
+    ...(result.error ? [`      ${result.error}`] : []),
+    ...(result.stdout ? ["    stdout:", ...tail(result.stdout)] : []),
+    ...(result.stderr ? ["    stderr:", ...tail(result.stderr)] : []),
+    ...(result.truncated?.length
+      ? [`    (${result.truncated.join(" and ")} exceeded the capture bound and was truncated)`] : []),
+  ];
+}
+
+export function describeExecution({ status, results = [], artifacts }) {
+  const unpassed = results.filter((result) => result.status !== "passed").length;
+  const headline = {
+    passed: `V2a safeguard execution: ${results.length} approved command(s), all of which passed.`,
+    failed: `V2a safeguard execution: ${results.length} approved command(s), ${unpassed} of which did not pass.`,
+    cancelled: `V2a safeguard execution was cancelled after ${results.length} approved command(s); anything ` +
+      "still running was killed, along with everything it had started.",
+    "not-started": "V2a safeguard execution ran no command, because nothing was approved.",
+  }[status];
+  const changed = artifacts?.error
+    ? [`The checkout could not be inspected afterwards: ${artifacts.error}`]
+    : !artifacts ? []
+      : artifacts.paths?.length
+        ? ["Running these left the checkout changed. Nothing was reverted, stashed or cleaned:",
+          ...artifacts.paths.map((path) => `  ${path}`)]
+        : ["The checkout is unchanged: no safeguard left a modified or untracked path behind."];
+  return [headline, ...results.flatMap(describeResult), ...changed, notReviewCoverage].join("\n");
 }
