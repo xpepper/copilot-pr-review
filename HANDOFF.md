@@ -8,20 +8,24 @@ from what has only been assumed, in your own reporting as well as in the code.
 
 ## Recorded state
 
-This handoff is prepared on branch **`v1a-verify-preflight`**, with **pull
-request #16 open and awaiting the user's merge decision**. It carries `V1a`,
-branched from `main` at `5d9eb8c`. Confirm the branch, the pull request and the
-working tree before proceeding. If #16 has been merged, start from clean `main`
-and reconcile against git history; a squash merge need not retain the individual
-commits as ancestors. If it is still open, the merge is the user's call and is
-not yours to request again unless they ask. The only other open pull requests
-should be the synthetic playground ones, #1 and #2, which must never be merged
-or republished. No uncommitted work or increment in flight is intended to remain.
+This handoff is prepared for a fresh session on **clean `main` after the
+user-authorized merge of pull request #16**, which carried `V1a` from branch
+`v1a-verify-preflight`, branched from `main` at `5d9eb8c`. Confirm the merge,
+branch and working-tree state before proceeding; if #16 is still open, report
+the unfinished merge rather than starting another increment. A squash merge need
+not retain the individual commits as ancestors of `main`; use #16 and git
+history to reconcile state. The only other open pull requests should be the
+synthetic playground ones, #1 and #2, which must never be merged or republished.
+No uncommitted work or increment in flight is intended to remain.
+
+**Start `V1b` by discussing its boundary with the user, not by writing code.**
+That is the whole of the next step; everything below is the context for it.
 
 `V1a` is complete. Its boundary was discussed and approved before any code was
 written, which is now the expected sequence for an increment that touches a
-gate. Five commits carried the implementation and its evidence, ending at
-`88400df`, which is **the revision the installed plugin reviewed**. `5b2d897`
+gate. On `v1a-verify-preflight`, five commits carried the implementation and its
+evidence, ending at `88400df`, which is **the revision the installed plugin
+reviewed**; a squash merge will not keep them as ancestors of `main`. `5b2d897`
 fixes the one finding that review produced, and `2e86bbb` records the review and
 its outcome. This handoff is documentation only. **Nothing after `88400df` has
 been reviewed again**, and this increment's single authorization is spent.
@@ -162,8 +166,10 @@ checkout**. It also asserts the checkout is byte-identical after every refusal,
 so the gate demonstrably switches, stashes and cleans nothing. Keep that
 assertion when extending it.
 
-Both no-inference runtime probes pass against the installed plugin built from
-this branch. They spend no credits but need a live runtime connection:
+Both no-inference runtime probes passed at this handoff against the installed
+plugin built from `V1a`'s fixed checkout. They spend no credits but need a live
+runtime connection, and `copilot plugin install "$(pwd)"` must be rerun whenever
+the checkout changes, or the probe measures the previous build:
 
 ```sh
 COPILOT_CLI_PATH="$(command -v copilot)" \

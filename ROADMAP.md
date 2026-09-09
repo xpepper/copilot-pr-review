@@ -6544,13 +6544,15 @@ node scripts/smoke-runtime.mjs --targets
 
 ## Exact next increment
 
-**`V1a` is complete on its own branch and pull request, recorded above.** Its
-boundary was approved before implementation, and it deliberately executes
-nothing. The five choices recorded in its table are settled; do not reopen them
-and do not widen the flag.
+**`V1a` is complete, from pull request #16, which the user authorized merging at
+the end of that session.** Its boundary was approved before implementation, and
+it deliberately executes nothing. The five choices recorded in its table are
+settled; do not reopen them and do not widen the flag. Confirm the merge against
+git state before relying on it: this paragraph was written just before it.
 
 **`Q7` and `C5` are complete and merged, from pull requests #15 and #14.** Their
-authorizations are spent. Nothing about either should be redone or widened.
+authorizations are spent. Nothing about any of the three should be redone or
+widened.
 
 ### The next increment is `V1b`: safeguard discovery and presentation
 
