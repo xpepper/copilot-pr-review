@@ -505,6 +505,12 @@ for (const [scenario, command] of [
   ["a watcher", "nodemon scripts/check.mjs"],
   ["a runner that watches unless told not to", "vitest"],
   ["a placeholder", "node scripts/dogfood-review.mjs NUMBER --all"],
+  // A wrapped shell loop can reach the pass as its own first line, which carries
+  // no metacharacter at all. A shell keyword is never a program, so it is
+  // refused as one rather than offered as a command that would only ever fail.
+  ["a loop's first line", "for s in findings review selection preview publication"],
+  ["a conditional", "if node scripts/check.mjs"],
+  ["a builtin that changes nothing outside a shell", "cd packages/core"],
 ]) {
   assert(commandRefusal(command), scenario);
 }

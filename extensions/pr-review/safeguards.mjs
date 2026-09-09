@@ -190,6 +190,11 @@ export const commandWords = (command) => String(command ?? "").trim().split(/\s+
 export const refusedPrograms = new Map([
   ...["sh", "bash", "zsh", "ksh", "dash", "fish", "csh", "tcsh", "env", "xargs", "exec", "eval", "source"]
     .map((name) => [name, "opens a shell or runs an arbitrary program, which is exactly what this gate prevents"]),
+  // A wrapped shell construct can reach the pass as its own first line, which
+  // carries no metacharacter and would otherwise look like an ordinary command.
+  ...["for", "while", "until", "do", "done", "if", "then", "else", "elif", "fi", "case", "esac",
+    "select", "function", "set", "unset", "export", "cd", "alias", "trap"]
+    .map((name) => [name, "is a shell keyword or builtin, not a program, so it cannot run without a shell"]),
   ...["sudo", "su", "doas"].map((name) => [name, "escalates privilege, and a review runs as the person who started it"]),
   ...["rm", "mv", "cp", "ln", "dd", "mkfs", "mount", "umount", "chmod", "chown", "shutdown", "reboot",
     "kill", "killall", "pkill", "crontab", "at", "systemctl", "launchctl", "osascript"]

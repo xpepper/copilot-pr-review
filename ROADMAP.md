@@ -7067,7 +7067,7 @@ does not touch `read-only.mjs`. The handoff for `V1c` predicted `V2` would touch
 the question it answers. It does not: reviewer confinement is unchanged, and what
 `V2a` adds is a separate path that no reviewer can reach.
 
-### The installed-plugin review of pull request PENDING
+### The installed-plugin review of pull request #19
 
 **Not run.** This increment's verification of record is outstanding, and it must
 be run interactively rather than through `scripts/dogfood-review.mjs`, which
@@ -7077,10 +7077,10 @@ elicitation request, an accepted subset, a decline, a cancel and an executed
 command can be observed live.
 
 ```sh
-gh pr checkout NUMBER
+gh pr checkout 19
 copilot plugin install "$(pwd)"
-# then, inside an interactive copilot session:
-/pr-review NUMBER --balanced --verify --all --no-comment
+# then, inside an interactive copilot session started in this checkout:
+/pr-review 19 --balanced --verify --all --no-comment
 ```
 
 Expect discovery to find `node scripts/smoke-safeguards.mjs` and
@@ -7108,7 +7108,7 @@ of them should be redone or widened.
 must be run interactively, because `scripts/dogfood-review.mjs` registers no
 elicitation handler and can therefore never approve or execute anything. The
 command and what to expect from it are recorded under "The installed-plugin
-review of pull request PENDING" above.
+review of pull request #19" above.
 
 Record its evidence in that section: mode, model and effort actually used,
 coverage, what discovery found, what was offered and what was refused with the
