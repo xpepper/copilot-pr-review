@@ -54,8 +54,8 @@ posting them.
 | Q5 | Completed | A candidate anchored on a changed line carries an optional `breaks` citation for the code that change breaks, which may be unchanged, in another hunk, or in another changed file, and which passes the same bound, in-window, exact-quote checks as every other citation. A supplied introduction citation still belongs to the location's own hunk; a null one is now a claim the adjudicator tests. Demonstrated by the twelve controlled suites, the reconstructed rejections from pull requests #4, #5 and #10, and the live balanced review of pull request #12, which cost 137.274102 credits, saw a reviewer use the new citation, and found one real defect in this increment's adjudicator contract. | Q4; [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | Q6 | Completed | Candidate-only clipped-end quote repair restores exact bound source without dropping a named line. Controlled reconstructions of #11 and #12 reach adjudication; #4's inserted-space fabrication stays refused. PR #13's installed balanced review cost 134.753239 credits and was incomplete: contracts returned no usable output and correctness reported a coverage gap. No candidates or adjudication occurred, so live repair behavior remains unobserved. Exact adjudicator/publication checks and both schema versions are unchanged. | Q5; [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | C5 | Pending | A completed reviewer whose output the evidence boundary discards becomes eligible for its tier's one fallback attempt, as an empty response already is. Found by pull request #10's overview reviewer and discarded by the evidence boundary's same-hunk rule. Needs the user's go-ahead: it moves the retry decision across the evidence boundary. | C3, Q4; [Fallbacks/execution](SCOPE.md#models-configuration-and-execution) |
-| V1 | In progress | `--verify` enforces matching branch/SHA/cleanliness before reviewers and presents discovered existing commands for approval. `V1a` added the preflight and executes nothing; `V1b` added discovery and presentation from the project's own instruction files, approving and running nothing, and merged without installed-plugin evidence after its one authorized review refused at capture. Command approval remains open. | Q1; [Safeguards](SCOPE.md#optional-project-safeguards) |
-| V2 | Pending | Execute only approved existing safeguards with installed dependencies; show evidence and artifacts without autofix or checkout manipulation. | V1; [Safeguards](SCOPE.md#optional-project-safeguards) |
+| V1 | In progress | `--verify` enforces matching branch/SHA/cleanliness before reviewers and presents discovered existing commands for approval. `V1a` added the preflight and executes nothing; `V1b` added discovery and presentation from the project's own instruction files, and merged without installed-plugin evidence after its one authorized review refused at capture; `V1c` adds per-command approval, which records the answer, executes nothing, and outlives no run. Execution is all that remains, as `V2`. | Q1; [Safeguards](SCOPE.md#optional-project-safeguards) |
+| V2 | Pending | Execute only approved existing safeguards with installed dependencies; show evidence and artifacts without autofix or checkout manipulation. Carries the exclusions and the citation check that `V1c` deferred to it. Earlier prose called this increment `V1d`; it is the same one. | V1; [Safeguards](SCOPE.md#optional-project-safeguards) |
 | D1 | Pending | Document configuration, modes, incomplete coverage, cancellation, publication, cache, and safeguards with reproducible end-to-end examples. | Remaining v1 items; [Release boundary](SCOPE.md#priority-and-release-boundary) |
 
 ## Completed increment: F1
@@ -6733,6 +6733,118 @@ evidence exists that:
 own change.** Read the discovery output in that timeline with the scepticism due
 to a path no live run has ever taken, and record what it shows here.
 
+
+## Completed increment: V1c
+
+**`V1c` adds per-command safeguard approval, and still executes nothing.** It is
+the third slice of `V1` and the last one before pull-request controlled code
+runs. Like `V1a` and `V1b`, its boundary was discussed and approved before any
+code was written, one choice at a time.
+
+A verification-enabled run that has discovered commands now asks which of them
+may run, records that answer, and continues as an ordinary review. Nothing is
+executed on the strength of the answer, no reviewer receives an approved command,
+and the approval does not outlive the run that recorded it.
+
+### The six choices settled before implementation
+
+| Choice | Settled as | Why |
+|---|---|---|
+| The exclusions | **None in `V1c`.** Every discovered command is offered, including one that installs, migrates, deploys, formats in place, auto-fixes or watches. Moved to `V2`. | Reversed during the discussion, on the user's argument. Choice 5 keeps the approval out of the retained record, so a `V1c` approval can never be consumed by anything; a refusal here therefore guards nothing, which is the same reasoning `V1b` used to defer them in the first place. `SCOPE.md` prohibits *running* such commands, and this increment runs none. A refusal list is also a heuristic: the one drafted during the discussion refused this repository's own `copilot plugin install` but passed `gh pr checkout`, the dogfood review command and a bare `vitest` that watches by default. |
+| The citation check | **None in `V1c`.** Code still proves only that the cited file was read. Moved to `V2`. | Reversed during the discussion on evidence from this repository. Its own safeguards are written as `node scripts/smoke-<name>.mjs` in prose, as `node scripts/smoke-$s.mjs` inside a shell loop, and, for the dogfood command, wrapped across two source lines inside one pair of backticks. An exact quote check would refuse almost all of it, or force the pass to return a loop variable as the command. The same failure mode that ruled out an allowlist of known runners. |
+| Granularity | **Per command**, using the opaque invocation-scoped choices finding selection already uses. | A project declares a mix worth separating, such as a fast lint beside a suite that takes half an hour. All-or-nothing pushes a user toward accepting a command they would refuse on its own, because refusing it costs them every other command. It is the one place where the absolute cheapest option was not taken, and the user was told so. |
+| Placement | **Immediately after discovery, before any reviewer starts.** | The only placement that leaves room for `V2` to run an approved command where its output could ground a reviewer's claim, which `SCOPE.md` names as the flag's purpose. Beside finding selection would foreclose it. Cheapest to build as well: it is a few lines inside the block that already runs discovery. The cost is that the run waits on a human before any reviewer starts. |
+| The retained record | **Approval stays out. No schema version minted.** | The version ladder means one thing today, how much publication authority a record carries, and safeguard approval would make the number mean two unrelated things. A stored approval is also the artifact a later increment could mistake for standing permission to execute. `V1b` set the precedent with discovery. |
+| Configuration and flags | **Nothing.** No key, no trusted-project allowlist, no approve-everything flag. | A saved approval is standing permission to run pull-request controlled code, granted before anyone has seen what this pull request's instruction files declare. `V1a` kept the flag itself off the configuration keys for the same reason, and `SCOPE.md` already forbids publication flags and the saved automatic-posting setting from bypassing approval. |
+
+**Two of these reverse what `V1b` recorded.** `V1b` deferred the exclusions and
+the citation check specifically to the approval slice, "beside the thing they
+guard". The discussion established that the thing they guard is execution, not
+approval: with choice 5 settled, an approval cannot outlive its run, so nothing
+built here could ever be the gate a command passes on its way to running. They
+move to `V2` for that reason, and `V2` gains the first live discovery output to
+design them against, which no increment has had.
+
+### What the run does
+
+`approveSafeguards` in `safeguards.mjs` runs immediately after
+`discoverSafeguards`, inside the same `verify` block in `review.mjs`, before any
+specialist starts:
+
+- each discovered command is one choice, titled with the command and the file it
+  was declared in, keyed by an opaque `invocationId:index` value, so an answer
+  cannot approve a command by its position in another run's list;
+- the recorded answer keeps discovery's order, never the order the choices were
+  picked in;
+- an unavailable elicitation host, a decline, an empty acceptance and an answer
+  code cannot account for all approve nothing and leave the reviewers to run.
+  Approval grounds no finding, so an unanswered question cannot make the review
+  itself less trustworthy, and none of these is incomplete review coverage;
+- a cancelled approval aborts the run before any reviewer starts, and is
+  reported as the cancellation it was rather than as a refused checkout or a
+  failed approval. `signal.throwIfAborted()` after the log is what enforces it;
+- the failure path returns `failed` rather than throwing, because failing open
+  here is the one mistake this gate exists to prevent.
+
+**No retained-record schema changed and no version was bumped.** `retainedRecord`
+picks a fixed outcome key list that excludes `approval` exactly as it excludes
+`discovery`, and `scripts/smoke-review.mjs` asserts both stay out and that the
+schema version of a verification run equals an ordinary run's.
+
+`verificationNotice` and the preflight's own timeline line both said no command
+is approved. That was `V1b`'s boundary, not this one, and both now state this
+increment's: an approval is asked for per command and recorded, nothing is
+executed on it, and the offered list is unfiltered.
+
+### Validation
+
+Thirteen controlled suites pass, `git diff --check` is clean, and tests were
+written first and confirmed red for the right reason at each implementation
+commit. No new suite was added: approval is covered where discovery is, so the
+suite count is unchanged at thirteen.
+
+`scripts/smoke-safeguards.mjs` drives the approval unit surface: a subset, a
+reordered acceptance, an empty acceptance, a decline, a cancel, a host with no
+elicitation UI, six answers code cannot account for, a choice minted for another
+invocation, a wrong originating session, three discovery outcomes with nothing to
+approve, and an already-cancelled run. It checks every presentation string says
+plainly that nothing ran, that none of them claims incomplete coverage, and that
+none implies a command was vetted. It also asserts the module cannot spawn a
+process at all, which is what keeps `V1c` executing nothing while `V2` is ahead.
+
+`scripts/smoke-review.mjs` drives the run: the question is asked once, after
+discovery and before the first specialist, and the approved subset is recorded;
+no reviewer prompt carries an approved command; a decline, an empty answer and
+an unaccountable answer each leave `complete` true with the reviewers running;
+an absent UI approves nothing; a cancel starts no reviewer; nothing discovered
+asks nothing; an ordinary review asks nothing and records no approval; and a run
+with `--all --comment` and an effective `autoPostReviews=true` is still asked and
+still approves nothing when declined, which is `SCOPE.md`'s requirement in one
+assertion.
+
+`scripts/smoke-checkout.mjs` pins the notice the flag prints about itself.
+`scripts/smoke-reviewer-tools.mjs` was not run and was not required: `V1c` does
+not touch `read-only.mjs`.
+
+### Remaining limitations
+
+- **Nothing about execution is demonstrated, because it does not exist.** The
+  flag's purpose is still ahead of it.
+- **The offered list is unfiltered, deliberately.** A command that installs,
+  migrates, deploys, formats in place, auto-fixes or watches is offered like any
+  other. Watching is the sharp case for `V2`: `SCOPE.md` forbids review timeouts,
+  and `C3` and `C5` depend on their absence, so an approved watch command would
+  have nothing to end it.
+- **A presented command is still not checked against the file it cites.** Code
+  proves the file was read, not that the command appears in it.
+- **The run now waits on a human before any reviewer starts.** A verification run
+  left unattended reaches no reviewer at all, where previously the first question
+  came after they had finished. That is the accepted cost of the placement.
+- **The instructions tier is still the only discovery source**, so a project that
+  declares its commands only in a manifest, a task runner or a CI workflow finds
+  nothing to approve.
+- **`V1b`'s discovery path still has no installed-plugin evidence.** This
+  increment's review is the first opportunity to produce any; see below.
 
 ## Exact next increment
 
