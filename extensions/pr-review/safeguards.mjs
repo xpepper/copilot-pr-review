@@ -1,6 +1,7 @@
 import { lstatSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { delimitedFormat, unwrapEnvelope } from "./findings.mjs";
+import { waitForInteraction } from "./interaction.mjs";
 
 // V1b: safeguard discovery and presentation. A verification-enabled run finds
 // the commands this project already declares in its own instructions, shows
@@ -158,14 +159,18 @@ export function discoveryEnvelope(raw, key, supplied) {
   return { commands: parsed.commands };
 }
 
-// What the run shows. Choice 3 settled this at the command and the file it came
-// from: the quoted line, and the check that the line really appears there,
-// belong to the increment that can approve a command, because until then an
-// invented one can do nothing. Choice 2 settled that nothing is filtered out
-// here, so the exclusions for installing, auto-fixing and watching arrive with
-// approval too.
-const nothingRan = "None of this was approved and none of it ran. No reviewer receives these commands, and " +
-  "this stays an ordinary review of the selected mode.";
+// What the run shows: the command and the file it came from. The quoted line and
+// the check that the line really appears there belong to the increment that can
+// execute a command, and so do the exclusions for installing, auto-fixing and
+// watching. Nothing is filtered out here.
+//
+// V1c asks which of these may run immediately after this is printed, so the text
+// must not defer the offer to a later increment. Pull request #18's contracts
+// reviewer caught that wording after it went stale, which every controlled suite
+// had passed over because they asserted the stale sentence.
+const nothingRan = "Nothing here has been approved and nothing has run. You are asked next which of these may " +
+  "run; this release executes none of them, no reviewer receives one, and this stays an ordinary review of " +
+  "the selected mode.";
 
 export function describeDiscovery({ status, commands, files, skipped, reason }) {
   const read = files.length
@@ -196,6 +201,125 @@ export function describeDiscovery({ status, commands, files, skipped, reason }) 
     `V1b safeguard discovery found ${commands.length} command(s) declared in this project's instructions.`,
     ...commands.map(({ command, file }) => `  ${command}  [declared in ${file}]`),
     `${read}${missed}`,
-    `These are the commands a later increment would offer to run, in this checkout. ${nothingRan}`,
+    nothingRan,
+  ].join("\n");
+}
+
+// V1c: command approval. A run that discovered commands asks which of them may
+// run, records that answer, and still executes nothing. Approval is per command
+// so that a fast check can be taken without the suite that takes half an hour,
+// it is bound to the invocation that discovered the list, and it comes from a
+// person in this run and from nowhere else. No flag grants it, no configuration
+// key grants it, and neither the posting flags nor a saved automatic-posting
+// setting grants it, which `SCOPE.md` requires by name.
+//
+// Nothing filters the discovered list here. The exclusions for installing,
+// migrating, deploying, formatting in place, auto-fixing and watching, and the
+// check that a command really appears in the file it cites, both belong to the
+// increment that executes: this one runs nothing, and an approval it records
+// cannot outlive the run, so a refusal here would guard nothing. Watching is
+// the sharp case for that later increment, because `SCOPE.md` forbids review
+// timeouts and an approved watch command would have nothing to end it.
+
+const approvalFailure = (message) => { throw new Error(`Safeguard approval: ${message}.`); };
+
+const approvalQuestion = (binding, commands) => [
+  `Approve project safeguard commands for ${binding.repository.nameWithOwner}#${binding.number} ` +
+    `at head ${binding.head}.`,
+  `${commands.length} command(s) were discovered in this project's own instruction files, at that revision.`,
+  "Nothing runs in this release. This run records your answer, executes no command, hands none to any reviewer, " +
+    "and continues as an ordinary review of the selected mode.",
+  "This list is unfiltered: a command below is one the pass read out of a file, not one this tool has judged.",
+  "Accept with no choices or decline to approve none; cancel to cancel this run.",
+].join("\n");
+
+const choiceTitle = ({ command, file }) => `${command}  [declared in ${file}]`;
+
+export async function approveSafeguards(parent, discovery, { invocation, binding, controller }) {
+  const signal = controller.signal;
+  const commands = discovery?.status === "found" && Array.isArray(discovery.commands) ? discovery.commands : [];
+  const result = (status, approved = [], error) => ({
+    status, approved, offered: commands.length, ...(error === undefined ? {} : { error }),
+  });
+  // A cancelled run is never asked a question, and a run with nothing to
+  // approve is not asked one either.
+  if (signal.aborted) return result("cancelled");
+  if (!commands.length) return result("not-started");
+  try {
+    if (!invocation?.invocationId || !invocation.sessionId || invocation.sessionId !== parent.sessionId) {
+      approvalFailure("the originating invocation and session are required");
+    }
+    if (!binding?.repository?.nameWithOwner || !binding.number || !binding.head) {
+      approvalFailure("the captured pull request binding is required");
+    }
+    if (!parent.capabilities.ui?.elicitation) {
+      return result("unavailable", [],
+        "This host has no safeguard approval UI, so no command was approved. Nothing approves one instead: " +
+        "there is deliberately no flag and no configuration key that can.");
+    }
+    // Opaque invocation-scoped values, as finding selection uses. A late or
+    // replayed answer cannot approve a command by its position in another run's
+    // list, and a position in this list is meaningless outside this invocation.
+    const choices = new Map(commands.map((entry, index) => [`${invocation.invocationId}:${index}`, entry]));
+    const answer = await waitForInteraction(signal, () => parent.ui.elicitation({
+      message: approvalQuestion(binding, commands),
+      requestedSchema: {
+        type: "object",
+        properties: {
+          commands: {
+            type: "array", title: "Discovered safeguard commands", default: [],
+            items: { anyOf: [...choices].map(([value, entry]) => ({ const: value, title: choiceTitle(entry) })) },
+          },
+        },
+        required: ["commands"],
+      },
+    }));
+    if (parent.sessionId !== invocation.sessionId) {
+      approvalFailure("the originating session changed while the answer was awaited");
+    }
+    if (answer?.action === "cancel") {
+      controller.abort(new DOMException("Safeguard approval cancelled; nothing was approved or run.", "AbortError"));
+      return result("cancelled");
+    }
+    if (answer?.action === "decline") return result("none");
+    const content = answer?.content;
+    if (answer?.action !== "accept" || !content || Object.keys(content).length !== 1 ||
+        !Array.isArray(content.commands) || content.commands.some((value) => !choices.has(value)) ||
+        new Set(content.commands).size !== content.commands.length) {
+      approvalFailure("the answer was invalid, or named a command this run did not offer");
+    }
+    const picked = new Set(content.commands);
+    // Canonical order is the order the commands were discovered in, never the
+    // order they happened to be picked in.
+    const approved = [...choices].filter(([value]) => picked.has(value)).map(([, entry]) => entry);
+    return result(approved.length ? "approved" : "none", approved);
+  } catch (error) {
+    // An answer code cannot account for approves nothing: failing open is the
+    // one mistake this gate exists to prevent. A cancellation is reported as
+    // itself, and the run that owns the signal decides what to do about it.
+    if (signal.aborted) return result("cancelled");
+    return result("failed", [], String(error));
+  }
+}
+
+const nothingExecuted = "Nothing ran. This release records an approval and executes no command; running one is a " +
+  "later increment with its own gate, its own discussion and its own review. No reviewer receives an approved " +
+  "command, and this stays an ordinary review of the selected mode.";
+
+export function describeApproval({ status, approved, offered, error }) {
+  const headline = {
+    approved: `V1c safeguard approval: ${approved.length} of ${offered} discovered command(s) approved.`,
+    none: `V1c safeguard approval: none of the ${offered} discovered command(s) were approved.`,
+    unavailable: `V1c safeguard approval could not be requested: ${error}`,
+    cancelled: "V1c safeguard approval was cancelled, so no command was approved.",
+    failed: `V1c safeguard approval did not complete: ${error}`,
+    // Approval is not review coverage, so none of these makes the review itself
+    // incomplete, and none of them may be worded as though it did.
+    "not-started": "V1c safeguard approval was not requested: discovery found no command to approve.",
+  }[status];
+  return [
+    headline,
+    ...(status === "approved" ? approved.map((entry) => `  ${choiceTitle(entry)}`) : []),
+    nothingExecuted,
   ].join("\n");
 }

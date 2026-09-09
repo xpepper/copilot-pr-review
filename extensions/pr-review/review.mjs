@@ -18,7 +18,8 @@ import {
   formatFindings, reviewKey, validationInstructions,
 } from "./findings.mjs";
 import {
-  collectInstructionFiles, describeDiscovery, discoveryEnvelope, discoveryInstructions, discoveryPrompt,
+  approveSafeguards, collectInstructionFiles, describeApproval, describeDiscovery, discoveryEnvelope,
+  discoveryInstructions, discoveryPrompt,
 } from "./safeguards.mjs";
 
 const settingKeys = ["heavyModel", "heavyEffort"];
@@ -276,11 +277,12 @@ export async function executeReviewRun(parent, client, options, assignments, {
   let boundary;
   let cwd;
   let discovery;
+  let approval;
   const outcome = await executeOwnedRun(parent, client, {
     controller, onStopped, subject: mode.label, evidencePrefix: prefix,
     details: () => ({
       mode: mode.id, noComment: options.noComment, verify: options.verify === true,
-      invocation, binding, validation, adjudicator, discovery,
+      invocation, binding, validation, adjudicator, discovery, approval,
       executionComplete: execution?.complete ?? false,
       reviewers: assignments.map((assignment) => ({
         ...assignment, status: "incomplete", error: "Review did not reach specialist execution.",
@@ -331,8 +333,9 @@ export async function executeReviewRun(parent, client, options, assignments, {
         // ran, so the run says plainly that nothing did.
         (verify
           ? `\nV1a verification preflight passed on head branch ${access.branch}, with no untracked path. ` +
-            "No project safeguard is approved or executed, and no reviewer receives safeguard output; " +
-            "this is an ordinary review of the selected mode."
+            "A discovered command may be approved for a later increment to run, and no approved command is " +
+            "executed here; no reviewer receives safeguard output, and this is an ordinary review of the " +
+            "selected mode."
           : "") +
         (access.untracked.length
           ? `\nWarning: ${access.untracked.length} untracked file(s) are present and readable; they are not reviewed content.`
@@ -345,6 +348,19 @@ export async function executeReviewRun(parent, client, options, assignments, {
       if (verify) {
         discovery = await discoverSafeguards(parent, client, assignments, access, binding, signal);
         await parent.log(describeDiscovery(discovery));
+        // V1c: the run asks which of the discovered commands may run, records
+        // that answer, and still executes nothing. The question sits here, and
+        // not beside finding selection, because this is where a later increment
+        // would have to run an approved command for its output to ground a
+        // reviewer's claim. Nothing filters the list on the way in: the
+        // exclusions and the citation check belong to the increment that
+        // executes, where they guard something a person could actually start.
+        approval = await approveSafeguards(parent, discovery, { invocation, binding, controller });
+        await parent.log(describeApproval(approval),
+          { level: ["failed", "unavailable", "cancelled"].includes(approval.status) ? "error" : "info" });
+        // A cancelled approval belongs to the owned run, which reports it as the
+        // cancellation it was. No reviewer starts after one.
+        signal.throwIfAborted();
       }
       const report = await reviewAssignments(parent, client, assignments, {
         signal, systemMessage: { mode: "append", content: reviewInstructions(mode) }, access,

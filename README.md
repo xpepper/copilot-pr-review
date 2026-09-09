@@ -282,11 +282,11 @@ capture.
 
 `--verify` is the opt-in for running this project's existing safeguards, such as
 its tests, compilation or linting, so that a reviewer's claims can be grounded
-in evidence rather than reading alone. **Nothing is executed yet.** The first
-two slices are the flag with the gate a verification-enabled run must pass, and
-the discovery that shows you which commands a later slice would offer to run.
-Nothing is approved, nothing is run, and no reviewer receives a discovered
-command. A run that passes the preflight is an ordinary review of whichever mode
+in evidence rather than reading alone. **Nothing is executed yet.** Three slices
+exist: the gate a verification-enabled run must pass, the discovery that shows
+which commands the project declares, and the approval that asks which of them
+may run. That answer is recorded and nothing acts on it, so no command is run
+and no reviewer receives one. A run that passes the preflight is an ordinary review of whichever mode
 it selected, and the timeline says so in those words, so the flag can never be
 mistaken for evidence that something verified the change.
 
@@ -321,8 +321,9 @@ be combined with `--capture-only`, which stops before any reviewer and so
 reaches no preflight. It is deliberately not a configuration key: no saved
 personal setting and no trusted project file can turn verification on, which
 keeps the decision to run a repository's own commands an explicit one, made at
-the invocation. Posting authority grants nothing here either, and will not
-grant command approval when that part exists.
+the invocation. Posting authority grants nothing here either: neither posting
+flag and no saved automatic-posting setting can approve a command, which
+`SCOPE.md` requires by name.
 
 ### Safeguard discovery (V1b)
 
@@ -335,9 +336,9 @@ V1b safeguard discovery found 2 command(s) declared in this project's instructio
   npm test  [declared in AGENTS.md]
   npm run typecheck  [declared in CONTRIBUTING.md]
 Read: AGENTS.md, CLAUDE.md, CONTRIBUTING.md. Skipped: ROADMAP.md (exceeds 65536 bytes).
-These are the commands a later increment would offer to run, in this checkout. None of
-this was approved and none of it ran. No reviewer receives these commands, and this
-stays an ordinary review of the selected mode.
+Nothing here has been approved and nothing has run. You are asked next which of these
+may run; this release executes none of them, no reviewer receives one, and this stays
+an ordinary review of the selected mode.
 ```
 
 The source is your project's own instructions, and only those. A package
@@ -354,8 +355,8 @@ the binding, the command text and above all the file a command is attributed to
 are all checked before anything reaches your screen: a command can only cite a
 file this run actually read, and must be a single line without control
 characters. Nothing is filtered on top of that. Commands that install, rewrite
-files or watch are not yet excluded, because that exclusion belongs with the
-approval step that can act on it.
+files or watch are not excluded, because that exclusion belongs with the
+increment that can execute one.
 
 Discovery is not a reviewer and is not part of review coverage. It holds no
 tool, is never given the checkout to read, and takes no configured fallback. A
@@ -372,8 +373,58 @@ change what they say. For this release that is accepted rather than mitigated:
 the tool is used on its author's own pull requests and those of their team, and
 nothing discovered can act until a later slice adds approval.
 
-Obtaining approval for a command and executing one are separate work that has
-not started.
+### Command approval (V1c)
+
+With commands discovered, the run asks which of them may run, one choice per
+command, before any reviewer starts:
+
+```text
+V1c safeguard approval: 1 of 2 discovered command(s) approved.
+  npm test  [declared in AGENTS.md]
+Nothing ran. This release records an approval and executes no command; running one is a
+later increment with its own gate, its own discussion and its own review. No reviewer
+receives an approved command, and this stays an ordinary review of the selected mode.
+```
+
+Approval is per command, so a fast check can be taken without the suite that
+takes half an hour. Each choice is scoped to the invocation that discovered the
+list, so an answer can never approve a command by its position in some other
+run, and the recorded answer keeps the order the commands were discovered in
+rather than the order you happened to pick them.
+
+The question sits between discovery and the reviewers rather than beside finding
+selection. That is where a later increment would have to run an approved command
+for its output to ground a reviewer's claim, so the gate is put where execution
+could follow it. The cost is that the run waits for you before any reviewer
+starts.
+
+Approval comes from that question and from nowhere else. There is no flag that
+approves everything, no personal setting and no trusted project file that
+pre-approves a command. `--comment`, `--all` and a saved `autoPostReviews=true`
+grant posting authority and no approval whatsoever, which `SCOPE.md` requires by
+name. A host with no elicitation UI approves nothing and says so, and there is
+deliberately nothing to suggest instead.
+
+Declining, approving nothing, or returning an answer this run cannot account for
+all approve nothing and leave the reviewers to run: approval grounds no finding,
+so an unanswered question cannot make the review itself less trustworthy. None
+of them is incomplete review coverage. Cancelling the question cancels the run,
+before any reviewer starts.
+
+The approval does not outlive the run. It is not written to the retained result,
+so no schema version moves for it, and a publish-later of that result carries no
+approval and never could.
+
+**The offered list is unfiltered.** A command that installs, migrates, deploys,
+formats in place, auto-fixes or watches is offered like any other, and code does
+not check that a command really appears in the file it cites. Both belong to the
+increment that executes, where they guard a command someone could actually
+start. Here they would guard nothing, because nothing runs and the approval
+cannot outlive the run that recorded it. Watching is the sharp case for that
+increment: this tool imposes no review timeout by design, so an approved watch
+command would have nothing to end it.
+
+Executing an approved command is separate work that has not started.
 
 ### Balanced review mode (M1)
 
