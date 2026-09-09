@@ -6662,8 +6662,48 @@ not touch `read-only.mjs`.
 - **The pass runs on the heavy tier**, reusing the assignment the adjudicator
   reuses, because every mode has one. A cheaper tier for what is an extraction
   task is a possible refinement, unmeasured.
-- **Live evidence is pending** at the time of writing; see the review section
-  below once it is recorded.
+- **Live evidence is pending** at the time of writing; see the refused attempt
+  below. The increment has no installed-plugin evidence yet.
+
+### The first review attempt refused, and why
+
+**The single authorized review of pull request #17 never reached a reviewer.**
+The installed plugin refused during PR capture, with:
+
+```text
+Error: PR capture failed (api --hostname): Command failed: gh api --hostname
+github.com --method GET repos/xpepper/copilot-pr-review/pulls/17
+-H Accept: application/vnd.github.diff
+the response contains terminal escape sequences; pass --allow-escape-sequences
+to output it anyway
+```
+
+Coverage was `incomplete` with six execution failures, all of them
+`Review did not reach specialist execution`. No reviewer session started, no
+owned runtime ran, and the runtime reported no charge. The timeline is at
+`~/.claude/pr-review-timelines/v1b-review-17-timeline.log`.
+
+**The cause was this increment's own test fixture.** The case that proves a
+discovered command may not carry a terminal escape sequence was written with a
+raw `ESC` byte embedded in `scripts/smoke-safeguards.mjs`, rather than as a
+source escape. That made the file binary to `grep` and made the repository's own
+pull-request diff something `gh` refuses to print. The fixture now spells the
+same byte as `\u001b`, the case under test is unchanged, and `gh` returns the
+diff normally again.
+
+**`--allow-escape-sequences` was deliberately not added to the capture.** That
+refusal is `gh`'s own protection against a hostile diff writing escape sequences
+into a terminal, and passing the flag to make a run succeed would be weakening a
+gate for convenience, which `AGENTS.md` forbids. It is recorded here as a real
+limitation instead: **this tool cannot review a pull request whose diff contains
+terminal escape sequences**, and it fails at capture with a message that names
+`gh`'s flag rather than explaining the situation. Whether to handle such a diff
+safely, by capturing to a file rather than through a terminal-bound pipe, is a
+separate question and is not scheduled.
+
+Worth keeping: the tool refused to read a diff whose content could have attacked
+the terminal it was printed to, and the content in question was a test asserting
+that this tool refuses exactly that. The protection and the feature agreed.
 
 
 ## Exact next increment
