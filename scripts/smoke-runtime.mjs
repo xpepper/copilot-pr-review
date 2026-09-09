@@ -122,11 +122,18 @@ try {
     console.log(`PASS /pr-review ${args}`);
   }
 
-  for (const args of ["123 --verify --no-comment", "status extra", "cancel extra", "--comment"]) {
+  for (const args of ["123 --unsupported --no-comment", "status extra", "cancel extra", "--comment"]) {
     const result = await session.rpc.commands.execute({ commandName: "pr-review", args });
     assert.match(result.error, /Unsupported arguments\. No review was started\./);
     console.log(`PASS rejected /pr-review ${args}`);
   }
+  // --verify is a supported review flag now, but it still starts no capture when
+  // it is combined with the capture-only path, which reaches no preflight.
+  const combined = await session.rpc.commands.execute({
+    commandName: "pr-review", args: "123 --verify --capture-only",
+  });
+  assert.match(combined.error, /cannot be combined with --verify/);
+  console.log("PASS rejected /pr-review 123 --verify --capture-only");
 
   const listing = await session.rpc.model.list();
   const modelsResult = await session.rpc.commands.execute({ commandName: "pr-review", args: "models" });

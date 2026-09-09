@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { assertReviewableCheckout } from "./checkout.mjs";
+import { assertReviewableCheckout, verifyFlag } from "./checkout.mjs";
 import {
   ambientAssignment, describeFallback, describeTier, requireUsableProject, resolveFallback, resolveTier,
   resolvedAssignment,
@@ -28,7 +28,7 @@ export function parseReviewArgs(args) {
   for (const token of tokens) {
     if (seen.has(token)) throw new Error(`Duplicate review argument: ${token}`);
     seen.add(token);
-    if ([...modeFlags, captureOnlyFlag, "--comment", "--no-comment", "--all"].includes(token)) continue;
+    if ([...modeFlags, captureOnlyFlag, verifyFlag, "--comment", "--no-comment", "--all"].includes(token)) continue;
     if (token.includes("=")) {
       const [key, value, extra] = token.split("=");
       if (!settingKeys.includes(key) || !value || extra !== undefined || key in settings) {
@@ -48,19 +48,23 @@ export function parseReviewArgs(args) {
   // Capture-only is the diagnostic path that stops after the bound snapshot, so
   // it takes no mode, posting, selection or model argument of its own.
   if (seen.has(captureOnlyFlag)) {
-    const conflicting = [...chosen, ...["--comment", "--no-comment", "--all"].filter((flag) => seen.has(flag)),
+    const conflicting = [...chosen, ...["--comment", "--no-comment", "--all", verifyFlag].filter((flag) => seen.has(flag)),
       ...Object.keys(settings)];
     if (conflicting.length) {
       throw new Error(`${captureOnlyFlag} captures the target without reviewing it, ` +
         `so it cannot be combined with ${conflicting.join(", ")}.`);
     }
-    return { mode: undefined, captureOnly: true, captureArgs, settings, all: false, comment: false, noComment: false };
+    return { mode: undefined, captureOnly: true, captureArgs, settings,
+      all: false, comment: false, noComment: false, verify: false };
   }
   const mode = chosen.length ? modeForFlag(chosen[0]) : reviewMode(defaultModeId);
   const { policy } = postingAuthority({ comment: seen.has("--comment"), noComment: seen.has("--no-comment") });
   return {
     mode: mode.id, captureOnly: false, captureArgs, settings,
     all: seen.has("--all"), comment: policy.comment, noComment: policy.noComment,
+    // Verification opts the run into the stricter checkout profile. It selects a
+    // gate, never a mode or a posting authority, so it constrains no other option.
+    verify: seen.has(verifyFlag),
   };
 }
 
@@ -223,7 +227,8 @@ export async function executeReviewRun(parent, client, options, assignments, {
   const outcome = await executeOwnedRun(parent, client, {
     controller, onStopped, subject: mode.label, evidencePrefix: prefix,
     details: () => ({
-      mode: mode.id, noComment: options.noComment, invocation, binding, validation, adjudicator,
+      mode: mode.id, noComment: options.noComment, verify: options.verify === true,
+      invocation, binding, validation, adjudicator,
       executionComplete: execution?.complete ?? false,
       reviewers: assignments.map((assignment) => ({
         ...assignment, status: "incomplete", error: "Review did not reach specialist execution.",
@@ -248,10 +253,17 @@ export async function executeReviewRun(parent, client, options, assignments, {
       // Reviewers read the checkout, so it must provably be the reviewed
       // revision. A mismatch refuses the review; it never degrades to a
       // context-only run, and never touches the checkout.
+      // Verification opts into a stricter profile of that same gate; it selects no
+      // other behaviour, and a run that passes it is an ordinary review.
+      const verify = options.verify === true;
       let access;
       try {
-        access = await assertReviewableCheckout(target.snapshot, { cwd, gh: request, git, signal, mode });
+        access = await assertReviewableCheckout(target.snapshot, { cwd, gh: request, git, signal, mode, verify });
       } catch (refusal) {
+        // A cancelled run is not a refused checkout. The gate's own refusals are
+        // the only thing reported as one; whatever the cancellation caused belongs
+        // to the owned run, which reports it as the cancellation it was.
+        if (signal.aborted) throw refusal;
         await parent.log(String(refusal.message ?? refusal), { level: "error" });
         return {
           coverage: "not-started", disposition: "refused",
@@ -261,7 +273,15 @@ export async function executeReviewRun(parent, client, options, assignments, {
       }
       await parent.log(`R1 checkout: ${JSON.stringify({
         root: access.root, head: access.head, untracked: access.untracked.length,
+        ...(verify ? { verify, branch: access.branch } : {}),
       })}\nReviewers may read this checkout read-only; it matches the captured head and has no modified tracked file.` +
+        // A passing preflight must never be mistaken for evidence that something
+        // ran, so the run says plainly that nothing did.
+        (verify
+          ? `\nV1a verification preflight passed on head branch ${access.branch}, with no untracked path. ` +
+            "No project safeguard was discovered, approved or run, and no reviewer receives safeguard output; " +
+            "this is an ordinary review of the selected mode."
+          : "") +
         (access.untracked.length
           ? `\nWarning: ${access.untracked.length} untracked file(s) are present and readable; they are not reviewed content.`
           : ""));

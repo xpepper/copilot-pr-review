@@ -33,11 +33,12 @@ const fullMode = reviewModes.full;
 const deepMode = reviewModes.deep;
 const options = parseReviewArgs("1 --quick --no-comment");
 assert.deepEqual(options, { mode: "quick", captureOnly: false, captureArgs: "1", settings: {},
-  all: false, comment: false, noComment: true });
+  all: false, comment: false, noComment: true, verify: false });
 assert.deepEqual(parseReviewArgs("  1 --major-only --no-comment  "), options);
 assert.deepEqual(parseReviewArgs("2 --quick --no-comment --include-drafts heavyModel=other heavyEffort=low"),
   { mode: "quick", captureOnly: false, captureArgs: "2 --include-drafts",
-    settings: { heavyModel: "other", heavyEffort: "low" }, all: false, comment: false, noComment: true });
+    settings: { heavyModel: "other", heavyEffort: "low" }, all: false, comment: false, noComment: true,
+    verify: false });
 assert.deepEqual(parseReviewArgs("1 --major-only --all --no-comment"), { ...options, all: true });
 assert.deepEqual(parseReviewArgs("1 --quick"), { ...options, noComment: false });
 assert.deepEqual(parseReviewArgs("1 --quick --all --comment"), { ...options, all: true, comment: true, noComment: false });
@@ -60,15 +61,29 @@ assert.deepEqual(parseReviewArgs("1 --deep --all --comment"),
 assert.equal(parseReviewArgs("2 --deep --no-comment --include-drafts").captureArgs, "2 --include-drafts");
 assert.deepEqual(parseReviewArgs("1 --deep --no-comment heavyModel=other heavyEffort=low"),
   { ...options, mode: "deep", settings: { heavyModel: "other", heavyEffort: "low" } });
+// V1a: --verify opts a run into the stricter preflight. It is orthogonal to the
+// mode and posting flags, changes no other parsed option, and runs nothing: the
+// flag decides which checkout profile the gate applies, and nothing else.
+assert.deepEqual(parseReviewArgs("1 --quick --no-comment --verify"), { ...options, verify: true });
+assert.deepEqual(parseReviewArgs("1 --verify"), { ...balancedOptions, noComment: false, verify: true });
+assert.deepEqual(parseReviewArgs("1 --deep --verify --all --comment"),
+  { ...options, mode: "deep", all: true, comment: true, noComment: false, verify: true });
+assert.deepEqual(parseReviewArgs("2 --full --verify --no-comment --include-drafts"),
+  { ...options, mode: "full", captureArgs: "2 --include-drafts", verify: true });
+// The flag reaches the review, never target capture: the captured target is the
+// same one an ordinary review of that PR captures.
+assert.equal(parseReviewArgs("2 --verify --include-drafts").captureArgs, "2 --include-drafts");
+assert.throws(() => parseTargetArgs("2 --verify"), /Unsupported/);
+
 // Capture-only keeps the diagnostic capture path reachable without a reviewer.
 assert.deepEqual(parseReviewArgs("1 --capture-only"), { mode: undefined, captureOnly: true, captureArgs: "1",
-  settings: {}, all: false, comment: false, noComment: false });
+  settings: {}, all: false, comment: false, noComment: false, verify: false });
 assert.equal(parseReviewArgs("2 --capture-only --include-drafts").captureArgs, "2 --include-drafts");
 for (const args of [
   "1 --quick --major-only --no-comment", "1 --quick --balanced --no-comment", "1 --balanced --major-only",
   "1 --quick --quick --no-comment", "1 --quick --no-comment --no-comment",
   "1 --quick --no-comment --comment", "1 --balanced --no-comment --comment",
-  "1 --quick --no-comment --verify", "1 --quick --no-comment --all --all",
+  "1 --quick --no-comment --verify --verify", "1 --quick --no-comment --all --all",
   "1 --quick --no-comment heavyModel=", "1 --quick --no-comment heavyEffort=low=high",
   "1 --quick --no-comment heavyModel=heavy heavyModel=other",
   "1 --quick --no-comment lightModel=other", "0 --quick --no-comment",
@@ -80,7 +95,7 @@ for (const args of [
   "1 --deep --no-comment lightModel=other", "1 --deep --no-comment mediumModel=other",
   "1 --capture-only --deep",
   "1 --capture-only --quick", "1 --capture-only --balanced", "1 --capture-only --full",
-  "1 --capture-only --all",
+  "1 --capture-only --all", "1 --capture-only --verify", "1 --verify --capture-only",
   "1 --capture-only --no-comment", "1 --capture-only heavyModel=heavy", "1 --capture-only --capture-only",
 ]) assert.throws(() => parseReviewArgs(args),
   /mutually exclusive|Duplicate|Invalid|Unsupported|integer|Conflicting|cannot be combined/, args);
@@ -300,7 +315,7 @@ function fakeGh() {
 // The gate runs real Git in smoke-checkout.mjs; here it is injected so the
 // synthetic fixture PR can stand in for a checked-out head revision.
 const checkout = realpathSync(mkdtempSync(join(tmpdir(), "pr-review-quick-checkout-")));
-let checkoutState = { head: "b".repeat(40), status: "" };
+let checkoutState = { head: "b".repeat(40), status: "", branch: "feature" };
 const gitCalls = [];
 const checkoutGit = async (args, cwd, { signal } = {}) => {
   signal?.throwIfAborted();
@@ -308,6 +323,16 @@ const checkoutGit = async (args, cwd, { signal } = {}) => {
   if (args[0] === "rev-parse" && args[1] === "--show-toplevel") return `${checkout}\n`;
   if (args[0] === "rev-parse" && args[1] === "HEAD") return `${checkoutState.head}\n`;
   if (args[0] === "status") return checkoutState.status;
+  // Only the verification profile asks which branch is checked out, and git
+  // itself fails this command on a detached HEAD rather than naming one. Real
+  // `symbolic-ref --quiet` exits 1 there, which is the status the gate reads as
+  // detached, so the double carries it rather than an unlabelled failure.
+  if (args[0] === "symbolic-ref") {
+    if (!checkoutState.branch) {
+      throw Object.assign(new Error("Command failed: git symbolic-ref --quiet --short HEAD"), { code: 1 });
+    }
+    return `${checkoutState.branch}\n`;
+  }
   throw new Error(`Unexpected git command: ${JSON.stringify(args)} in ${cwd}`);
 };
 
@@ -1007,6 +1032,97 @@ for (const [scenario, state, expected] of [
   assert.match(refusal, /rerun \/pr-review 1 --quick/);
 }
 console.log("PASS the revision gate refuses mismatched, dirty and stale checkouts before any reviewer session");
+
+// V1a: the stricter profile refuses before any reviewer starts, and each of the
+// same checkouts still passes an ordinary review of the same pull request.
+for (const [scenario, state, expected, fix] of [
+  ["untracked path", { head: "b".repeat(40), status: "?? scratch.txt\n" },
+    /1 untracked path\(s\) are present/, /remove or ignore those paths yourself/],
+  ["detached HEAD", { head: "b".repeat(40), status: "", branch: "" },
+    /detached HEAD at b{40}, not PR #1's head branch feature/, /gh pr checkout 1/],
+  ["another branch", { head: "b".repeat(40), status: "", branch: "local-work" },
+    /current branch is local-work, but PR #1's head branch is feature/, /gh pr checkout 1/],
+]) {
+  const previous = checkoutState;
+  checkoutState = { branch: "feature", ...state };
+  const h = harness();
+  const report = await executeReviewRun(h.parent, h.client, { ...options, verify: true },
+    structuredClone(assignments), { controller: h.controller, gh: fakeGh(), git: checkoutGit });
+  assert.equal(report.verify, true, scenario);
+  assert.equal(report.coverage, "not-started", scenario);
+  assert.equal(report.disposition, "refused", scenario);
+  assert.equal(h.sessions.length, 0, "No reviewer session may be created");
+  assert.equal(h.client.starts, 0, "No owned runtime may start");
+  validateRecord(retainedRecord(report), h.parent.sessionId);
+  const refusal = h.messages.find((message) => message.startsWith("Quick review with --verify refused"));
+  assert.match(refusal, expected, scenario);
+  assert.match(refusal, fix, scenario);
+  assert.match(refusal, /rerun \/pr-review 1 --quick --verify/, scenario);
+  assert(!h.messages.some((message) => message.startsWith("R1 checkout:")), scenario);
+
+  // The identical checkout is an ordinary review's business as usual: the
+  // stricter conditions belong to the flag, not to the gate everyone reaches.
+  const ordinary = harness();
+  const proceeded = await executeReviewRun(ordinary.parent, ordinary.client, options,
+    structuredClone(assignments), { controller: ordinary.controller, gh: fakeGh(), git: checkoutGit });
+  assert.equal(proceeded.verify, false, scenario);
+  assert.notEqual(proceeded.coverage, "not-started", scenario);
+  assert(ordinary.sessions.length > 0, "An ordinary review of the same checkout still runs");
+  const opened = ordinary.messages.find((message) => message.startsWith("R1 checkout: "));
+  assert.doesNotMatch(opened, /verif/i, "An ordinary run's checkout report is unchanged");
+  checkoutState = previous;
+}
+{
+  // A passing preflight is an ordinary review of its mode. It says so in the
+  // timeline, so the flag can never be read as evidence that a safeguard ran.
+  const h = harness();
+  const report = await executeReviewRun(h.parent, h.client, { ...options, verify: true },
+    structuredClone(assignments), { controller: h.controller, gh: fakeGh(), git: checkoutGit });
+  assert.equal(report.verify, true);
+  assert.notEqual(report.coverage, "not-started");
+  assert(h.sessions.length > 0, "A passing preflight starts the mode's reviewers");
+  const opened = h.messages.find((message) => message.startsWith("R1 checkout: "));
+  assert.match(opened, /"verify":true/);
+  assert.match(opened, /"branch":"feature"/);
+  assert.match(opened, /preflight passed on head branch feature/);
+  assert.match(opened, /No project safeguard was discovered, approved or run/);
+  assert(gitCalls.some((args) => args[0] === "symbolic-ref"), "The branch is read from git, never assumed");
+  // Verification changes no reviewer's input. The harness already asserts every
+  // session's system message equals this mode's ordinary instructions, so the
+  // prompts are what remains to check for a claim no safeguard could support.
+  assert(h.sessions.every((session) => !/--verify|safeguard/i.test(session.prompt ?? "")),
+    "A verification run's reviewers receive exactly an ordinary review's input");
+  // The flag stays out of the retained record: it changes no published finding
+  // and no publication authority, so it needs no schema version of its own.
+  const record = retainedRecord(report);
+  validateRecord(record, h.parent.sessionId);
+  assert(!Object.hasOwn(record.outcome, "verify"), "The retained record schema is unchanged");
+}
+{
+  // Cancelling the run while the gate is reading the branch is a cancellation,
+  // not a refused checkout: the gate's own refusals are the only thing reported
+  // as one, and a cancelled probe must never be diagnosed as a detached HEAD.
+  const previous = checkoutState;
+  checkoutState = { head: "b".repeat(40), status: "", branch: "feature" };
+  const h = harness();
+  const cancellingGit = async (args, cwd, gitOptions) => {
+    if (args[0] === "symbolic-ref") {
+      h.controller.abort(new DOMException("cancel during the preflight", "AbortError"));
+      gitOptions.signal.throwIfAborted();
+    }
+    return checkoutGit(args, cwd, gitOptions);
+  };
+  const report = await executeReviewRun(h.parent, h.client, { ...options, verify: true },
+    structuredClone(assignments), { controller: h.controller, gh: fakeGh(), git: cancellingGit });
+  assert.equal(report.cancelled, true);
+  assert.notEqual(report.disposition, "refused", "A cancelled preflight is not a refused checkout");
+  assert(!h.messages.some((message) => /detached HEAD/.test(message)),
+    "A cancellation is never reported as a detached HEAD");
+  assert.equal(h.sessions.length, 0);
+  assert.equal(h.client.starts, 0);
+  checkoutState = previous;
+}
+console.log("PASS --verify refuses on branch and untracked conditions, and otherwise reviews and says nothing ran");
 
 for (const number of [2, 3, 4, 5, 8, 9, 10]) {
   const h = harness();

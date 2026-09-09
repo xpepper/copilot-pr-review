@@ -6301,90 +6301,311 @@ COPILOT_SDK_PATH="$(ls -d "$HOME"/.copilot/pkg/*/"$(copilot --version \
 node scripts/smoke-reviewer-tools.mjs
 ```
 
+## Completed increment: V1a
+
+**`V1a` adds `--verify` and the preflight a verification-enabled run must pass,
+and deliberately executes nothing.** It is the first slice of `V1`, the opt-in
+project safeguards in `SCOPE.md`. The boundary was discussed and approved before
+any code was written, as `C5`'s and `Q7`'s were.
+
+No safeguard is discovered, none is presented, none is approved, and none is
+run. No reviewer receives safeguard output, and no reviewer's input changes at
+all: the system message and prompts of a verification-enabled run are exactly an
+ordinary review's, which `scripts/smoke-review.mjs` asserts directly. A run that
+passes the preflight is an ordinary review of its selected mode, and it says so
+in the timeline in those words, because a flag named `--verify` must never be
+readable as evidence that something verified the change.
+
+### The five choices settled before implementation
+
+| Choice | Settled as | Why |
+|---|---|---|
+| Untracked files | Refuse, under `--verify` only | Safeguards write artifacts into the checkout; afterwards nothing can tell those apart from files that were already there. Ordinary review still warns. |
+| Branch identity | Refuse a detached `HEAD` and any branch other than the captured head ref | `SCOPE.md` requires the current branch to match. A detached `HEAD` is the reviewed revision without being a branch anything can land on. |
+| Where the gate lives | One gate, stricter profile | A single place decides whether a checkout may be used at all. The ordinary profile runs exactly the commands it ran before. |
+| Flag interactions | Orthogonal to mode and posting flags; refused with `--capture-only`; not a configuration key | Capture-only starts no reviewer and reaches no preflight. Keeping it off the configuration keys means no saved or trusted-project setting can turn verification on. |
+| A passing preflight | An ordinary review, stated plainly in the run | With nothing to discover, the only risk is that the flag reads as evidence. The run denies it explicitly. |
+
+`SCOPE.md`'s third condition, a clean working tree, and its head-SHA condition
+were already enforced for every review, which is why this slice is an addition
+to an existing gate rather than a new one.
+
+### What the gate does
+
+`assertReviewableCheckout` takes a `verify` flag. When it is set, and only then,
+it asks `git symbolic-ref --quiet --short HEAD` for the current branch and
+compares it to `snapshot.pull.head.ref`, and it refuses on any untracked path.
+The order narrows from identity to cleanliness: repository, head SHA, branch,
+tracked-file cleanliness, untracked paths, remote head. A modified tracked file
+therefore still outranks an untracked one.
+
+Three no-inference facts this increment established, all reproduced locally:
+
+- `git symbolic-ref --quiet --short HEAD` prints the branch when attached and
+  exits non-zero with empty output when detached, so it answers the question
+  directly. `rev-parse --abbrev-ref HEAD` answers `HEAD` in both the detached
+  case and, in principle, for a branch of that name; git refuses to create such
+  a branch, but `symbolic-ref` needs no such argument to be correct.
+- `git status --porcelain=v1 --untracked-files=normal`, which the gate already
+  ran, never lists ignored paths. An ordinary working checkout with its
+  dependencies and build output installed passes the untracked condition.
+- `gh pr checkout NUMBER` names the local branch after the head branch by
+  documented default, including for a fork, so the ordinary workflow satisfies
+  the branch condition. Its `--detach` and `--branch` options do not, by design.
+
+**No retained-record schema changed and no version was bumped.** `retainedRecord`
+picks a fixed outcome key list that does not include `verify`, so the flag stays
+out of the record; `scripts/smoke-review.mjs` asserts that it does. It appears in
+the run's logged evidence JSON and in the `R1 checkout:` line. The record's
+version tracks publication authority, and verification changes none: it decides
+whether a review may start, not what may be published.
+
+### Validation
+
+The twelve controlled suites pass, as they did at each checkpoint, and
+`git diff --check` is clean. Tests were written first and confirmed red for the
+right reason at each of the three implementation commits.
+
+`scripts/smoke-checkout.mjs` drives the profile against real throwaway git
+checkouts: a clean checkout on the head branch passes and reports its branch; a
+detached `HEAD` at the reviewed commit refuses verification **and still passes
+an ordinary review**; a differently named branch at the reviewed commit refuses;
+an untracked file refuses verification while an ordinary review still only
+warns; an ignored path does not refuse; and a modified tracked file still
+refuses first. It also asserts the checkout is byte-identical after each
+refusal, so the gate demonstrably switches, stashes and cleans nothing.
+
+`scripts/smoke-review.mjs` covers the run: the flag parses and is orthogonal to
+every mode and posting flag, `--capture-only` refuses it, each of the three new
+refusals stops the run with `coverage: "not-started"` and zero reviewer sessions
+while the same checkout still passes an ordinary review, and a passing preflight
+starts the mode's reviewers, logs the branch it confirmed, and states that no
+safeguard ran.
+
+`scripts/smoke-reviewer-tools.mjs` was not run and was not required: `V1a` does
+not touch `read-only.mjs`.
+
+Both no-inference runtime probes pass against the **installed** plugin built
+from this branch, so the flag is demonstrated to reach the real dispatch and the
+real gate:
+
+- `node scripts/smoke-runtime.mjs` accepts `--verify` as a review flag and still
+  rejects `123 --verify --capture-only` with the combination error, asserting no
+  model turn, subagent or tool execution in the whole probe.
+- `node scripts/smoke-runtime.mjs --targets` dispatches
+  `/pr-review 1 --quick --no-comment --all --verify` against the controlled
+  fixture checkout. The run logs the verification notice before it starts,
+  records `verify: true`, refuses with `Failed condition: local-head` under the
+  heading `Quick review with --verify refused`, suggests
+  `rerun /pr-review 1 --quick --verify`, starts no reviewer and no owned
+  runtime, and leaves the checkout byte-identical.
+
+That fixture's local `HEAD` is not the captured head, so the refusal it reaches
+is the existing head condition rather than one of the two new ones. It
+demonstrates that the flag reaches the installed gate and is reported; the
+branch and untracked conditions themselves are covered by the controlled suites
+against real git checkouts. Neither probe spends Copilot credits.
+
+### Installed balanced review of pull request #16
+
+The one authorized review ran in explicit **balanced** mode, the default
+topology, because `V1a` adds no mode and changes a gate every review already
+passes through. It cost **152.816643 credits**: `contracts` 39.72552,
+`security` 32.78638, `correctness` 28.94156, the adjudicator 23.83625,
+`performance-resources` 23.20285 and `overview` 4.324083. Four heavy
+specialists ran `gpt-5.6-terra`/high, `overview` ran `gpt-5.6-luna`/high, and
+the adjudicator ran `gpt-5.6-terra`/high. Five reviewers came from saved
+personal configuration, and there was **no configured fallback on any tier**.
+
+Reviewed head `88400df`, base `5d9eb8c`, nine files, 612 additions and 108
+deletions. There were **38 tool calls and 39 confined reads, with no permission
+denial and no tool denial**: `contracts` 13, `overview` 12 calls against 13
+approved reads, `security` 9, `correctness` 4, and neither
+`performance-resources` nor the adjudicator read anything at all. A read is
+recorded when the permission handler approves it and a call when the runtime
+reports it, so the one reviewer whose output was discarded is also the only one
+whose two counts differ.
+
+Coverage is **INCOMPLETE**: two execution failures, zero coverage gaps and five
+informational caveats. One validated finding was accepted, at P2. It is real,
+and it is fixed on this branch. This is not a clean-review claim.
+
+**`C5`'s demotion fired live for the second time.** `overview` returned an
+envelope whose JSON was invalid at position 2137, and the attempt was demoted
+to `incomplete` with `Discarded unusable reviewer output`. No tier had a
+configured fallback, so no fallback attempt started. The gap `C5` and #15 both
+record is therefore unchanged: **no live run has ever started a fallback from a
+demotion**, because no live review has ever had one configured.
+
+The second execution failure is the one worth keeping. `contracts` found the
+same defect as `correctness`, independently, and titled it `Do not convert
+symbolic-ref failures into a detached-HEAD refusal`. It was **rejected at the
+evidence boundary** for a citation that did not exactly match a supplied
+context window, so it never reached adjudication. `Q6` separately repaired a
+clipped-end citation in `correctness:1`'s second evidence anchor, which did
+reach adjudication and was accepted. Two reviewers agreeing is not what saved
+the finding. One of them citing exactly is.
+
+Four reviewers filed the same shape of caveat, that no live runtime execution
+was available and the assessment is made from the captured source. All are
+preserved as reported and needed no change.
+
+### The finding, and what changed
+
+**`correctness:1`, P2, accepted and fixed.** The verification profile asked
+`git symbolic-ref --quiet --short HEAD` for the current branch inside a catch
+that discarded the error and set the branch to the empty string, which is the
+value that takes the detached-HEAD refusal path. Every rejection therefore
+became the same confident sentence, `this checkout has a detached HEAD at
+<sha>`, with no trace of what actually happened. The reviewer named
+cancellation as the case that matters: the probe is signal-aware, so an
+`AbortError` raised by cancelling the run was reported as a fact about the
+user's checkout.
+
+Three exit statuses were measured locally, not inferred, against a throwaway
+repository and Node's `execFile`:
+
+| Branch probe rejection | Reviewed implementation | After the fix |
+|---|---|---|
+| `symbolic-ref` exits 1, HEAD is not a symbolic ref | detached-HEAD refusal | detached-HEAD refusal |
+| Cancelled in flight, `AbortError`/`ABORT_ERR` | detached-HEAD refusal | propagates; the run reports the cancellation |
+| Any other failure, such as exit 128 outside a repository | detached-HEAD refusal | refused, naming the failure it actually got |
+
+Exit status 1 with empty output is the answer `--quiet` gives when HEAD is not a
+symbolic ref, and it is now the only rejection read as detached. The gate also
+no longer needs to guess: a cancelled probe observed nothing, so it propagates,
+and anything else is refused on the `head-branch` condition with the real error
+message rather than a diagnosis.
+
+**The runner stopped reporting a cancelled gate as a refused checkout.** The
+`catch` around `assertReviewableCheckout` returned `disposition: "refused"` for
+anything the gate threw, so even a propagated cancellation would have been
+reported as a checkout that is not the reviewed revision. It now re-throws once
+the signal is aborted, before logging anything, so the cancellation reaches the
+owned run and is reported as the cancellation it was. That catch is older than
+`V1a` and covers the gate's two `rev-parse` catches as well, which means the
+run is now truthful about a cancellation anywhere in the gate.
+
+The controlled double had to be corrected with the implementation.
+`scripts/smoke-review.mjs` modelled the detached case as an unlabelled `Error`,
+which real git does not produce; it now carries exit status 1, which is what
+the gate reads.
+
+The complete stdout timeline was saved before analysis, outside the checkout, as
+`~/.claude/pr-review-timelines/v1a-review-16-timeline.log`, with the run's
+evidence JSON beside it as `v1a-review-16-evidence.json`. They stay local.
+
+Both fixes landed as one commit after the review, with tests confirmed red
+against the reviewed implementation at `88400df`: the cancelled probe became a
+`head-branch` refusal, and the run reported `disposition: "refused"`. The
+twelve controlled suites pass, `git diff --check` is clean, and both
+no-inference runtime probes pass again against the plugin reinstalled from the
+fixed checkout. **Those commits have not been reviewed again**; this
+increment's single authorization is spent.
+
+### Remaining limitations
+
+- **A branch name is not a lineage.** The gate proves the current branch carries
+  the pull request's head branch name, not that it is that branch. Head SHA
+  identity is what actually binds the revision, and it was already enforced.
+- **A `gh pr checkout --detach` or `--branch other-name` workflow is refused**
+  under `--verify`, and correctly so, but it is a real friction for anyone who
+  uses one. The message names both the expected and the current branch.
+- **Nothing about safeguard execution is demonstrated, because nothing executes.**
+  The flag's whole purpose is still ahead of it.
+- **The two new conditions have no installed-plugin evidence of their own.** The
+  runtime fixture refuses earlier, on the head condition. Only the controlled
+  suites exercise the branch and untracked refusals, against real git checkouts
+  but not through the real dispatch.
+- **No live run has been cancelled during the preflight.** The corrected
+  cancellation path is covered by the controlled suites only. What #16 observed
+  was the defect in the source, not a cancelled run.
+- **Called directly, the gate still shapes a cancellation during either
+  `rev-parse` as a refusal** carrying the abort message, rather than propagating
+  it the way the branch probe now does. Only the run is demonstrably truthful
+  about those two, because the runner re-throws once the signal is aborted.
+  Making the gate itself uniform is recorded, not done: those catches predate
+  `V1a` and no review has asked for them.
+
+### Reproduction
+
+```sh
+# The twelve controlled suites cover every V1a refusal and the pass-through.
+for s in findings review selection retention preview publication publish-later \
+  checkout config context fixture target; do node scripts/smoke-$s.mjs; done
+
+# The installed-plugin probes. No inference and no credits, but they need a live
+# runtime connection and the plugin installed from this checkout.
+COPILOT_CLI_PATH="$(command -v copilot)" \
+COPILOT_SDK_PATH="$(ls -d "$HOME"/.copilot/pkg/*/"$(copilot --version \
+  | sed -n 's/.*CLI \([0-9][0-9.]*[0-9]\).*/\1/p')"/copilot-sdk)" \
+node scripts/smoke-runtime.mjs --targets
+```
+
 ## Exact next increment
 
-**`C5` is complete and merged from pull request #14.** Its one authorized
-installed review ran in balanced mode, cost 110.736851 credits and is recorded
-above. That authorization is spent: do not rerun it. Nothing about `C5` should
-be redone or widened; the four choices recorded in its table are settled.
+**`V1a` is complete, from pull request #16, which the user authorized merging at
+the end of that session.** Its boundary was approved before implementation, and
+it deliberately executes nothing. The five choices recorded in its table are
+settled; do not reopen them and do not widen the flag. Confirm the merge against
+git state before relying on it: this paragraph was written just before it.
 
-**`Q7` is complete on its own branch and pull request, recorded above.** Its
-boundary was approved before implementation, and the confinement defect it found
-was folded in on the user's explicit instruction rather than scheduled
-separately.
+**`Q7` and `C5` are complete and merged, from pull requests #15 and #14.** Their
+authorizations are spent. Nothing about any of the three should be redone or
+widened.
 
-### The next increment is `V1a`: the verification preflight gate
+### The next increment is `V1b`: safeguard discovery and presentation
 
-**`V1a` is the next increment. It still needs the user's go-ahead before
-implementation, and it must not begin with code.** It touches a gate, so discuss
-the boundary and present it first, as `C5` and `Q7` did.
+**`V1b` is the next increment. It still needs the user's go-ahead before
+implementation, and it must not begin with code.** It is the second slice of
+`V1`, and like `V1a` it must be discussed and presented first, because the slice
+after it executes pull-request controlled code.
 
-`V1` in `SCOPE.md`, the opt-in project safeguards, is the last agreed v1
-capability that has not been started, and the only remaining implementation work
-of any size. It is far too large for one increment: it spans a flag, a stricter
-preflight, safeguard discovery, command approval, execution of pull-request
-controlled code, and feeding results to reviewers. `V1a` is the first slice, and
-deliberately the one that executes nothing.
+**`V1b` is discovery and presentation, and nothing else.** A verification-enabled
+run that passes `V1a`'s preflight finds this project's existing safeguard
+commands, shows the user the exact commands it would run, and stops. No approval
+prompt, no execution, and still no change to what any reviewer receives.
 
-**`V1a` is the `--verify` flag and its preflight refusal, and nothing else.** No
-discovery, no approval prompt, no command execution, no change to what any
-reviewer receives. A verification-enabled run either passes the preflight and
-proceeds as an ordinary review of that mode, or stops before any reviewer
-starts.
-
-`SCOPE.md` requires all three of these before reviewers start on a
-verification-enabled run: the current branch matches the pull request's head
-branch, local `HEAD` equals the captured head SHA, and the working tree is
-clean. It also forbids ever switching branches, pulling, stashing or cleaning to
-satisfy the gate.
-
-**Two of those three already hold for every review.**
-`assertReviewableCheckout` in `checkout.mjs` refuses unless local `HEAD` equals
-the captured head and no tracked file is modified or staged, and it also refuses
-if the remote head moved after capture. What it does **not** check is branch
-identity: it never reads the current branch name, so a detached `HEAD` at the
-right commit passes today. Untracked files warn rather than refuse. `V1a` is
-therefore a small, well-bounded addition to an existing gate rather than a new
-one, which is why it is the right first slice.
+`SCOPE.md` requires that discovery find **existing** commands, present them
+exactly, run in the current checkout using already installed dependencies,
+install nothing, use no auto-fix option, and invent no safeguard script. It also
+records that these commands execute pull-request controlled code, that this is
+not a sandbox, and that publication flags and saved automatic-posting settings
+never bypass command approval.
 
 Settle these before writing code, and give the user a recommendation for each:
 
-- **Untracked files.** Ordinary review lets them warn, because they cannot be
-  mistaken for modified reviewed code. Safeguards execute in the checkout and
-  can read them. Recommend refusing on untracked files for `--verify` only,
-  leaving ordinary review exactly as it is.
-- **Branch identity.** How the current branch is read and compared against the
-  pull request's head branch, and whether a detached `HEAD` at the correct commit
-  is a refusal. `SCOPE.md` says the branch must match, so recommend refusing.
-- **Where the gate lives.** A verification profile inside
-  `assertReviewableCheckout`, or a separate preflight beside it. Recommend one
-  gate with a stricter profile, so there is a single place that decides whether a
-  checkout may be used.
-- **Flag interactions.** Whether `--verify` is orthogonal to the mode flags and
-  to the posting flags. `SCOPE.md` says posting authority never bypasses command
-  approval, which `V1a` does not reach yet; recommend orthogonal, and say so.
-- **What a passing preflight does in `V1a`.** With no discovery yet, a
-  verification-enabled run that passes the gate is an ordinary review. Say
-  plainly in the run output that no safeguard ran, so the flag cannot be mistaken
-  for evidence that one did.
+- **Where commands come from.** A package manifest's scripts, a task runner's
+  file, a CI workflow, or a fixed list of well-known ones. Recommend the
+  narrowest source that needs no interpretation of intent, and say plainly which
+  projects it would find nothing in.
+- **What "existing" excludes.** A script that installs, migrates, deploys,
+  formats in place or takes an auto-fix flag is not a safeguard. Recommend
+  refusing to present such a command at all rather than presenting it with a
+  warning.
+- **What is presented.** The exact argv, the directory, and where it came from,
+  so the user can judge it before the increment that runs it exists. Recommend
+  presenting nothing the plugin could not later run verbatim.
+- **Whether discovery reads the checkout or the captured revision.** The
+  preflight has already proven they are the same commit. Recommend the checkout,
+  and say why that is safe only because `V1a` refuses otherwise.
+- **What a run does after presenting.** With no approval step yet, recommend
+  proceeding as an ordinary review and saying, as `V1a` does, that nothing ran.
 
-Acceptance is: `--verify` parses, is displayed with the effective settings, and
-is recorded in the run; a verification-enabled run refuses before any reviewer
-starts when the branch does not match, when `HEAD` does not match, or when the
-tree is not clean, with a message that names the failed condition and never
-offers to fix it automatically; ordinary review behaviour is byte-identical to
-today; nothing is discovered and no command is executed; and the controlled
-suites cover each refusal and the pass-through. It needs no inference beyond the
-increment's single authorized pull-request review.
+Acceptance is: a verification-enabled run that passes the preflight presents the
+discovered commands and their source, presents nothing outside the agreed
+sources, changes no reviewer input, executes nothing, and the controlled suites
+cover discovery against fixture projects including one with no safeguards at
+all. Ordinary review behaviour stays byte-identical.
 
-The rest of `V1` stays unscheduled. Do not start discovery, approval or
-execution in the same increment: executing pull-request controlled code is the
-largest safety boundary in this project, and it deserves its own discussion,
-its own tests and its own review.
+**Do not pull approval or execution into `V1b`.** Executing pull-request
+controlled code is the largest safety boundary in this project and needs its own
+increment, discussion, tests and review.
+
 
 ### Recorded, not scheduled
 
-These stay open and none is scheduled. Do not start one instead of `V1a`
+These stay open and none is scheduled. Do not start one instead of `V1b`
 without the user saying so.
 
 - **A review against a substantial code diff**, the oldest and largest open
@@ -6399,9 +6620,9 @@ without the user saying so.
   #14's reviewers named about `C3` and `C5`. That is a deliberate credit
   decision, because a discarded output would then spend a second attempt.
 - `L1` remains pending; copy no upstream source.
-- **The rest of `V1`** after `V1a`: safeguard discovery and presentation, then
-  command approval and execution with its evidence. Each needs its own
-  increment.
+- **The rest of `V1`** after `V1b`: command approval, then execution of
+  pull-request controlled code with its evidence. Each needs its own increment,
+  its own discussion and its own review.
 
 `F6`'s marker contract has live evidence from five of six reviewers on #7, both
 sessions on #8, every session on #10, on #11 every session that produced an

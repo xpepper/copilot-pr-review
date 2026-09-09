@@ -13,13 +13,15 @@ import { inspectRetained } from "./retention.mjs";
 import { executePublishLater } from "./publish-later.mjs";
 import { publicationSummary } from "./publication.mjs";
 import { resolveCliPath } from "./cli-runtime.mjs";
+import { verificationNotice } from "./checkout.mjs";
 
 const help = [
   "Copilot PR Review - runtime feasibility prototype",
   "",
   "Usage: /pr-review [status|help|models|fixture model1=ID effort1=LEVEL model2=ID effort2=LEVEL]",
   "       /pr-review NUMBER [--balanced|--full|--deep|--quick|--major-only] [--comment|--no-comment] [--all]",
-  "                         [--include-drafts] [--include-closed|--review-closed] [heavyModel=ID] [heavyEffort=LEVEL]",
+  "                         [--verify] [--include-drafts] [--include-closed|--review-closed]",
+  "                         [heavyModel=ID] [heavyEffort=LEVEL]",
   "       /pr-review NUMBER --capture-only [--include-drafts] [--include-closed|--review-closed]",
   "",
   "status  Show the implemented capability boundary (default).",
@@ -52,10 +54,18 @@ const help = [
   "Balanced presents P0-P2 findings plus at most three P3/nit findings anchored on changed lines;",
   "full and deep present every substantiated severity with no minor cap; quick presents P0-P2 only.",
   "Withheld minor findings are reported, never silently dropped.",
+  "--verify  Opt into the stricter preflight before any reviewer starts: the current branch must be the",
+  "          PR's head branch, and no path may be untracked, in addition to the checks every review makes.",
+  "          It runs no project safeguard, discovers none and presents none, so it grounds no claim in the",
+  "          review; a passing preflight is an ordinary review of the selected mode. It is orthogonal to the",
+  "          mode and posting flags, cannot be combined with --capture-only, and is not a configuration key:",
+  "          no saved or trusted-project setting can turn verification on.",
   "--capture-only  Capture and bind the target, then stop: no reviewers, no inference, no publication.",
   "Reviewers additionally read this checkout, so it must be the reviewed revision:",
   "local HEAD must equal the captured PR head, the PR head must not have moved, and no tracked",
   "file may be modified or staged. Otherwise the review is refused; run `gh pr checkout NUMBER` first.",
+  "A --verify run adds the head branch and the untracked-path conditions to that same gate. No refusal is",
+  "ever repaired automatically: nothing is switched, pulled, stashed or cleaned to satisfy any of them.",
   "Reviewers get view/grep/glob confined to the checkout; every other tool stays unavailable.",
   "Each reviewer resolves its mode's tier: heavy specialists, light overview, medium conventions,",
   "and deep's single integrated reviewer on the heavy tier.",
@@ -72,7 +82,8 @@ const help = [
   "Results are retained only in the originating local session; a new review replaces the previous result.",
   "publish is a new explicit authorization; retained flags, configuration and confirmations authorize nothing.",
   "It refetches the reviewed evidence and reruns every gate, and refuses repeats of published or unresolved writes.",
-  "No safeguards yet. Validation also uses Copilot credits; publish uses none.",
+  "Project safeguards are not implemented: --verify gates a run, it never executes one.",
+  "Validation also uses Copilot credits; publish uses none.",
   "Other review flags are not supported yet.",
 ].join("\n");
 
@@ -106,6 +117,8 @@ const status = [
   "read-only gh requests against the captured revisions, never the local checkout.",
   "Reviewers may read the local checkout read-only, but only after it is proven to be",
   "exactly the reviewed head revision; otherwise the review refuses to start.",
+  "--verify additionally requires the PR's head branch and no untracked path before any reviewer starts.",
+  "It executes nothing: no project safeguard is discovered, presented, approved or run in any mode.",
   "Only authorized selected findings can publish; no project safeguards are run.",
   "Status is not a review result or a clean-review claim.",
 ].join("\n");
@@ -185,6 +198,9 @@ const session = await joinSession({
               }));
               const assignments = await reviewerAssignments(session, mode, options.settings, configuration);
               await session.log(describeAssignments(mode, assignments));
+              // A verification-enabled run states its own boundary before it
+              // starts. An ordinary run's output is unchanged.
+              if (options.verify) await session.log(verificationNotice);
               startRun((client, lifecycle) => executeRetainedReview(session, client, options, assignments, lifecycle,
                 { autoPostReviews: configuration.autoPostReviews }));
               return;
