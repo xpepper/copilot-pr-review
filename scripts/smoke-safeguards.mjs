@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { randomUUID } from "node:crypto";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
-  collectInstructionFiles, describeDiscovery, discoveryEnvelope, discoveryInstructions, discoveryPrompt,
-  instructionBudgetBytes, instructionFileMaxBytes, maxCommandLength, maxDiscoveredCommands,
+  approveSafeguards, collectInstructionFiles, describeApproval, describeDiscovery, discoveryEnvelope,
+  discoveryInstructions, discoveryPrompt, instructionBudgetBytes, instructionFileMaxBytes, maxCommandLength,
+  maxDiscoveredCommands,
 } from "../extensions/pr-review/safeguards.mjs";
 import { outputEnd, outputStart } from "../extensions/pr-review/findings.mjs";
 
@@ -217,5 +219,189 @@ console.log("PASS the discovery envelope is validated in code, including which f
   assert.doesNotMatch(failed, /incomplete coverage/i);
 }
 console.log("PASS discovery is presented with its source, its skipped files, and no claim that anything ran");
+
+// V1c: command approval. A run that has discovered commands asks which of them
+// may run, records that answer, and still executes nothing. Approval is per
+// command, it is never granted by a flag or by configuration, and it does not
+// survive the run. Nothing here filters the discovered list: the exclusions and
+// the citation check belong to the increment that executes, where they guard
+// something real rather than a command nothing can run.
+
+const approvalBinding = {
+  repository: { id: "repo", host: "github.com", nameWithOwner: "fixture/repository" },
+  number: 18, pullId: "pull-18", head: "b".repeat(40), base: "a".repeat(40),
+  diffSha256: "diff", contextSha256: "context", paths: [],
+};
+// One safeguard and one command that plainly is not a safeguard. V1c offers
+// both, because nothing it can approve is able to run.
+const declared = [
+  { command: "node scripts/smoke-findings.mjs", file: "HANDOFF.md" },
+  { command: "mvn deploy", file: "AGENTS.md" },
+];
+const foundDiscovery = {
+  status: "found", commands: declared, files: [{ name: "AGENTS.md" }, { name: "HANDOFF.md" }], skipped: [],
+};
+
+function approvalFixture({ answer = () => ({ action: "decline" }), ui = true, discovery = foundDiscovery,
+  sessionId = "parent-session", controller = new AbortController() } = {}) {
+  const invocation = { invocationId: randomUUID(), sessionId };
+  const requests = [];
+  const parent = {
+    sessionId: "parent-session", capabilities: { ui: { elicitation: ui } },
+    ui: { async elicitation(request) { requests.push(request); return answer(request); } },
+  };
+  return {
+    parent, controller, requests, invocation,
+    approve: () => approveSafeguards(parent, discovery, { invocation, binding: approvalBinding, controller }),
+  };
+}
+const offered = (request) => request.requestedSchema.properties.commands.items.anyOf;
+const accepted = (commands) => ({ action: "accept", content: { commands } });
+
+{
+  // Per command, and the recorded answer keeps the order the commands were
+  // discovered in rather than the order they were picked.
+  const fixture = approvalFixture({
+    answer: (request) => accepted([offered(request)[1].const, offered(request)[0].const]),
+  });
+  const approval = await fixture.approve();
+  assert.equal(approval.status, "approved");
+  assert.deepEqual(approval.approved, declared);
+  assert.equal(approval.offered, 2);
+  // Each choice is scoped to this invocation, so a late answer from another run
+  // cannot approve a command by its position in this one.
+  assert(offered(fixture.requests[0]).every(({ const: value }) =>
+    value.startsWith(`${fixture.invocation.invocationId}:`)));
+  // A choice carries the command and the file it was declared in, which is the
+  // whole of what V1b can stand behind about it.
+  assert.deepEqual(offered(fixture.requests[0]).map(({ title }) => title),
+    ["node scripts/smoke-findings.mjs  [declared in HANDOFF.md]", "mvn deploy  [declared in AGENTS.md]"]);
+  // The question must never read as though approving were running.
+  assert.match(fixture.requests[0].message, /nothing .*(runs|ran|executed)|no command .*(runs|is run|executed)/i);
+  assert.match(fixture.requests[0].message, /fixture\/repository#18/);
+  assert.match(fixture.requests[0].message, new RegExp(approvalBinding.head));
+}
+{
+  // Approving a subset is the point of asking per command.
+  const fixture = approvalFixture({ answer: (request) => accepted([offered(request)[0].const]) });
+  const approval = await fixture.approve();
+  assert.equal(approval.status, "approved");
+  assert.deepEqual(approval.approved, [declared[0]]);
+  assert.equal(approval.offered, 2);
+}
+for (const [scenario, answer] of [
+  ["accepting no choice", () => accepted([])],
+  ["declining", () => ({ action: "decline" })],
+]) {
+  const approval = await approvalFixture({ answer }).approve();
+  assert.equal(approval.status, "none", scenario);
+  assert.deepEqual(approval.approved, [], scenario);
+}
+{
+  // Cancelling the approval cancels the run, exactly as cancelling finding
+  // selection does. Nothing afterwards may treat it as an answer.
+  const fixture = approvalFixture({ answer: () => ({ action: "cancel" }) });
+  const approval = await fixture.approve();
+  assert.equal(approval.status, "cancelled");
+  assert.deepEqual(approval.approved, []);
+  assert.equal(fixture.controller.signal.aborted, true);
+}
+{
+  // A host with no approval UI approves nothing and says so, the way finding
+  // selection reports itself unavailable. There is deliberately no flag that
+  // approves unattended, so there is nothing to suggest instead.
+  const fixture = approvalFixture({ ui: false });
+  const approval = await fixture.approve();
+  assert.equal(approval.status, "unavailable");
+  assert.deepEqual(approval.approved, []);
+  assert.equal(fixture.requests.length, 0);
+  assert.match(approval.error, /approval/i);
+}
+for (const [scenario, answer] of [
+  ["an unknown choice value", () => accepted(["stale-invocation:0"])],
+  ["a duplicate choice", (request) => accepted([offered(request)[0].const, offered(request)[0].const])],
+  ["an extra field", () => ({ action: "accept", content: { commands: [], all: true } })],
+  ["an answer that is not an array", () => accepted("all")],
+  ["no content at all", () => ({ action: "accept" })],
+  ["an unknown action", () => ({ action: "approve-everything" })],
+]) {
+  // An answer that code cannot account for approves nothing. Failing open here
+  // is the one mistake this gate exists to prevent.
+  const approval = await approvalFixture({ answer }).approve();
+  assert.equal(approval.status, "failed", scenario);
+  assert.deepEqual(approval.approved, [], scenario);
+}
+{
+  // A choice minted for another invocation is refused even though the same
+  // position exists in this one.
+  const other = approvalFixture();
+  const fixture = approvalFixture({ answer: () => accepted([`${other.invocation.invocationId}:0`]) });
+  assert.equal((await fixture.approve()).status, "failed");
+}
+{
+  // The approval belongs to the session that discovered the commands.
+  const fixture = approvalFixture({ sessionId: "other-session" });
+  const approval = await fixture.approve();
+  assert.equal(approval.status, "failed");
+  assert.equal(fixture.requests.length, 0);
+}
+for (const discovery of [
+  { status: "none", commands: [], files: [], skipped: [] },
+  { status: "none", commands: [], files: [{ name: "AGENTS.md" }], skipped: [] },
+  { status: "failed", commands: [], files: [{ name: "AGENTS.md" }], skipped: [], reason: "pass failed" },
+]) {
+  // Nothing to approve is not a question worth asking, and a failed discovery
+  // has produced no list that anyone could answer about.
+  const fixture = approvalFixture({ discovery });
+  const approval = await fixture.approve();
+  assert.equal(approval.status, "not-started");
+  assert.deepEqual(approval.approved, []);
+  assert.equal(approval.offered, 0);
+  assert.equal(fixture.requests.length, 0);
+}
+{
+  // A run already cancelled asks nothing.
+  const controller = new AbortController();
+  controller.abort(new DOMException("cancelled before approval", "AbortError"));
+  const fixture = approvalFixture({ controller });
+  assert.equal((await fixture.approve()).status, "cancelled");
+  assert.equal(fixture.requests.length, 0);
+}
+console.log("PASS approval is asked per command, bound to its invocation, and approves nothing it cannot account for");
+
+// Presentation. Every status says plainly that nothing ran, and none of them
+// may claim the review itself is incomplete: approval is not review coverage.
+for (const [scenario, approval] of [
+  ["an approved subset", { status: "approved", approved: [declared[0]], offered: 2 }],
+  ["nothing approved", { status: "none", approved: [], offered: 2 }],
+  ["no approval UI", { status: "unavailable", approved: [], offered: 2, error: "This host has no approval UI." }],
+  ["a cancelled approval", { status: "cancelled", approved: [], offered: 2 }],
+  ["a failed approval", { status: "failed", approved: [], offered: 2, error: "Invalid approval answer" }],
+  ["nothing to approve", { status: "not-started", approved: [], offered: 0 }],
+]) {
+  const described = describeApproval(approval);
+  assert.match(described, /^V1c safeguard approval/, scenario);
+  assert.match(described, /nothing ran|no command ran|nothing was executed/i, scenario);
+  assert.doesNotMatch(described, /incomplete coverage/i, scenario);
+}
+{
+  const described = describeApproval({ status: "approved", approved: declared, offered: 2 });
+  assert.match(described, /node scripts\/smoke-findings\.mjs {2}\[declared in HANDOFF\.md\]/);
+  assert.match(described, /mvn deploy {2}\[declared in AGENTS\.md\]/);
+  assert.match(described, /2 of 2/);
+  // No exclusion rule exists, so the presentation must never imply a command
+  // was vetted by anything other than the person who approved it.
+  assert.doesNotMatch(described, /vetted|safe to run|checked for/i);
+}
+assert.match(describeApproval({ status: "failed", approved: [], offered: 2, error: "Invalid approval answer" }),
+  /Invalid approval answer/);
+console.log("PASS an approval is presented as an approval, never as evidence that a command ran");
+
+// V1c executes nothing, and this keeps it that way while the increment that
+// will execute is still ahead: a module that cannot spawn a process cannot run
+// a discovered command by accident.
+assert.doesNotMatch(readFileSync(new URL("../extensions/pr-review/safeguards.mjs", import.meta.url), "utf8"),
+  /child_process|execFile|spawnSync|\bspawn\(/);
+console.log("PASS the safeguard module cannot spawn a process at all");
 
 for (const root of roots) rmSync(root, { recursive: true, force: true });
