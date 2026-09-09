@@ -17,6 +17,9 @@ import {
   adjudicateCandidates, candidateFormat, collectCandidates, envelopeVerifier, evidenceBoundary,
   formatFindings, reviewKey, validationInstructions,
 } from "./findings.mjs";
+import {
+  collectInstructionFiles, describeDiscovery, discoveryEnvelope, discoveryInstructions, discoveryPrompt,
+} from "./safeguards.mjs";
 
 const settingKeys = ["heavyModel", "heavyEffort"];
 
@@ -212,6 +215,54 @@ export function reviewPrompt(mode, assignment, snapshot, context, binding, acces
   ].join("\n");
 }
 
+// V1b: what a verification-enabled run finds and shows, once the preflight has
+// proven this checkout is the reviewed revision. It reads the project's own
+// instruction files and reports the commands they declare. It approves nothing,
+// runs nothing, and hands nothing to any reviewer.
+//
+// The pass is a heavy-tier judgment over prose, as adjudication is, and like the
+// adjudicator it holds no tool and is never given the checkout: it decides on
+// the supplied file text alone. It is deliberately not a reviewer, so it takes
+// no configured fallback. A fallback answers a gap in review coverage, and
+// discovery is not part of that coverage.
+async function discoverSafeguards(parent, client, assignments, access, binding, signal) {
+  const collected = collectInstructionFiles(access.root);
+  const sources = {
+    files: collected.files.map(({ name, bytes }) => ({ name, bytes })), skipped: collected.skipped,
+  };
+  // Nothing to read is a complete answer, and it costs no model turn to give.
+  if (!collected.files.length) return { status: "none", commands: [], ...sources };
+  const heavy = assignments.find(({ tier }) => tier === "heavy");
+  if (!heavy) throw new Error("Safeguard discovery requires a heavy-tier assignment.");
+  const { fallback, ...assignment } = heavy;
+  const key = reviewKey(binding);
+  const supplied = collected.files.map(({ name }) => name);
+  let report;
+  try {
+    report = await reviewAssignments(parent, client, [{ ...assignment, label: "safeguard-discovery" }], {
+      signal, systemMessage: { mode: "append", content: discoveryInstructions() },
+      verifyResult: (result) => { discoveryEnvelope(result, key, supplied); },
+      intro: `Reading ${supplied.length} instruction file(s) from this checkout: one pass, which is not a ` +
+        "reviewer, and nothing it reports is approved or executed by this run.",
+      outputLabel: "Untrusted safeguard discovery output",
+      prompt: () => discoveryPrompt(key, collected.files),
+    });
+  } catch (error) {
+    // A pass that cannot even start is a failed discovery, not a failed review:
+    // it grounds nothing a finding depends on, so the reviewers still run. A
+    // cancellation is never one of these, and is re-thrown before anything is
+    // recorded, so it reaches the owned run as the cancellation it was.
+    if (signal.aborted) throw error;
+    return { status: "failed", commands: [], reason: String(error), ...sources };
+  }
+  // The same rule for a pass that started: cancellation belongs to the run.
+  signal.throwIfAborted();
+  const [pass] = report.reviewers;
+  if (pass.status !== "completed") return { status: "failed", commands: [], reason: pass.error, ...sources };
+  const { commands } = discoveryEnvelope(pass.result, key, supplied);
+  return { status: commands.length ? "found" : "none", commands, ...sources };
+}
+
 export async function executeReviewRun(parent, client, options, assignments, {
   controller, onStopped, gh = runGh, git, persist, effectiveConfig,
   invocation = { invocationId: randomUUID(), sessionId: parent.sessionId },
@@ -224,11 +275,12 @@ export async function executeReviewRun(parent, client, options, assignments, {
   let adjudicator;
   let boundary;
   let cwd;
+  let discovery;
   const outcome = await executeOwnedRun(parent, client, {
     controller, onStopped, subject: mode.label, evidencePrefix: prefix,
     details: () => ({
       mode: mode.id, noComment: options.noComment, verify: options.verify === true,
-      invocation, binding, validation, adjudicator,
+      invocation, binding, validation, adjudicator, discovery,
       executionComplete: execution?.complete ?? false,
       reviewers: assignments.map((assignment) => ({
         ...assignment, status: "incomplete", error: "Review did not reach specialist execution.",
@@ -279,13 +331,21 @@ export async function executeReviewRun(parent, client, options, assignments, {
         // ran, so the run says plainly that nothing did.
         (verify
           ? `\nV1a verification preflight passed on head branch ${access.branch}, with no untracked path. ` +
-            "No project safeguard was discovered, approved or run, and no reviewer receives safeguard output; " +
+            "No project safeguard is approved or executed, and no reviewer receives safeguard output; " +
             "this is an ordinary review of the selected mode."
           : "") +
         (access.untracked.length
           ? `\nWarning: ${access.untracked.length} untracked file(s) are present and readable; they are not reviewed content.`
           : ""));
       await startRuntime();
+      // V1b: discovery runs before the reviewers, so the commands are on screen
+      // before the review that does not use them. It changes no reviewer's input
+      // and no coverage state; a failed pass is reported as itself, because it
+      // grounds nothing that a finding depends on.
+      if (verify) {
+        discovery = await discoverSafeguards(parent, client, assignments, access, binding, signal);
+        await parent.log(describeDiscovery(discovery));
+      }
       const report = await reviewAssignments(parent, client, assignments, {
         signal, systemMessage: { mode: "append", content: reviewInstructions(mode) }, access,
         verifyResult: envelopeVerifier(reviewKey(binding), "candidates"),

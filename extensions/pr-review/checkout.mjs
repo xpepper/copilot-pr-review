@@ -60,8 +60,9 @@ export function refuseCheckout(condition, detail, number, mode = reviewModes.qui
 export const verificationNotice = [
   `Verification: ${verifyFlag} is set. This run additionally requires the pull request's head branch and a `,
   "tree with no untracked path, checked with the revision gate before any reviewer starts.",
-  "\nNo project safeguard is discovered, presented, approved or executed, and no reviewer receives safeguard ",
-  "output. A passing preflight is an ordinary review of the selected mode, so this flag grounds no claim in it.",
+  "\nOnce it passes, this project's own instruction files are read and the safeguard commands they declare ",
+  "are presented. No command is approved or executed, and no reviewer receives one, so a passing preflight ",
+  "is still an ordinary review of the selected mode and this flag grounds no claim in it.",
 ].join("");
 
 function statusEntries(status) {

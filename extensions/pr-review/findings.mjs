@@ -38,7 +38,7 @@ function severityGuide(policy) {
 export const outputStart = "<<<PR_REVIEW_JSON>>>";
 export const outputEnd = "<<<END_PR_REVIEW_JSON>>>";
 
-const delimitedFormat = [
+export const delimitedFormat = [
   `Put the JSON object between the markers ${outputStart} and ${outputEnd}, each alone on its own line.`,
   "Between the markers emit raw JSON only: no code fences, no comments, no prose, and nothing after the object.",
   "Emit each marker exactly once. Text outside them is discarded unread, and a repeated or missing marker discards your whole output.",
@@ -150,12 +150,17 @@ function unfenced(raw) {
   return body.split("\n").some((line) => line.trim().startsWith("```")) ? raw : body;
 }
 
+// Removing those two known wrappers is the whole tolerance. No prose stripping,
+// substring recovery, brace matching, repair or malformed-output extraction:
+// anything else is parsed unchanged and fails whole. Exported so a second
+// structured contract shares exactly this unwrap instead of growing its own,
+// which is the one way the marker rule could quietly widen.
+export const unwrapEnvelope = (raw) => typeof raw === "string" ? unfenced(delimited(raw)) : raw;
+
 function envelope(raw, key, field) {
-  // Removing those two known wrappers is the whole tolerance. No prose stripping,
-  // substring recovery, brace matching, repair or malformed-output extraction:
-  // anything else is parsed unchanged and fails whole, and every check below is
-  // applied to the unwrapped payload exactly as it was to a bare response.
-  const parsed = JSON.parse(typeof raw === "string" ? unfenced(delimited(raw)) : raw);
+  // Every check below is applied to the unwrapped payload exactly as it was to
+  // a bare response.
+  const parsed = JSON.parse(unwrapEnvelope(raw));
   object(parsed, ["schemaVersion", "reviewKey", field, "limitations"], "Review output");
   if (![1, 2].includes(parsed.schemaVersion) || parsed.reviewKey !== key) throw new Error("Wrong schema version or review binding.");
   if (!Array.isArray(parsed[field]) || !Array.isArray(parsed.limitations)) throw new Error("Expected result arrays.");
