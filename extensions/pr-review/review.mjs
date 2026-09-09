@@ -18,7 +18,8 @@ import {
   formatFindings, reviewKey, validationInstructions,
 } from "./findings.mjs";
 import {
-  collectInstructionFiles, describeDiscovery, discoveryEnvelope, discoveryInstructions, discoveryPrompt,
+  approveSafeguards, collectInstructionFiles, describeApproval, describeDiscovery, discoveryEnvelope,
+  discoveryInstructions, discoveryPrompt,
 } from "./safeguards.mjs";
 
 const settingKeys = ["heavyModel", "heavyEffort"];
@@ -276,11 +277,12 @@ export async function executeReviewRun(parent, client, options, assignments, {
   let boundary;
   let cwd;
   let discovery;
+  let approval;
   const outcome = await executeOwnedRun(parent, client, {
     controller, onStopped, subject: mode.label, evidencePrefix: prefix,
     details: () => ({
       mode: mode.id, noComment: options.noComment, verify: options.verify === true,
-      invocation, binding, validation, adjudicator, discovery,
+      invocation, binding, validation, adjudicator, discovery, approval,
       executionComplete: execution?.complete ?? false,
       reviewers: assignments.map((assignment) => ({
         ...assignment, status: "incomplete", error: "Review did not reach specialist execution.",
@@ -345,6 +347,19 @@ export async function executeReviewRun(parent, client, options, assignments, {
       if (verify) {
         discovery = await discoverSafeguards(parent, client, assignments, access, binding, signal);
         await parent.log(describeDiscovery(discovery));
+        // V1c: the run asks which of the discovered commands may run, records
+        // that answer, and still executes nothing. The question sits here, and
+        // not beside finding selection, because this is where a later increment
+        // would have to run an approved command for its output to ground a
+        // reviewer's claim. Nothing filters the list on the way in: the
+        // exclusions and the citation check belong to the increment that
+        // executes, where they guard something a person could actually start.
+        approval = await approveSafeguards(parent, discovery, { invocation, binding, controller });
+        await parent.log(describeApproval(approval),
+          { level: ["failed", "unavailable", "cancelled"].includes(approval.status) ? "error" : "info" });
+        // A cancelled approval belongs to the owned run, which reports it as the
+        // cancellation it was. No reviewer starts after one.
+        signal.throwIfAborted();
       }
       const report = await reviewAssignments(parent, client, assignments, {
         signal, systemMessage: { mode: "append", content: reviewInstructions(mode) }, access,

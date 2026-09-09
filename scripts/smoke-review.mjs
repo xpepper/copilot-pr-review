@@ -342,9 +342,12 @@ const checkoutGit = async (args, cwd, { signal } = {}) => {
 function harness({
   failure, fallbackFailure, controller = new AbortController(), withCandidate = false, acceptCandidate = false,
   limitations = [], mode = reviewModes.quick, severity = "P2", candidateFrom = [0], clipQuotes = false,
-  badAnchor = false, extraBadCandidate = false, proseFrom = [0], discovered = [],
+  badAnchor = false, extraBadCandidate = false, proseFrom = [0], discovered = [], approve,
 } = {}) {
   const messages = [];
+  // V1c's approval needs an elicitation host. A harness without one is the
+  // hostless case, which must approve nothing rather than fail the run.
+  const requests = [];
   const sessions = [];
   // V1b's discovery pass is not a reviewer, so it is kept out of the reviewer
   // sessions every assertion above counts. Its own session is checked here for
@@ -586,10 +589,11 @@ function harness({
     sessionId: "parent-session",
     ...parentModels,
     rpc: { ...parentModels.rpc, metadata: { async snapshot() { return { workingDirectory: "/synthetic-checkout" }; } } },
-    capabilities: {},
+    capabilities: approve ? { ui: { elicitation: true } } : {},
+    ...(approve ? { ui: { async elicitation(request) { requests.push(request); return approve(request); } } } : {}),
     async log(message) { messages.push(message); },
   };
-  return { client, parent, sessions, discoveries, messages, controller };
+  return { client, parent, sessions, discoveries, messages, requests, controller };
 }
 
 for (const failure of [undefined, "reviewer", "reads", "usage", "missing-usage", "cancel", "startup", "cleanup", "assignment", "tools", "catalog"]) {
@@ -1294,6 +1298,151 @@ for (const [scenario, failure, expected] of [
   assert.equal(h.sessions.length, 0, "No reviewer starts after a cancelled discovery");
 }
 console.log("PASS --verify discovers and presents declared safeguard commands, and still executes nothing");
+
+// V1c: a run that discovered commands asks which of them may run, records that
+// answer, and still executes nothing. The question sits where discovery does,
+// before any reviewer starts, because that is the only placement that leaves
+// room for a later increment to ground a reviewer's claims in what it ran.
+const approvalChoices = (request) => request.requestedSchema.properties.commands.items.anyOf.map((c) => c.const);
+const isApproval = (request) => Object.hasOwn(request.requestedSchema.properties, "commands");
+const instructionRoot = { "AGENTS.md": "Run node scripts/smoke-findings.mjs.",
+  "HANDOFF.md": "Then node scripts/smoke-review.mjs." };
+{
+  // The whole increment in one run. Discovery presents, approval asks per
+  // command, the answer is recorded, and the reviewers then run exactly as
+  // they would without the flag.
+  const h = harness({ discovered: declared, approve: (request) => ({
+    action: "accept", content: { commands: [approvalChoices(request)[1]] } }) });
+  const report = await withInstructions(instructionRoot,
+    () => executeReviewRun(h.parent, h.client, { ...options, verify: true },
+      structuredClone(assignments), { controller: h.controller, gh: fakeGh(), git: checkoutGit }));
+  assert.equal(h.requests.length, 1, "One approval question, not one per command and not one per reviewer");
+  assert(isApproval(h.requests[0]));
+  assert.equal(report.approval.status, "approved");
+  assert.deepEqual(report.approval.approved, [declared[1]]);
+  assert.equal(report.approval.offered, 2);
+  const recorded = h.messages.find((message) => message.startsWith("V1c safeguard approval"));
+  assert.match(recorded, /1 of 2 discovered command\(s\) approved/);
+  assert.match(recorded, /node scripts\/smoke-review\.mjs {2}\[declared in HANDOFF\.md\]/);
+  assert.match(recorded, /Nothing ran/);
+  // The question is asked after the commands are on screen and before any
+  // specialist starts, which is the placement this increment settled.
+  const presented = h.messages.findIndex((message) => message.startsWith("V1b safeguard discovery"));
+  const approved = h.messages.indexOf(recorded);
+  const firstReviewer = h.messages.findIndex((message) => /^Reviewer correctness: starting/.test(message));
+  assert(presented < approved && approved < firstReviewer,
+    "Approval is asked after discovery and before any specialist starts");
+  // An approved command is still only an approved command: no reviewer receives
+  // one, and nothing in this run executes it.
+  assert(h.sessions.length > 0, "A verification run still runs the mode's reviewers");
+  assert(h.sessions.every((session) => !/smoke-findings|smoke-review\.mjs|approv/i.test(session.prompt ?? "")),
+    "No reviewer receives an approved command");
+  assert.equal(report.complete, true, "Approval does not change review coverage");
+  // Approval decides nothing about publication, so it stays out of the record
+  // exactly as discovery does. No schema version moves for it.
+  const record = retainedRecord(report);
+  validateRecord(record, h.parent.sessionId);
+  assert(!Object.hasOwn(record.outcome, "approval"), "The retained record schema is unchanged");
+  assert(!Object.hasOwn(record.outcome, "discovery"));
+  assert.equal(record.schemaVersion, retainedRecord(await withInstructions(instructionRoot,
+    () => executeReviewRun(harness().parent, harness().client, options, structuredClone(assignments),
+      { controller: new AbortController(), gh: fakeGh(), git: checkoutGit }))).schemaVersion);
+}
+{
+  // Approving every command is a subset like any other, and the recorded order
+  // is the order the commands were discovered in.
+  const h = harness({ discovered: declared, approve: (request) => ({
+    action: "accept", content: { commands: [...approvalChoices(request)].reverse() } }) });
+  const report = await withInstructions(instructionRoot,
+    () => executeReviewRun(h.parent, h.client, { ...options, verify: true },
+      structuredClone(assignments), { controller: h.controller, gh: fakeGh(), git: checkoutGit }));
+  assert.deepEqual(report.approval.approved, declared);
+}
+for (const [scenario, approve, status] of [
+  ["declining", () => ({ action: "decline" }), "none"],
+  ["approving nothing", () => ({ action: "accept", content: { commands: [] } }), "none"],
+  ["an answer this run cannot account for", () => ({ action: "accept", content: { commands: ["stale:0"] } }), "failed"],
+]) {
+  // None of these approves anything, and none of them stops the review: the
+  // flag grounds nothing in this release, so an unanswered approval cannot make
+  // the review itself less trustworthy.
+  const h = harness({ discovered: declared, approve });
+  const report = await withInstructions(instructionRoot,
+    () => executeReviewRun(h.parent, h.client, { ...options, verify: true },
+      structuredClone(assignments), { controller: h.controller, gh: fakeGh(), git: checkoutGit }));
+  assert.equal(report.approval.status, status, scenario);
+  assert.deepEqual(report.approval.approved, [], scenario);
+  assert.equal(report.complete, true, `${scenario} does not make the review incomplete`);
+  assert(h.sessions.length > 0, `${scenario} still leaves the reviewers to run`);
+  const recorded = h.messages.find((message) => message.startsWith("V1c safeguard approval"));
+  assert.match(recorded, /Nothing ran/, scenario);
+  assert.doesNotMatch(recorded, /incomplete coverage/i, scenario);
+}
+{
+  // A host with no approval UI approves nothing and says so, and the review
+  // still runs. There is no flag to suggest instead, because none exists.
+  const h = harness({ discovered: declared });
+  const report = await withInstructions(instructionRoot,
+    () => executeReviewRun(h.parent, h.client, { ...options, verify: true },
+      structuredClone(assignments), { controller: h.controller, gh: fakeGh(), git: checkoutGit }));
+  assert.equal(report.approval.status, "unavailable");
+  assert.deepEqual(report.approval.approved, []);
+  assert.equal(report.complete, true);
+  assert.match(h.messages.find((message) => message.startsWith("V1c safeguard approval")), /could not be requested/);
+}
+{
+  // Cancelling the approval cancels the run, before any specialist starts.
+  const h = harness({ discovered: declared, approve: () => ({ action: "cancel" }) });
+  const report = await withInstructions(instructionRoot,
+    () => executeReviewRun(h.parent, h.client, { ...options, verify: true },
+      structuredClone(assignments), { controller: h.controller, gh: fakeGh(), git: checkoutGit }));
+  assert.equal(report.cancelled, true);
+  assert.equal(report.approval.status, "cancelled");
+  assert.notEqual(report.disposition, "refused", "A cancelled approval is not a refused checkout");
+  assert.equal(h.sessions.length, 0, "No reviewer starts after a cancelled approval");
+}
+for (const [scenario, files, failure] of [
+  ["a root with no instruction file", {}, undefined],
+  ["files that declare no command", { "AGENTS.md": "This project has no test suite." }, undefined],
+  ["a failed discovery pass", instructionRoot, "discovery-error"],
+]) {
+  // With nothing discovered there is nothing to approve, so no question is
+  // asked and no answer is invented.
+  const h = harness({ discovered: [], failure, approve: () => ({ action: "decline" }) });
+  const report = await withInstructions(files,
+    () => executeReviewRun(h.parent, h.client, { ...options, verify: true },
+      structuredClone(assignments), { controller: h.controller, gh: fakeGh(), git: checkoutGit }));
+  assert.equal(h.requests.length, 0, scenario);
+  assert.equal(report.approval.status, "not-started", scenario);
+  assert.equal(report.complete, true, scenario);
+}
+{
+  // An ordinary review asks nothing, discovers nothing and records no approval.
+  const h = harness({ discovered: declared, approve: () => ({ action: "decline" }) });
+  const report = await withInstructions(instructionRoot,
+    () => executeReviewRun(h.parent, h.client, options, structuredClone(assignments),
+      { controller: h.controller, gh: fakeGh(), git: checkoutGit }));
+  assert.equal(h.requests.length, 0, "An ordinary review asks for no approval");
+  assert.equal(report.approval, undefined);
+  assert(!h.messages.some((message) => /safeguard approval/i.test(message)));
+}
+{
+  // SCOPE.md by name: publication flags and the saved automatic-posting setting
+  // do not bypass command approval. The most authorized run this tool can make
+  // is still asked, and declining still approves nothing.
+  const h = harness({ discovered: declared, approve: (request) =>
+    (isApproval(request) ? { action: "decline" } : { action: "accept", content: { findingIds: [] } }) });
+  const report = await withInstructions(instructionRoot,
+    () => executeReviewRun(h.parent, h.client,
+      { ...options, verify: true, all: true, comment: true, noComment: false },
+      structuredClone(assignments),
+      { controller: h.controller, gh: fakeGh(), git: checkoutGit, effectiveConfig: { autoPostReviews: true } }));
+  assert.equal(h.requests.filter(isApproval).length, 1, "An authorized run is still asked to approve");
+  assert.equal(report.approval.status, "none");
+  assert.deepEqual(report.approval.approved, []);
+}
+console.log("PASS --verify asks which discovered commands may run, records the answer, and still runs none");
+
 
 for (const number of [2, 3, 4, 5, 8, 9, 10]) {
   const h = harness();
