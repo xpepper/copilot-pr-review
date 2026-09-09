@@ -282,13 +282,13 @@ capture.
 
 `--verify` is the opt-in for running this project's existing safeguards, such as
 its tests, compilation or linting, so that a reviewer's claims can be grounded
-in evidence rather than reading alone. **Nothing is executed yet.** This first
-slice is only the flag and the gate that a verification-enabled run must pass:
-no safeguard is discovered, none is presented for approval, none is run, and no
-reviewer receives safeguard output. A run that passes the preflight is an
-ordinary review of whichever mode it selected, and the timeline says so in
-those words, so the flag can never be mistaken for evidence that something
-verified the change.
+in evidence rather than reading alone. **Nothing is executed yet.** The first
+two slices are the flag with the gate a verification-enabled run must pass, and
+the discovery that shows you which commands a later slice would offer to run.
+Nothing is approved, nothing is run, and no reviewer receives a discovered
+command. A run that passes the preflight is an ordinary review of whichever mode
+it selected, and the timeline says so in those words, so the flag can never be
+mistaken for evidence that something verified the change.
 
 The preflight is the same revision gate every review already passes, with two
 conditions added:
@@ -324,8 +324,56 @@ keeps the decision to run a repository's own commands an explicit one, made at
 the invocation. Posting authority grants nothing here either, and will not
 grant command approval when that part exists.
 
-Discovering safeguards, presenting the exact commands, obtaining approval and
-executing them are separate work that has not started.
+### Safeguard discovery (V1b)
+
+Once the preflight passes, the run reads the markdown files at the root of your
+checkout and presents the safeguard commands they declare, each with the file it
+came from:
+
+```text
+V1b safeguard discovery found 2 command(s) declared in this project's instructions.
+  npm test  [declared in AGENTS.md]
+  npm run typecheck  [declared in CONTRIBUTING.md]
+Read: AGENTS.md, CLAUDE.md, CONTRIBUTING.md. Skipped: ROADMAP.md (exceeds 65536 bytes).
+These are the commands a later increment would offer to run, in this checkout. None of
+this was approved and none of it ran. No reviewer receives these commands, and this
+stays an ordinary review of the selected mode.
+```
+
+The source is your project's own instructions, and only those. A package
+manifest's scripts and a best-effort guess from the project's stack are both
+recorded as later slices, so a project that declares nothing in prose finds
+nothing here today. Reading is confined to the root of the checkout: no
+subdirectory, no symbolic link followed out of it, nothing that is not markdown,
+and nothing over 64KB, with a total budget for the run. Every file that was read
+and every candidate skipped is named, because a source dropped in silence cannot
+be told apart from a project that documented nothing.
+
+A model reads the prose, and code decides what its answer may say. The schema,
+the binding, the command text and above all the file a command is attributed to
+are all checked before anything reaches your screen: a command can only cite a
+file this run actually read, and must be a single line without control
+characters. Nothing is filtered on top of that. Commands that install, rewrite
+files or watch are not yet excluded, because that exclusion belongs with the
+approval step that can act on it.
+
+Discovery is not a reviewer and is not part of review coverage. It holds no
+tool, is never given the checkout to read, and takes no configured fallback. A
+pass that fails, returns an unusable answer or cannot start is reported as
+itself, and the review continues and reports its own coverage exactly as it
+would have. A checkout root with no markdown at all spends no model turn.
+Everything else does: from this slice on, a verification run costs one extra
+model turn compared to the same review without the flag.
+
+Reading these files is safe here only because the preflight already proved this
+checkout is the reviewed revision, which is why discovery never runs during an
+ordinary review. The files are read at the pull request's head, so a branch can
+change what they say. For this release that is accepted rather than mitigated:
+the tool is used on its author's own pull requests and those of their team, and
+nothing discovered can act until a later slice adds approval.
+
+Obtaining approval for a command and executing one are separate work that has
+not started.
 
 ### Balanced review mode (M1)
 
