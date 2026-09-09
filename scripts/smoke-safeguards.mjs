@@ -191,8 +191,12 @@ console.log("PASS the discovery envelope is validated in code, including which f
   assert.match(found, /ROADMAP\.md/);
   assert.match(found, /exceeds 65536 bytes/);
   // The presentation can never read as evidence that anything ran or was allowed to.
-  assert.match(found, /None of this was approved and none of it ran/);
-  assert.match(found, /No reviewer receives these commands/);
+  assert.match(found, /Nothing here has been approved and nothing has run/);
+  assert.match(found, /asked next which of these may run/);
+  assert.match(found, /no reviewer receives one/i);
+  // V1c asks in this same run, so discovery may no longer defer the offer to a
+  // later increment. Pull request #18's contracts reviewer caught exactly this.
+  assert.doesNotMatch(found, /a later increment would offer to run/);
   assert.doesNotMatch(found, /pass(ed)?\b.*safeguard|safeguard.*pass(ed)?\b/i);
 }
 {

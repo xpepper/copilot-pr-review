@@ -159,14 +159,18 @@ export function discoveryEnvelope(raw, key, supplied) {
   return { commands: parsed.commands };
 }
 
-// What the run shows. Choice 3 settled this at the command and the file it came
-// from: the quoted line, and the check that the line really appears there,
-// belong to the increment that can approve a command, because until then an
-// invented one can do nothing. Choice 2 settled that nothing is filtered out
-// here, so the exclusions for installing, auto-fixing and watching arrive with
-// approval too.
-const nothingRan = "None of this was approved and none of it ran. No reviewer receives these commands, and " +
-  "this stays an ordinary review of the selected mode.";
+// What the run shows: the command and the file it came from. The quoted line and
+// the check that the line really appears there belong to the increment that can
+// execute a command, and so do the exclusions for installing, auto-fixing and
+// watching. Nothing is filtered out here.
+//
+// V1c asks which of these may run immediately after this is printed, so the text
+// must not defer the offer to a later increment. Pull request #18's contracts
+// reviewer caught that wording after it went stale, which every controlled suite
+// had passed over because they asserted the stale sentence.
+const nothingRan = "Nothing here has been approved and nothing has run. You are asked next which of these may " +
+  "run; this release executes none of them, no reviewer receives one, and this stays an ordinary review of " +
+  "the selected mode.";
 
 export function describeDiscovery({ status, commands, files, skipped, reason }) {
   const read = files.length
@@ -197,7 +201,7 @@ export function describeDiscovery({ status, commands, files, skipped, reason }) 
     `V1b safeguard discovery found ${commands.length} command(s) declared in this project's instructions.`,
     ...commands.map(({ command, file }) => `  ${command}  [declared in ${file}]`),
     `${read}${missed}`,
-    `These are the commands a later increment would offer to run, in this checkout. ${nothingRan}`,
+    nothingRan,
   ].join("\n");
 }
 

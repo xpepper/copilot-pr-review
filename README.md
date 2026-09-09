@@ -336,9 +336,9 @@ V1b safeguard discovery found 2 command(s) declared in this project's instructio
   npm test  [declared in AGENTS.md]
   npm run typecheck  [declared in CONTRIBUTING.md]
 Read: AGENTS.md, CLAUDE.md, CONTRIBUTING.md. Skipped: ROADMAP.md (exceeds 65536 bytes).
-These are the commands a later increment would offer to run, in this checkout. None of
-this was approved and none of it ran. No reviewer receives these commands, and this
-stays an ordinary review of the selected mode.
+Nothing here has been approved and nothing has run. You are asked next which of these
+may run; this release executes none of them, no reviewer receives one, and this stays
+an ordinary review of the selected mode.
 ```
 
 The source is your project's own instructions, and only those. A package

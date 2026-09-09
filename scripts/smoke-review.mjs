@@ -1208,7 +1208,8 @@ const withInstructions = async (files, body) => {
   assert.match(presented, /node scripts\/smoke-findings\.mjs {2}\[declared in AGENTS\.md\]/);
   assert.match(presented, /node scripts\/smoke-review\.mjs {2}\[declared in HANDOFF\.md\]/);
   assert.match(presented, /Read: AGENTS\.md, HANDOFF\.md\./);
-  assert.match(presented, /None of this was approved and none of it ran/);
+  assert.match(presented, /Nothing here has been approved and nothing has run/);
+  assert.doesNotMatch(presented, /a later increment would offer to run/);
   // The pass reads the files themselves, not a description of them.
   assert.match(h.discoveries[0].prompt, /Run node scripts\/smoke-findings\.mjs\./);
   // Choice 5: the commands are on screen before the review that does not use
