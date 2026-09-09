@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { mkdirSync, mkdtempSync, realpathSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -11,7 +11,10 @@ import { reviewModes } from "../extensions/pr-review/modes.mjs";
 import { captureTarget, parseTargetArgs } from "../extensions/pr-review/target.mjs";
 import { assembleContext } from "../extensions/pr-review/context.mjs";
 import { repository, respond } from "./target-fixture.mjs";
-import { formatFindings, reviewKey, validationInstructions } from "../extensions/pr-review/findings.mjs";
+import {
+  formatFindings, outputEnd, outputStart, reviewKey, validationInstructions,
+} from "../extensions/pr-review/findings.mjs";
+import { discoveryInstructions } from "../extensions/pr-review/safeguards.mjs";
 import { retainedRecord, sessionStore, validateRecord } from "../extensions/pr-review/retention.mjs";
 import { executeRetainedReview } from "../extensions/pr-review/retained-run.mjs";
 import { readOnlyToolFilters, readOnlyTools } from "../extensions/pr-review/read-only.mjs";
@@ -339,10 +342,15 @@ const checkoutGit = async (args, cwd, { signal } = {}) => {
 function harness({
   failure, fallbackFailure, controller = new AbortController(), withCandidate = false, acceptCandidate = false,
   limitations = [], mode = reviewModes.quick, severity = "P2", candidateFrom = [0], clipQuotes = false,
-  badAnchor = false, extraBadCandidate = false, proseFrom = [0],
+  badAnchor = false, extraBadCandidate = false, proseFrom = [0], discovered = [],
 } = {}) {
   const messages = [];
   const sessions = [];
+  // V1b's discovery pass is not a reviewer, so it is kept out of the reviewer
+  // sessions every assertion above counts. Its own session is checked here for
+  // the two things that matter: it holds no tool, and it is never handed the
+  // checkout that the specialists read.
+  const discoveries = [];
   const reviewerCount = mode.reviewers.length;
   let sends = 0;
   const client = {
@@ -358,28 +366,36 @@ function harness({
       assert.equal(config.enableConfigDiscovery, false);
       // A fallback attempt creates one more session of the same kind, so the two
       // kinds are told apart by the instructions they carry rather than by count.
+      const discovering = config.systemMessage?.content === discoveryInstructions();
       const validating = config.systemMessage?.content === validationInstructions(mode.policy);
       assert.deepEqual(config.systemMessage, {
-        mode: "append", content: validating ? validationInstructions(mode.policy) : reviewInstructions(mode),
+        mode: "append",
+        content: discovering ? discoveryInstructions()
+          : validating ? validationInstructions(mode.policy) : reviewInstructions(mode),
       });
-      const fallbackAttempt = sessions.filter((s) => s.validating === validating).length >= (validating ? 1 : reviewerCount);
+      // Discovery and adjudication both decide on supplied text alone.
+      const zeroTool = discovering || validating;
+      const fallbackAttempt = !discovering &&
+        sessions.filter((s) => s.validating === validating).length >= (validating ? 1 : reviewerCount);
       if (validating && failure === "validator-setup") throw new Error("validator setup failed");
+      if (discovering && failure === "discovery-setup") throw new Error("discovery setup failed");
       if (fallbackAttempt && fallbackFailure === "setup") throw new Error("fallback setup failed");
-      // Specialists hold the confined read-only set; the adjudicator still holds
-      // nothing and decides only on the captured evidence it is given.
-      assert.deepEqual(config.availableTools, validating ? [] : readOnlyToolFilters);
+      // Specialists hold the confined read-only set; the adjudicator and the
+      // discovery pass hold nothing and decide only on what they are given.
+      assert.deepEqual(config.availableTools, zeroTool ? [] : readOnlyToolFilters);
       assert.equal((await config.onPermissionRequest({ kind: "read", path: checkout })).kind,
-        validating ? "reject" : "approve-once");
+        zeroTool ? "reject" : "approve-once");
       assert.equal((await config.onPermissionRequest({ kind: "read", path: tmpdir() })).kind, "reject");
       assert.equal((await config.onPermissionRequest({ kind: "write", path: checkout })).kind, "reject");
       assert.equal((await config.hooks.onPreToolUse({ toolName: "bash" })).permissionDecision, "deny");
       assert.equal((await config.hooks.onPreToolUse({ toolName: "view" }))?.permissionDecision,
-        validating ? "deny" : undefined);
+        zeroTool ? "deny" : undefined);
       const handlers = new Set();
-      const index = sessions.length;
+      const index = discovering ? discoveries.length : sessions.length;
       const session = {
-        sessionId: `reviewer-${index}`, model: config.model, reasoningEffort: config.reasoningEffort,
-        prompt: undefined, aborts: 0, validating, fallbackAttempt,
+        sessionId: discovering ? `discovery-${index}` : `reviewer-${index}`,
+        model: config.model, reasoningEffort: config.reasoningEffort,
+        prompt: undefined, aborts: 0, discovering, validating, fallbackAttempt,
         rpc: {
           model: {
             async list() { return { list: failure === "catalog" ? [] : catalog }; },
@@ -394,13 +410,14 @@ function harness({
             async initializeAndValidate() {},
             async getCurrentMetadata() {
               if (failure === "tools") return { tools: [{ name: "bash" }] };
-              return { tools: validating ? [] : readOnlyTools.map((name) => ({ name })) };
+              return { tools: zeroTool ? [] : readOnlyTools.map((name) => ({ name })) };
             },
           },
           metadata: {
             async setWorkingDirectory({ workingDirectory }) {
               assert.equal(workingDirectory, checkout, "Reviewers are pointed at the reviewed checkout");
               assert.equal(validating, false, "The adjudicator is not given the checkout");
+              assert.equal(discovering, false, "The discovery pass is not given the checkout");
               return { workingDirectory };
             },
           },
@@ -411,6 +428,31 @@ function harness({
         },
         async send({ prompt }) {
           this.prompt = prompt;
+          // Discovery settles on its own, before any specialist is sent to, and
+          // is deliberately not counted among the reviewer sends the batch waits on.
+          if (discovering) {
+            this.emit("assistant.turn_start");
+            if (failure === "discovery-error") {
+              this.emit("session.error", { message: "discovery failed after start" });
+              return;
+            }
+            if (failure === "discovery-cancel") {
+              controller.abort(new DOMException("cancel discovery", "AbortError"));
+              await client.forceStop();
+              return;
+            }
+            const input = JSON.parse(prompt.split("\n").at(-1));
+            this.emit("assistant.message", { content: failure === "discovery-malformed"
+              ? "I read the instructions and found the test suite."
+              : [outputStart, JSON.stringify({
+                schemaVersion: 1, discoveryKey: input.discoveryKey, commands: discovered,
+              }), outputEnd].join("\n") });
+            this.emit("assistant.usage", {
+              model: config.model, reasoningEffort: config.reasoningEffort ?? "low", isByok: false,
+            });
+            this.emit("session.idle");
+            return;
+          }
           sends++;
           this.emit("assistant.turn_start");
           if (validating) {
@@ -536,7 +578,7 @@ function harness({
         async abort() { this.aborts++; },
         get listenerCount() { return handlers.size; },
       };
-      sessions.push(session);
+      (discovering ? discoveries : sessions).push(session);
       return session;
     },
   };
@@ -547,7 +589,7 @@ function harness({
     capabilities: {},
     async log(message) { messages.push(message); },
   };
-  return { client, parent, sessions, messages, controller };
+  return { client, parent, sessions, discoveries, messages, controller };
 }
 
 for (const failure of [undefined, "reviewer", "reads", "usage", "missing-usage", "cancel", "startup", "cleanup", "assignment", "tools", "catalog"]) {
@@ -1085,7 +1127,7 @@ for (const [scenario, state, expected, fix] of [
   assert.match(opened, /"verify":true/);
   assert.match(opened, /"branch":"feature"/);
   assert.match(opened, /preflight passed on head branch feature/);
-  assert.match(opened, /No project safeguard was discovered, approved or run/);
+  assert.match(opened, /No project safeguard is approved or executed/);
   assert(gitCalls.some((args) => args[0] === "symbolic-ref"), "The branch is read from git, never assumed");
   // Verification changes no reviewer's input. The harness already asserts every
   // session's system message equals this mode's ordinary instructions, so the
@@ -1123,6 +1165,135 @@ for (const [scenario, state, expected, fix] of [
   checkoutState = previous;
 }
 console.log("PASS --verify refuses on branch and untracked conditions, and otherwise reviews and says nothing ran");
+
+// V1b: a run that passes the preflight discovers this project's declared
+// safeguard commands and presents them. It still approves nothing, runs
+// nothing, and changes nothing about what any reviewer receives.
+const declared = [
+  { command: "node scripts/smoke-findings.mjs", file: "AGENTS.md" },
+  { command: "node scripts/smoke-review.mjs", file: "HANDOFF.md" },
+];
+const withInstructions = async (files, body) => {
+  const written = Object.entries(files).map(([name, content]) => {
+    writeFileSync(join(checkout, name), content);
+    return join(checkout, name);
+  });
+  try {
+    return await body();
+  } finally {
+    // The checkout must be left exactly as it was, so the next scenario sees a
+    // root with no instruction file rather than the previous one's.
+    for (const path of written) rmSync(path, { force: true });
+  }
+};
+{
+  // The whole increment in one run: discovery reads the instruction files,
+  // presents each command with the file it came from, and the mode's reviewers
+  // then run exactly as they would without the flag.
+  const h = harness({ discovered: declared });
+  const report = await withInstructions(
+    { "AGENTS.md": "Run node scripts/smoke-findings.mjs.", "HANDOFF.md": "Then node scripts/smoke-review.mjs." },
+    () => executeReviewRun(h.parent, h.client, { ...options, verify: true },
+      structuredClone(assignments), { controller: h.controller, gh: fakeGh(), git: checkoutGit }));
+  assert.equal(report.verify, true);
+  assert.equal(h.discoveries.length, 1, "Discovery is one pass, not one per reviewer");
+  assert.equal(report.discovery.status, "found");
+  assert.deepEqual(report.discovery.commands, declared);
+  const presented = h.messages.find((message) => message.startsWith("V1b safeguard discovery"));
+  assert.match(presented, /node scripts\/smoke-findings\.mjs {2}\[declared in AGENTS\.md\]/);
+  assert.match(presented, /node scripts\/smoke-review\.mjs {2}\[declared in HANDOFF\.md\]/);
+  assert.match(presented, /Read: AGENTS\.md, HANDOFF\.md\./);
+  assert.match(presented, /None of this was approved and none of it ran/);
+  // The pass reads the files themselves, not a description of them.
+  assert.match(h.discoveries[0].prompt, /Run node scripts\/smoke-findings\.mjs\./);
+  // Choice 5: the commands are on screen before the review that does not use
+  // them. The discovery pass borrows the reviewer execution seam, and so
+  // announces itself the way the adjudicator does; the mode's own specialists
+  // are what must not have started yet.
+  assert(h.messages.indexOf(presented) <
+    h.messages.findIndex((message) => /^Reviewer correctness: starting/.test(message)),
+  "The commands are presented before any specialist starts");
+  // The reviewers are untouched. A discovered command must never reach one,
+  // whether as instructions or as prompt input.
+  assert(h.sessions.length > 0, "A verification run still runs the mode's reviewers");
+  assert(h.sessions.every((session) => !/smoke-findings|safeguard|discover/i.test(session.prompt ?? "")),
+    "No reviewer receives a discovered command");
+  assert.equal(report.complete, true, "Discovery does not change review coverage");
+  // Discovery decides nothing about publication, so it stays out of the record.
+  const record = retainedRecord(report);
+  validateRecord(record, h.parent.sessionId);
+  assert(!Object.hasOwn(record.outcome, "discovery"), "The retained record schema is unchanged");
+}
+{
+  // An ordinary review discovers nothing at all: no pass, no message, and no
+  // extra credit spent. The checkout is not provably the reviewed revision
+  // without the preflight, so nothing may be read from it for this purpose.
+  const h = harness({ discovered: declared });
+  const report = await withInstructions({ "AGENTS.md": "Run node scripts/smoke-findings.mjs." },
+    () => executeReviewRun(h.parent, h.client, options, structuredClone(assignments),
+      { controller: h.controller, gh: fakeGh(), git: checkoutGit }));
+  assert.equal(h.discoveries.length, 0, "An ordinary review starts no discovery pass");
+  assert.equal(report.discovery, undefined);
+  assert(!h.messages.some((message) => /safeguard discovery/i.test(message)));
+}
+{
+  // A root with no instruction file spends no model turn at all. The empty
+  // answer is correct, and it is the answer this repository's own first
+  // review will produce if its commands ever move out of the root.
+  const h = harness();
+  const report = await executeReviewRun(h.parent, h.client, { ...options, verify: true },
+    structuredClone(assignments), { controller: h.controller, gh: fakeGh(), git: checkoutGit });
+  assert.equal(h.discoveries.length, 0, "With nothing to read, discovery costs nothing");
+  assert.equal(report.discovery.status, "none");
+  const presented = h.messages.find((message) => message.startsWith("V1b safeguard discovery"));
+  assert.match(presented, /no instruction file/i);
+  assert.equal(report.complete, true);
+}
+{
+  // Files that declare no command: the pass runs, answers honestly, and the
+  // run says so rather than implying the flag achieved something.
+  const h = harness({ discovered: [] });
+  const report = await withInstructions({ "AGENTS.md": "This project has no test suite." },
+    () => executeReviewRun(h.parent, h.client, { ...options, verify: true },
+      structuredClone(assignments), { controller: h.controller, gh: fakeGh(), git: checkoutGit }));
+  assert.equal(h.discoveries.length, 1);
+  assert.equal(report.discovery.status, "none");
+  assert.match(h.messages.find((message) => message.startsWith("V1b safeguard discovery")),
+    /found no command declared/);
+  assert.equal(report.complete, true);
+}
+for (const [scenario, failure, expected] of [
+  ["a malformed envelope", "discovery-malformed", /Discarded unusable/],
+  ["a pass that errors", "discovery-error", /discovery failed after start/],
+  ["a pass that cannot start", "discovery-setup", /discovery setup failed/],
+]) {
+  // Choice 5: a failed discovery is reported as itself and leaves review
+  // coverage alone, because it grounds nothing that a finding depends on.
+  const h = harness({ failure, discovered: declared });
+  const report = await withInstructions({ "AGENTS.md": "Run node scripts/smoke-findings.mjs." },
+    () => executeReviewRun(h.parent, h.client, { ...options, verify: true },
+      structuredClone(assignments), { controller: h.controller, gh: fakeGh(), git: checkoutGit }));
+  assert.equal(report.discovery.status, "failed", scenario);
+  assert.equal(report.complete, true, `${scenario} does not make the review incomplete`);
+  assert.equal(report.coverage, "completed", scenario);
+  assert(h.sessions.length > 0, `${scenario} still leaves the reviewers to run`);
+  const presented = h.messages.find((message) => message.startsWith("V1b safeguard discovery"));
+  assert.match(presented, /did not complete/, scenario);
+  assert.match(presented, expected, scenario);
+  assert.doesNotMatch(presented, /incomplete coverage/i, scenario);
+}
+{
+  // Cancelling during discovery is a cancellation, not a discovery failure and
+  // not a refused checkout. The signal-aware call must never be swallowed.
+  const h = harness({ failure: "discovery-cancel", discovered: declared });
+  const report = await withInstructions({ "AGENTS.md": "Run node scripts/smoke-findings.mjs." },
+    () => executeReviewRun(h.parent, h.client, { ...options, verify: true },
+      structuredClone(assignments), { controller: h.controller, gh: fakeGh(), git: checkoutGit }));
+  assert.equal(report.cancelled, true);
+  assert.notEqual(report.disposition, "refused", "A cancelled discovery is not a refused checkout");
+  assert.equal(h.sessions.length, 0, "No reviewer starts after a cancelled discovery");
+}
+console.log("PASS --verify discovers and presents declared safeguard commands, and still executes nothing");
 
 for (const number of [2, 3, 4, 5, 8, 9, 10]) {
   const h = harness();
