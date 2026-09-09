@@ -54,7 +54,7 @@ posting them.
 | Q5 | Completed | A candidate anchored on a changed line carries an optional `breaks` citation for the code that change breaks, which may be unchanged, in another hunk, or in another changed file, and which passes the same bound, in-window, exact-quote checks as every other citation. A supplied introduction citation still belongs to the location's own hunk; a null one is now a claim the adjudicator tests. Demonstrated by the twelve controlled suites, the reconstructed rejections from pull requests #4, #5 and #10, and the live balanced review of pull request #12, which cost 137.274102 credits, saw a reviewer use the new citation, and found one real defect in this increment's adjudicator contract. | Q4; [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | Q6 | Completed | Candidate-only clipped-end quote repair restores exact bound source without dropping a named line. Controlled reconstructions of #11 and #12 reach adjudication; #4's inserted-space fabrication stays refused. PR #13's installed balanced review cost 134.753239 credits and was incomplete: contracts returned no usable output and correctness reported a coverage gap. No candidates or adjudication occurred, so live repair behavior remains unobserved. Exact adjudicator/publication checks and both schema versions are unchanged. | Q5; [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | C5 | Pending | A completed reviewer whose output the evidence boundary discards becomes eligible for its tier's one fallback attempt, as an empty response already is. Found by pull request #10's overview reviewer and discarded by the evidence boundary's same-hunk rule. Needs the user's go-ahead: it moves the retry decision across the evidence boundary. | C3, Q4; [Fallbacks/execution](SCOPE.md#models-configuration-and-execution) |
-| V1 | In progress | `--verify` enforces matching branch/SHA/cleanliness before reviewers and presents discovered existing commands for approval. `V1a` added the preflight and executes nothing; `V1b` added discovery and presentation from the project's own instruction files, approving and running nothing. Command approval remains open. | Q1; [Safeguards](SCOPE.md#optional-project-safeguards) |
+| V1 | In progress | `--verify` enforces matching branch/SHA/cleanliness before reviewers and presents discovered existing commands for approval. `V1a` added the preflight and executes nothing; `V1b` added discovery and presentation from the project's own instruction files, approving and running nothing, and merged without installed-plugin evidence after its one authorized review refused at capture. Command approval remains open. | Q1; [Safeguards](SCOPE.md#optional-project-safeguards) |
 | V2 | Pending | Execute only approved existing safeguards with installed dependencies; show evidence and artifacts without autofix or checkout manipulation. | V1; [Safeguards](SCOPE.md#optional-project-safeguards) |
 | D1 | Pending | Document configuration, modes, incomplete coverage, cancellation, publication, cache, and safeguards with reproducible end-to-end examples. | Remaining v1 items; [Release boundary](SCOPE.md#priority-and-release-boundary) |
 
@@ -6662,8 +6662,12 @@ not touch `read-only.mjs`.
 - **The pass runs on the heavy tier**, reusing the assignment the adjudicator
   reuses, because every mode has one. A cheaper tier for what is an extraction
   task is a possible refinement, unmeasured.
-- **Live evidence is pending** at the time of writing; see the refused attempt
-  below. The increment has no installed-plugin evidence yet.
+- **This increment has no installed-plugin evidence at all, and was merged
+  anyway.** That is a deliberate, user-authorized departure from the rule in
+  `AGENTS.md` that an increment touching `extensions/` is not demonstrated until
+  the installed plugin has reviewed its own pull request. See the two sections
+  below. Nothing in `V1b` has been exercised through the real dispatch, the real
+  models or a real `gh` request: every claim here rests on the controlled suites.
 
 ### The first review attempt refused, and why
 
@@ -6704,6 +6708,30 @@ separate question and is not scheduled.
 Worth keeping: the tool refused to read a diff whose content could have attacked
 the terminal it was printed to, and the content in question was a test asserting
 that this tool refuses exactly that. The protection and the feature agreed.
+
+### No second review was run, and the increment merged without one
+
+**The user was told the increment had no verification of record and chose to
+merge pull request #17 without rerunning the review.** The standing workflow
+authorizes exactly one review per increment pull request; that one was spent on
+the refused capture above, and a rerun needs a fresh explicit instruction, which
+was not given. This is recorded as a decision, not an oversight.
+
+What that costs, concretely. `V1b` adds a model pass to the run, and no live
+evidence exists that:
+
+- the discovery pass reaches the real dispatch at all, or that a real model
+  returns the envelope contract this increment defined;
+- `collectInstructionFiles` behaves against this repository's own root, where it
+  should read `AGENTS.md`, `CLAUDE.md`, `HANDOFF.md` and `SCOPE.md`, and skip
+  `README.md` and `ROADMAP.md` for size;
+- a real pass attributes commands to the right files, or how often it invents or
+  paraphrases one, which is the risk the deferred citation check exists for;
+- the extra model turn's real credit cost, which is therefore unknown.
+
+**The next increment's review should be treated as covering `V1b` as well as its
+own change.** Read the discovery output in that timeline with the scepticism due
+to a path no live run has ever taken, and record what it shows here.
 
 
 ## Exact next increment

@@ -9,167 +9,143 @@ from what has only been assumed, in your own reporting as well as in the code.
 ## Recorded state
 
 This handoff is prepared for a fresh session on **clean `main` after the
-user-authorized merge of pull request #16**, which carried `V1a` from branch
-`v1a-verify-preflight`, branched from `main` at `5d9eb8c`. Confirm the merge,
-branch and working-tree state before proceeding; if #16 is still open, report
-the unfinished merge rather than starting another increment. A squash merge need
-not retain the individual commits as ancestors of `main`; use #16 and git
-history to reconcile state. The only other open pull requests should be the
-synthetic playground ones, #1 and #2, which must never be merged or republished.
-No uncommitted work or increment in flight is intended to remain.
+user-authorized merge of pull request #17**, which carried `V1b` from branch
+`v1b-safeguard-discovery`, branched from `main` at `d88df68`. Confirm the merge,
+branch and working-tree state before proceeding; if #17 is still open, report the
+unfinished merge rather than starting another increment. A squash merge need not
+retain the individual commits as ancestors of `main`; use #17 and git history to
+reconcile state. The only other open pull requests should be the synthetic
+playground ones, #1 and #2, which must never be merged or republished. No
+uncommitted work or increment in flight is intended to remain.
 
-**Start `V1b` by discussing its boundary with the user, not by writing code.**
+**Start `V1c` by discussing its boundary with the user, not by writing code.**
 That is the whole of the next step; everything below is the context for it.
 
-`V1a` is complete. Its boundary was discussed and approved before any code was
-written, which is now the expected sequence for an increment that touches a
-gate. On `v1a-verify-preflight`, five commits carried the implementation and its
-evidence, ending at `88400df`, which is **the revision the installed plugin
-reviewed**; a squash merge will not keep them as ancestors of `main`. `5b2d897`
-fixes the one finding that review produced, and `2e86bbb` records the review and
-its outcome. This handoff is documentation only. **Nothing after `88400df` has
-been reviewed again**, and this increment's single authorization is spent.
+## What `V1b` settled
 
-## What `V1a` settled
+**`--verify` now discovers and presents safeguard commands, and still executes
+nothing.** A run that passes `V1a`'s preflight reads the markdown at the checkout
+root, asks one bounded pass which safeguard commands those files declare, and
+presents each command with the file it came from. No command is approved, none is
+executed, and no reviewer receives one. `scripts/smoke-review.mjs` asserts that
+no discovered command reaches a reviewer prompt and that an ordinary review
+starts no discovery pass at all.
 
-**`--verify` adds a preflight and deliberately executes nothing.** No safeguard
-is discovered, none is presented, none is approved, and none is run. No
-reviewer's input changes at all: the system message and prompts of a
-verification-enabled run are exactly an ordinary review's, which
-`scripts/smoke-review.mjs` asserts directly. A run that passes the preflight is
-an ordinary review of its mode, and the timeline says so in those words, because
-a flag named `--verify` must never read as evidence that something verified the
-change.
+Five choices are settled and must be preserved. The source is the project's own
+agent instructions and nothing else, with manifest entry points and best-effort
+stack inference recorded as later slices in that order. Nothing is filtered out
+of the presentation, because the install, auto-fix and watch exclusions are rules
+about what may be approved. A presented command carries the file it came from,
+not a quoted line. Files are read from the checkout the preflight already proved,
+capped at 64KB each with a 256KB budget for the run, with every skipped candidate
+named. An empty or failed pass is reported plainly and leaves review coverage
+untouched.
 
-Five choices are settled and must be preserved: untracked paths refuse under
-`--verify` only, while an ordinary review still warns; a detached `HEAD` and any
-branch other than the captured head ref are refused; the stricter conditions
-live in the one existing gate as a profile, never in a second gate; the flag is
-orthogonal to the mode and posting flags, is refused with `--capture-only`, and
-is **deliberately not a configuration key**, so no saved or trusted-project
-setting can turn verification on; and a passing preflight is an ordinary review
-that says so.
+**Prompt injection through instruction files is accepted for this release**, on
+the user's explicit decision, because the tool runs on their own and their team's
+pull requests. It is recorded in the roadmap as a decision. Revisit before the
+tool reviews pull requests from outside a trusted team. The mitigation that was
+proposed and dropped was diffing the instruction files against the base and
+refusing commands from a file the branch modified.
 
-**No retained-record schema changed and no version was bumped.**
-`retainedRecord` picks a fixed outcome key list that excludes `verify`, and
-`scripts/smoke-review.mjs` asserts it stays out. Ask before changing the
-retained-record schema version: it tracks publication authority, not whether a
-review may start.
+**A `--verify` run now spends one extra model turn**, unless the checkout root
+holds no markdown, in which case discovery costs nothing and says so.
 
-Three no-inference facts underpin the gate and are recorded in the roadmap:
-`git symbolic-ref --quiet --short HEAD` prints the branch when attached and
-exits **1** with empty output when detached; `git status --porcelain=v1
---untracked-files=normal` never lists ignored paths, so an ordinary working
-checkout with dependencies installed passes; and `gh pr checkout NUMBER` names
-the local branch after the head branch by documented default, including for a
-fork.
+**No retained-record schema changed and no version was bumped.** `retainedRecord`
+picks a fixed outcome key list that excludes `discovery`, and
+`scripts/smoke-review.mjs` asserts it stays out.
 
-## Review of record and the finding it found
+Discovery is not a reviewer. It holds no tool, is never given the checkout, takes
+no configured fallback, and a pass that fails or cannot start is reported as
+itself while the reviewers run on. **Its cancellation is re-thrown before
+anything is recorded**, which is the shape #16's review taught: do not put a bare
+`catch` around a signal-aware call.
 
-`V1a`'s single authorized review used explicit **balanced** mode, the default
-topology, because the increment adds no mode and changes a gate. It cost
-**152.816643 credits**. Four heavy reviewers ran `gpt-5.6-terra`/high, overview
-ran `gpt-5.6-luna`/high, and the adjudicator ran `gpt-5.6-terra`/high. There
-were 38 tool calls and 39 confined reads, with **no permission denial and no
-tool denial**.
+## The gap this increment leaves, and what to do about it
 
-Coverage is **INCOMPLETE**: two execution failures, zero coverage gaps, five
-informational caveats, and one accepted P2 finding. This is not a clean-review
-claim. The finding was a real defect in the new code and is fixed, with tests
-confirmed red against the reviewed implementation at `88400df`.
+**`V1b` has no installed-plugin evidence and was merged without any.** Its one
+authorized review refused during PR capture, because a raw `ESC` byte in this
+increment's own test fixture made the repository's diff something `gh` refuses to
+print. The fixture was fixed to spell that byte as `\u001b`, `gh` reads the diff
+normally again, and the user chose to merge rather than authorize a rerun. Both
+the refusal and the decision are recorded in the roadmap.
 
-**The defect: a blanket `catch` around the new branch probe.** Every rejection
-became an empty branch, which takes the detached-HEAD refusal path, so a
-cancelled run and a broken git alike were reported as `this checkout has a
-detached HEAD at <sha>`. Exit status 1 is now the only rejection read as
-detached; a cancelled probe propagates, and any other failure is refused naming
-what actually happened. The runner also stopped reporting a cancelled gate as
-`disposition: "refused"`: it re-throws once the signal is aborted, before
-logging anything, so the cancellation reaches the owned run as one. **Do not
-reintroduce a bare `catch` around a signal-aware call**; that is the shape this
-review caught.
+Consequences you must carry:
 
-The controlled double in `scripts/smoke-review.mjs` had to be corrected with the
-implementation: it modelled the detached case as an unlabelled `Error`, which
-real git does not produce, and now carries exit status 1.
+- Nothing in `V1b` has run through the real dispatch, the real models or a real
+  `gh` request. Every claim about it rests on the controlled suites.
+- No live run has ever produced a discovery envelope, so the contract this
+  increment defined is unproven against a real model.
+- The extra model turn's real credit cost is unknown.
+- **Treat your own increment's review as covering `V1b` too.** Read the discovery
+  output in that timeline with the scepticism due to a path no live run has taken,
+  and record what it shows in the roadmap.
 
-**`C5`'s demotion fired live for the second time.** Overview returned invalid
-JSON and its completed attempt was demoted to `incomplete`. No tier had a
-configured fallback, so none started. `C5`'s live gap is unchanged: **no live
-review has ever had a fallback configured, so none has ever started from a
-demotion.**
-
-Worth remembering: `contracts` found the same defect independently and was
-**rejected at the evidence boundary** for a citation that did not exactly match
-a supplied window, so it never reached adjudication. Two reviewers agreeing did
-not save the finding. One of them citing exactly did.
-
-The complete timeline was saved before analysis, outside the checkout, as
-`~/.claude/pr-review-timelines/v1a-review-16-timeline.log`, with the run's
-evidence JSON beside it. They stay local. The roadmap records the invocation,
-binding, charges and reproduction.
-
-What the run does not show: no live run has been cancelled during the preflight,
-and no live run has exercised the branch or untracked refusals, because the
-runtime fixture refuses earlier on the head condition. Those have controlled
-evidence against real git checkouts only.
+**`--allow-escape-sequences` was deliberately not added to PR capture.** That
+refusal is `gh` protecting a terminal from a hostile diff. Do not add the flag to
+make a run succeed. The real limitation, that this tool cannot review a pull
+request whose diff carries escape sequences, is recorded and unscheduled.
 
 ## Exact next step
 
-**The next increment is `V1b`: safeguard discovery and presentation.** Read "The
-next increment is `V1b`" under "Exact next increment" in the roadmap; it is
-authoritative and fuller than this summary.
+**The next increment is `V1c`: command approval.** Read "The next increment is
+`V1c`" under "Exact next increment" in the roadmap; it is authoritative and
+fuller than this summary.
 
 **It still needs the user's explicit go-ahead, and it must not begin with code.**
-Like `V1a`, discuss and present the boundary first and wait for approval,
-because the slice after it executes pull-request controlled code.
+Present its choices **one at a time**, each with your recommendation, the reason,
+and every alternative. Lead with which option is cheapest and which is cheapest
+while still pointing the right way; that is how `V1b`'s boundary was settled and
+what the user asked for. Do not present all the choices at once.
 
-`V1b` is discovery and presentation, and nothing else. A verification-enabled
-run that passes `V1a`'s preflight finds this project's existing safeguard
-commands, shows the user the exact commands it would run, and stops. No approval
-prompt, no execution, and still no change to what any reviewer receives. The
-roadmap names five choices to settle first, each with a recommendation: where
-commands come from, what "existing" excludes, what is presented, whether
-discovery reads the checkout or the captured revision, and what a run does after
-presenting.
+`V1c` is approval and still not execution: a run that has discovered commands
+asks which of them may run, records that answer, and stops. Two things `V1b`
+deliberately deferred land here. The exclusions for commands that install,
+migrate, deploy, format in place, auto-fix or watch, where watching is the sharp
+one because `SCOPE.md` forbids review timeouts and an approved watch command
+would wait forever. And the citation check, since code currently proves a
+command's file was read but not that the command appears in it.
 
-Acceptance is: a run that passes the preflight presents the discovered commands
-and their source, presents nothing outside the agreed sources, changes no
-reviewer input, executes nothing, and the controlled suites cover discovery
-against fixture projects including one with no safeguards at all. Ordinary
-review behaviour stays byte-identical.
+Also settle whether approval is per command or all-or-nothing, whether it enters
+the retained record and so touches a schema version that currently tracks
+publication authority only, and whether anything about approval may come from
+configuration, given that `V1a` kept `--verify` itself off the configuration keys.
 
-**Do not pull approval or execution into `V1b`**, and do not widen `V1a`'s flag.
-Executing pull-request controlled code is the largest safety boundary in this
-project and needs its own increment, discussion, tests and review. A review
-against a substantial code diff, a live review with a fallback configured, a
-live review in which a reviewer is refused an absent path, and `L1` are all
-recorded as open in the roadmap and none is scheduled.
+**Do not pull execution into `V1c`.** Executing pull-request controlled code is
+the largest safety boundary in this project and needs its own increment, its own
+discussion, its own tests and its own review. A review against a substantial code
+diff, a live review with a fallback configured, a live review in which a reviewer
+is refused an absent path, and `L1` are all recorded as open in the roadmap and
+none is scheduled.
 
 ## Validation and runtime caveats
 
-The twelve controlled suites (`node scripts/smoke-<name>.mjs`) are findings,
+The **thirteen** controlled suites (`node scripts/smoke-<name>.mjs`) are findings,
 review, selection, retention, preview, publication, publish-later, checkout,
-config, context, fixture and target. They require no inference or network. All
-twelve pass at this handoff, as they did at each checkpoint. `git diff --check`
-is clean.
+config, context, fixture, target and **safeguards**, the last added by `V1b`.
+They require no inference or network. All thirteen pass at this handoff, as they
+did at each checkpoint. `git diff --check` is clean.
 
 ```sh
 for s in findings review selection retention preview publication publish-later \
-  checkout config context fixture target; do node scripts/smoke-$s.mjs; done
+  checkout config context fixture target safeguards; do node scripts/smoke-$s.mjs; done
 ```
 
-`scripts/smoke-checkout.mjs` drives the verification profile against real
-throwaway git checkouts, including the case that matters most: a detached `HEAD`
-refuses verification and **still passes an ordinary review of the same
-checkout**. It also asserts the checkout is byte-identical after every refusal,
-so the gate demonstrably switches, stashes and cleans nothing. Keep that
-assertion when extending it.
+`scripts/smoke-safeguards.mjs` covers file collection against real temporary
+directories and the envelope against malformed answers, including a command
+citing a file that was never read. **Keep the source of every fixture plain
+text**: a raw control byte in a test is what refused #17's review.
 
-Both no-inference runtime probes passed at this handoff against the installed
-plugin built from `V1a`'s fixed checkout. They spend no credits but need a live
-runtime connection, and `copilot plugin install "$(pwd)"` must be rerun whenever
-the checkout changes, or the probe measures the previous build:
+`scripts/smoke-checkout.mjs` drives the verification profile against real
+throwaway git checkouts, including a detached `HEAD` that refuses verification
+and **still passes an ordinary review of the same checkout**. It also asserts the
+checkout is byte-identical after every refusal. Keep that assertion when
+extending it.
+
+Both no-inference runtime probes passed before `V1b`, against the plugin built
+from `V1a`'s checkout. **They were not rerun for `V1b`.** They spend no credits
+but need a live runtime connection, and `copilot plugin install "$(pwd)"` must be
+rerun whenever the checkout changes, or the probe measures the previous build:
 
 ```sh
 COPILOT_CLI_PATH="$(command -v copilot)" \
@@ -178,29 +154,31 @@ COPILOT_SDK_PATH="$(ls -d "$HOME"/.copilot/pkg/*/"$(copilot --version \
 node scripts/smoke-runtime.mjs --targets
 ```
 
-`scripts/smoke-reviewer-tools.mjs`, the confinement probe outside the twelve,
-must be run and reported for any increment touching `read-only.mjs`. `V1a` does
-not touch it, so it was not run and was not required. Run it for `V1b` only if
-that increment reaches into the read tools, which it should not.
+`scripts/smoke-reviewer-tools.mjs`, the confinement probe outside the thirteen,
+must be run and reported for any increment touching `read-only.mjs`. `V1b` does
+not touch it, so it was not run and was not required.
 
-**Never add a timeout, deadline or stuck-reviewer heuristic.** `SCOPE.md`
-forbids review timeouts, and both `C3` and `C5` depend on their absence. There
-is no timeout: a quiet timeline is not a hang.
+**Never add a timeout, deadline or stuck-reviewer heuristic.** `SCOPE.md` forbids
+review timeouts, and `C3`, `C5` and `V1c`'s watch-command exclusion all depend on
+their absence. There is no timeout: a quiet timeline is not a hang.
 
 **Do not revert to `fs.realpathSync` anywhere in `read-only.mjs`**, and do not
-replace the `lstat` check in `absentInsideRoot` with a `stat` or a plain
-resolve: both exist to stop the refusal from saying where a symlink points.
+replace the `lstat` check in `absentInsideRoot` with a `stat` or a plain resolve:
+both exist to stop the refusal from saying where a symlink points. The same
+`lstat` reasoning is why `collectInstructionFiles` refuses a symbolic link rather
+than following it.
 
 No runtime API changed. CLI 1.0.83 remains the recorded runtime. Derive the SDK
 path from `copilot --version`. Consult the installed SDK and current official
 documentation before adopting new APIs. Do not revisit Agent Factories without a
-new CLI version. Do not widen `F6`'s marker unwrap or reintroduce substring
-matching.
+new CLI version. **Do not widen `F6`'s marker unwrap or reintroduce substring
+matching**; `V1b` shares it as `unwrapEnvelope` from `findings.mjs` precisely so
+the one rule stays in one place.
 
 The personal config probe fails its first assertion if personal
 `pr-review/config.json` exists. Move it aside only if running that probe, restore
 it afterwards, and verify the restore with `shasum -a 256`. That file was not
-moved or edited in the `V1a` session.
+moved or edited in the `V1b` session.
 
 Cold resume of command-only records remains unsupported. The adjudicator is
 zero-tool; citations remain limited to captured diff/context windows.
@@ -229,15 +207,18 @@ publishing is authorized.
 
 The standing workflow authorizes exactly one review per increment pull request,
 not reruns, extra probes, or `scripts/smoke-factory.mjs --spend`. Historical
-reviews are already spent and carry no authorization forward.
+reviews are already spent and carry no authorization forward. **If that one
+review refuses before any reviewer starts, record the refusal and ask; do not
+rerun on your own judgment.**
 
 ## Landing and handoff
 
 Follow `AGENTS.md`: meaningful validated checkpoint commits, a named increment
 branch and pull request, never direct `main` pushes, no force-push or amended
 published history. Merging remains the user's decision. Preserve unrelated
-changes. Inspect enumerations and counts when extending a concept. Update
-`README.md` for user-visible behaviour; `V1a` did, under its `--verify` section.
+changes. Inspect enumerations and counts when extending a concept; `V1b` had to
+update the suite count from twelve to thirteen in several places. Update
+`README.md` for user-visible behaviour; `V1b` did, under its own section.
 
 Finish implementation, validation and roadmap evidence first. Rewrite
 `HANDOFF.md` as the final repository file edit before the session-ending commit,
