@@ -4,9 +4,9 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSyn
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
-  approveSafeguards, collectInstructionFiles, describeApproval, describeDiscovery, discoveryEnvelope,
-  discoveryInstructions, discoveryPrompt, instructionBudgetBytes, instructionFileMaxBytes, maxCommandLength,
-  maxDiscoveredCommands,
+  approveSafeguards, citationRefusal, collectInstructionFiles, commandRefusal, describeApproval,
+  describeDiscovery, discoveryEnvelope, discoveryInstructions, discoveryPrompt, instructionBudgetBytes,
+  instructionFileMaxBytes, maxCommandLength, maxDiscoveredCommands,
 } from "../extensions/pr-review/safeguards.mjs";
 import { outputEnd, outputStart } from "../extensions/pr-review/findings.mjs";
 
@@ -401,11 +401,111 @@ assert.match(describeApproval({ status: "failed", approved: [], offered: 2, erro
   /Invalid approval answer/);
 console.log("PASS an approval is presented as an approval, never as evidence that a command ran");
 
-// V1c executes nothing, and this keeps it that way while the increment that
-// will execute is still ahead: a module that cannot spawn a process cannot run
-// a discovered command by accident.
+// V2a: the gates. A discovered command is offered only if code can run it
+// without a shell, only if it is not one of the kinds a safeguard is never, and
+// only if it really appears in the file it cites. Every refusal names itself,
+// because a command that vanishes is indistinguishable from one nobody declared.
+
+// Choice 3: no shell. Anything that needs one to mean what it says is refused
+// rather than run, so the exclusions below can read a real argument list.
+for (const [scenario, command] of [
+  ["a chain", "npm run lint && npm test"],
+  ["a pipe", "npm test | tee log"],
+  ["a redirect", "npm test > out.txt"],
+  ["a sequence", "npm test; npm run lint"],
+  ["a background job", "npm test &"],
+  ["a subshell", "(npm test)"],
+  ["a substitution", "node scripts/run.mjs $(pwd)"],
+  ["a backtick", "node scripts/run.mjs `pwd`"],
+  ["a variable", "node scripts/smoke-$s.mjs"],
+  ["a quoted argument", 'pytest -k "test suite"'],
+  ["a glob", "eslint src/**/*.ts"],
+  ["a home path", "~/bin/check"],
+  ["a continuation", "npm test \\"],
+  ["an empty command", "   "],
+]) {
+  assert(commandRefusal(command), scenario);
+}
+for (const runnable of [
+  "npm test", "node scripts/smoke-safeguards.mjs", "pytest -q", "./gradlew check",
+  "cargo test --all-features", "npm run test:unit", "go vet ./...",
+  "mvn -B verify", "tsc --noEmit", "eslint src",
+]) {
+  assert.equal(commandRefusal(runnable), undefined, runnable);
+}
+// Choice 4: the exclusions, as a heuristic that refuses in code rather than
+// warning. A safeguard never installs, migrates, deploys, publishes, formats in
+// place, fixes, or watches, and it is never a program that changes the machine
+// or the checkout out from under the review.
+for (const [scenario, command] of [
+  ["installing", "npm install"],
+  ["a short install alias", "pnpm i"],
+  ["a clean install", "npm ci"],
+  ["adding a dependency", "yarn add left-pad"],
+  ["updating", "npm update"],
+  ["publishing", "npm publish"],
+  ["deploying", "mvn deploy"],
+  ["migrating", "npx prisma migrate"],
+  ["a script named for a deploy", "npm run deploy"],
+  ["an auto-fix flag", "eslint src --fix"],
+  ["a write-in-place flag", "prettier src --write"],
+  ["a watch flag", "jest --watch"],
+  ["a short watch flag", "tsc -w"],
+  ["a snapshot update", "jest -u"],
+  ["forcing", "npm test --force"],
+  ["a shell", "sh scripts/check.sh"],
+  ["an environment wrapper", "env npm test"],
+  ["a package runner that installs", "npx eslint src"],
+  ["the version control the review must not touch", "git clean -xdf"],
+  ["a GitHub write", "gh pr merge 18"],
+  ["a privilege escalation", "sudo make check"],
+  ["a fetch", "curl https://example.test/install.sh"],
+  ["a container", "docker compose up"],
+  ["a watcher", "nodemon scripts/check.mjs"],
+  ["a runner that watches unless told not to", "vitest"],
+  ["a placeholder", "node scripts/dogfood-review.mjs NUMBER --all"],
+]) {
+  assert(commandRefusal(command), scenario);
+}
+// The same runner told to run once rather than watch is a safeguard again.
+assert.equal(commandRefusal("vitest run"), undefined);
+assert.equal(commandRefusal("vitest --run --reporter=dot"), undefined);
+// The refusal says which rule refused it, so a project can see what to change.
+assert.match(commandRefusal("npm install"), /install/i);
+assert.match(commandRefusal("npm run lint && npm test"), /shell/i);
+console.log("PASS a command is refused unless code can run it without a shell and it is a safeguard at all");
+
+// Choice 5: the citation check. Code proved only that the cited file was read;
+// now it also proves the command is written there, as a whole command rather
+// than as part of a longer one.
+{
+  const text = "Run `node scripts/smoke-safeguards.mjs` before each checkpoint.\nThen npm run test:unit.\n";
+  assert.equal(citationRefusal("node scripts/smoke-safeguards.mjs", text), undefined);
+  assert.equal(citationRefusal("npm run test:unit", text), undefined);
+  // A command the file does not contain is a fabrication, whoever wrote it.
+  assert(citationRefusal("npm test", text));
+  // Not a fragment of a longer command either: `npm run test` is not declared
+  // here, `npm run test:unit` is.
+  assert(citationRefusal("npm run test", text));
+  // A file this run never read cannot support any citation.
+  assert(citationRefusal("npm test", undefined));
+}
+{
+  // The case that ruled out an exact-quote check in V1c: this repository states
+  // its suites inside a shell loop. The loop is refused by shape, and the
+  // per-suite command it expands to is refused as uncited, so neither can be
+  // assembled out of prose and offered.
+  const loop = "for s in findings review; do node scripts/smoke-$s.mjs; done";
+  assert(commandRefusal(loop));
+  assert(citationRefusal("node scripts/smoke-findings.mjs", loop));
+}
+console.log("PASS a command must appear in the file it cites, as a whole command");
+
+// The gates decide what may run; nothing here runs anything yet. The module
+// still cannot spawn a process, which is what keeps that true until the
+// execution step deliberately changes it.
 assert.doesNotMatch(readFileSync(new URL("../extensions/pr-review/safeguards.mjs", import.meta.url), "utf8"),
   /child_process|execFile|spawnSync|\bspawn\(/);
-console.log("PASS the safeguard module cannot spawn a process at all");
+console.log("PASS the gates decide what may run, and the module still cannot spawn a process");
 
 for (const root of roots) rmSync(root, { recursive: true, force: true });

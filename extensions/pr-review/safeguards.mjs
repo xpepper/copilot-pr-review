@@ -159,6 +159,147 @@ export function discoveryEnvelope(raw, key, supplied) {
   return { commands: parsed.commands };
 }
 
+// V2a: the two gates a discovered command must pass before anyone is offered
+// the chance to run it. Both were deferred here from `V1b` and `V1c`, which
+// established that they guard execution rather than approval, and here there is
+// finally execution to guard. Both are heuristics, and the table below is the
+// honest statement of that: it is a list of what a safeguard is never, not a
+// proof of what is safe.
+//
+// The refusals are applied where they can be seen. Discovery still reports every
+// command it read, marked with the reason it may not run, because a command that
+// silently vanishes is indistinguishable from one nobody declared. Approval
+// offers only what survives, and execution asserts the same rule again in the
+// moment before it spawns.
+
+// Choice 3: no shell, ever. A command is split on whitespace and handed to the
+// operating system as an argument list, so a line that needs a shell to mean
+// what it says cannot mean it here. Refusing such a line is what makes the
+// exclusions below worth anything: against `sh -c`, `npm test && npm install`
+// defeats any rule that reads the first word.
+const safeCharacter = /[A-Za-z0-9._:/=@+,-]/;
+// `NUMBER`, `PATH`, `FILE`: an instruction file writes these where a real
+// argument goes, and running one literally is never what the project meant.
+const placeholderWord = /^[A-Z][A-Z0-9_]+$/;
+
+export const commandWords = (command) => String(command ?? "").trim().split(/\s+/).filter(Boolean);
+
+// Programs that are never a project safeguard. Each entry says what it is,
+// because a refusal a project cannot understand is a refusal it cannot fix.
+export const refusedPrograms = new Map([
+  ...["sh", "bash", "zsh", "ksh", "dash", "fish", "csh", "tcsh", "env", "xargs", "exec", "eval", "source"]
+    .map((name) => [name, "opens a shell or runs an arbitrary program, which is exactly what this gate prevents"]),
+  ...["sudo", "su", "doas"].map((name) => [name, "escalates privilege, and a review runs as the person who started it"]),
+  ...["rm", "mv", "cp", "ln", "dd", "mkfs", "mount", "umount", "chmod", "chown", "shutdown", "reboot",
+    "kill", "killall", "pkill", "crontab", "at", "systemctl", "launchctl", "osascript"]
+    .map((name) => [name, "changes the machine rather than checking the project"]),
+  ...["curl", "wget", "ssh", "scp", "sftp", "rsync", "nc", "ncat", "telnet"]
+    .map((name) => [name, "moves data across the network, which a safeguard does not need to do"]),
+  ...["git", "gh", "hub", "glab", "jj", "hg", "svn"]
+    .map((name) => [name, "is version control, and a review never switches branches, pulls, stashes or cleans"]),
+  ...["docker", "podman", "kubectl", "helm", "terraform", "ansible", "ansible-playbook", "vagrant", "serverless"]
+    .map((name) => [name, "provisions or deploys, which is not a check of this checkout"]),
+  ...["apt", "apt-get", "aptitude", "yum", "dnf", "pacman", "apk", "brew", "port", "snap", "choco", "winget",
+    "pip", "pip3", "easy_install", "gem", "cpan", "npx", "pnpx", "bunx"]
+    .map((name) => [name, "installs software, and safeguards run with the dependencies already installed"]),
+  ...["nodemon", "watchexec", "entr", "watchman", "webpack-dev-server"]
+    .map((name) => [name, "watches for changes and never finishes, and a review has no timeout to end it"]),
+  ...["copilot", "claude"].map((name) => [name, "drives this tool's own runtime, which a review must not do to itself"]),
+]);
+
+// A word anywhere in the command, not only the subcommand, so `npm run deploy`
+// is refused for the same reason `mvn deploy` is.
+export const refusedWords = new Set([
+  "install", "i", "ci", "add", "uninstall", "remove", "update", "upgrade", "bootstrap", "provision",
+  "publish", "deploy", "release", "migrate", "apply", "destroy",
+  "push", "pull", "clone", "checkout", "commit", "merge", "rebase", "reset",
+  "clean", "prune", "link", "unlink", "init", "create", "new",
+  "serve", "start", "dev", "watch", "format", "fmt", "fix", "autofix",
+]);
+
+// Long flags match their own prefix, so `--fix` also refuses `--fix-type` and
+// `--fix=all`. Short flags match exactly, because `-w` is a flag and `-warn`
+// is not.
+export const refusedLongFlags = ["--fix", "--write", "--watch", "--update", "--force", "--save", "--global",
+  "--apply", "--in-place", "--yes", "--no-verify", "--allow-dirty", "--overwrite", "--auto", "--install",
+  "--serve", "--reload", "--hot"];
+export const refusedShortFlags = new Set(["-w", "-W", "-g", "-u", "-y", "-i"]);
+
+// The named exception the `V1c` discussion found: a runner whose bare form
+// watches. It is a special case and is recorded as one; there is no general way
+// to see this from the command line alone.
+export const watchesUnlessTold = new Map([["vitest", ["run", "--run"]]]);
+
+const refusedFlag = (word) => refusedShortFlags.has(word) ||
+  refusedLongFlags.some((flag) => word === flag || word.startsWith(`${flag}-`) || word.startsWith(`${flag}=`));
+
+const program = (word) => word.slice(word.lastIndexOf("/") + 1);
+
+// Undefined when the command may run; otherwise the reason it may not, written
+// for the person who declared it.
+export function commandRefusal(command) {
+  const words = commandWords(command);
+  if (!words.length) return "it is empty";
+  const shellCharacter = [...String(command)].find((character) =>
+    !safeCharacter.test(character) && !/\s/.test(character));
+  if (shellCharacter) {
+    return `it contains ${JSON.stringify(shellCharacter)}, which only a shell can interpret, and safeguards ` +
+      "are run as an argument list with no shell at all";
+  }
+  const placeholder = words.find((word) => placeholderWord.test(word));
+  if (placeholder) return `${JSON.stringify(placeholder)} is a placeholder rather than a real argument`;
+  const name = program(words[0]);
+  if (refusedPrograms.has(name)) return `\`${name}\` ${refusedPrograms.get(name)}`;
+  const word = words.find((entry) => refusedWords.has(entry));
+  if (word) {
+    return `\`${word}\` is not a check: a safeguard never installs, migrates, deploys, publishes, creates, ` +
+      "cleans, serves, formats in place or watches";
+  }
+  const flag = words.find(refusedFlag);
+  if (flag) return `\`${flag}\` changes the checkout or never finishes, rather than reporting on it`;
+  const told = watchesUnlessTold.get(name);
+  if (told && !words.some((entry) => told.includes(entry))) {
+    return `\`${name}\` watches for changes unless it is told to run once (${told.join(" or ")}), and a review ` +
+      "has no timeout that could ever end a watch";
+  }
+  return undefined;
+}
+
+// Choice 5: the command must be written in the file it cites. `V1b` proved only
+// that the cited file was read, which left an invented command wearing a real
+// file's name. An exact quote was dropped in `V1c` because this project writes
+// its commands as loops and wrapped lines; that is no longer the obstacle it
+// was, because choice 3 already refuses every one of those shapes. What is left
+// to check is whether a plain command line is actually there.
+//
+// It must be there as a command of its own, so that `npm run test` cannot be
+// carved out of `npm run test:unit`. Prose that ends a command with a full stop,
+// a comma or a colon still counts, because that is how a sentence is written.
+const sentencePunctuation = new Set([".", ",", ":"]);
+
+export function citationRefusal(command, text) {
+  if (typeof text !== "string") return "the file it cites was not read by this run";
+  const needle = String(command ?? "");
+  if (!needle) return "it is empty";
+  const ends = (at) => {
+    const character = text[at];
+    if (character === undefined || !safeCharacter.test(character)) return true;
+    return sentencePunctuation.has(character) &&
+      (text[at + 1] === undefined || !safeCharacter.test(text[at + 1]));
+  };
+  for (let at = text.indexOf(needle); at >= 0; at = text.indexOf(needle, at + 1)) {
+    if ((at === 0 || !safeCharacter.test(text[at - 1])) && ends(at + needle.length)) return undefined;
+  }
+  return "it is not written in that file as a command of its own";
+}
+
+// One verdict per discovered command: the entry as discovered, plus the reason
+// it may not run when there is one.
+export const judgeCommands = (commands, textByFile) => commands.map((entry) => {
+  const refusal = commandRefusal(entry.command) ?? citationRefusal(entry.command, textByFile.get(entry.file));
+  return refusal ? { ...entry, refusal } : { ...entry };
+});
+
 // What the run shows: the command and the file it came from. The quoted line and
 // the check that the line really appears there belong to the increment that can
 // execute a command, and so do the exclusions for installing, auto-fixing and
