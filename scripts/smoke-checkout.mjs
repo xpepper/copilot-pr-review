@@ -331,12 +331,19 @@ try {
   assert.match(verificationNotice, /head branch/);
   assert.match(verificationNotice, /untracked/);
   assert.match(verificationNotice, /approv/i);
-  assert.match(verificationNotice, /nothing is executed|no command is executed|nothing runs/i);
+  // V2a: the flag now runs what it is given permission to run, so the notice
+  // must say that plainly, and must no longer promise that nothing executes.
+  assert.match(verificationNotice, /runs in this checkout|approved command runs/i);
+  assert.match(verificationNotice, /not a sandbox/i);
+  assert.doesNotMatch(verificationNotice, /nothing is executed|no command is executed/i);
+  // The offered list is no longer unfiltered, so it may not claim to be.
+  assert.doesNotMatch(verificationNotice, /unfiltered/i);
+  assert.match(verificationNotice, /heuristic|never offered/i);
   assert.match(verificationNotice, /ordinary review/);
-  // No exclusion rule exists yet, so the notice must not imply the offered list
-  // was filtered or judged by anything.
-  assert.match(verificationNotice, /unfiltered|not .*judged/i);
-  console.log("PASS the verification notice states that an approval is recorded and nothing is executed");
+  // The exclusions are a heuristic, so the notice must never let surviving them
+  // read as a judgement that a command is safe to run.
+  assert.match(verificationNotice, /not a judgement|never a judgement/i);
+  console.log("PASS the verification notice states what an approved command does, and what it is not");
 } finally {
   for (const directory of temporary) rmSync(directory, { recursive: true, force: true });
 }

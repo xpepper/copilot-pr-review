@@ -191,14 +191,33 @@ console.log("PASS the discovery envelope is validated in code, including which f
   // Skipped sources are named, so an incomplete read is visible.
   assert.match(found, /ROADMAP\.md/);
   assert.match(found, /exceeds 65536 bytes/);
-  // The presentation can never read as evidence that anything ran or was allowed to.
-  assert.match(found, /Nothing here has been approved and nothing has run/);
+  // Nothing has run at the point this is printed, and the next thing that
+  // happens is the question, so the text says exactly that and nothing more.
+  assert.match(found, /Nothing here has run/);
   assert.match(found, /asked next which of these may run/);
-  assert.match(found, /no reviewer receives one/i);
   // V1c asks in this same run, so discovery may no longer defer the offer to a
   // later increment. Pull request #18's contracts reviewer caught exactly this.
   assert.doesNotMatch(found, /a later increment would offer to run/);
+  // V2a executes, so discovery may no longer claim that nothing will.
+  assert.doesNotMatch(found, /this release executes none/i);
   assert.doesNotMatch(found, /pass(ed)?\b.*safeguard|safeguard.*pass(ed)?\b/i);
+}
+{
+  // V2a: a command code refuses to run is still reported, with the reason, and
+  // is marked as one nobody will be offered. A refused command that vanished
+  // would be indistinguishable from one the project never declared.
+  const found = describeDiscovery({
+    status: "found",
+    commands: [
+      { command: "node scripts/smoke-safeguards.mjs", file: "AGENTS.md" },
+      { command: "npm install", file: "AGENTS.md", refusal: "`install` is not a check" },
+    ],
+    files: [{ name: "AGENTS.md" }], skipped: [],
+  });
+  assert.match(found, /npm install/);
+  assert.match(found, /`install` is not a check/);
+  assert.match(found, /not offered/i);
+  assert.match(found, /1 of 2|1 command/i);
 }
 {
   // Choice 5: an empty result is reported plainly and the run carries on.
@@ -237,14 +256,17 @@ const approvalBinding = {
   number: 18, pullId: "pull-18", head: "b".repeat(40), base: "a".repeat(40),
   diffSha256: "diff", contextSha256: "context", paths: [],
 };
-// One safeguard and one command that plainly is not a safeguard. V1c offers
-// both, because nothing it can approve is able to run.
+// Two safeguards code can run, and one command it refuses. V2a offers only the
+// two: approving now means running, so a command that may not run is never put
+// in front of a person as though it could.
 const declared = [
   { command: "node scripts/smoke-findings.mjs", file: "HANDOFF.md" },
-  { command: "mvn deploy", file: "AGENTS.md" },
+  { command: "node scripts/smoke-review.mjs", file: "AGENTS.md" },
 ];
+const refusedCommand = { command: "mvn deploy", file: "AGENTS.md", refusal: "`deploy` is not a check" };
 const foundDiscovery = {
-  status: "found", commands: declared, files: [{ name: "AGENTS.md" }, { name: "HANDOFF.md" }], skipped: [],
+  status: "found", commands: [...declared, refusedCommand],
+  files: [{ name: "AGENTS.md" }, { name: "HANDOFF.md" }], skipped: [],
 };
 
 function approvalFixture({ answer = () => ({ action: "decline" }), ui = true, discovery = foundDiscovery,
@@ -280,9 +302,16 @@ const accepted = (commands) => ({ action: "accept", content: { commands } });
   // A choice carries the command and the file it was declared in, which is the
   // whole of what V1b can stand behind about it.
   assert.deepEqual(offered(fixture.requests[0]).map(({ title }) => title),
-    ["node scripts/smoke-findings.mjs  [declared in HANDOFF.md]", "mvn deploy  [declared in AGENTS.md]"]);
-  // The question must never read as though approving were running.
-  assert.match(fixture.requests[0].message, /nothing .*(runs|ran|executed)|no command .*(runs|is run|executed)/i);
+    ["node scripts/smoke-findings.mjs  [declared in HANDOFF.md]",
+      "node scripts/smoke-review.mjs  [declared in AGENTS.md]"]);
+  // A command code refuses is never offered, and the question says how many
+  // were held back rather than quietly presenting a shorter list.
+  assert.equal(approval.refused, 1);
+  assert(offered(fixture.requests[0]).every(({ title }) => !title.includes("mvn deploy")));
+  // The question must say what approving does, because approving now runs it.
+  assert.match(fixture.requests[0].message, /runs? (it|them|now)|run(s)? in this checkout/i);
+  assert.doesNotMatch(fixture.requests[0].message, /nothing runs in this release/i);
+  assert.match(fixture.requests[0].message, /not a sandbox|does not sandbox/i);
   assert.match(fixture.requests[0].message, /fixture\/repository#18/);
   assert.match(fixture.requests[0].message, new RegExp(approvalBinding.head));
 }
@@ -354,6 +383,9 @@ for (const discovery of [
   { status: "none", commands: [], files: [], skipped: [] },
   { status: "none", commands: [], files: [{ name: "AGENTS.md" }], skipped: [] },
   { status: "failed", commands: [], files: [{ name: "AGENTS.md" }], skipped: [], reason: "pass failed" },
+  // Every discovered command refused is nothing to offer, and it says so
+  // differently from a project that declared nothing at all.
+  { status: "found", commands: [refusedCommand], files: [{ name: "AGENTS.md" }], skipped: [] },
 ]) {
   // Nothing to approve is not a question worth asking, and a failed discovery
   // has produced no list that anyone could answer about.
@@ -363,6 +395,7 @@ for (const discovery of [
   assert.deepEqual(approval.approved, []);
   assert.equal(approval.offered, 0);
   assert.equal(fixture.requests.length, 0);
+  assert.match(describeApproval(approval), discovery.status === "found" ? /refus/i : /no command to approve/i);
 }
 {
   // A run already cancelled asks nothing.
@@ -376,26 +409,33 @@ console.log("PASS approval is asked per command, bound to its invocation, and ap
 
 // Presentation. Every status says plainly that nothing ran, and none of them
 // may claim the review itself is incomplete: approval is not review coverage.
-for (const [scenario, approval] of [
-  ["an approved subset", { status: "approved", approved: [declared[0]], offered: 2 }],
-  ["nothing approved", { status: "none", approved: [], offered: 2 }],
-  ["no approval UI", { status: "unavailable", approved: [], offered: 2, error: "This host has no approval UI." }],
-  ["a cancelled approval", { status: "cancelled", approved: [], offered: 2 }],
-  ["a failed approval", { status: "failed", approved: [], offered: 2, error: "Invalid approval answer" }],
-  ["nothing to approve", { status: "not-started", approved: [], offered: 0 }],
+for (const [scenario, approval, runs] of [
+  ["an approved subset", { status: "approved", approved: [declared[0]], offered: 2, refused: 1 }, true],
+  ["nothing approved", { status: "none", approved: [], offered: 2, refused: 1 }, false],
+  ["no approval UI", { status: "unavailable", approved: [], offered: 2, refused: 1,
+    error: "This host has no approval UI." }, false],
+  ["a cancelled approval", { status: "cancelled", approved: [], offered: 2, refused: 1 }, false],
+  ["a failed approval", { status: "failed", approved: [], offered: 2, refused: 1,
+    error: "Invalid approval answer" }, false],
+  ["nothing to approve", { status: "not-started", approved: [], offered: 0, refused: 0 }, false],
 ]) {
   const described = describeApproval(approval);
   assert.match(described, /^V1c safeguard approval/, scenario);
-  assert.match(described, /nothing ran|no command ran|nothing was executed/i, scenario);
+  // Approval is not review coverage, whatever happened to it.
   assert.doesNotMatch(described, /incomplete coverage/i, scenario);
+  // Nothing may be approved except by a person, in this run.
+  assert.match(described, /no flag|nothing else approves|only you/i, scenario);
+  if (!runs) assert.match(described, /nothing runs|no command runs|nothing will run/i, scenario);
 }
 {
-  const described = describeApproval({ status: "approved", approved: declared, offered: 2 });
+  const described = describeApproval({ status: "approved", approved: declared, offered: 2, refused: 1 });
   assert.match(described, /node scripts\/smoke-findings\.mjs {2}\[declared in HANDOFF\.md\]/);
-  assert.match(described, /mvn deploy {2}\[declared in AGENTS\.md\]/);
+  assert.match(described, /node scripts\/smoke-review\.mjs {2}\[declared in AGENTS\.md\]/);
   assert.match(described, /2 of 2/);
-  // No exclusion rule exists, so the presentation must never imply a command
-  // was vetted by anything other than the person who approved it.
+  // The approved commands run next, in this checkout, before any reviewer.
+  assert.match(described, /before any reviewer|before the reviewers/i);
+  // The exclusions are a heuristic, so the presentation must never imply that
+  // surviving them means a command was judged safe.
   assert.doesNotMatch(described, /vetted|safe to run|checked for/i);
 }
 assert.match(describeApproval({ status: "failed", approved: [], offered: 2, error: "Invalid approval answer" }),

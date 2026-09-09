@@ -301,18 +301,19 @@ export const judgeCommands = (commands, textByFile) => commands.map((entry) => {
   return refusal ? { ...entry, refusal } : { ...entry };
 });
 
-// What the run shows: the command and the file it came from. The quoted line and
-// the check that the line really appears there belong to the increment that can
-// execute a command, and so do the exclusions for installing, auto-fixing and
-// watching. Nothing is filtered out here.
+// What the run shows: every command the pass read, the file it came from, and,
+// for one the gates refuse, the reason nobody will be offered it. Nothing is
+// filtered out of this report. A refused command that vanished here would be
+// indistinguishable from one the project never declared, and the person reading
+// this is the one who can fix the declaration.
 //
-// V1c asks which of these may run immediately after this is printed, so the text
-// must not defer the offer to a later increment. Pull request #18's contracts
-// reviewer caught that wording after it went stale, which every controlled suite
-// had passed over because they asserted the stale sentence.
-const nothingRan = "Nothing here has been approved and nothing has run. You are asked next which of these may " +
-  "run; this release executes none of them, no reviewer receives one, and this stays an ordinary review of " +
-  "the selected mode.";
+// The question follows immediately, and an approved command runs in this same
+// run, so the text must state both. Pull request #18's contracts reviewer caught
+// this wording after `V1c` made the previous version false, which every
+// controlled suite had passed over because they asserted the stale sentence.
+const nothingRan = "Nothing here has run. You are asked next which of these may run in this checkout; an " +
+  "approved command runs before any reviewer starts, no reviewer receives its output, and this stays an " +
+  "ordinary review of the selected mode.";
 
 export function describeDiscovery({ status, commands, files, skipped, reason }) {
   const read = files.length
@@ -339,10 +340,19 @@ export function describeDiscovery({ status, commands, files, skipped, reason }) 
         "selected mode.",
     ].join("\n");
   }
+  const offerable = commands.filter(({ refusal }) => !refusal);
+  const withheld = commands.length - offerable.length;
   return [
     `V1b safeguard discovery found ${commands.length} command(s) declared in this project's instructions.`,
-    ...commands.map(({ command, file }) => `  ${command}  [declared in ${file}]`),
+    ...commands.map((entry) => entry.refusal
+      ? `  ${choiceTitle(entry)}  not offered: ${entry.refusal}`
+      : `  ${choiceTitle(entry)}`),
     `${read}${missed}`,
+    ...(withheld
+      ? [`${offerable.length} of ${commands.length} can be run by this tool. The rest are not offered at all. ` +
+        "A refusal is a rule about the kind of command it is, and passing those rules is never a judgement " +
+        "that a command is safe to run."]
+      : []),
     nothingRan,
   ].join("\n");
 }
@@ -365,13 +375,15 @@ export function describeDiscovery({ status, commands, files, skipped, reason }) 
 
 const approvalFailure = (message) => { throw new Error(`Safeguard approval: ${message}.`); };
 
-const approvalQuestion = (binding, commands) => [
+const approvalQuestion = (binding, commands, refused) => [
   `Approve project safeguard commands for ${binding.repository.nameWithOwner}#${binding.number} ` +
     `at head ${binding.head}.`,
-  `${commands.length} command(s) were discovered in this project's own instruction files, at that revision.`,
-  "Nothing runs in this release. This run records your answer, executes no command, hands none to any reviewer, " +
-    "and continues as an ordinary review of the selected mode.",
-  "This list is unfiltered: a command below is one the pass read out of a file, not one this tool has judged.",
+  `${commands.length} command(s) discovered in this project's own instruction files, at that revision, can be ` +
+    `run by this tool.${refused ? ` ${refused} more were refused outright and are not offered.` : ""}`,
+  "Approving a command runs it now, in this checkout, before any reviewer starts. It runs as you, with the " +
+    "dependencies you already have installed. This is not a sandbox: this tool does not confine what an " +
+    "approved command can read, write or reach.",
+  "These commands are declared by the code under review. Approve one only if you would run it yourself.",
   "Accept with no choices or decline to approve none; cancel to cancel this run.",
 ].join("\n");
 
@@ -379,9 +391,14 @@ const choiceTitle = ({ command, file }) => `${command}  [declared in ${file}]`;
 
 export async function approveSafeguards(parent, discovery, { invocation, binding, controller }) {
   const signal = controller.signal;
-  const commands = discovery?.status === "found" && Array.isArray(discovery.commands) ? discovery.commands : [];
+  const discovered = discovery?.status === "found" && Array.isArray(discovery.commands) ? discovery.commands : [];
+  // Only what code would actually run is offered. A command the gates refuse is
+  // already on screen with its reason; putting it in the question as well would
+  // ask for permission that could not be acted on.
+  const commands = discovered.filter(({ refusal }) => !refusal);
+  const refused = discovered.length - commands.length;
   const result = (status, approved = [], error) => ({
-    status, approved, offered: commands.length, ...(error === undefined ? {} : { error }),
+    status, approved, offered: commands.length, refused, ...(error === undefined ? {} : { error }),
   });
   // A cancelled run is never asked a question, and a run with nothing to
   // approve is not asked one either.
@@ -444,25 +461,30 @@ export async function approveSafeguards(parent, discovery, { invocation, binding
   }
 }
 
-const nothingExecuted = "Nothing ran. This release records an approval and executes no command; running one is a " +
-  "later increment with its own gate, its own discussion and its own review. No reviewer receives an approved " +
-  "command, and this stays an ordinary review of the selected mode.";
+const onlyYou = "Nothing else approves a command: there is no flag, no configuration key and no saved posting " +
+  "setting that can, and an approval does not outlive the run that recorded it.";
 
-export function describeApproval({ status, approved, offered, error }) {
+export function describeApproval({ status, approved, offered, refused = 0, error }) {
   const headline = {
-    approved: `V1c safeguard approval: ${approved.length} of ${offered} discovered command(s) approved.`,
-    none: `V1c safeguard approval: none of the ${offered} discovered command(s) were approved.`,
-    unavailable: `V1c safeguard approval could not be requested: ${error}`,
-    cancelled: "V1c safeguard approval was cancelled, so no command was approved.",
-    failed: `V1c safeguard approval did not complete: ${error}`,
+    approved: `V1c safeguard approval: ${approved.length} of ${offered} offered command(s) approved.`,
+    none: `V1c safeguard approval: none of the ${offered} offered command(s) were approved, so nothing runs.`,
+    unavailable: `V1c safeguard approval could not be requested, so nothing runs: ${error}`,
+    cancelled: "V1c safeguard approval was cancelled, so nothing was approved and nothing runs.",
+    failed: `V1c safeguard approval did not complete, so nothing runs: ${error}`,
     // Approval is not review coverage, so none of these makes the review itself
     // incomplete, and none of them may be worded as though it did.
-    "not-started": "V1c safeguard approval was not requested: discovery found no command to approve.",
+    "not-started": refused
+      ? "V1c safeguard approval was not requested: every discovered command was refused before the offer, " +
+        "so nothing runs."
+      : "V1c safeguard approval was not requested: discovery found no command to approve, so nothing runs.",
   }[status];
   return [
     headline,
-    ...(status === "approved" ? approved.map((entry) => `  ${choiceTitle(entry)}`) : []),
-    nothingExecuted,
+    ...(status === "approved"
+      ? [...approved.map((entry) => `  ${choiceTitle(entry)}`),
+        "These run now, in this checkout, before any reviewer starts."]
+      : []),
+    onlyYou,
   ].join("\n");
 }
 

@@ -1131,7 +1131,7 @@ for (const [scenario, state, expected, fix] of [
   assert.match(opened, /"verify":true/);
   assert.match(opened, /"branch":"feature"/);
   assert.match(opened, /preflight passed on head branch feature/);
-  assert.match(opened, /no approved command is executed/);
+  assert.match(opened, /an approved command runs before the reviewers|approved command runs/);
   assert.match(opened, /no reviewer receives safeguard output/);
   assert(gitCalls.some((args) => args[0] === "symbolic-ref"), "The branch is read from git, never assumed");
   // Verification changes no reviewer's input. The harness already asserts every
@@ -1208,7 +1208,7 @@ const withInstructions = async (files, body) => {
   assert.match(presented, /node scripts\/smoke-findings\.mjs {2}\[declared in AGENTS\.md\]/);
   assert.match(presented, /node scripts\/smoke-review\.mjs {2}\[declared in HANDOFF\.md\]/);
   assert.match(presented, /Read: AGENTS\.md, HANDOFF\.md\./);
-  assert.match(presented, /Nothing here has been approved and nothing has run/);
+  assert.match(presented, /Nothing here has run/);
   assert.doesNotMatch(presented, /a later increment would offer to run/);
   // The pass reads the files themselves, not a description of them.
   assert.match(h.discoveries[0].prompt, /Run node scripts\/smoke-findings\.mjs\./);
@@ -1299,7 +1299,7 @@ for (const [scenario, failure, expected] of [
   assert.notEqual(report.disposition, "refused", "A cancelled discovery is not a refused checkout");
   assert.equal(h.sessions.length, 0, "No reviewer starts after a cancelled discovery");
 }
-console.log("PASS --verify discovers and presents declared safeguard commands, and still executes nothing");
+console.log("PASS --verify discovers declared safeguard commands and presents them with their sources");
 
 // V1c: a run that discovered commands asks which of them may run, records that
 // answer, and still executes nothing. The question sits where discovery does,
@@ -1324,9 +1324,9 @@ const instructionRoot = { "AGENTS.md": "Run node scripts/smoke-findings.mjs.",
   assert.deepEqual(report.approval.approved, [declared[1]]);
   assert.equal(report.approval.offered, 2);
   const recorded = h.messages.find((message) => message.startsWith("V1c safeguard approval"));
-  assert.match(recorded, /1 of 2 discovered command\(s\) approved/);
+  assert.match(recorded, /1 of 2 offered command\(s\) approved/);
   assert.match(recorded, /node scripts\/smoke-review\.mjs {2}\[declared in HANDOFF\.md\]/);
-  assert.match(recorded, /Nothing ran/);
+  assert.match(recorded, /before any reviewer starts/);
   // The question is asked after the commands are on screen and before any
   // specialist starts, which is the placement this increment settled.
   const presented = h.messages.findIndex((message) => message.startsWith("V1b safeguard discovery"));
@@ -1377,8 +1377,9 @@ for (const [scenario, approve, status] of [
   assert.equal(report.complete, true, `${scenario} does not make the review incomplete`);
   assert(h.sessions.length > 0, `${scenario} still leaves the reviewers to run`);
   const recorded = h.messages.find((message) => message.startsWith("V1c safeguard approval"));
-  assert.match(recorded, /Nothing ran/, scenario);
+  assert.match(recorded, /nothing runs/i, scenario);
   assert.doesNotMatch(recorded, /incomplete coverage/i, scenario);
+  assert.equal(report.safeguards.status, "not-started", scenario);
 }
 {
   // A host with no approval UI approves nothing and says so, and the review
@@ -1443,7 +1444,116 @@ for (const [scenario, files, failure] of [
   assert.equal(report.approval.status, "none");
   assert.deepEqual(report.approval.approved, []);
 }
-console.log("PASS --verify asks which discovered commands may run, records the answer, and still runs none");
+console.log("PASS --verify asks which discovered commands may run, and approves nothing it cannot account for");
+
+// V2a: an approved command runs, in this checkout, before any reviewer starts.
+// This is the first pull-request controlled code this tool executes, so what it
+// runs, what it does not run, and what running it means for the review are all
+// asserted at the level of the whole run.
+const evidence = "safeguard evidence 4711";
+const runnableRoot = {
+  "AGENTS.md": "Run node safeguard-check.mjs before each checkpoint.",
+  "safeguard-check.mjs": `console.log(${JSON.stringify(evidence)});`,
+};
+const runnable = [{ command: "node safeguard-check.mjs", file: "AGENTS.md" }];
+{
+  // The whole increment in one run: discovered, offered, approved, run, and
+  // reported with its output and with what it left in the checkout.
+  const h = harness({ discovered: runnable, approve: (request) =>
+    ({ action: "accept", content: { commands: approvalChoices(request) } }) });
+  const report = await withInstructions(runnableRoot,
+    () => executeReviewRun(h.parent, h.client, { ...options, verify: true },
+      structuredClone(assignments), { controller: h.controller, gh: fakeGh(), git: checkoutGit }));
+  assert.equal(report.safeguards.status, "passed");
+  assert.equal(report.safeguards.results.length, 1);
+  assert.equal(report.safeguards.results[0].code, 0);
+  assert.match(report.safeguards.results[0].stdout, new RegExp(evidence));
+  assert.deepEqual(report.safeguards.artifacts.paths, [], "The synthetic checkout is left clean");
+  const ran = h.messages.find((message) => message.startsWith("V2a safeguard execution"));
+  assert.match(ran, new RegExp(evidence), "The output is shown to the person who approved it");
+  assert.match(ran, /all of which passed/);
+  // It runs where approval does: after the commands are on screen, and before
+  // any reviewer starts, which is the placement V1c chose for exactly this.
+  const approved = h.messages.findIndex((message) => message.startsWith("V1c safeguard approval"));
+  const firstReviewer = h.messages.findIndex((message) => /^Reviewer correctness: starting/.test(message));
+  assert(approved < h.messages.indexOf(ran) && h.messages.indexOf(ran) < firstReviewer,
+    "An approved safeguard runs after approval and before any specialist starts");
+  // V2b decides whether a reviewer ever sees this. V2a does not, and must not
+  // build the plumbing for it early.
+  assert(h.sessions.length > 0, "A verification run still runs the mode's reviewers");
+  assert(h.sessions.every((session) => !new RegExp(evidence).test(session.prompt ?? "")),
+    "No reviewer receives safeguard output");
+  assert(h.sessions.every((session) => !/safeguard-check/.test(session.prompt ?? "")));
+  // Execution decides nothing about publication, so it stays out of the record
+  // exactly as discovery and approval do. That is V2b's question, not this one's.
+  const record = retainedRecord(report);
+  validateRecord(record, h.parent.sessionId);
+  assert(!Object.hasOwn(record.outcome, "safeguards"), "The retained record schema is unchanged");
+}
+{
+  // A failed safeguard is reported loudly and changes nothing about review
+  // coverage. Discovery and approval already mean nothing for coverage, and a
+  // safeguard grounds no finding here, so a failing suite cannot make the
+  // review's own findings less trustworthy.
+  const h = harness({ discovered: [{ command: "node safeguard-check.mjs", file: "AGENTS.md" }],
+    approve: (request) => ({ action: "accept", content: { commands: approvalChoices(request) } }) });
+  const report = await withInstructions({
+    "AGENTS.md": "Run node safeguard-check.mjs before each checkpoint.",
+    "safeguard-check.mjs": "console.error('the suite failed'); process.exit(2);",
+  }, () => executeReviewRun(h.parent, h.client, { ...options, verify: true },
+    structuredClone(assignments), { controller: h.controller, gh: fakeGh(), git: checkoutGit }));
+  assert.equal(report.safeguards.status, "failed");
+  assert.equal(report.safeguards.results[0].code, 2);
+  assert.equal(report.complete, true, "A failed safeguard does not make the review incomplete");
+  assert.equal(report.coverage, "completed");
+  const ran = h.messages.find((message) => message.startsWith("V2a safeguard execution"));
+  assert.match(ran, /the suite failed/);
+  assert.doesNotMatch(ran, /incomplete coverage/i);
+}
+{
+  // A command code refuses is never offered, so it can never be approved, so it
+  // can never run. The whole rule in one run.
+  const h = harness({ discovered: [{ command: "npm install", file: "AGENTS.md" }],
+    approve: (request) => ({ action: "accept", content: { commands: approvalChoices(request) } }) });
+  const report = await withInstructions({ "AGENTS.md": "Run npm install first." },
+    () => executeReviewRun(h.parent, h.client, { ...options, verify: true },
+      structuredClone(assignments), { controller: h.controller, gh: fakeGh(), git: checkoutGit }));
+  assert.equal(h.requests.length, 0, "A refused command is never put to a person");
+  assert.equal(report.approval.status, "not-started");
+  assert.equal(report.approval.refused, 1);
+  assert.equal(report.safeguards.status, "not-started");
+  const presented = h.messages.find((message) => message.startsWith("V1b safeguard discovery"));
+  assert.match(presented, /npm install/, "It is still reported, with the reason it may not run");
+  assert.match(presented, /not offered/);
+  assert.equal(report.complete, true);
+}
+{
+  // A command the discovery pass invented, attributed to a file it really read,
+  // is refused as uncited and never offered. This is the check V1c dropped and
+  // V2a restored, at the level of the whole run.
+  const h = harness({ discovered: [{ command: "node not-in-any-file.mjs", file: "AGENTS.md" }],
+    approve: (request) => ({ action: "accept", content: { commands: approvalChoices(request) } }) });
+  const report = await withInstructions({ "AGENTS.md": "Run node safeguard-check.mjs before each checkpoint." },
+    () => executeReviewRun(h.parent, h.client, { ...options, verify: true },
+      structuredClone(assignments), { controller: h.controller, gh: fakeGh(), git: checkoutGit }));
+  assert.equal(h.requests.length, 0);
+  assert.equal(report.approval.refused, 1);
+  assert.match(h.messages.find((message) => message.startsWith("V1b safeguard discovery")),
+    /not written in that file/);
+}
+{
+  // An ordinary review runs no safeguard at all, and never reaches the code
+  // that could: the checkout is not provably the reviewed revision without the
+  // preflight, so nothing may be executed in it on this pull request's word.
+  const h = harness({ discovered: runnable, approve: (request) =>
+    ({ action: "accept", content: { commands: approvalChoices(request) } }) });
+  const report = await withInstructions(runnableRoot,
+    () => executeReviewRun(h.parent, h.client, options, structuredClone(assignments),
+      { controller: h.controller, gh: fakeGh(), git: checkoutGit }));
+  assert.equal(report.safeguards, undefined);
+  assert(!h.messages.some((message) => /safeguard execution/i.test(message)));
+}
+console.log("PASS an approved safeguard runs before the reviewers, and a refused one is never offered at all");
 
 
 for (const number of [2, 3, 4, 5, 8, 9, 10]) {

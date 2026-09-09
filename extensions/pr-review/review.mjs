@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { assertReviewableCheckout, verifyFlag } from "./checkout.mjs";
+import { assertReviewableCheckout, runGit, verifyFlag } from "./checkout.mjs";
 import {
   ambientAssignment, describeFallback, describeTier, requireUsableProject, resolveFallback, resolveTier,
   resolvedAssignment,
@@ -18,8 +18,8 @@ import {
   formatFindings, reviewKey, validationInstructions,
 } from "./findings.mjs";
 import {
-  approveSafeguards, collectInstructionFiles, describeApproval, describeDiscovery, discoveryEnvelope,
-  discoveryInstructions, discoveryPrompt,
+  approveSafeguards, collectInstructionFiles, describeApproval, describeDiscovery, describeExecution,
+  discoveryEnvelope, discoveryInstructions, discoveryPrompt, executeSafeguards, judgeCommands,
 } from "./safeguards.mjs";
 
 const settingKeys = ["heavyModel", "heavyEffort"];
@@ -261,7 +261,11 @@ async function discoverSafeguards(parent, client, assignments, access, binding, 
   const [pass] = report.reviewers;
   if (pass.status !== "completed") return { status: "failed", commands: [], reason: pass.error, ...sources };
   const { commands } = discoveryEnvelope(pass.result, key, supplied);
-  return { status: commands.length ? "found" : "none", commands, ...sources };
+  // V2a: each command is judged here, against the text this run actually read,
+  // while that text is still in hand. A command the gates refuse stays in the
+  // report with its reason and is never offered for approval.
+  const judged = judgeCommands(commands, new Map(collected.files.map(({ name, text }) => [name, text])));
+  return { status: judged.length ? "found" : "none", commands: judged, ...sources };
 }
 
 export async function executeReviewRun(parent, client, options, assignments, {
@@ -278,11 +282,12 @@ export async function executeReviewRun(parent, client, options, assignments, {
   let cwd;
   let discovery;
   let approval;
+  let safeguards;
   const outcome = await executeOwnedRun(parent, client, {
     controller, onStopped, subject: mode.label, evidencePrefix: prefix,
     details: () => ({
       mode: mode.id, noComment: options.noComment, verify: options.verify === true,
-      invocation, binding, validation, adjudicator, discovery, approval,
+      invocation, binding, validation, adjudicator, discovery, approval, safeguards,
       executionComplete: execution?.complete ?? false,
       reviewers: assignments.map((assignment) => ({
         ...assignment, status: "incomplete", error: "Review did not reach specialist execution.",
@@ -333,9 +338,9 @@ export async function executeReviewRun(parent, client, options, assignments, {
         // ran, so the run says plainly that nothing did.
         (verify
           ? `\nV1a verification preflight passed on head branch ${access.branch}, with no untracked path. ` +
-            "A discovered command may be approved for a later increment to run, and no approved command is " +
-            "executed here; no reviewer receives safeguard output, and this is an ordinary review of the " +
-            "selected mode."
+            "A discovered command this tool can run is offered for approval, and an approved command runs " +
+            "in this checkout before the reviewers start; no reviewer receives safeguard output, and this " +
+            "is an ordinary review of the selected mode."
           : "") +
         (access.untracked.length
           ? `\nWarning: ${access.untracked.length} untracked file(s) are present and readable; they are not reviewed content.`
@@ -360,6 +365,17 @@ export async function executeReviewRun(parent, client, options, assignments, {
           { level: ["failed", "unavailable", "cancelled"].includes(approval.status) ? "error" : "info" });
         // A cancelled approval belongs to the owned run, which reports it as the
         // cancellation it was. No reviewer starts after one.
+        signal.throwIfAborted();
+        // V2a: the approved commands run here, in this checkout, before the
+        // reviewers. Nothing else in this tool executes pull-request controlled
+        // code, and nothing but a person's answer in this run reaches this line.
+        // A failed safeguard is reported as itself and leaves review coverage
+        // alone: it grounds no finding, exactly as discovery and approval do.
+        safeguards = await executeSafeguards(approval, {
+          root: access.root, controller, git: git ?? runGit,
+        });
+        await parent.log(describeExecution(safeguards),
+          { level: ["failed", "cancelled"].includes(safeguards.status) ? "error" : "info" });
         signal.throwIfAborted();
       }
       const report = await reviewAssignments(parent, client, assignments, {
