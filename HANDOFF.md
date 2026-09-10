@@ -13,10 +13,12 @@ do not need unless you want an older increment's evidence.
 ## Recorded state
 
 This handoff is written on branch `l1-upstream-licensing`, which carries `L1` on
-**pull request #23**. **Confirm before anything else**: check whether #23 is
-merged, and start from `main` if it is. The only open pull requests should then
-be the synthetic playground ones, #1 and #2, which must never be merged or
-republished.
+**pull request #23**. That pull request is being merged into `main` in the same
+session that wrote this, and nothing is left uncommitted. **Confirm that before
+anything else**: check whether #23 is merged, and start from `main` if it is. The
+only open pull requests should then be the synthetic playground ones, #1 and #2,
+which must never be merged or republished, and the only branches besides `main`
+should be theirs.
 
 **Note that issue #21 exists**, a feature request about incremental re-reviews
 and unattended non-interactive execution. It is **not** scheduled, it is not in
