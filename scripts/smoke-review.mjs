@@ -1366,8 +1366,8 @@ const instructionRoot = { "AGENTS.md": "Run node scripts/smoke-findings.mjs.",
   assert.deepEqual(report.approval.approved, declared);
 }
 for (const [scenario, approve, status] of [
-  ["declining", () => ({ action: "decline" }), "none"],
-  ["approving nothing", () => ({ action: "accept", content: { commands: [] } }), "none"],
+  ["declining", () => ({ action: "decline" }), "declined"],
+  ["approving nothing", () => ({ action: "accept", content: { commands: [] } }), "empty"],
   ["an answer this run cannot account for", () => ({ action: "accept", content: { commands: ["stale:0"] } }), "failed"],
 ]) {
   // None of these approves anything, and none of them stops the review: the
@@ -1446,7 +1446,7 @@ for (const [scenario, files, failure] of [
       structuredClone(assignments),
       { controller: h.controller, gh: fakeGh(), git: checkoutGit, effectiveConfig: { autoPostReviews: true } }));
   assert.equal(h.requests.filter(isApproval).length, 1, "An authorized run is still asked to approve");
-  assert.equal(report.approval.status, "none");
+  assert.equal(report.approval.status, "declined");
   assert.deepEqual(report.approval.approved, []);
 }
 console.log("PASS --verify asks which discovered commands may run, and approves nothing it cannot account for");

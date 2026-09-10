@@ -437,16 +437,16 @@ cut, and the archive's own pointer was widened to cover it.
 
 | File | Bytes after `D1` | Against the 65536-byte cap |
 | --- | --- | --- |
-| `README.md` | 55403, from 103903 | read, was the only root file still skipped |
-| `ROADMAP.md` | 58171 | read, 7365 bytes spare |
-| `HANDOFF.md` | 14225 | read |
+| `README.md` | 56073, from 103903 | read, was the only root file still skipped |
+| `ROADMAP.md` | 60540 | read, 4996 bytes spare |
+| `HANDOFF.md` | 14847 | read |
 | `docs/readme-archive-2026-09-10.md` | 105975 | not a candidate; discovery does not recurse |
 | `docs/roadmap-archive-2026-09-10.md` | 450090 | not a candidate; discovery does not recurse |
 
 **Discovery now reads every root markdown file of this project and skips none.**
 That was demonstrated rather than inferred, by running the real
 `collectInstructionFiles` against this checkout; the six files it reads spend
-150571 bytes of the 262144-byte budget, so nothing is near being
+154232 bytes of the 262144-byte budget, so nothing is near being
 skipped for the budget either.
 
 ### Validation
@@ -532,8 +532,9 @@ NUMBER`, which the exclusion table would refuse, and the pass reported neither.
 What a discovery pass reports is a model's judgment over prose, not an
 enumeration of every command-shaped line, which is exactly why this roadmap has
 always said a live exclusion refusal cannot be arranged deliberately. And
-**approval remains the one gate nothing else can open**: the run offered, waited,
-was told no, and ran nothing, which is the behaviour `V1c` specifies. **This is
+**approval remains the one gate nothing else can open**: the run offered, waited
+127 seconds, received an answer naming no command, and ran nothing, which is the
+behaviour `V1c` specifies. **This is
 also the first run in which discovery read every root file of this project**,
 which is `D1`'s own outcome observed live rather than in a probe.
 
@@ -575,6 +576,39 @@ The clipped-quote repair fired live again, restoring one citation on the
 candidate that reached adjudication. That is `Q6` observed live for the second
 time, after #18.
 
+**The run also produced a defect no reviewer found, and it is the most valuable
+thing this review returned.** The operator reports having selected `node
+scripts/smoke-safeguards.mjs`, and the run recorded that nothing was approved.
+The session's own event log shows the question was open for **127 seconds**, so
+nothing auto-answered it, and `approveSafeguards` returned a status rather than
+an error, so the answer was well formed. What could not be determined is which
+well-formed answer it was, **because `V1c` reported a decline and an accepted
+answer naming nothing identically, both as `none`**. No elicitation payload is
+logged by the session events, the process log or the extension log, so the raw
+answer is unrecoverable and the two cases cannot be told apart after the fact.
+
+The gate behaved correctly throughout: an answer naming no command approves no
+command, and failing open is the one mistake this gate exists to prevent. **The
+reporting was the defect.** A person whose selection never arrived was told, in
+the same words a refusal gets, that nothing was approved, with nothing to
+suggest their own answer had been empty rather than negative. That is very
+likely why this review did not produce the live execution evidence it was run
+for.
+
+`D1` fixes it, test-first, and changes no gate. `declined` and `empty` are now
+distinct statuses, execution still keys only on `approved`, and the `empty`
+message says what happened and what to do:
+
+    V1c safeguard approval: the answer named none of the 2 offered command(s), so nothing
+    runs. If you meant to approve one, it did not reach this run; rerun the review to be
+    asked again.
+
+**This is the clearest vindication of the dogfooding workflow this project has
+recorded.** No controlled suite could have found it, because both cases were
+asserted to produce exactly the status the code produced; the suite agreed with
+the code about a distinction neither of them drew. It took a person approving a
+command in a real run and noticing that the tool disagreed with them.
+
 The thirteen suites were rerun after these fixes and all thirteen still pass.
 
 ### Remaining limitations
@@ -587,7 +621,7 @@ The thirteen suites were rerun after these fixes and all thirteen still pass.
   increment, so there is no later increment's review to fold it into: closing it
   needs a review authorized for that purpose, and the closing section says what
   the cheapest one would be.
-- **`README.md` has 10133 bytes of headroom, not a lot.** It is 55403 bytes
+- **`README.md` has 9463 bytes of headroom, not a lot.** It is 56073 bytes
   against the 65536-byte cap, so roughly 10KB of further documentation would put
   it back where `D1` found it, skipped by this project's own discovery. Measure
   with `wc -c` before extending it, and move material into `docs/` rather than
@@ -651,8 +685,11 @@ all demonstrated only by the controlled suites. `D1`'s own required review was
 the last chance to close that inside an increment's own budget, and it was run
 with `--verify` for exactly that reason.
 
-**It did not close it.** The run offered both discovered commands, waited, and
-was told no, so nothing was approved and nothing ran. **Safeguard execution is
+**It did not close it.** The run offered both discovered commands, waited 127
+seconds, and received an answer that named none of them, so nothing was approved
+and nothing ran. **The person at the keyboard reports having selected
+`node scripts/smoke-safeguards.mjs`**, and the recorded outcome is a defect in
+its own right; see the entry above. **Safeguard execution is
 therefore still demonstrated only by the controlled suites, and no entry in this
 file may be read as though the installed plugin had ever executed anything.**
 The `--verify` path is now demonstrated live as far as the approval gate and no
@@ -692,7 +729,8 @@ not a backlog. Do not start one without the user saying so.
   which is what a configured one would have answered.
 - **A live approval that approves something, and everything downstream of it.**
   Two reviews have now reached the host's approval UI and approved nothing: #19
-  offered two commands, and #24 offered two and was told no. So a non-empty
+  offered two commands, and #24 offered two and received an answer naming
+  neither, against the operator's own account of what they picked. So a non-empty
   `accept`, a real spawn, a real capture, a real artifact line, and cancelling a
   running command and its grandchildren are all still demonstrated only against
   the controlled harness. This is the largest remaining gap between what the

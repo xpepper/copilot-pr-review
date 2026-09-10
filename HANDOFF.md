@@ -62,6 +62,14 @@ path from the controlled suites.
   non-empty `accept`, a spawn, a capture, an artifact line and a cancellation are
   demonstrated only by `scripts/smoke-safeguards.mjs`. The `--verify` path is
   demonstrated live as far as the approval gate and no further.
+- **Why it did not run is itself a defect, now fixed.** The operator selected a
+  command and the run recorded none approved. `V1c` reported a decline and an
+  accepted answer naming nothing identically, as `none`, so nothing on screen
+  said the selection had failed to arrive, and the raw answer is unrecoverable
+  because no elicitation payload is logged anywhere. `declined` and `empty` are
+  now separate statuses and the `empty` message tells you to rerun. **Execution
+  still keys only on `approved`; no gate changed.** If you run a `--verify`
+  review and see the `empty` message, your pick did not reach the run.
 - Closing that needs a review authorized for the purpose, because approval sits
   after discovery inside a running review. **Do not spend it unasked.** The
   cheapest honest version is one `--deep --verify` review of a small pull

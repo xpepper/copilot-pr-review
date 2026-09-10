@@ -776,11 +776,25 @@ anything. `--comment`, `--all` and a saved `autoPostReviews=true` grant posting
 authority and no approval whatsoever.
 
 A host with no elicitation UI approves nothing and says so, and there is
-deliberately nothing to suggest instead. Declining, approving nothing, or
-returning an answer this run cannot account for all approve nothing and leave
-the reviewers to run: approval grounds no finding, so an unanswered question
-cannot make the review less trustworthy. None of them is incomplete coverage.
-Cancelling the question cancels the run, before any reviewer starts.
+deliberately nothing to suggest instead. Declining, answering without naming a
+command, or returning an answer this run cannot account for all approve nothing
+and leave the reviewers to run: approval grounds no finding, so an unanswered
+question cannot make the review less trustworthy. None of them is incomplete
+coverage. Cancelling the question cancels the run, before any reviewer starts.
+
+**An answer that names no command is reported apart from a decline**, because
+they are different events. If your selection does not reach the run, you see
+this rather than a refusal, and the review continues as an ordinary review:
+
+```text
+V1c safeguard approval: the answer named none of the 2 offered command(s), so nothing
+runs. If you meant to approve one, it did not reach this run; rerun the review to be
+asked again.
+```
+
+The two were once reported identically, and a real run lost its approval that
+way: the person selected a command, the run recorded that none was approved, and
+nothing on screen distinguished that from their having said no.
 
 The approval is not written to the retained result, so a publish-later of that
 result carries no approval and never could.

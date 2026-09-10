@@ -323,12 +323,17 @@ const accepted = (commands) => ({ action: "accept", content: { commands } });
   assert.deepEqual(approval.approved, [declared[0]]);
   assert.equal(approval.offered, 2);
 }
-for (const [scenario, answer] of [
-  ["accepting no choice", () => accepted([])],
-  ["declining", () => ({ action: "decline" })],
+// Both of these approve nothing, and they are two different things that
+// happened. An accepted answer carrying no command is the shape a person gets
+// when they meant to pick one and the pick never reached this run, so it is
+// reported apart from a decline instead of being folded into it. Only the
+// wording differs: neither approves anything and neither starts a process.
+for (const [scenario, answer, status] of [
+  ["accepting no choice", () => accepted([]), "empty"],
+  ["declining", () => ({ action: "decline" }), "declined"],
 ]) {
   const approval = await approvalFixture({ answer }).approve();
-  assert.equal(approval.status, "none", scenario);
+  assert.equal(approval.status, status, scenario);
   assert.deepEqual(approval.approved, [], scenario);
 }
 {
@@ -411,7 +416,8 @@ console.log("PASS approval is asked per command, bound to its invocation, and ap
 // may claim the review itself is incomplete: approval is not review coverage.
 for (const [scenario, approval, runs] of [
   ["an approved subset", { status: "approved", approved: [declared[0]], offered: 2, refused: 1 }, true],
-  ["nothing approved", { status: "none", approved: [], offered: 2, refused: 1 }, false],
+  ["a declined question", { status: "declined", approved: [], offered: 2, refused: 1 }, false],
+  ["an accepted answer naming nothing", { status: "empty", approved: [], offered: 2, refused: 1 }, false],
   ["no approval UI", { status: "unavailable", approved: [], offered: 2, refused: 1,
     error: "This host has no approval UI." }, false],
   ["a cancelled approval", { status: "cancelled", approved: [], offered: 2, refused: 1 }, false],
@@ -625,7 +631,7 @@ const run = (approved, options = {}) => executeSafeguards(approvalOf(approved), 
 {
   // Nothing approved is nothing run, and no process is started to discover that.
   for (const approval of [
-    { status: "none", approved: [], offered: 2, refused: 0 },
+    { status: "declined", approved: [], offered: 2, refused: 0 },
     { status: "unavailable", approved: [], offered: 2, refused: 0 },
     { status: "not-started", approved: [], offered: 0, refused: 0 },
     { status: "failed", approved: [], offered: 2, refused: 0, error: "invalid answer" },
