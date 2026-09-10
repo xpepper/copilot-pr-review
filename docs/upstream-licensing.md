@@ -175,15 +175,18 @@ default.
 
 ## Reproducing this
 
-Every figure above comes from these commands. None needs this repository, a
-model, or a paid API.
+Every figure above comes from these commands. None needs a model or a paid API.
+The upstream checks need only `gh`, `curl` and `tar`. The reuse audit at the end
+is the one step that also needs this checkout, because it is the one figure
+about this repository rather than about upstream.
 
 ```sh
 SHA=457e18e30437984e2e6680802c9da25d270b82cc
 
-# the declared licence, at the exact revision
+# the declared licence, at the exact revision. Raw content, so no base64 decode
+# is involved and no GNU-only flag is needed.
 gh api "repos/10ego/pi-pr-review/contents/package.json?ref=$SHA" \
-  --jq '.content' | base64 -d | grep '"license"'
+  -H "Accept: application/vnd.github.raw" | grep '"license"'
 
 # no licence file anywhere in that tree
 gh api "repos/10ego/pi-pr-review/git/trees/$SHA?recursive=1" \
@@ -191,19 +194,69 @@ gh api "repos/10ego/pi-pr-review/git/trees/$SHA?recursive=1" \
 gh api "repos/10ego/pi-pr-review/git/trees/$SHA?recursive=1" --jq '.tree[].path' \
   | grep -iE 'licen[cs]e|copying|notice|copyright|legal|third.?party'
 
-# GitHub's own detection finds none
-gh api repos/10ego/pi-pr-review --jq '.license'
-gh api repos/10ego/pi-pr-review/license
+# no licence section in the README at that revision
+gh api "repos/10ego/pi-pr-review/contents/README.md?ref=$SHA" \
+  -H "Accept: application/vnd.github.raw" \
+  | grep -nowiE 'licence|license|copyright|MIT'
 
-# the published artifact, verified then listed
+# GitHub's own detection finds none, and none has appeared on the default branch
+gh api repos/10ego/pi-pr-review --jq '{license, pushed_at, default_branch}'
+gh api repos/10ego/pi-pr-review/license
+gh api repos/10ego/pi-pr-review/contents --jq '.[].name' \
+  | grep -iE 'licen[cs]e|copying|notice'
+gh api repos/10ego/pi-pr-review/releases/latest --jq '.tag_name'
+
+# nobody upstream has raised it
+gh api "search/issues?q=repo:10ego/pi-pr-review+license+OR+licence+OR+LICENSE" \
+  --jq '.total_count'
+
+# what npm records for the published version
+curl -sS https://registry.npmjs.org/pi-pr-review/1.17.10 | python3 -c \
+  'import json,sys; d=json.load(sys.stdin); print(d["license"], [m["name"] for m in d["maintainers"]], d["dist"]["shasum"])'
+
+# the published artifact: verified first, and listed and extracted only if the
+# digest matches, so a substituted download stops here instead of being read
 curl -sSo pkg.tgz https://registry.npmjs.org/pi-pr-review/-/pi-pr-review-1.17.10.tgz
-shasum -a 1 pkg.tgz   # expect 88db35cc407c33158d2c33a512f53d6fc6caf5ec
-tar -tzf pkg.tgz | grep -iE 'licen[cs]e|copying|notice'
-tar -xzf pkg.tgz && grep -rniE 'copyright|SPDX' package/
+echo '88db35cc407c33158d2c33a512f53d6fc6caf5ec  pkg.tgz' | shasum -a 1 -c - \
+  && tar -tzf pkg.tgz | grep -iE 'licen[cs]e|copying|notice' \
+  ; tar -xzf pkg.tgz && grep -rniE 'copyright|SPDX' package/
 ```
 
-The reuse audit compares the extracted `package/` tree against this checkout's
-`extensions/` and `scripts/`, reporting every line of 40 or more characters that
-appears in both after whitespace normalisation. Rerun it if upstream source is
-ever considered again; the expected result is the seven boilerplate lines listed
-above and nothing else.
+Every `grep` above is expected to match nothing and exit 1, except the first,
+which prints the declared licence. The `pi.dev` listing is a web page rather
+than an API, so it is the one source read in a browser.
+
+**The reuse audit.** This is the figure that needs this checkout. Run it from
+the directory holding the extracted `package/`, passing that directory and the
+path to this repository:
+
+```sh
+node --input-type=module -e '
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import { join } from "node:path";
+const [pkg, checkout] = process.argv.slice(1);
+const walk = (d) => readdirSync(d).flatMap((n) => {
+  const p = join(d, n);
+  return statSync(p).isDirectory() ? walk(p) : [p];
+});
+const norm = (s) => s.replace(/\s+/g, " ").trim();
+const keep = (s) => norm(s).length >= 40 && /[a-zA-Z]/.test(s);
+const upstream = new Set();
+for (const f of walk(pkg).filter((p) => /\.(ts|mjs|js|md|json)$/.test(p)))
+  for (const l of readFileSync(f, "utf8").split("\n")) if (keep(l)) upstream.add(norm(l));
+const local = ["extensions", "scripts"]
+  .flatMap((d) => walk(join(checkout, d)))
+  .filter((p) => /\.(mjs|js|ts|txt)$/.test(p));
+const shared = new Set();
+for (const f of local)
+  for (const l of readFileSync(f, "utf8").split("\n")) if (keep(l) && upstream.has(norm(l))) shared.add(norm(l));
+console.log(`upstream lines ${upstream.size}, local files ${local.length}, shared ${shared.size}`);
+for (const s of [...shared].sort()) console.log(`  ${s}`);
+' "$PWD/package" /path/to/this/checkout
+```
+
+It prints `upstream lines 5544, local files 56, shared 7` followed by the seven
+boilerplate strings listed earlier, and nothing else. Rerun it if upstream
+source is ever considered again. A shared string that is not one of those seven,
+or one that is not obviously boilerplate, is the signal that this document's
+central conclusion no longer holds.

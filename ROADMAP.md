@@ -32,7 +32,7 @@ posting them.
 | ID | Status | Independently demonstrable outcome | Requirements / dependencies |
 | --- | --- | --- | --- |
 | S0 | Completed | Confirmed product specification recorded in `SCOPE.md`, commit `6407a59`. | [Goal](SCOPE.md#goal) |
-| L1 | Completed | Upstream declares MIT in every place it publishes metadata and publishes no licence text and no copyright notice anywhere, so MIT's notice condition cannot be discharged from upstream material. Nothing may be copied; a line-level audit of 5544 upstream lines against 56 local files confirms nothing has been, the only overlap being seven boilerplate strings. Answer, evidence and rule recorded in `docs/upstream-licensing.md`. Pull request recorded in the entry below; documentation-only. | [Upstream baseline](SCOPE.md#upstream-baseline) |
+| L1 | Completed | Upstream declares MIT in every place it publishes metadata and publishes no licence text and no copyright notice anywhere, so MIT's notice condition cannot be discharged from upstream material. Nothing may be copied; a line-level audit of 5544 upstream lines against 56 local files confirms nothing has been, the only overlap being seven boilerplate strings. Answer, evidence and rule recorded in `docs/upstream-licensing.md`. Pull request #23, reviewed once with this plugin at the user's authorization: 0 validated findings on incomplete coverage, 137.46398 credits, and six discarded candidates of which most were real and are fixed on the branch. | [Upstream baseline](SCOPE.md#upstream-baseline) |
 | F1 | Completed | Locally installable plugin with a code-owned, usable status/help entry point; runtime evidence and reproduction below. | [Technical feasibility](SCOPE.md#technical-uncertainties-and-proposed-sequence) |
 | F2 | Completed | Two concurrent reviewers over a tiny original local fixture; distinct explicitly configured subscription models and reasoning levels; display assignments, per-reviewer progress, and results. | F1; [Models/execution](SCOPE.md#models-configuration-and-execution) |
 | F3 | Completed | Native forbidden-tool denials plus an adversarial fixture; retained incomplete coverage; startup/active/unresponsive cancellation and owned-runtime/extension/parent loss exercised with process-exit evidence. Stdio integration selected; limits below. | F2; [Models/execution](SCOPE.md#models-configuration-and-execution) |
@@ -155,8 +155,8 @@ them; the `L1` entry below carries the current measurement.
 | `ROADMAP.md` after | 61264 | read, 4272 bytes spare |
 | `docs/roadmap-archive-2026-09-10.md` | 413800 | not a candidate; discovery does not recurse |
 
-Every root markdown file is now under the cap except `README.md` at 103636
-bytes, which is `D1`'s to shorten. The root's readable files spend well under
+Every root markdown file was under the cap at this checkpoint except
+`README.md` at 103636 bytes, which is `D1`'s to shorten. The root's readable files spend well under
 half the 262144-byte discovery budget, so nothing is near being skipped for the
 budget rather than for its own size.
 
@@ -216,8 +216,9 @@ the shipped tool went undemonstrated by not reviewing it.
   a pull request, and treat 65536 as the number that matters. **`L1` did this**,
   archiving both `V2` halves before writing its own entry; the arithmetic held
   and the freed 28517 bytes are recorded below.
-- **`README.md` is still skipped for size** at 103636 bytes, so discovery still
-  names one file of this project it cannot read. `D1` owns it.
+- **`README.md` is still skipped for size**, at 103636 bytes when this entry was
+  written, so discovery still names one file of this project it cannot read.
+  `D1` owns it.
 - **`README.md`'s discovery example is now stale in one detail.** It uses
   `Skipped: ROADMAP.md (exceeds 65536 bytes)` to illustrate a skipped file, which
   no longer describes this checkout. The example is hypothetical throughout, so
@@ -329,9 +330,9 @@ the live copy was cut, and the pointer above was widened to cover them.
 
 | File | Bytes after `L1` | Against the 65536-byte cap |
 | --- | --- | --- |
-| `ROADMAP.md` | 43316 | read, 22220 bytes spare |
+| `ROADMAP.md` | 49253 | read, 16283 bytes spare |
 | `docs/roadmap-archive-2026-09-10.md` | 442748 | not a candidate; discovery does not recurse |
-| `docs/upstream-licensing.md` | 10979 | not a candidate; discovery does not recurse |
+| `docs/upstream-licensing.md` | 13731 | not a candidate; discovery does not recurse |
 | `README.md` | 103903 | still skipped, still `D1`'s |
 
 The move freed 28517 bytes. `A1`'s own figures are kept in its entry as `A1`'s
@@ -347,16 +348,99 @@ touched. `git diff --check` is clean and the diff carries no control byte, which
 matters because a raw control byte is what refused #17's review.
 
 `scripts/smoke-reviewer-tools.mjs` was not run and did not need to be:
-`read-only.mjs` was not touched. The runtime probes were not rerun, for the same
-reason, and no Copilot credits were spent.
+`read-only.mjs` was not touched. The no-inference runtime probes were not rerun
+for the same reason. Credits were spent, once, on the review the user authorized;
+the section below records what that cost and what it found.
 
 The increment's own outcome was demonstrated rather than inferred, twice.
 This project's real `collectInstructionFiles` was run against this checkout and
 still reads five root files and skips only `README.md`, so the archiving did not
 cost the tool its own roadmap. Every reproduction command printed in
-`docs/upstream-licensing.md` was executed as written before it was recorded,
-including the tarball digest check, and each produced the result the file
-claims.
+`docs/upstream-licensing.md` was executed as written, from an empty directory,
+both before it was first recorded and again after the review's findings rewrote
+that section; each produced the result the file claims, the digest gate refuses a
+tampered tarball when tested with a wrong digest, and the audit command prints
+exactly `upstream lines 5544, local files 56, shared 7`.
+
+### Pull request #23 and its review
+
+Pull request #23 carries this increment. **The user was asked whether to spend a
+review on it and authorized one balanced review**, which `AGENTS.md` makes the
+user's call for a documentation-only pull request rather than a requirement. One
+review ran, `node scripts/dogfood-review.mjs 23 --all --no-comment`, and nothing
+was published. The plugin had to be installed from this checkout first, because
+`copilot plugin list` showed it was not installed on this machine at all.
+
+| What the run actually used | |
+| --- | --- |
+| Mode | balanced, 5 reviewers plus the adjudicator, `--no-comment` |
+| Heavy tier | `gpt-5.6-terra` at reasoning `high`: correctness, contracts, security, performance-resources, evidence-validator |
+| Light tier | `gpt-5.6-luna` at reasoning `high`: overview |
+| Fallbacks | none configured, so a discarded output had no second attempt |
+| Diff reviewed | 843 additions, 440 deletions, 5 files, 98002 diff bytes |
+| Reviewer execution | all six sessions completed; none failed, none was cancelled |
+| Credit cost | **137.46398 AI credits**, being 28.77710 correctness, 31.37626 contracts, 22.84345 security, 26.64120 performance-resources, 3.32752 overview and 24.49845 adjudicator |
+| Outcome | **0 validated findings, coverage INCOMPLETE**, 0 withheld, nothing published |
+
+**Zero validated findings here is not a clean review, and this entry does not
+read it as one.** Every reviewer completed and produced output. The run reported
+five execution failures and four coverage gaps, and the cause was the same in
+almost every case: `Citation does not exactly match a supplied context window`.
+The reviewers had quoted this repository's own markdown with the link syntax
+stripped, so `[docs/upstream-licensing.md](docs/upstream-licensing.md)` was cited
+as `docs/upstream-licensing.md` and the exact-quote gate refused it. That is the
+evidence boundary behaving exactly as `Q4` and `C5` specify, on reviewer error
+rather than on a tool defect, and `C5` made each of those discarded outputs
+eligible for a fallback attempt that no tier had configured.
+
+**The gate was right and the reviewers were also right.** Six candidates were
+produced and none survived to become a validated finding, but reading them showed
+that most described real defects in this increment's own new files. They were
+fixed on this branch as a second commit rather than dismissed, which is the same
+course `V2a` took with the two findings its evidence gate discarded:
+
+- **The documented tarball check printed a digest without enforcing it**, so a
+  reader following the reproduction would list and extract an artifact whose
+  SHA-1 did not match. Fixed: the sequence now pipes the expected digest through
+  `shasum -a 1 -c -` and chains extraction behind it, so a substituted download
+  stops there. **The adjudicator rejected this candidate**, reasoning that the
+  document never promised a machine-enforced gate. The rejection is fair on its
+  own terms and the change was made anyway, because the document does claim the
+  artifact was verified before being read and the enforcement costs one line.
+- **The reproduction section omitted the reuse audit entirely**, which two
+  reviewers raised independently and which mattered most, because the audit is
+  what closes the reuse question. The runnable command is now in the document,
+  and it prints `upstream lines 5544, local files 56, shared 7` followed by the
+  seven boilerplate strings.
+- **The reproduction claim overreached.** It said every figure came from the
+  listed commands while omitting npm, the pinned README, the upstream issue
+  search, the default-branch recheck and the audit. All are now present, and the
+  claim that no repository is needed is narrowed to the upstream checks, because
+  the audit does need this checkout.
+- **`base64 -d` was called a macOS portability defect.** The adjudicator returned
+  `uncertain` and recorded a coverage gap, correctly, because nothing in a
+  revision-bound checkout can establish a platform utility's flags. Checked
+  directly instead: `base64 -d` and `base64 -D` both work on this machine, macOS
+  26.6.2, so **the candidate's premise is false here**. The command was still
+  replaced, with `Accept: application/vnd.github.raw`, which removes the decode
+  step altogether and is shorter. The finding was wrong and the change is still
+  an improvement.
+- **The `L1` row claimed a pull-request record that did not exist yet.** True
+  when raised: this section is that record.
+- **The `D1` bullet contradicted itself on `README.md`'s size**, giving both
+  103636 and 103903 bytes in one paragraph. Fixed to the measured figure, once.
+
+Every reproduction command in `docs/upstream-licensing.md` was then executed as
+written, from an empty directory, and each produced the documented result. The
+thirteen suites were rerun after the fixes and all thirteen still pass.
+
+**This run also produced two pieces of evidence worth keeping beyond `L1`.** It
+is the first review of any mode whose reviewers all completed and whose findings
+were nonetheless all discarded at the evidence boundary, which makes it the
+clearest live demonstration so far that `C5`'s demotion path and the exact-quote
+gate do what they claim. And its citation failures share one cause, a reviewer
+normalising markdown link syntax out of a quote, which is a plausible thing to
+watch for in later documentation reviews rather than a defect to fix here.
 
 ### Remaining limitations
 
@@ -419,12 +503,12 @@ so.
 
 - **`D1`: the user documentation.** Document configuration, modes, incomplete
   coverage, cancellation, publication, the cache and safeguards with
-  reproducible end-to-end examples. `README.md` is 103636 bytes and is skipped
-  by safeguard discovery for size, exactly as this file was until `A1`, so `D1`
-  should shorten it at least as much as it extends it, and should replace the
-  now-stale `ROADMAP.md` line in its discovery example. `L1` added six lines to
-  it and removed two, so that figure is now 103903 bytes. It also carries one
-  recorded wording defect: the reviewer prompt in `review.mjs` tells every
+  reproducible end-to-end examples. `README.md` is 103903 bytes after `L1`'s one
+  edit to it, and is skipped by safeguard discovery for size, exactly as this
+  file was until `A1`, so `D1` should shorten it at least as much as it extends
+  it, and should replace the now-stale `ROADMAP.md` line in its discovery
+  example. It also carries one recorded wording defect: the reviewer prompt in
+  `review.mjs` tells every
   specialist its working directory is "verified to be at" the reviewed head,
   which stays true of `HEAD` after a safeguard runs but not of the working tree.
   Bound citations already contain the consequence, as the archived `V2b` entry
