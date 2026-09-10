@@ -61,7 +61,7 @@ posting them.
 | V1 | Completed | `--verify` enforces matching branch/SHA/cleanliness before reviewers and presents discovered existing commands for approval. `V1a` added the preflight, `V1b` discovery and presentation from the project's own instruction files, `V1c` per-command approval that records the answer, executes nothing and outlives no run. Demonstrated by the thirteen controlled suites and pull request #18's balanced `--verify` review, which cost 166.859549 credits, found two real defects and produced the first live discovery evidence. **That pass found no command in this repository**, so the interactive approval path is demonstrated only by the controlled suites. Execution is `V2`. | Q1; [Safeguards](SCOPE.md#optional-project-safeguards) |
 | V2a | Completed | Execute only approved existing safeguards with installed dependencies, in the current checkout, and show evidence and artifacts without autofix or checkout manipulation. Carries the exclusions and the citation check that `V1c` deferred to `V2`. Demonstrated by the thirteen controlled suites and pull request #19's interactive balanced `--verify` review, which cost 252.771985 credits, reached the host's real approval UI for the first time and saw the citation gate refuse a constructed command live. **That run approved nothing, so execution itself is still demonstrated only by the controlled suites.** It found one validated defect and two more that its own evidence gate discarded; two of the three are fixed here. | V1; [Safeguards](SCOPE.md#optional-project-safeguards) |
 | V2b | Completed | Settled without code: safeguard output reaches no reviewer, the retained record says nothing about what ran, and the citation gate keeps accepting a prefix as a documented limitation. All three were answered "no change", so `V2` closes with `V2a`'s behaviour and the thirteen suites unchanged. The prompt's "verified to be at" wording is a recorded wording defect that bound citations already contain; it goes to `D1`. | V2a; [Safeguards](SCOPE.md#optional-project-safeguards) |
-| A1 | Completed | Completed entries `F1` through `V1c` moved verbatim into `docs/roadmap-archive-2026-09-10.md`, leaving a live `ROADMAP.md` that this project's own safeguard discovery reads instead of skipping for size. The increments table, the two most recent completed entries and the exact-next-increment section stayed. Landed on its own pull request; documentation-only, so no installed-plugin review, and the user was asked rather than charged. | V2b; housekeeping, no scope clause |
+| A1 | Completed | Completed entries `F1` through `V1c` moved verbatim into `docs/roadmap-archive-2026-09-10.md`, leaving a live `ROADMAP.md` that this project's own safeguard discovery reads instead of skipping for size. The increments table, the two most recent completed entries and the exact-next-increment section stayed. Pull request #22; documentation-only, so no installed-plugin review, and the user was asked rather than charged. | V2b; housekeeping, no scope clause |
 | D1 | Pending | Document configuration, modes, incomplete coverage, cancellation, publication, cache, and safeguards with reproducible end-to-end examples. Also fixes the reviewer prompt's "verified to be at" wording, which makes it a behaviour change needing one installed-plugin review; run that review with `--verify` and approve the safeguards suite. | A1, L1; [Release boundary](SCOPE.md#priority-and-release-boundary) |
 
 ## Completed increments `F1` through `V1c` are archived
@@ -525,7 +525,7 @@ could not read. The subdirectory turns the skip into nothing at all.
 | File | Bytes | Against the 65536-byte cap |
 | --- | --- | --- |
 | `ROADMAP.md` before | 464771 | skipped, 7.1x over |
-| `ROADMAP.md` after | 61105 | read, 4431 bytes spare |
+| `ROADMAP.md` after | 61264 | read, 4272 bytes spare |
 | `docs/roadmap-archive-2026-09-10.md` | 413800 | not a candidate; discovery does not recurse |
 
 Every root markdown file is now under the cap except `README.md` at 103636
@@ -546,7 +546,7 @@ weaken it. `git diff --check` is clean and the diff carries no control byte.
 The increment's own outcome was demonstrated rather than inferred, by running
 this project's real `collectInstructionFiles` against this checkout. It now
 reads five root files in `conventionalInstructionFiles` order, `AGENTS.md`,
-`CLAUDE.md`, `HANDOFF.md`, `ROADMAP.md` at 61105 bytes and `SCOPE.md`, and
+`CLAUDE.md`, `HANDOFF.md`, `ROADMAP.md` at 61264 bytes and `SCOPE.md`, and
 skips exactly one, `README.md`, for exceeding the cap. **Before this increment
 that skipped list held `ROADMAP.md` too.**
 `docs/roadmap-archive-2026-09-10.md` appears in neither list, because
@@ -556,13 +556,17 @@ that skipped list held `ROADMAP.md` too.**
 for s in findings review selection retention preview publication publish-later \
   checkout config context fixture target safeguards; do node scripts/smoke-$s.mjs; done
 wc -c ROADMAP.md docs/roadmap-archive-2026-09-10.md
-node --input-type=module -e 'import { collectInstructionFiles } from \
-  "./extensions/pr-review/safeguards.mjs"; console.log(collectInstructionFiles(process.cwd()));'
+node --input-type=module -e '
+import { collectInstructionFiles } from "./extensions/pr-review/safeguards.mjs";
+const { files, skipped } = collectInstructionFiles(process.cwd());
+console.log("read:", files.map((f) => `${f.name} ${f.bytes}`).join(", "));
+console.log("skipped:", skipped.map((s) => `${s.name} (${s.reason})`).join(", ") || "none");
+'
 ```
 
-### The pull request and its review
+### Pull request #22 and its review
 
-This increment's pull request carries it alone. **It was not reviewed by the installed
+Pull request #22 carries this increment. **It was not reviewed by the installed
 plugin.** `AGENTS.md` makes the review of a documentation-only pull request the
 user's call rather than a requirement, because a review spends real credits; the
 user was asked and authorized none. That is a recorded decision, not an omission
@@ -572,7 +576,7 @@ the shipped tool went undemonstrated by not reviewing it.
 ### Remaining limitations
 
 - **The headroom does not survive the next entry, and `L1` must archive before
-  it writes one.** This file has 4431 bytes spare against the cap. The last
+  it writes one.** This file has 4272 bytes spare against the cap. The last
   six completed entries measured 7546, 12085, 14651, 15365, 15406 and 20969
   bytes, so even the smallest of them overruns what is left: this is not a risk
   to watch but an arithmetic certainty. **The increment that adds the next entry
