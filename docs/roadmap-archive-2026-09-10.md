@@ -1,22 +1,28 @@
 # Delivery roadmap archive, 2026-09-10
 
 These are the completed increment entries moved out of
-[../ROADMAP.md](../ROADMAP.md) by increment `A1` on 2026-09-10. They are the
-project's evidence of record and are reproduced verbatim: nothing here was
-rewritten, condensed or corrected in the move, so a claim below still reads
-exactly as the session that demonstrated it wrote it.
+[../ROADMAP.md](../ROADMAP.md) on 2026-09-10, by increment `A1` for everything
+through `V1c` and by increment `L1` for `V2a` and `V2b`. They are the project's
+evidence of record and are reproduced verbatim: nothing here was rewritten,
+condensed or corrected in either move, so a claim below still reads exactly as
+the session that demonstrated it wrote it.
 
 [../ROADMAP.md](../ROADMAP.md) remains the live roadmap and stays
 authoritative for the increments table, the two most recent completed entries
-and the exact next increment. [../SCOPE.md](../SCOPE.md) remains authoritative
-for the product scope. Read those first; come here for the evidence behind a
-completed increment.
+and the exact next increment. The safeguard decisions `V2a` and `V2b` settled
+are read from here now, not from the live roadmap.
+[../SCOPE.md](../SCOPE.md) remains authoritative for the product scope. Read
+those first; come here for the evidence behind a completed increment.
 
 **Why the entries moved.** `ROADMAP.md` had reached 454KB, and
 `instructionFileMaxBytes` in `extensions/pr-review/safeguards.mjs` caps one
 instruction file at 65536 bytes, so this project's own safeguard discovery
 skipped its roadmap by name for size. The tool could not read its own project.
-Pull requests #18 and #19 both recorded that skip as live evidence.
+Pull requests #18 and #19 both recorded that skip as live evidence. `L1` moved
+`V2a` and `V2b` for the same cap for a different reason: the live file was back
+under the cap but had only 4272 bytes of headroom, and the smaller of those two
+entries is 7547 bytes, so the next completed entry could not have fitted beside
+them.
 
 **This file is deliberately not at the checkout root.**
 `collectInstructionFiles` reads the root's markdown and does not recurse into
@@ -6928,3 +6934,390 @@ and no exact-quote check can fix that.
 evidence.** Discovery returned nothing, so only the `not-started` branch ran, and
 it ran correctly. The elicitation request, an accepted subset, a decline and a
 cancel have been demonstrated only against the controlled harness.
+
+## Completed increment: V2a
+
+**`V2a` runs an approved safeguard.** It is the first increment in which
+pull-request controlled code executes on the user's machine, and everything
+before it was built so that this one could be small. Its boundary was discussed
+and approved before any code was written, one choice at a time, as `V1a`, `V1b`
+and `V1c`'s were.
+
+`V2` was split. `V2a` executes and reports to the person who approved. `V2b`
+decides whether that output reaches a reviewer and what the retained record says
+about what ran. The seam is clean because nothing in `V2a` needs to know a
+reviewer exists, and the split keeps the largest safety boundary in the project
+out of the largest diff in the project.
+
+### The eight choices settled before implementation
+
+| Choice | Settled as | Why |
+|---|---|---|
+| Slicing | **Two increments.** `V2a` executes and reports to the user alone. `V2b` takes reviewer visibility and the retained record. | Safeguard output is pull-request controlled text, so handing it to a reviewer opens an injection surface that has nothing to do with running a process. Both gates stay with `V2a`, because a slice that executes without them re-creates exactly the defect `V1c`'s argument identified. The user added a standing principle here: the smaller the increment the better, provided it stays coherent and meaningful. |
+| Live evidence | **Two runnable safeguard lines in `AGENTS.md`, and the one authorized review is run interactively** by the user typing the slash command, so the host's elicitation UI can answer. | `scripts/dogfood-review.mjs` registers no elicitation handler, so it reports approval `unavailable` and can never approve or execute. Making a command discoverable is therefore not enough on its own. The interactive run closes the exact gap #18's correctness reviewer named, the untested dependency on the installed host accepting the multi-select schema and returning its documented actions. The alternative of teaching the dogfood runner an elicitation handler was refused: its current safety value is precisely that it has none. |
+| Mechanism | **No shell.** Whitespace split, a strict character allowlist, `spawn` with an argument list, cwd at the checkout root, git and `gh` environment overrides scrubbed, `stdin` closed. | It is the only mechanism that makes the exclusions mean anything: against `sh -c`, `npm test && npm install` defeats any rule that reads the first word, and quoting defeats the rest. It also matches what `target.mjs` and `checkout.mjs` already do and say. The cost is stated rather than mitigated: this repository's own `for` loop is refused, which is why the live-evidence choice adds two plain lines. |
+| The exclusions | **Refuse in code, before the offer.** Discovery still reports every command with its reason; approval offers only what survives; execution asserts the rule again before it spawns. | A command that may not run must never be put to a person as though it could. Reporting it anyway is what keeps a refusal distinguishable from a project that declared nothing. Re-asserting before the spawn is the belt: approval is the person's decision, and the check beside the spawn is the code's. |
+| The citation check | **Token-bounded exact occurrence** in the text of the cited file, which this run read. | `V1c` dropped an exact quote on evidence that it would refuse almost everything this repository declares. That evidence no longer bites, because the shell gate already refuses every one of those shapes: a loop, a continuation, a quoted argument. What is left to check is only whether a plain single line is written where it says it is. Token bounding is what stops `npm run test` being carved out of `npm run test:unit`. |
+| Output and artifacts | **Bounded capture, never a kill.** 8 MiB held per stream, the tail displayed, truncation stated. One `git status --porcelain` afterwards names what running project code left behind. | A chatty suite is not a failing one, so reaching the bound must not kill it, and the pipe is drained past the bound so nothing blocks on a reader that stopped listening. The preflight already proved the tree was clean, so the status read is an exact statement of what the safeguards changed. Nothing is reverted, stashed or cleaned, which `SCOPE.md` requires. |
+| Cancellation | **Process-group `SIGKILL`, and no timer anywhere.** Commands run sequentially in discovery order; a cancelled run starts no further command. | `SCOPE.md` requires cancellation to stop owned work, and a test runner's workers are owned work. `detached: true` plus `process.kill(-pid)` is what reaches them. There is deliberately no escalation delay and no deadline: `SCOPE.md` forbids review timeouts, and `C3`, `C5` and the watch exclusion all depend on their absence. |
+| A failed safeguard | **Not review coverage.** Reported loudly as its own outcome; `complete` and `coverage` stay exactly as the reviewers determined. | The same reasoning `V1b` used for discovery and `V1c` for approval. No reviewer receives safeguard output in this slice, so a safeguard grounds no finding, so a failing suite cannot make the review's own findings less trustworthy. `V2b` may change this, and would have to argue for it. |
+
+### What the run does
+
+`executeSafeguards` in `safeguards.mjs` runs immediately after
+`approveSafeguards`, inside the same `verify` block in `review.mjs`, before any
+specialist starts:
+
+- only commands a person approved in this run reach it, and only after
+  `commandRefusal` is asserted once more in the moment before the spawn;
+- each runs as one process with no shell, in the checkout root, with `stdin`
+  closed so a command that stops to ask a question fails instead of waiting
+  forever on a review that has no timeout to rescue it;
+- output is captured to a bound per stream and the end is displayed, because
+  that is where a failing suite says what failed;
+- cancellation kills the whole process group, so a runner's workers do not
+  outlive the review, and no further command is started;
+- one `git status --porcelain` afterwards reports what was left behind, and
+  nothing is reverted, stashed or cleaned;
+- a failed or refused safeguard is reported as itself and leaves review coverage
+  alone.
+
+**Nothing about execution enters the retained record**, exactly as discovery and
+approval do not. `scripts/smoke-review.mjs` asserts `safeguards` stays out, and
+no schema version moves. Answering that question by building the plumbing early
+is precisely what `V2b` exists to prevent.
+
+**Three stale statements were corrected**, all of which the controlled suites had
+been asserting: the discovery presentation said this release executes none of the
+commands, the approval question said nothing runs in this release, and both the
+preflight timeline line and `verificationNotice` said no approved command is
+executed and that the offered list is unfiltered.
+
+### The exclusions are a heuristic, and here is what it misses
+
+The table refuses programs that install, escalate privilege, change the machine,
+move data over the network, drive version control, provision or deploy, or watch;
+any token that names an installing, migrating, deploying, publishing, creating,
+cleaning, serving, formatting or fixing verb; a set of write-in-place and watch
+flags; a placeholder word; a shell keyword or builtin, which a wrapped construct
+can present as its own first line carrying no metacharacter at all; and `vitest`
+in the bare form that watches by default.
+Known holes, recorded rather than papered over:
+
+- **`node scripts/dogfood-review.mjs ...` passes every rule**, because its
+  program is `node` and its arguments name nothing refused. It spends Copilot
+  credits. Only an allowlist of known runners would catch it, and that was ruled
+  out for the reason the exact-quote check was.
+- **A project script can hide anything.** `npm run check` may install, deploy or
+  watch, and nothing here can see inside it.
+- **Combined short flags are not decomposed**, so `-gy` is not read as `-g -y`.
+- **False refusals are expected.** `cargo test --features clean` is refused for
+  the word `clean`. The refusal is visible and names its rule, and a project can
+  answer it by declaring the command differently.
+
+### Validation
+
+Thirteen controlled suites pass, `git diff --check` is clean, and tests were
+written first and confirmed red for the right reason at each implementation
+commit. No new suite was added: execution is covered where discovery and approval
+are, so the count is unchanged at thirteen.
+
+`scripts/smoke-safeguards.mjs` drives the unit surface: fourteen shapes that need
+a shell and ten that do not; twenty-seven exclusion cases and the two `vitest`
+forms that are safeguards again; the citation check against a fragment, a
+fabrication, an unread file and this repository's own shell loop; a passing and a
+failing command with their exit status and output; a command that does not exist;
+the re-assertion before the spawn; four approval outcomes that start no process;
+a truncating capture that still passes; artifacts present, absent and unreadable;
+a cancel before execution; and a cancel during execution that kills a grandchild
+process the safeguard started, asserted by signalling that pid until it is gone.
+
+`scripts/smoke-review.mjs` drives the run: an approved command runs after
+approval and before the first specialist, its output reaches the timeline and no
+reviewer prompt; a failing safeguard leaves `complete` true and `coverage`
+completed; a refused command is never put to a person and is still reported with
+its reason; an invented command is refused as uncited; an ordinary review runs
+none of it; and `safeguards` stays out of the retained record.
+
+`scripts/smoke-checkout.mjs` pins the notice the flag prints about itself, which
+now states what an approved command does and that this is not a sandbox.
+
+**`scripts/smoke-reviewer-tools.mjs` was not run and is not required**: `V2a`
+does not touch `read-only.mjs`. The handoff for `V1c` predicted `V2` would touch
+the question it answers. It does not: reviewer confinement is unchanged, and what
+`V2a` adds is a separate path that no reviewer can reach.
+
+### The installed-plugin review of pull request #19
+
+**One authorized balanced review ran, with `--verify`, typed interactively so
+that the host's approval UI could answer.** It reached that UI, discovery found
+three commands in this repository's own files, the citation gate refused one of
+them, and the person answered without approving anything. Nothing executed.
+
+| Fact | Value |
+|---|---|
+| Command | `/pr-review 19 --balanced --verify --all --no-comment`, typed in an interactive Copilot session |
+| Head reviewed | `8106ac3c9b80a19dc1f1fcf487054fddb73a4201` |
+| Heavy reviewers | `gpt-5.6-terra`, reasoning `high`: correctness, contracts, security, performance-resources |
+| Light overview | `gpt-5.6-luna`, reasoning `high` |
+| Adjudicator | `gpt-5.6-terra`, reasoning `high` |
+| Coverage | `incomplete` |
+| Candidates | 8 produced, 4 reached adjudication |
+| Validated findings | 1 |
+| Withheld / rejected | 0 / 2 rejected on the merits, 4 rejected at the evidence boundary, 1 adjudication invalidated |
+| Credit cost | 252.771985 |
+
+#### What discovery and approval did, live
+
+**The elicitation request reached a real host and a real answer came back.**
+`V1c` merged with the interactive approval path demonstrated only by the
+controlled suites, and #18's correctness reviewer named the untested dependency
+on the installed host accepting the multi-select schema and returning one of its
+documented actions. That dependency is now half closed: the host accepted the
+schema and returned a documented action. What is still untested is `accept`
+carrying a non-empty selection, and therefore execution itself.
+
+**The record cannot say which answer it was.** `approveSafeguards` returns
+`none` both for a decline and for an accept that selected nothing, so the
+recorded `{"status":"none","approved":[],"offered":2,"refused":1}` is consistent
+with either. Nothing runs in either case, so this changes no outcome; it is
+recorded because a later increment reading the record should not believe it says
+more than it does.
+
+Discovery read `AGENTS.md`, `CLAUDE.md`, `HANDOFF.md` and `SCOPE.md`, and skipped
+`README.md` at 101652 bytes and `ROADMAP.md` at 444530 bytes for size, exactly as
+`V1b` predicted. It reported three commands:
+
+| Command | Cited file | Verdict |
+|---|---|---|
+| `node scripts/smoke-safeguards.mjs` | `AGENTS.md` | offered |
+| `node scripts/smoke-review.mjs` | `AGENTS.md` | offered |
+| `node scripts/smoke-reviewer-tools.mjs` | `HANDOFF.md` | refused: it is not written in that file as a command of its own |
+
+**The two plain runnable lines this increment added to `AGENTS.md` were found,
+and they were the only two offered.** That is the live-evidence choice working:
+before `V2a` added them, this repository declared nothing a discovery pass could
+offer, which is why #18 found no command at all.
+
+**The citation gate refused a constructed command, live, for the reason it
+exists.** `HANDOFF.md` writes `scripts/smoke-reviewer-tools.mjs` inside prose
+about the confinement probe; it never writes `node` in front of it. The pass
+supplied the runner itself, and the gate refused the result as uncited. This is
+the first live evidence that the check catches a command a model assembled
+rather than copied, and it is worth more than the controlled fabrication case
+because nothing was staged to produce it.
+
+**The exclusion table recorded no live refusal at all.** The pass reported only
+those three candidates. It did not report this repository's own `for` loop,
+`copilot plugin install "$(pwd)"`, `gh pr create`, or the wrapped dogfood
+command, all of which the handoff predicted it might, and it did not report
+`node scripts/smoke-runtime.mjs --targets`, which both gates would have accepted.
+So the exclusions remain demonstrated only by the controlled suites. A discovery
+pass that reports little is a safe failure and not a defect, but it is also not
+evidence, and this entry must not be read as though the table had been exercised.
+
+#### The findings, and what changed
+
+**One candidate was validated, and its remedy is refused on the merits.**
+Contracts, P1, `review.mjs:374-379`: the revision and cleanliness gate runs
+before safeguards, the same checkout root then goes to the specialists, and only
+an informational status read sits between them, so a reviewer can read a file an
+approved safeguard changed. **The observation is true and the proposed remedy is
+not adopted.** Re-asserting the checkout invariant after execution contradicts
+`SCOPE.md`, which says in the same breath that these commands "may create
+artifacts" and that this tool must "never automatically switch branches, pull,
+stash, or clean the checkout". A re-assertion would refuse the review because the
+person's own approved test suite wrote a coverage file, or it would clean the
+checkout to satisfy itself. Both are forbidden. What is genuinely open is that
+the reviewer prompt still tells every specialist its working directory is
+"verified to be at" the head, which stays true of `HEAD` but no longer of the
+working tree. **Deciding what a reviewer is told about a checkout safeguards
+touched is `V2b`'s question, not a patch to `V2a`**, because it is the same
+question as whether safeguard output reaches a reviewer at all; it is recorded
+under the next increment below.
+
+**Two more defects were real, were confirmed by reading and running the code,
+and are fixed on this branch.** Neither was reported to the user by the tool.
+
+- *Letter case walked past the whole denylist.* `commandRefusal` folded no case
+  before its name lookups, so `Curl https://example.test/x` was neither the
+  lowercase entry the table names nor an all-caps placeholder, and it passed
+  every rule. `spawn("Curl")` then resolves to `curl` on a case-insensitive
+  filesystem, which is the macOS default; that was confirmed on this machine,
+  where it printed `curl 8.7.1`. It defeated the network exclusion the README
+  promises in this same increment. Fixed in `b6fa802`, which folds case for the
+  program, word and watch lookups and deliberately leaves flags exact, because
+  `-w` and `-W` are two different flags and the table already carries both.
+  **Security reported this, the adjudicator accepted it, and the acceptance was
+  then thrown away**: `security:1: invalid adjudication: Citation does not
+  exactly match a supplied context window`. The adjudicator's own citations
+  failed the boundary, so a correct acceptance of a real defect produced no
+  finding. This is the first recorded case of an adjudication being invalidated
+  rather than a candidate.
+- *The artifact scan outlived the run that started it.* `checkoutArtifacts`
+  called `git` with an empty options object, so `runGit` received no signal and
+  the post-execution `git status --porcelain` could not be cancelled. Fixed in
+  `9c6182c`. Performance-resources and correctness reported this independently;
+  neither reached the user.
+
+**A third real defect was reported three times and surfaced zero times.** The
+citation gate accepts a prefix followed by whitespace, so `npm test` passes as
+cited from a file that declares `npm test --fix`, and
+`node scripts/deploy.mjs` can be carved out of
+`node scripts/deploy.mjs --dry-run`. Both were confirmed against the shipped
+code. Correctness, contracts and overview each reported it; correctness's whole
+output was discarded on a JSON syntax error, and contracts' and overview's
+candidates were rejected at the evidence boundary for inexact citations. **It is
+not fixed here**, because tightening the boundary also refuses prose that
+declares a command mid-sentence, which is a trade-off for the user to settle
+rather than a typo to patch. It is the first choice of the next increment.
+
+**Two candidates were rejected on the merits, and both rejections are correct.**
+Performance-resources argued that retaining each command's bounded output could
+exhaust the host; the adjudicator answered that the 8 MiB per-stream bound is
+deliberate and the run-level budget it proposed was never a contract. Overview
+argued that the `V1` row still saying "Execution is `V2`" conflicts with the
+`V2a`/`V2b` split; the adjudicator answered that the aggregate statement stays
+true and the next-increment section is unambiguous. Both stand.
+
+**Four candidates never reached adjudication**, three of them for inexact
+citations (`contracts:2`, `performance-resources:2`, `overview:1`) and one for a
+malformed candidate shape (`overview:2`, which supplied a key the schema does not
+allow). `Q6`'s clipped-end repair fired once more, on `security:1`'s `breaks`
+citation, restoring a truncated `README.md` quote.
+
+#### What this run says about the tool itself
+
+**This is the sharpest recorded measurement of what the exact-citation gate
+costs.** Of three real defects in the increment, the gate let one through, threw
+away a correct adjudication of the second, and rejected the third from all three
+reviewers that found it. Every rejection was mechanically justified: the
+citations really did not match. The gate is still the right design, because the
+alternative is publishing claims nobody checked, and this review published
+nothing. But "no accepted findings is not proof of a clean PR" is no longer a
+disclaimer in this repository; it is a measured result. The rejected-candidate
+text stays on screen for the person running the review, which is how all three
+were recovered here, and that is the property to protect.
+
+**Coverage was `incomplete` for a reason `C5` already describes.** Correctness
+returned unusable output, `SyntaxError: Expected ',' or ']' after array element
+in JSON at position 6519`, which makes it an eligible failed attempt with no
+fallback configured on the heavy tier to take. That is the second live
+observation of the `C5` path, after #18's adjudicator, and a live review with a
+fallback configured remains the open question it was.
+
+**Overview's coverage gap was accurate when written and is now closed.** It said
+the installed-plugin review had not run, so the real elicitation and execution
+behaviour could not be assessed from the controlled checkout. This run is that
+assessment for elicitation. Execution stays unassessed live, because nothing was
+approved.
+
+#### Validation after the two fixes
+
+All thirteen controlled suites pass at `9c6182c`, and `git diff --check` is
+clean. `scripts/smoke-safeguards.mjs` gained four case-folded exclusion cases, an
+assertion that the refusal names the rule rather than the spelling, an assertion
+that short flags stay case-significant, and an assertion that the artifact scan
+carries the run's cancellation signal.
+
+**No second review was run.** The standing workflow authorizes exactly one review
+per increment pull request, and it is spent. Both fixes are small, both are
+covered by the suites, and neither is demonstrated by the installed plugin.
+
+## Completed increment: V2b
+
+**`V2b` is settled without code.** Its three open questions were put to the user
+one at a time, as `V1a`, `V1b`, `V1c` and `V2a`'s were, and all three were
+answered "no change". `V2` closes here. No file under `extensions/` or
+`scripts/` was touched by this increment, so the shipped behaviour is exactly
+`V2a`'s and the thirteen controlled suites are unchanged.
+
+The user's reason for closing rather than building is recorded plainly, because
+a later reader will otherwise assume the questions were never asked: the port
+had grown far past the effort its goal justified, every must-have and every
+costly-to-lose item in `SCOPE.md` was already complete, and the remaining
+appetite belongs to `L1` and `D1` rather than to a fourth safeguard slice. That
+is a judgement about scope, not a discovery that the questions were empty. Each
+answer below is also defensible on its own merits, and the merits are what the
+entry records.
+
+### The three decisions
+
+| Question | Settled as | Why |
+|---|---|---|
+| Whether the citation gate may accept a prefix | **No change. It still accepts one.** The behaviour is now documented as a limitation instead of being tightened. | Tightening it means demanding the match reach the end of its line, and that refuses the ordinary way a project declares a command, in prose: "run `npm test` before committing". The residual risk is real but narrow and bounded by the rules on either side of it, which the next table sets out. `V2a`'s answer to the same class of question applies here too: a project whose declaration is refused writes a plain line, and this tool does not loosen a rule to accommodate prose it cannot parse. |
+| Whether safeguard output reaches a reviewer | **No. It never does, and this is now a decision rather than a deferral.** A failed safeguard therefore stays outside review coverage permanently, as `V2a` left it. | Safeguard output is pull-request controlled text produced by pull-request controlled code. Handing it to a reviewer opens a prompt-injection surface that has nothing to do with running a process, and it would let a failing suite make the review's own findings look less trustworthy when the two are unrelated. `SCOPE.md` asks the flag to ground claims in evidence; it grounds them for the person who approved the command, which is who decides what to do about a red suite. |
+| What the retained record says about what ran | **Nothing. The record is unchanged and gains no schema version.** `discovery`, `approval` and `safeguards` stay out of `outcomeKeys`, as they have since `V1b`. | The record exists to let a later publish act on a settled result without rerunning reviewers. Nothing about what a safeguard did changes what may be published, so an execution record would be inert data on a durable artifact, and inert data on a durable artifact is what a later increment misreads. The argument is weaker here than for a stored approval, which is why it was asked rather than inherited, but it is the same argument and it still holds. |
+
+### What #19's one validated finding turns out to mean
+
+Contracts, P1 on #19 observed that the revision and cleanliness gate runs before
+safeguards, so a reviewer can read a file an approved safeguard changed while
+the reviewer prompt still says its working directory is "verified to be at" the
+reviewed head. Re-asserting cleanliness afterwards was refused in `V2a` and stays
+refused: `SCOPE.md` says these commands may create artifacts and forbids
+cleaning the checkout, so a re-assertion would refuse a review because the
+person's own approved tests wrote a coverage file.
+
+**What was not established at the time is that the inaccuracy cannot produce a
+finding.** `boundCitation` in `findings.mjs` resolves every citation against
+`context.files`, requires the source's `ref` and `blobSha` to equal the bound
+head or base fetched from GitHub, and then replaces the model's quote with the
+lines of that bound content. A file a safeguard wrote or changed in the working
+tree has no bound source, so a citation naming it is refused as outside bound
+provenance, and a candidate without an accepted citation never becomes a
+finding.
+
+So the prompt sentence is inaccurate about the working tree and accurate about
+`HEAD`, and the inaccuracy is contained by a check that was already there for
+another reason. It is recorded as a wording defect, not a path. Fixing the
+wording is a behaviour change under `AGENTS.md` and would cost this increment a
+review it does not otherwise need, so it is left for `D1`, which revisits the
+user-facing text anyway.
+
+### The prefix limitation, stated exactly
+
+`citationRefusal` in `safeguards.mjs` searches the cited file for the command
+text, requires the character before the match to be outside `safeCharacter`, and
+accepts the match when the character after it is outside `safeCharacter` too, or
+is a full stop, comma or colon that ends a word. Whitespace is outside
+`safeCharacter`. A prefix ending at a space therefore passes.
+
+| Consequence | Bounded by |
+|---|---|
+| `npm test` is accepted as cited from a file that declares `npm test --fix`. | The offer shows the person the exact command that would run, not the line it was cited from. Approval is per command. |
+| A command whose safety lives in a trailing argument can be offered without that argument. | `commandRefusal` runs first and refuses by program, word and flag, so the dangerous shapes the denylist names are refused whatever their arguments. The `--fix` case above is refused outright as an auto-fix. |
+| A longer declared command can be truncated at any whitespace boundary. | No shell, so a truncated line is still one program with an argument list, and it is still asserted against `commandRefusal` again in the moment before the spawn. |
+
+What a prefix cannot do is invent a command out of nothing, which is the check's
+actual purpose and the thing #19 demonstrated live: the pass put `node` in front
+of a filename that `HANDOFF.md` mentions only in prose, and the gate refused it.
+Token bounding still stops `npm run test` being carved out of `npm run
+test:unit`, because `:` is inside `safeCharacter`.
+
+### What this increment changed
+
+Documentation only. `README.md`'s safeguard section now states the settled
+answers where it previously said the questions were open, and states the prefix
+limitation where it previously implied the check was exact. The increments table
+above records `V2b` as complete.
+
+### Validation
+
+All thirteen controlled suites pass and `git diff --check` is clean. They are
+unchanged, because no behaviour is. `scripts/smoke-reviewer-tools.mjs` was not
+run and did not need to be: `read-only.mjs` is untouched.
+
+**No installed-plugin review was run for this increment by default.** `AGENTS.md`
+makes the review the user's call for a documentation-only pull request, because
+it costs real credits. Whether one ran is recorded in the pull-request entry
+below.
+
+**The live evidence gaps `V2a` recorded stay open.** Execution has never run
+under the installed plugin: an `accept` carrying a non-empty selection, a real
+spawn, a real capture, a real artifact line and a real cancellation are
+demonstrated only by the controlled suites, and no exclusion rule has ever
+refused a real discovered command. Settling `V2b` without code means there is no
+review here to fold them into. They close in `D1`, whose own review is already
+required and can run with `--verify`; the next-increment section below says
+exactly how. Until then, do not mistake the suites for delivery evidence.
