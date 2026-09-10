@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
-  approveSafeguards, collectInstructionFiles, describeApproval, describeDiscovery, discoveryEnvelope,
-  discoveryInstructions, discoveryPrompt, instructionBudgetBytes, instructionFileMaxBytes, maxCommandLength,
+  approveSafeguards, citationRefusal, collectInstructionFiles, commandRefusal, describeApproval,
+  describeDiscovery, describeExecution, discoveryEnvelope, discoveryInstructions, discoveryPrompt,
+  executeSafeguards, instructionBudgetBytes, instructionFileMaxBytes, maxCommandLength,
   maxDiscoveredCommands,
 } from "../extensions/pr-review/safeguards.mjs";
 import { outputEnd, outputStart } from "../extensions/pr-review/findings.mjs";
@@ -190,14 +191,33 @@ console.log("PASS the discovery envelope is validated in code, including which f
   // Skipped sources are named, so an incomplete read is visible.
   assert.match(found, /ROADMAP\.md/);
   assert.match(found, /exceeds 65536 bytes/);
-  // The presentation can never read as evidence that anything ran or was allowed to.
-  assert.match(found, /Nothing here has been approved and nothing has run/);
+  // Nothing has run at the point this is printed, and the next thing that
+  // happens is the question, so the text says exactly that and nothing more.
+  assert.match(found, /Nothing here has run/);
   assert.match(found, /asked next which of these may run/);
-  assert.match(found, /no reviewer receives one/i);
   // V1c asks in this same run, so discovery may no longer defer the offer to a
   // later increment. Pull request #18's contracts reviewer caught exactly this.
   assert.doesNotMatch(found, /a later increment would offer to run/);
+  // V2a executes, so discovery may no longer claim that nothing will.
+  assert.doesNotMatch(found, /this release executes none/i);
   assert.doesNotMatch(found, /pass(ed)?\b.*safeguard|safeguard.*pass(ed)?\b/i);
+}
+{
+  // V2a: a command code refuses to run is still reported, with the reason, and
+  // is marked as one nobody will be offered. A refused command that vanished
+  // would be indistinguishable from one the project never declared.
+  const found = describeDiscovery({
+    status: "found",
+    commands: [
+      { command: "node scripts/smoke-safeguards.mjs", file: "AGENTS.md" },
+      { command: "npm install", file: "AGENTS.md", refusal: "`install` is not a check" },
+    ],
+    files: [{ name: "AGENTS.md" }], skipped: [],
+  });
+  assert.match(found, /npm install/);
+  assert.match(found, /`install` is not a check/);
+  assert.match(found, /not offered/i);
+  assert.match(found, /1 of 2|1 command/i);
 }
 {
   // Choice 5: an empty result is reported plainly and the run carries on.
@@ -236,14 +256,17 @@ const approvalBinding = {
   number: 18, pullId: "pull-18", head: "b".repeat(40), base: "a".repeat(40),
   diffSha256: "diff", contextSha256: "context", paths: [],
 };
-// One safeguard and one command that plainly is not a safeguard. V1c offers
-// both, because nothing it can approve is able to run.
+// Two safeguards code can run, and one command it refuses. V2a offers only the
+// two: approving now means running, so a command that may not run is never put
+// in front of a person as though it could.
 const declared = [
   { command: "node scripts/smoke-findings.mjs", file: "HANDOFF.md" },
-  { command: "mvn deploy", file: "AGENTS.md" },
+  { command: "node scripts/smoke-review.mjs", file: "AGENTS.md" },
 ];
+const refusedCommand = { command: "mvn deploy", file: "AGENTS.md", refusal: "`deploy` is not a check" };
 const foundDiscovery = {
-  status: "found", commands: declared, files: [{ name: "AGENTS.md" }, { name: "HANDOFF.md" }], skipped: [],
+  status: "found", commands: [...declared, refusedCommand],
+  files: [{ name: "AGENTS.md" }, { name: "HANDOFF.md" }], skipped: [],
 };
 
 function approvalFixture({ answer = () => ({ action: "decline" }), ui = true, discovery = foundDiscovery,
@@ -279,9 +302,16 @@ const accepted = (commands) => ({ action: "accept", content: { commands } });
   // A choice carries the command and the file it was declared in, which is the
   // whole of what V1b can stand behind about it.
   assert.deepEqual(offered(fixture.requests[0]).map(({ title }) => title),
-    ["node scripts/smoke-findings.mjs  [declared in HANDOFF.md]", "mvn deploy  [declared in AGENTS.md]"]);
-  // The question must never read as though approving were running.
-  assert.match(fixture.requests[0].message, /nothing .*(runs|ran|executed)|no command .*(runs|is run|executed)/i);
+    ["node scripts/smoke-findings.mjs  [declared in HANDOFF.md]",
+      "node scripts/smoke-review.mjs  [declared in AGENTS.md]"]);
+  // A command code refuses is never offered, and the question says how many
+  // were held back rather than quietly presenting a shorter list.
+  assert.equal(approval.refused, 1);
+  assert(offered(fixture.requests[0]).every(({ title }) => !title.includes("mvn deploy")));
+  // The question must say what approving does, because approving now runs it.
+  assert.match(fixture.requests[0].message, /runs? (it|them|now)|run(s)? in this checkout/i);
+  assert.doesNotMatch(fixture.requests[0].message, /nothing runs in this release/i);
+  assert.match(fixture.requests[0].message, /not a sandbox|does not sandbox/i);
   assert.match(fixture.requests[0].message, /fixture\/repository#18/);
   assert.match(fixture.requests[0].message, new RegExp(approvalBinding.head));
 }
@@ -353,6 +383,9 @@ for (const discovery of [
   { status: "none", commands: [], files: [], skipped: [] },
   { status: "none", commands: [], files: [{ name: "AGENTS.md" }], skipped: [] },
   { status: "failed", commands: [], files: [{ name: "AGENTS.md" }], skipped: [], reason: "pass failed" },
+  // Every discovered command refused is nothing to offer, and it says so
+  // differently from a project that declared nothing at all.
+  { status: "found", commands: [refusedCommand], files: [{ name: "AGENTS.md" }], skipped: [] },
 ]) {
   // Nothing to approve is not a question worth asking, and a failed discovery
   // has produced no list that anyone could answer about.
@@ -362,6 +395,7 @@ for (const discovery of [
   assert.deepEqual(approval.approved, []);
   assert.equal(approval.offered, 0);
   assert.equal(fixture.requests.length, 0);
+  assert.match(describeApproval(approval), discovery.status === "found" ? /refus/i : /no command to approve/i);
 }
 {
   // A run already cancelled asks nothing.
@@ -375,37 +409,388 @@ console.log("PASS approval is asked per command, bound to its invocation, and ap
 
 // Presentation. Every status says plainly that nothing ran, and none of them
 // may claim the review itself is incomplete: approval is not review coverage.
-for (const [scenario, approval] of [
-  ["an approved subset", { status: "approved", approved: [declared[0]], offered: 2 }],
-  ["nothing approved", { status: "none", approved: [], offered: 2 }],
-  ["no approval UI", { status: "unavailable", approved: [], offered: 2, error: "This host has no approval UI." }],
-  ["a cancelled approval", { status: "cancelled", approved: [], offered: 2 }],
-  ["a failed approval", { status: "failed", approved: [], offered: 2, error: "Invalid approval answer" }],
-  ["nothing to approve", { status: "not-started", approved: [], offered: 0 }],
+for (const [scenario, approval, runs] of [
+  ["an approved subset", { status: "approved", approved: [declared[0]], offered: 2, refused: 1 }, true],
+  ["nothing approved", { status: "none", approved: [], offered: 2, refused: 1 }, false],
+  ["no approval UI", { status: "unavailable", approved: [], offered: 2, refused: 1,
+    error: "This host has no approval UI." }, false],
+  ["a cancelled approval", { status: "cancelled", approved: [], offered: 2, refused: 1 }, false],
+  ["a failed approval", { status: "failed", approved: [], offered: 2, refused: 1,
+    error: "Invalid approval answer" }, false],
+  ["nothing to approve", { status: "not-started", approved: [], offered: 0, refused: 0 }, false],
 ]) {
   const described = describeApproval(approval);
   assert.match(described, /^V1c safeguard approval/, scenario);
-  assert.match(described, /nothing ran|no command ran|nothing was executed/i, scenario);
+  // Approval is not review coverage, whatever happened to it.
   assert.doesNotMatch(described, /incomplete coverage/i, scenario);
+  // Nothing may be approved except by a person, in this run.
+  assert.match(described, /no flag|nothing else approves|only you/i, scenario);
+  if (!runs) assert.match(described, /nothing runs|no command runs|nothing will run/i, scenario);
 }
 {
-  const described = describeApproval({ status: "approved", approved: declared, offered: 2 });
+  const described = describeApproval({ status: "approved", approved: declared, offered: 2, refused: 1 });
   assert.match(described, /node scripts\/smoke-findings\.mjs {2}\[declared in HANDOFF\.md\]/);
-  assert.match(described, /mvn deploy {2}\[declared in AGENTS\.md\]/);
+  assert.match(described, /node scripts\/smoke-review\.mjs {2}\[declared in AGENTS\.md\]/);
   assert.match(described, /2 of 2/);
-  // No exclusion rule exists, so the presentation must never imply a command
-  // was vetted by anything other than the person who approved it.
+  // The approved commands run next, in this checkout, before any reviewer.
+  assert.match(described, /before any reviewer|before the reviewers/i);
+  // The exclusions are a heuristic, so the presentation must never imply that
+  // surviving them means a command was judged safe.
   assert.doesNotMatch(described, /vetted|safe to run|checked for/i);
 }
 assert.match(describeApproval({ status: "failed", approved: [], offered: 2, error: "Invalid approval answer" }),
   /Invalid approval answer/);
 console.log("PASS an approval is presented as an approval, never as evidence that a command ran");
 
-// V1c executes nothing, and this keeps it that way while the increment that
-// will execute is still ahead: a module that cannot spawn a process cannot run
-// a discovered command by accident.
-assert.doesNotMatch(readFileSync(new URL("../extensions/pr-review/safeguards.mjs", import.meta.url), "utf8"),
-  /child_process|execFile|spawnSync|\bspawn\(/);
-console.log("PASS the safeguard module cannot spawn a process at all");
+// V2a: the gates. A discovered command is offered only if code can run it
+// without a shell, only if it is not one of the kinds a safeguard is never, and
+// only if it really appears in the file it cites. Every refusal names itself,
+// because a command that vanishes is indistinguishable from one nobody declared.
+
+// Choice 3: no shell. Anything that needs one to mean what it says is refused
+// rather than run, so the exclusions below can read a real argument list.
+for (const [scenario, command] of [
+  ["a chain", "npm run lint && npm test"],
+  ["a pipe", "npm test | tee log"],
+  ["a redirect", "npm test > out.txt"],
+  ["a sequence", "npm test; npm run lint"],
+  ["a background job", "npm test &"],
+  ["a subshell", "(npm test)"],
+  ["a substitution", "node scripts/run.mjs $(pwd)"],
+  ["a backtick", "node scripts/run.mjs `pwd`"],
+  ["a variable", "node scripts/smoke-$s.mjs"],
+  ["a quoted argument", 'pytest -k "test suite"'],
+  ["a glob", "eslint src/**/*.ts"],
+  ["a home path", "~/bin/check"],
+  ["a continuation", "npm test \\"],
+  ["an empty command", "   "],
+]) {
+  assert(commandRefusal(command), scenario);
+}
+for (const runnable of [
+  "npm test", "node scripts/smoke-safeguards.mjs", "pytest -q", "./gradlew check",
+  "cargo test --all-features", "npm run test:unit", "go vet ./...",
+  "mvn -B verify", "tsc --noEmit", "eslint src",
+]) {
+  assert.equal(commandRefusal(runnable), undefined, runnable);
+}
+// Choice 4: the exclusions, as a heuristic that refuses in code rather than
+// warning. A safeguard never installs, migrates, deploys, publishes, formats in
+// place, fixes, or watches, and it is never a program that changes the machine
+// or the checkout out from under the review.
+for (const [scenario, command] of [
+  ["installing", "npm install"],
+  ["a short install alias", "pnpm i"],
+  ["a clean install", "npm ci"],
+  ["adding a dependency", "yarn add left-pad"],
+  ["updating", "npm update"],
+  ["publishing", "npm publish"],
+  ["deploying", "mvn deploy"],
+  ["migrating", "npx prisma migrate"],
+  ["a script named for a deploy", "npm run deploy"],
+  ["an auto-fix flag", "eslint src --fix"],
+  ["a write-in-place flag", "prettier src --write"],
+  ["a watch flag", "jest --watch"],
+  ["a short watch flag", "tsc -w"],
+  ["a snapshot update", "jest -u"],
+  ["forcing", "npm test --force"],
+  ["a shell", "sh scripts/check.sh"],
+  ["an environment wrapper", "env npm test"],
+  ["a package runner that installs", "npx eslint src"],
+  ["the version control the review must not touch", "git clean -xdf"],
+  ["a GitHub write", "gh pr merge 18"],
+  ["a privilege escalation", "sudo make check"],
+  ["a fetch", "curl https://example.test/install.sh"],
+  ["a container", "docker compose up"],
+  ["a watcher", "nodemon scripts/check.mjs"],
+  ["a runner that watches unless told not to", "vitest"],
+  ["a placeholder", "node scripts/dogfood-review.mjs NUMBER --all"],
+  // A wrapped shell loop can reach the pass as its own first line, which carries
+  // no metacharacter at all. A shell keyword is never a program, so it is
+  // refused as one rather than offered as a command that would only ever fail.
+  ["a loop's first line", "for s in findings review selection preview publication"],
+  ["a conditional", "if node scripts/check.mjs"],
+  ["a builtin that changes nothing outside a shell", "cd packages/core"],
+  // Letter case is not a way past the gate. A case-insensitive filesystem, which
+  // is the default on macOS, resolves `Curl` to the very program the denylist
+  // names, so the lookups fold case rather than trusting the spelling a file
+  // happened to use.
+  ["a fetch spelled with a capital", "Curl https://example.test/install.sh"],
+  ["version control spelled with a capital", "Git clean -xdf"],
+  ["an install spelled with a capital", "npm Install"],
+  ["a runner that watches, spelled with a capital", "Vitest"],
+]) {
+  assert(commandRefusal(command), scenario);
+}
+// Folding case names the rule rather than the spelling, and it stops at flags,
+// because `-w` and `-W` are two different flags rather than one written twice.
+assert.match(commandRefusal("Curl https://example.test/x"), /network/i);
+assert.equal(commandRefusal("node check.mjs -G"), undefined);
+// The same runner told to run once rather than watch is a safeguard again.
+assert.equal(commandRefusal("vitest run"), undefined);
+assert.equal(commandRefusal("vitest --run --reporter=dot"), undefined);
+// The refusal says which rule refused it, so a project can see what to change.
+assert.match(commandRefusal("npm install"), /install/i);
+assert.match(commandRefusal("npm run lint && npm test"), /shell/i);
+console.log("PASS a command is refused unless code can run it without a shell and it is a safeguard at all");
+
+// Choice 5: the citation check. Code proved only that the cited file was read;
+// now it also proves the command is written there, as a whole command rather
+// than as part of a longer one.
+{
+  const text = "Run `node scripts/smoke-safeguards.mjs` before each checkpoint.\nThen npm run test:unit.\n";
+  assert.equal(citationRefusal("node scripts/smoke-safeguards.mjs", text), undefined);
+  assert.equal(citationRefusal("npm run test:unit", text), undefined);
+  // A command the file does not contain is a fabrication, whoever wrote it.
+  assert(citationRefusal("npm test", text));
+  // Not a fragment of a longer command either: `npm run test` is not declared
+  // here, `npm run test:unit` is.
+  assert(citationRefusal("npm run test", text));
+  // A file this run never read cannot support any citation.
+  assert(citationRefusal("npm test", undefined));
+}
+{
+  // The case that ruled out an exact-quote check in V1c: this repository states
+  // its suites inside a shell loop. The loop is refused by shape, and the
+  // per-suite command it expands to is refused as uncited, so neither can be
+  // assembled out of prose and offered.
+  const loop = "for s in findings review; do node scripts/smoke-$s.mjs; done";
+  assert(commandRefusal(loop));
+  assert(citationRefusal("node scripts/smoke-findings.mjs", loop));
+}
+console.log("PASS a command must appear in the file it cites, as a whole command");
+
+// V2a: execution. This is the first thing in this tool that runs pull-request
+// controlled code on the user's machine, so what it does and what it refuses to
+// do are both asserted here.
+
+const script = (root, name, body) => { writeFileSync(join(root, name), body); return `node ${name}`; };
+const fakeGit = (output = "", seen = {}) => Object.assign(async (args, cwd, options) => {
+  assert.deepEqual(args, ["status", "--porcelain"]);
+  assert.equal(typeof cwd, "string");
+  // The scan is the review's own work, so it carries the review's cancellation.
+  seen.signal = options?.signal;
+  return output;
+}, { seen });
+const approvalOf = (commands) => ({ status: "approved", approved: commands, offered: commands.length, refused: 0 });
+const run = (approved, options = {}) => executeSafeguards(approvalOf(approved), {
+  root: options.root, controller: options.controller ?? new AbortController(),
+  git: options.git ?? fakeGit(), ...options,
+});
+
+{
+  // A safeguard that passes, and one that fails, in the order they were
+  // approved. Both are reported with their exit status and their output, and a
+  // failing one never stops the next from running.
+  const root = project({});
+  const pass = script(root, "pass.mjs", "console.log('42 checks passed');");
+  const fail = script(root, "fail.mjs", "console.error('one check failed'); process.exit(3);");
+  const execution = await run([
+    { command: pass, file: "AGENTS.md" }, { command: fail, file: "AGENTS.md" },
+  ], { root });
+  assert.equal(execution.status, "failed", "One failed safeguard makes the whole execution failed");
+  assert.equal(execution.results.length, 2);
+  assert.equal(execution.results[0].status, "passed");
+  assert.equal(execution.results[0].code, 0);
+  assert.match(execution.results[0].stdout, /42 checks passed/);
+  assert.equal(execution.results[1].status, "failed");
+  assert.equal(execution.results[1].code, 3);
+  assert.match(execution.results[1].stderr, /one check failed/);
+  assert.deepEqual(execution.results.map(({ command }) => command), [pass, fail]);
+  assert(execution.results.every(({ milliseconds }) => Number.isInteger(milliseconds)));
+}
+{
+  // A command that is not there at all fails as itself rather than taking the
+  // run down with it.
+  const root = project({});
+  const execution = await run([{ command: "node no-such-check.mjs", file: "AGENTS.md" }], { root });
+  assert.equal(execution.status, "failed");
+  assert.equal(execution.results[0].status, "failed");
+  assert.notEqual(execution.results[0].code, 0);
+}
+{
+  // The gate is asserted again in the moment before the spawn, so an approved
+  // entry that could not pass it now is refused rather than run. Approval is
+  // the person's decision; this is the code's, and it is the one that spawns.
+  const root = project({});
+  const execution = await run([
+    { command: "mvn deploy", file: "AGENTS.md" },
+    { command: "npm test && npm run lint", file: "AGENTS.md" },
+  ], { root });
+  assert.equal(execution.status, "failed");
+  assert(execution.results.every(({ status }) => status === "refused"));
+  assert.match(execution.results[0].error, /deploy/i);
+  assert.match(execution.results[1].error, /shell/i);
+}
+{
+  // Nothing approved is nothing run, and no process is started to discover that.
+  for (const approval of [
+    { status: "none", approved: [], offered: 2, refused: 0 },
+    { status: "unavailable", approved: [], offered: 2, refused: 0 },
+    { status: "not-started", approved: [], offered: 0, refused: 0 },
+    { status: "failed", approved: [], offered: 2, refused: 0, error: "invalid answer" },
+  ]) {
+    const execution = await executeSafeguards(approval, {
+      root: project({}), controller: new AbortController(), git: fakeGit(),
+    });
+    assert.equal(execution.status, "not-started", approval.status);
+    assert.deepEqual(execution.results, []);
+  }
+}
+{
+  // Output is bounded rather than unbounded, and a bound that is reached is
+  // stated rather than hidden. Reaching it never kills a safeguard that is
+  // otherwise passing: a chatty suite is not a failing one.
+  const root = project({});
+  const chatty = script(root, "chatty.mjs", "for (let i = 0; i < 400; i++) console.log('x'.repeat(100));");
+  const execution = await run([{ command: chatty, file: "AGENTS.md" }], { root, captureBytes: 1024 });
+  assert.equal(execution.results[0].status, "passed");
+  assert.equal(execution.results[0].code, 0);
+  assert(execution.results[0].stdout.length <= 1024);
+  assert.deepEqual(execution.results[0].truncated, ["stdout"]);
+}
+{
+  // SCOPE.md asks for artifacts as well as evidence. Running project code can
+  // leave files behind, and the preflight has already proven the tree was clean,
+  // so one status read afterwards says exactly what running it changed. Nothing
+  // is cleaned, reverted or stashed.
+  const root = project({});
+  const writer = script(root, "writer.mjs", "console.log('wrote');");
+  const execution = await run([{ command: writer, file: "AGENTS.md" }],
+    { root, git: fakeGit("?? build.log\n M src/example.js\n") });
+  assert.deepEqual(execution.artifacts.paths, ["?? build.log", " M src/example.js"]);
+  const clean = await run([{ command: writer, file: "AGENTS.md" }], { root });
+  assert.deepEqual(clean.artifacts.paths, []);
+}
+{
+  // A status read that fails is reported, and does not turn a passing safeguard
+  // into a failing one.
+  const root = project({});
+  const writer = script(root, "writer.mjs", "console.log('wrote');");
+  const execution = await run([{ command: writer, file: "AGENTS.md" }], {
+    root, git: async () => { throw new Error("git is unavailable"); },
+  });
+  assert.equal(execution.status, "passed");
+  assert.match(execution.artifacts.error, /git is unavailable/);
+}
+{
+  // The scan runs git, and a review that has been cancelled must not be left
+  // waiting on a process it started and cannot stop.
+  const root = project({});
+  const writer = script(root, "writer.mjs", "console.log('wrote');");
+  const controller = new AbortController();
+  const git = fakeGit("");
+  await run([{ command: writer, file: "AGENTS.md" }], { root, controller, git });
+  assert.equal(git.seen.signal, controller.signal, "The artifact scan carries the run's cancellation signal");
+}
+{
+  // A run cancelled before execution starts nothing at all.
+  const controller = new AbortController();
+  controller.abort(new DOMException("cancelled before execution", "AbortError"));
+  const root = project({});
+  const marker = join(root, "should-not-exist");
+  const execution = await run([
+    { command: script(root, "touch.cjs", `require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'x');`),
+      file: "AGENTS.md" },
+  ], { root, controller });
+  assert.equal(execution.status, "cancelled");
+  assert.deepEqual(execution.results, []);
+  assert.throws(() => readFileSync(marker));
+}
+{
+  // Cancelling during a safeguard kills it, and every process it started with
+  // it. There is no timeout anywhere in this: the only thing that ends a
+  // running safeguard is the person who cancels the review.
+  const root = project({});
+  writeFileSync(join(root, "child.cjs"), "setTimeout(() => {}, 120000);");
+  writeFileSync(join(root, "parent.cjs"), [
+    "const { spawn } = require('node:child_process');",
+    "const { writeFileSync } = require('node:fs');",
+    "const child = spawn(process.execPath, ['child.cjs'], { cwd: __dirname, stdio: 'ignore' });",
+    `writeFileSync(${JSON.stringify(join(root, "child.pid"))}, String(child.pid));`,
+    "setTimeout(() => {}, 120000);",
+  ].join("\n"));
+  const controller = new AbortController();
+  const started = Date.now();
+  const pending = run([{ command: "node parent.cjs", file: "AGENTS.md" },
+    { command: "node parent.cjs", file: "AGENTS.md" }], { root, controller });
+  const pidFile = join(root, "child.pid");
+  for (let waited = 0; waited < 5000 && !existsSync(pidFile); waited += 25) {
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  const grandchild = Number(readFileSync(pidFile, "utf8"));
+  assert(Number.isInteger(grandchild) && grandchild > 0, "The safeguard really started a process of its own");
+  process.kill(grandchild, 0);
+  controller.abort(new DOMException("cancelled during execution", "AbortError"));
+  const execution = await pending;
+  assert.equal(execution.status, "cancelled");
+  assert.equal(execution.results[0].status, "cancelled");
+  assert.equal(execution.results.length, 1, "A cancelled run starts no further safeguard");
+  assert(Date.now() - started < 60000, "Cancellation does not wait for the safeguard to finish on its own");
+  let alive = true;
+  for (let waited = 0; waited < 5000 && alive; waited += 25) {
+    try { process.kill(grandchild, 0); await new Promise((resolve) => setTimeout(resolve, 25)); }
+    catch { alive = false; }
+  }
+  assert.equal(alive, false, "Cancelling kills the whole process group, not only the command itself");
+}
+console.log("PASS an approved safeguard runs, is bounded, is re-checked before it spawns, and is killable");
+
+// Presentation. What ran, what it said, and what it changed. It must never read
+// as a claim about the review's own coverage: a safeguard grounds no finding in
+// this increment, so a failing one cannot make the review less complete.
+{
+  const described = describeExecution({
+    status: "failed",
+    results: [
+      { command: "node check.mjs", file: "AGENTS.md", status: "passed", code: 0, milliseconds: 12,
+        stdout: "42 checks passed\n", stderr: "", truncated: [] },
+      { command: "node lint.mjs", file: "AGENTS.md", status: "failed", code: 3, milliseconds: 40,
+        stdout: "", stderr: "one check failed\n", truncated: [] },
+      { command: "mvn deploy", file: "AGENTS.md", status: "refused", error: "`deploy` is not a check" },
+    ],
+    artifacts: { paths: ["?? build.log"] },
+  });
+  assert.match(described, /^V2a safeguard execution/);
+  assert.match(described, /node check\.mjs/);
+  assert.match(described, /42 checks passed/);
+  assert.match(described, /one check failed/);
+  assert.match(described, /exit 3/);
+  assert.match(described, /\?\? build\.log/);
+  assert.match(described, /deploy` is not a check/);
+  // The rule this increment settled, in the text the user reads.
+  assert.match(described, /not review coverage|does not.*coverage/i);
+  assert.doesNotMatch(described, /incomplete coverage/i);
+  // A safeguard grounds no finding here, so nothing may suggest a reviewer saw it.
+  assert.doesNotMatch(described, /reviewer .*(saw|received|used)/i);
+}
+for (const [scenario, execution] of [
+  ["nothing approved", { status: "not-started", results: [] }],
+  ["a cancelled execution", { status: "cancelled", results: [
+    { command: "node check.mjs", file: "AGENTS.md", status: "cancelled", milliseconds: 5, stdout: "", stderr: "",
+      truncated: [] }] }],
+  ["output that was truncated", { status: "passed", results: [
+    { command: "node check.mjs", file: "AGENTS.md", status: "passed", code: 0, milliseconds: 5,
+      stdout: "x".repeat(100), stderr: "", truncated: ["stdout"] }] }],
+  ["artifacts that could not be read", { status: "passed", results: [], artifacts: { error: "git failed" } }],
+]) {
+  const described = describeExecution(execution);
+  assert.match(described, /^V2a safeguard execution/, scenario);
+  assert.doesNotMatch(described, /incomplete coverage/i, scenario);
+}
+assert.match(describeExecution({ status: "passed", results: [
+  { command: "node check.mjs", file: "AGENTS.md", status: "passed", code: 0, milliseconds: 5,
+    stdout: "x".repeat(100), stderr: "", truncated: ["stdout"] }] }), /truncat/i);
+assert.match(describeExecution({ status: "not-started", results: [] }), /nothing was approved|no command/i);
+console.log("PASS execution is presented with its evidence and its artifacts, and never as review coverage");
+
+// V2a executes, so the module may spawn. What it may never do is open a shell:
+// choice 3 is worth nothing if any path here can reach one.
+{
+  const source = readFileSync(new URL("../extensions/pr-review/safeguards.mjs", import.meta.url), "utf8");
+  assert.doesNotMatch(source, /shell:\s*true|execSync|spawnSync|\/bin\/(sh|bash)/);
+  assert.match(source, /\bspawn\b/, "V2a executes, so the module spawns exactly one kind of process");
+}
+console.log("PASS the safeguard module can spawn a process, and can never open a shell");
 
 for (const root of roots) rmSync(root, { recursive: true, force: true });

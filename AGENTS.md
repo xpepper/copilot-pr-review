@@ -29,6 +29,18 @@
   Do not amend or rewrite published history.
 - A newer explicit instruction not to commit overrides this standing workflow.
 
+### Validate before each checkpoint
+
+Run this repository's controlled suites before a checkpoint commit. They use test
+doubles, need no network and no inference, and each finishes in well under a
+second. These two cover the safeguard path end to end:
+
+    node scripts/smoke-safeguards.mjs
+    node scripts/smoke-review.mjs
+
+`HANDOFF.md` lists the full set and the loop that runs every one of them. Run the
+whole set before opening a pull request.
+
 ## Land every increment on a reviewed pull request
 
 Every increment lands through a pull request that this plugin reviews. The

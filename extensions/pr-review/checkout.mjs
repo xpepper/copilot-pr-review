@@ -60,13 +60,16 @@ export function refuseCheckout(condition, detail, number, mode = reviewModes.qui
 export const verificationNotice = [
   `Verification: ${verifyFlag} is set. This run additionally requires the pull request's head branch and a `,
   "tree with no untracked path, checked with the revision gate before any reviewer starts.",
-  "\nOnce it passes, this project's own instruction files are read, the safeguard commands they declare are ",
-  "presented, and you are asked which of them may run. Approval is per command, and it comes from that ",
-  "question alone: no flag and no configuration key grants it. Nothing is executed on that answer: ",
-  "it is recorded, no reviewer receives a command, and a passing preflight is still an ordinary review of ",
-  "the selected mode, so this flag grounds no claim in it.",
-  "\nThe list you are asked about is unfiltered. A command in it is one the discovery pass read out of a ",
-  "file, not one this tool has judged.",
+  "\nOnce it passes, this project's own instruction files are read and the safeguard commands they declare ",
+  "are presented. You are then asked which of them may run. Approval is per command and it comes from that ",
+  "question alone: no flag, no configuration key and no saved posting setting grants it.",
+  "\nA command you approve runs in this checkout, before the reviewers start, as you, with the dependencies ",
+  "you already have installed. This is not a sandbox. What it prints is shown to you and to nobody else: no ",
+  "reviewer receives it, so a safeguard grounds no finding here and a failed one leaves this review's own ",
+  "coverage alone. A passing preflight is still an ordinary review of the selected mode.",
+  "\nA command this tool refuses to run at all, such as one that installs, deploys, formats in place or ",
+  "watches, is reported with the reason and never offered. That rule is a heuristic about the kind of ",
+  "command it is, and surviving it is not a judgement that a command is safe.",
 ].join("");
 
 function statusEntries(status) {
