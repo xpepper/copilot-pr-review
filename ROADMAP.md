@@ -438,7 +438,7 @@ cut, and the archive's own pointer was widened to cover it.
 | File | Bytes after `D1` | Against the 65536-byte cap |
 | --- | --- | --- |
 | `README.md` | 55195, from 103903 | read, was the only root file still skipped |
-| `ROADMAP.md` | 50131 | read, 15405 bytes spare |
+| `ROADMAP.md` | 50861 | read, 14675 bytes spare |
 | `HANDOFF.md` | 15861 | read |
 | `docs/readme-archive-2026-09-10.md` | 105434 | not a candidate; discovery does not recurse |
 | `docs/roadmap-archive-2026-09-10.md` | 450090 | not a candidate; discovery does not recurse |
@@ -446,7 +446,7 @@ cut, and the archive's own pointer was widened to cover it.
 **Discovery now reads every root markdown file of this project and skips none.**
 That was demonstrated rather than inferred, by running the real
 `collectInstructionFiles` against this checkout; the six files it reads spend
-143959 bytes of the 262144-byte budget, so nothing is near being
+144689 bytes of the 262144-byte budget, so nothing is near being
 skipped for the budget either.
 
 ### Validation
@@ -478,6 +478,17 @@ every argument refusal, the capture and lifecycle gates, the refusal of both an
 ordinary and a `--verify` review on a mismatched checkout, and its assertions
 that no model turn, subagent or tool execution occurred. It spends no credits.
 It had not been rerun since before `V1b`.
+
+**One operational caveat came out of that**, and it is not a defect in this
+project. An install that had reported success, and that `copilot plugin list`
+then showed, was gone from the list and from
+`~/.copilot/installed-plugins/_direct/` minutes later, with a concurrent
+`copilot` process the likeliest cause. The install was repeated, the installed
+`extension.mjs` and `review.mjs` were diffed against this checkout and are
+byte-identical, the probe was rerun against that copy and passed, and the copy
+survived. **Check `copilot plugin list` immediately before dispatching a review**:
+the installed copy is what a review actually exercises, and a silently missing
+or stale one would be reviewed as though it were this branch.
 
 ### Pull request #24 and its review
 
