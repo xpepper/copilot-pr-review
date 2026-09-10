@@ -1612,8 +1612,12 @@ deep's single integrated reviewer, attempt one configured fallback for a reviewe
 whose own execution failed, and validate/deduplicate findings, but cannot execute project safeguards. It does not restrict or change the model of the surrounding Copilot session. The SDK may
 retain its own session transcripts; no plugin review archive is implemented.
 
-No upstream source has been copied. Source reuse/licensing assessment remains
-pending before any upstream code is reused.
+No upstream source has been copied, and a line-level audit against the published
+upstream package confirms it rather than assuming it. The licensing assessment is
+settled: upstream declares MIT and publishes no licence text or copyright notice,
+so no upstream source may be copied into this port. See
+[docs/upstream-licensing.md](docs/upstream-licensing.md) for the evidence and the
+rule.
 
 ## Reproduce the runtime smoke exercise
 

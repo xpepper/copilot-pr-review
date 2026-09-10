@@ -39,8 +39,15 @@ or reproduce every upstream configuration field. Later upstream changes do not
 silently alter this scope.
 
 The package declares MIT licensing, but a standalone license text was not found
-during research. Confirm applicable licensing and attribution obligations before
-reusing or redistributing source.
+during research. Increment `L1` confirmed both halves of that from primary
+sources and recorded the answer, its evidence and the resulting rule in
+[docs/upstream-licensing.md](docs/upstream-licensing.md). In short: upstream
+declares MIT everywhere it publishes metadata and publishes no licence text and
+no copyright notice anywhere, so MIT's notice condition cannot be discharged
+from upstream material as it stands. No upstream source, prompt text or
+documentation may be copied into this port, and a line-level audit confirms that
+none has been. Behavioral guidance is unaffected; only copying is ruled out.
+Read that file before reusing or redistributing any upstream source.
 
 ## Review modes and findings
 

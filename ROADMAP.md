@@ -32,7 +32,7 @@ posting them.
 | ID | Status | Independently demonstrable outcome | Requirements / dependencies |
 | --- | --- | --- | --- |
 | S0 | Completed | Confirmed product specification recorded in `SCOPE.md`, commit `6407a59`. | [Goal](SCOPE.md#goal) |
-| L1 | Pending | Resolve applicable upstream licensing and attribution; record what can be reused. No upstream source reuse until resolved. Original prototypes need not wait. | [Upstream baseline](SCOPE.md#upstream-baseline) |
+| L1 | Completed | Upstream declares MIT in every place it publishes metadata and publishes no licence text and no copyright notice anywhere, so MIT's notice condition cannot be discharged from upstream material. Nothing may be copied; a line-level audit of 5544 upstream lines against 56 local files confirms nothing has been, the only overlap being seven boilerplate strings. Answer, evidence and rule recorded in `docs/upstream-licensing.md`. Pull request recorded in the entry below; documentation-only. | [Upstream baseline](SCOPE.md#upstream-baseline) |
 | F1 | Completed | Locally installable plugin with a code-owned, usable status/help entry point; runtime evidence and reproduction below. | [Technical feasibility](SCOPE.md#technical-uncertainties-and-proposed-sequence) |
 | F2 | Completed | Two concurrent reviewers over a tiny original local fixture; distinct explicitly configured subscription models and reasoning levels; display assignments, per-reviewer progress, and results. | F1; [Models/execution](SCOPE.md#models-configuration-and-execution) |
 | F3 | Completed | Native forbidden-tool denials plus an adversarial fixture; retained incomplete coverage; startup/active/unresponsive cancellation and owned-runtime/extension/parent loss exercised with process-exit evidence. Stdio integration selected; limits below. | F2; [Models/execution](SCOPE.md#models-configuration-and-execution) |
@@ -131,7 +131,8 @@ the archive's body hash to the same SHA-256.
 Three things stayed, as the increment required: the increments table, which is
 the index; the two most recent completed entries, `V2a` and `V2b`, so the closing
 state of `V2` reads without following a pointer; and the "Exact next increment"
-section, which is what a fresh session acts on.
+section, which is what a fresh session acts on. `L1` has since archived those two
+`V2` entries, for the headroom reason this entry predicted below.
 
 ### The archive is not at the checkout root, and that is the point
 
@@ -225,24 +226,175 @@ the shipped tool went undemonstrated by not reviewing it.
   searching it. None was added, because `D1` may want one and this increment was
   to stay mechanical.
 
+## Completed increment: L1
+
+**`L1` closes the last open question `SCOPE.md` carried from before
+implementation started**, and it is the only increment whose deliverable is an
+answer rather than behaviour. Nothing under `extensions/` or `scripts/` changed,
+so the shipped behaviour is exactly `V2a`'s, as it was at `A1`.
+
+The answer, its evidence and the rule it produces are in
+[docs/upstream-licensing.md](docs/upstream-licensing.md). This entry records the
+outcome and the validation; that file is the record of the work.
+
+### The answer
+
+**Upstream declares MIT, and publishes no licence text and no copyright
+notice.** Both halves are established from primary sources, and both matter.
+
+`SCOPE.md` had recorded the first half as a package-listing observation and the
+second as a research gap, with an instruction attached: confirm the obligations
+before reusing or redistributing source. The instruction is now discharged.
+Neither half was assumed from the listing: the declaration was read from the
+repository manifest at commit `457e18e30437984e2e6680802c9da25d270b82cc`, from
+the manifest inside the published tarball, from npm registry metadata and from
+the `pi.dev` listing, and the absence was measured across the whole tree, the
+whole published package, the README and GitHub's own licence detection.
+
+| What was checked, at the inspected revision unless stated | Result |
+| --- | --- |
+| `package.json` at the commit, and inside the tarball | `"license": "MIT"` in both |
+| npm registry metadata for `pi-pr-review@1.17.10` | `"license": "MIT"`, maintainer `10ego` |
+| `pi.dev` listing | "MIT License", no text, no copyright line |
+| Whole repository tree, 356 entries, untruncated | zero licence, copying, notice, copyright, legal or third-party paths |
+| `README.md`, 37687 bytes | zero word-boundary matches for licence, license, copyright or MIT |
+| All 25 files in the published tarball | zero licence text, zero copyright or SPDX headers |
+| GitHub licence detection | metadata `"license": null`, `/license` returns HTTP 404 |
+| Upstream default branch on 2026-09-10, at v1.18.1 | still no licence file |
+| Upstream issues and pull requests | zero mention licence or license |
+
+The tarball was verified as the genuine published artifact before being read:
+SHA-1 `88db35cc407c33158d2c33a512f53d6fc6caf5ec`, matching npm's recorded
+`dist.shasum`.
+
+**What it obliges.** MIT's one condition is that the copyright notice and the
+permission notice travel with copies and substantial portions. Neither artifact
+exists upstream, so a redistributor cannot discharge the condition by
+reproducing what upstream published. Writing one instead means asserting a
+copyright line on the holder's behalf, choosing a year and a name for them.
+`docs/upstream-licensing.md` sets out the pragmatic and the conservative reading
+of that and deliberately picks neither, because **the difference between them
+only bites if this project copies upstream source, and it does not.** The
+cheapest way to remove the ambiguity outright is recorded there too, and it is
+not a judgment call: ask upstream for a `LICENSE` file.
+
+### What may and may not be reused, and what has been
+
+Behaviour, interfaces and the workflow decisions already recorded in `SCOPE.md`
+may be reused, and are; `SCOPE.md` had always framed the port that way. No file
+or substantial part of one may be copied, specifically including
+`prompts/pr-review.md`, everything under `lib/` and `extensions/`, and the
+README's prose.
+
+**Nothing has been copied, and that is measured rather than asserted.** Every
+line of at least 40 characters from the 25 distributed upstream files was
+indexed after whitespace normalisation, 5544 of them, and compared against the
+56 files under this project's `extensions/` and `scripts/`. **Seven distinct
+strings appear in both, the longest 53 characters, and every one is boilerplate
+any Node.js program of this shape contains**: five `node:` import statements, a
+`Buffer.from(...).toString("utf8")` return, and an `abort` listener teardown.
+No shared prose, prompt text, identifier set or structure. The two
+implementations do not share a language either.
+
+**Attribution is not owed**, because MIT's condition attaches to copies and
+substantial portions and there are none. Credit is accurate and cheap, so the
+credit paragraph in `docs/upstream-licensing.md` states the derivation, the
+inspected revision, the declared licence and the fact that nothing was copied.
+It is deliberately not a root-level `NOTICE` file: a root markdown file would
+join this project's own discovery candidate set as noise, and the filename
+conventionally signals an obligation being discharged, which would overstate
+what is happening.
+
+### What this increment changed
+
+- `docs/upstream-licensing.md` is new: the answer, the evidence, the reuse rule,
+  the credit paragraph, and every command needed to recheck the lot.
+- `SCOPE.md`'s upstream-baseline paragraph now records the confirmed answer and
+  points at that file. The instruction it carried is discharged rather than
+  deleted, and no requirement changed.
+- `README.md`'s claim that the assessment "remains pending" was true when
+  written and is now false, so it states the settled answer instead. That is the
+  only `README.md` edit; its size and its stale discovery example remain `D1`'s.
+- `V2a` and `V2b` were archived first, for the reason `A1` recorded and this
+  increment inherited.
+
+### The archiving this entry required
+
+`A1` left 4272 bytes of headroom against the 65536-byte
+`instructionFileMaxBytes` cap and recorded that the next completed entry could
+not fit beside both `V2` halves, the smaller being 7547 bytes. That was
+arithmetic, and it held. Both entries moved verbatim into the existing dated
+archive, which was verified byte-identical against the extracted block before
+the live copy was cut, and the pointer above was widened to cover them.
+
+| File | Bytes after `L1` | Against the 65536-byte cap |
+| --- | --- | --- |
+| `ROADMAP.md` | 43316 | read, 22220 bytes spare |
+| `docs/roadmap-archive-2026-09-10.md` | 442748 | not a candidate; discovery does not recurse |
+| `docs/upstream-licensing.md` | 10979 | not a candidate; discovery does not recurse |
+| `README.md` | 103903 | still skipped, still `D1`'s |
+
+The move freed 28517 bytes. `A1`'s own figures are kept in its entry as `A1`'s
+measured evidence and labelled as measured there, rather than being rewritten to
+match this table.
+
+### Validation
+
+Documentation-only, and no behavioural change was made, so there was nothing to
+test first. All thirteen controlled suites were run anyway and all thirteen
+pass, which is the evidence that they do not depend on any file this increment
+touched. `git diff --check` is clean and the diff carries no control byte, which
+matters because a raw control byte is what refused #17's review.
+
+`scripts/smoke-reviewer-tools.mjs` was not run and did not need to be:
+`read-only.mjs` was not touched. The runtime probes were not rerun, for the same
+reason, and no Copilot credits were spent.
+
+The increment's own outcome was demonstrated rather than inferred, twice.
+This project's real `collectInstructionFiles` was run against this checkout and
+still reads five root files and skips only `README.md`, so the archiving did not
+cost the tool its own roadmap. Every reproduction command printed in
+`docs/upstream-licensing.md` was executed as written before it was recorded,
+including the tarball digest check, and each produced the result the file
+claims.
+
+### Remaining limitations
+
+- **This settles the inspected revision, not upstream in perpetuity.** Upstream
+  is actively developed, was pushed to on 2026-09-10 and is at v1.18.1. A later
+  revision could add a `LICENSE` file, which would resolve the question in the
+  obvious direction, or change the declaration. Recheck before relying on the
+  answer for any revision other than the one `SCOPE.md` pins.
+- **The notice question is answered, not removed.** If reuse of upstream source
+  is ever wanted, the sequence is to settle the notice with upstream first, then
+  copy, then carry what they provide. Nothing here authorizes copying.
+- **Whether this project should carry a licence of its own is open, and is the
+  user's decision.** `L1` deliberately does not take it. The repository is
+  public and has no `LICENSE` file, which leaves it in the position it just
+  finished documenting upstream being in: default copyright, no grant. That may
+  be exactly right for a personal tool. It is a question to answer deliberately
+  rather than by default, and it is not an increment.
+
 ## Exact next increment
 
 **`V2` is closed. `V2a` shipped execution and `V2b` settled its three remaining
-questions without code.** Their answers are recorded in the two completed
-entries above and are not to be reopened: no reviewer receives safeguard output,
-the retained record says nothing about what ran, the citation gate still accepts
+questions without code.** Their answers are recorded in the two entries `L1`
+archived into
+[docs/roadmap-archive-2026-09-10.md](docs/roadmap-archive-2026-09-10.md), and are
+not to be reopened: no reviewer receives safeguard output, the retained record
+says nothing about what ran, the citation gate still accepts
 a prefix, the shell gate does not accept a command a project wrote as a chain,
 and no timeout of any kind bounds a running safeguard.
 
-**`V1a`, `V1b`, `V1c`, `Q7`, `C5`, `V2a` and `V2b` are complete and merged, from
-pull requests #19, #18, #17, #16, #15 and #14 and this increment's own.** Their
+**`V1a`, `V1b`, `V1c`, `Q7`, `C5`, `V2a`, `V2b`, `A1` and `L1` are complete, from
+pull requests #19, #18, #17, #16, #15, #14, #22 and this increment's own.** Their
 authorizations are spent. Nothing about any of them should be redone or widened.
 
 ### Every must-have is complete, and the port is feature-complete for v1
 
 `SCOPE.md`'s must-have column and its costly-to-lose column are both entirely
-delivered. `A1` has landed, so what is left of v1 is `L1` and `D1`, and neither
-adds a capability. When both have landed, v1 is done, and the open items further
+delivered. `A1` and `L1` have landed, so **`D1` is the only increment left**, and
+it adds no capability. When it lands, v1 is done, and the open items further
 below are limitations to state in the release notes rather than work to
 schedule.
 
@@ -251,27 +403,32 @@ after #19 merged, is that the port had grown far past the effort its goal
 justified, and that the remaining appetite belongs to finishing rather than to
 building. Treat a new feature idea as out of scope unless the user asks for it.
 
-### The next increment is `L1`, then `D1`
+### The next increment is `D1`, and it is the last
 
-`A1` has landed, so two increments remain and this is their order. Take one,
-land it on its own branch and pull request, and stop.
+`L1` has landed, so one increment remains. Land it on its own branch and pull
+request, and stop.
 
-- **`L1`: resolve upstream licensing and attribution.** `SCOPE.md` records that
-  `pi-pr-review` declares MIT but that no standalone licence text was found at
-  the inspected revision, commit `457e18e30437984e2e6680802c9da25d270b82cc`. No
-  upstream source has been reused and none should be until this is settled. The
-  outcome is a recorded answer and, if attribution is owed, the text that
-  discharges it. It needs no review and spends no credits.
+**`L1` is done and is not to be reopened.** Upstream declares MIT and publishes
+no licence text and no copyright notice, so nothing may be copied from it, and
+nothing has been. The answer, its evidence and the reuse rule are in
+[docs/upstream-licensing.md](docs/upstream-licensing.md), and the entry above
+records the outcome. One question it deliberately left open belongs to the user
+and is not an increment: **whether this project should carry a licence of its
+own.** Do not decide it, and do not add a `LICENSE` file, unless the user says
+so.
+
 - **`D1`: the user documentation.** Document configuration, modes, incomplete
   coverage, cancellation, publication, the cache and safeguards with
   reproducible end-to-end examples. `README.md` is 103636 bytes and is skipped
   by safeguard discovery for size, exactly as this file was until `A1`, so `D1`
   should shorten it at least as much as it extends it, and should replace the
-  now-stale `ROADMAP.md` line in its discovery example. It also carries one
+  now-stale `ROADMAP.md` line in its discovery example. `L1` added six lines to
+  it and removed two, so that figure is now 103903 bytes. It also carries one
   recorded wording defect: the reviewer prompt in `review.mjs` tells every
   specialist its working directory is "verified to be at" the reviewed head,
   which stays true of `HEAD` after a safeguard runs but not of the working tree.
-  Bound citations already contain the consequence, as the `V2b` entry sets out;
+  Bound citations already contain the consequence, as the archived `V2b` entry
+  sets out;
   the sentence is still wrong and `D1` is where it is cheapest to fix, because
   that pull request touches user-facing text anyway. **That fix is a change
   under `extensions/`, so `D1`'s pull request needs an installed-plugin review
@@ -314,8 +471,8 @@ entry above may be read as though the installed plugin had executed anything.
 
 ### Recorded, not scheduled
 
-These stay open and none is scheduled. Do not start one instead of `L1` or `D1`
-without the user saying so.
+These stay open and none is scheduled. Do not start one instead of `D1` without
+the user saying so.
 
 - **A review against a substantial code diff**, the oldest and largest open
   observation. No review of any mode has run against one; #10 is the closest at
@@ -341,7 +498,11 @@ without the user saying so.
   three candidates and refused one of them by citation, so no exclusion rule has
   ever refused a real discovered command. No later review can close this
   deliberately, because what a discovery pass reports is not ours to arrange.
-- `L1` remains pending; copy no upstream source.
+- **Whether this project should carry a licence of its own**, which `L1`
+  deliberately left to the user. The repository is public with no `LICENSE`
+  file, so default copyright applies and nobody may reuse it, which may be
+  exactly right for a personal tool. It is a decision, not an increment; do not
+  take it unasked. `L1` itself is closed: copy no upstream source.
 
 `F6`'s marker contract has live evidence from five of six reviewers on #7, both
 sessions on #8, every session on #10, on #11 every session that produced an
