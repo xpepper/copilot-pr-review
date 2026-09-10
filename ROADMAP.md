@@ -439,14 +439,14 @@ cut, and the archive's own pointer was widened to cover it.
 | --- | --- | --- |
 | `README.md` | 56073, from 103903 | read, was the only root file still skipped |
 | `ROADMAP.md` | 60540 | read, 4996 bytes spare |
-| `HANDOFF.md` | 14847 | read |
+| `HANDOFF.md` | 14987 | read |
 | `docs/readme-archive-2026-09-10.md` | 105975 | not a candidate; discovery does not recurse |
 | `docs/roadmap-archive-2026-09-10.md` | 450090 | not a candidate; discovery does not recurse |
 
 **Discovery now reads every root markdown file of this project and skips none.**
 That was demonstrated rather than inferred, by running the real
 `collectInstructionFiles` against this checkout; the six files it reads spend
-154232 bytes of the 262144-byte budget, so nothing is near being
+154372 bytes of the 262144-byte budget, so nothing is near being
 skipped for the budget either.
 
 ### Validation

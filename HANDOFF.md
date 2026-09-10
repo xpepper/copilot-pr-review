@@ -129,10 +129,12 @@ console.log("skipped:", skipped.map((s) => `${s.name} (${s.reason})`).join(", ")
 
 **It should read all six root files and skip none**, which is `D1`'s own
 outcome and was confirmed live by #24's discovery pass. If a file starts
-appearing in the skipped list it has crossed 65536 bytes. **The margins are
-thin now**: `README.md` has about 10KB spare and `ROADMAP.md` about 7KB. Measure
-with `wc -c` before extending either, and put new material in `docs/`, which
-discovery does not recurse into, rather than growing a root file.
+appearing in the skipped list it has crossed 65536 bytes. **The margins are thin
+now**: `README.md` has 9463 bytes spare and `ROADMAP.md` has 4996,
+against a 65536-byte cap. Measure with `wc -c` before extending either, and put
+new material in `docs/`, which discovery does not recurse into, rather than
+growing a root file. If `ROADMAP.md` needs room, archive the `L1` entry the way
+`D1` archived `A1`'s, leaving the same kind of pointer.
 
 **Check `copilot plugin list` immediately before dispatching any review.** During
 `D1` an install that had reported success, and that the list then showed, was
