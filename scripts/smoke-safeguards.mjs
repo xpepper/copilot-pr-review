@@ -565,11 +565,13 @@ console.log("PASS a command must appear in the file it cites, as a whole command
 // do are both asserted here.
 
 const script = (root, name, body) => { writeFileSync(join(root, name), body); return `node ${name}`; };
-const fakeGit = (output = "") => async (args, cwd) => {
+const fakeGit = (output = "", seen = {}) => Object.assign(async (args, cwd, options) => {
   assert.deepEqual(args, ["status", "--porcelain"]);
   assert.equal(typeof cwd, "string");
+  // The scan is the review's own work, so it carries the review's cancellation.
+  seen.signal = options?.signal;
   return output;
-};
+}, { seen });
 const approvalOf = (commands) => ({ status: "approved", approved: commands, offered: commands.length, refused: 0 });
 const run = (approved, options = {}) => executeSafeguards(approvalOf(approved), {
   root: options.root, controller: options.controller ?? new AbortController(),
@@ -670,6 +672,16 @@ const run = (approved, options = {}) => executeSafeguards(approvalOf(approved), 
   });
   assert.equal(execution.status, "passed");
   assert.match(execution.artifacts.error, /git is unavailable/);
+}
+{
+  // The scan runs git, and a review that has been cancelled must not be left
+  // waiting on a process it started and cannot stop.
+  const root = project({});
+  const writer = script(root, "writer.mjs", "console.log('wrote');");
+  const controller = new AbortController();
+  const git = fakeGit("");
+  await run([{ command: writer, file: "AGENTS.md" }], { root, controller, git });
+  assert.equal(git.seen.signal, controller.signal, "The artifact scan carries the run's cancellation signal");
 }
 {
   // A run cancelled before execution starts nothing at all.

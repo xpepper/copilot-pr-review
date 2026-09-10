@@ -603,10 +603,10 @@ function spawnSafeguard(words, { root, signal, captureBytes, spawnProcess }) {
 // proved the tree was clean, so one status read afterwards is an exact statement
 // of what running project code left behind. Nothing is reverted, stashed or
 // cleaned: saying what changed is the whole of the job.
-async function checkoutArtifacts(git, root) {
+async function checkoutArtifacts(git, root, signal) {
   if (typeof git !== "function") return { paths: [], error: "the checkout could not be inspected" };
   try {
-    const output = await git(["status", "--porcelain"], root, {});
+    const output = await git(["status", "--porcelain"], root, { signal });
     return { paths: String(output).split("\n").filter((line) => line.trim().length) };
   } catch (error) {
     return { error: String(error?.message ?? error) };
@@ -640,7 +640,11 @@ export async function executeSafeguards(approval, {
       ...await spawnSafeguard(commandWords(entry.command), { root, signal, captureBytes, spawnProcess }),
     });
   }
-  const artifacts = await checkoutArtifacts(git, root);
+  // The scan is this run's own work, so it carries this run's cancellation. A
+  // cancelled review must not be left waiting on a process it started and has
+  // no way to stop; the run then says the checkout could not be inspected,
+  // which is exactly what happened.
+  const artifacts = await checkoutArtifacts(git, root, signal);
   return {
     status: signal.aborted ? "cancelled"
       : results.every(({ status }) => status === "passed") ? "passed" : "failed",
