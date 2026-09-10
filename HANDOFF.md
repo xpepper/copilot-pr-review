@@ -9,124 +9,88 @@ from what has only been assumed, in your own reporting as well as in the code.
 ## Recorded state
 
 This handoff is written on branch `v2a-safeguard-execution`, which carries `V2a`
-on **pull request #19**, branched from `main` at `fc8558c` after the merge of
-#18. Confirm the branch, the pull request and the working tree before doing
-anything. The only other open pull requests should be the synthetic playground
-ones, #1 and #2, which must never be merged or republished.
+on **pull request #19**. That pull request was reviewed, its findings were
+answered, and it is being merged into `main` in the same session that wrote
+this. **Confirm that before anything else**: check whether #19 is merged, and
+start from `main` if it is. The only open pull requests should then be the
+synthetic playground ones, #1 and #2, which must never be merged or republished.
 
-**`V2a` is implemented and its one authorized review has not run.** That review
-is the outstanding work, and it is described below. Do not start `V2b`, and do
-not start anything else, until it has run and its evidence is recorded.
+**`V2a` is complete.** An approved safeguard command runs in the checkout before
+any reviewer starts, with no shell anywhere in the path. Its eight choices are
+settled and recorded in the roadmap under "Completed increment: `V2a`", which is
+authoritative. Do not reopen them, do not weaken the shell gate to accept a
+command a project wrote as a chain, and do not add a timeout of any kind.
 
-## What `V2a` does
+**The next increment is `V2b`, and it must not begin with code.** It needs the
+user's go-ahead and it has three questions, all recorded under "Exact next
+increment". Present them one at a time, each with a recommendation, the reason,
+and every alternative, and lead with which option is cheapest. Expect `V2b` to be
+split further rather than taken whole: the user's standing principle is that the
+smaller the increment the better, provided it stays coherent and meaningful.
 
-**An approved safeguard command now runs, in this checkout, before any reviewer
-starts.** It is the first thing this tool does that is not a confined read.
-Eight choices were settled with the user before any code, and all eight are
-recorded in the table under "Implemented increment: `V2a`" in the roadmap, which
-is authoritative and fuller than this summary. Carry these:
+## What #19's review actually demonstrated, and what it did not
 
-- **`V2` was split.** `V2a` executes and reports to the person who approved.
-  `V2b` decides whether that output reaches a reviewer and what the retained
-  record says about what ran. `V2a` builds no plumbing for either, deliberately.
-- **No shell, ever.** A command is split on whitespace and spawned as an
-  argument list. A chain, a pipe, a redirect, a variable, a glob, a quoted
-  argument or a loop is refused rather than run. Every other rule depends on
-  this one, because against `sh -c` the first word of a line tells you nothing.
-- **The exclusions and the citation check landed here**, as `V1b` and `V1c` both
-  said they would. A refused command is still reported with its reason and is
-  never offered for approval. The exclusion table is a heuristic and the roadmap
-  names four holes it knows about; do not present it as anything more.
-- **A failed safeguard is not review coverage.** It is reported loudly and
-  leaves `complete` and `coverage` exactly as the reviewers determined.
-- **Cancellation kills the process group**, and there is no timer anywhere.
+Read the roadmap section "The installed-plugin review of pull request #19" in
+full before planning `V2b`. The short version:
 
-The user's standing principle, added during this discussion: the smaller the
-increment the better, provided it stays coherent and meaningful.
+- **It reached the host's real approval UI**, which #18 could not, because it was
+  typed interactively rather than dispatched through `scripts/dogfood-review.mjs`.
+  That runner registers no elicitation handler and can never approve anything.
+- **It approved nothing**, so execution has never run under the installed plugin.
+  A real spawn, a real capture, a real artifact line and a real cancellation are
+  demonstrated only by the controlled suites.
+- **The citation gate refused a constructed command live**: the pass supplied
+  `node` in front of a filename `HANDOFF.md` mentions in prose, and the gate
+  refused the result as uncited. That is the check working on something nobody
+  staged.
+- **No exclusion rule refused anything live.** The pass reported only three
+  candidates. The table remains demonstrated by the controlled suites alone.
+- **The evidence gate surfaced one of the three real defects in the increment.**
+  It invalidated a correct adjudication of the second and rejected the third from
+  all three reviewers that reported it, every time for a citation that genuinely
+  did not match. Two of the three are fixed on this branch; the third is `V2b`'s
+  first question. Keep the rejected-candidate text on screen: it is how the other
+  two were recovered.
 
-## The outstanding work: review pull request #19 interactively
+## `V2b`'s three questions
 
-**`scripts/dogfood-review.mjs` registers no elicitation handler**, so it reports
-approval `unavailable`, approves nothing and executes nothing. It therefore
-cannot demonstrate this increment at all. The review must be run interactively,
-by a person typing the command in a Copilot CLI session:
+1. **Whether the citation gate may accept a prefix.** It does today: whitespace
+   ends a match, so `npm test` passes as cited from a file declaring
+   `npm test --fix`, and a command whose safety lives in a trailing argument can
+   be offered without it. Tightening it also refuses a command declared
+   mid-sentence, which is how projects ordinarily write one. This is the cheapest
+   of the three and it is a rule to settle, not a patch to apply.
+2. **Whether safeguard output reaches a reviewer.** Safeguard output is
+   pull-request controlled text, so this is an injection surface, and it reopens
+   whether a failed safeguard stays outside review coverage. #19's one validated
+   finding belongs here: the reviewer prompt tells every specialist its working
+   directory is "verified to be at" the reviewed head, which stays true of `HEAD`
+   after a safeguard runs but need not stay true of the working tree.
+   **Re-asserting cleanliness after execution is refused and must stay refused**:
+   `SCOPE.md` says these commands may create artifacts and forbids cleaning the
+   checkout, so a re-assertion would refuse a review because the person's own
+   approved tests wrote a coverage file. Telling the reviewer what changed is an
+   option here, and it is not free, because a path list is still safeguard-derived.
+3. **What the retained record says about what ran.** `V1b` and `V1c` stayed out
+   of the record because a stored approval is the artifact a later increment
+   could mistake for standing permission. A record of what already ran does not
+   carry that risk in the same way; make the argument explicitly rather than
+   inheriting it. If the record is opened, note that `approveSafeguards` returns
+   `none` for both a decline and an accept that selected nothing, which #19 hit
+   live.
 
-```sh
-gh pr checkout 19
-copilot plugin install "$(pwd)"
-```
-
-then, inside an interactive `copilot` session started in this checkout:
-
-```text
-/pr-review 19 --balanced --verify --all --no-comment
-```
-
-`--verify` is the point of the run. Balanced is the default and no other
-topology is required here.
-
-**What to expect.** Discovery should read `AGENTS.md`, `CLAUDE.md`, `HANDOFF.md`
-and `SCOPE.md`, skip `README.md` and `ROADMAP.md` for size, and find
-`node scripts/smoke-safeguards.mjs` and `node scripts/smoke-review.mjs` in
-`AGENTS.md`, which this increment added there as plain runnable lines for
-exactly this reason. Both suites finish in well under a second and leave the
-checkout clean, which the artifact line should confirm.
-
-Most of what else it reads should be refused and shown with the rule that
-refused it: this repository's own `for` loop by shape or, if the pass reports
-only its first line, as a shell keyword; `copilot plugin install "$(pwd)"` by its
-program and its `install` token; `gh pr create` by its program; and the wrapped
-dogfood command as uncited. **One more may legitimately be offered.** This file
-states `node scripts/smoke-runtime.mjs --targets` as a line of its own, below the
-two environment variables it needs, so the pass may report it and the gates
-accept it. That is the contract working rather than a defect: it is a runnable
-line this project declares. Decline it, and record that it was offered.
-
-**Record the outcome** in the roadmap section "The installed-plugin review of
-pull request #19": mode, model and effort actually used, coverage, what
-discovery found, what was offered and what was refused with its rule, what was
-approved, what ran and what it printed, what the artifact line said, findings
-and withheld findings, and the reported credit cost. A refusal or a failure
-there is a real defect report about the shipped tool and outranks the green
-suites; never weaken a gate to make the run succeed.
-
-**The standing workflow authorizes exactly one review of this pull request.** If
-it refuses before any reviewer starts, record the refusal and ask. Do not rerun
-on your own judgement, and do not run `scripts/smoke-factory.mjs --spend` or any
-other probe that spends credits.
-
-## Then the next increment is `V2b`
-
-**It needs the user's go-ahead before implementation, and it must not begin with
-code.** Present its choices one at a time, each with your recommendation, the
-reason, and every alternative. Lead with which option is cheapest and which is
-cheapest while still pointing the right way. Be willing to change a
-recommendation when the cheap option is defensible on the merits, and say why
-rather than flipping silently: that is how `V1c`'s exclusions and `V2a`'s
-slicing were settled.
-
-`V2b` has two questions, both deliberately unanswered by `V2a`:
-
-- **Whether safeguard output reaches a reviewer.** `SCOPE.md` says the flag
-  exists to ground claims in evidence, and both `V1c`'s placement and `V2a`'s
-  execution point were chosen to keep that possible. It is not foregone:
-  safeguard output is pull-request controlled text, so handing it to a reviewer
-  is an injection surface, and it would also reopen whether a failed safeguard
-  stays outside review coverage.
-- **What the retained record says about what ran.** This is where a record of
-  execution is evidence rather than authority, so it may finally deserve a
-  schema version. `V1b` and `V1c` stayed out of the record because a stored
-  approval is the artifact a later increment could mistake for standing
-  permission. A record of what already ran does not carry that risk in the same
-  way, and the argument should be made explicitly rather than inherited.
+**When `V2b`'s own review is proposed, offer to approve
+`node scripts/smoke-safeguards.mjs` during it.** That is the cheapest way to
+give execution its first live evidence: the suite finishes in well under a
+second and leaves the checkout clean, so the artifact line should say so. Do not
+spend a review on that alone.
 
 ## Validation and runtime caveats
 
 The **thirteen** controlled suites (`node scripts/smoke-<name>.mjs`) are
 findings, review, selection, retention, preview, publication, publish-later,
-checkout, config, context, fixture, target and safeguards. `V2a` added no suite:
-execution is covered where discovery and approval are. They require no inference
-and no network. All thirteen pass at this handoff, as they did at each
+checkout, config, context, fixture, target and safeguards. They require no
+inference and no network. All thirteen pass at this handoff, as they did at each
 checkpoint. `git diff --check` is clean.
 
 ```sh
@@ -135,14 +99,19 @@ for s in findings review selection retention preview publication publish-later \
 ```
 
 `scripts/smoke-safeguards.mjs` covers the gates and execution: shapes that need a
-shell and shapes that do not, the exclusion cases including both `vitest` forms,
-the citation check against a fragment, a fabrication, an unread file and this
-repository's own shell loop, a passing and a failing command, a command that does
-not exist, the re-assertion before the spawn, four approval outcomes that start no
-process, a truncating capture that still passes, artifacts present, absent and
-unreadable, and a cancellation that kills a grandchild process the safeguard
-started. It also asserts the module can never open a shell; **keep that
-assertion**, and do not replace it with a weaker one.
+shell and shapes that do not, the exclusion cases including both `vitest` forms
+and four spellings that differ only in letter case, the citation check against a
+fragment, a fabrication, an unread file and this repository's own shell loop, a
+passing and a failing command, a command that does not exist, the re-assertion
+before the spawn, four approval outcomes that start no process, a truncating
+capture that still passes, artifacts present, absent and unreadable, an artifact
+scan that carries the run's cancellation signal, and a cancellation that kills a
+grandchild process the safeguard started. It also asserts the module can never
+open a shell; **keep that assertion**, and do not replace it with a weaker one.
+
+**Case is folded for the denylist's name lookups and deliberately not for
+flags.** `-w` and `-W` are two different flags and the table carries both; do not
+"simplify" that by lowercasing every word.
 
 `scripts/smoke-review.mjs` covers the run, including that an approved command
 runs after approval and before the first specialist, that no reviewer prompt
@@ -154,10 +123,9 @@ what refused #17's review. Check a branch's diff for control bytes before
 spending a review on it.
 
 `scripts/smoke-reviewer-tools.mjs`, the confinement probe outside the thirteen,
-must be run and reported for any increment touching `read-only.mjs`. `V2a` does
-not touch it, so it was not run and was not required. `V1c`'s handoff predicted
-`V2` would touch the question it answers; it does not. Reviewer confinement is
-unchanged, and execution is a separate path no reviewer can reach.
+must be run and reported for any increment touching `read-only.mjs`. `V2a` did
+not touch it. Reviewer confinement is unchanged, and execution is a separate path
+no reviewer can reach.
 
 Both no-inference runtime probes passed before `V1b` and **have not been rerun
 since**. They spend no credits but need a live runtime connection, and
@@ -203,13 +171,19 @@ moved or edited in this session.
 Cold resume of command-only records remains unsupported. The adjudicator is
 zero-tool; citations remain limited to captured diff/context windows.
 
+The review output is very verbose, and the user has asked for a way to quieten
+it. Nothing is designed and nothing is scheduled; record it if it comes up, and
+do not start it instead of `V2b`.
+
 ## Landing and handoff
 
 Follow `AGENTS.md`: meaningful validated checkpoint commits, a named increment
 branch and pull request, never direct `main` pushes, no force-push or amended
-published history. Merging remains the user's decision. Preserve unrelated
-changes. Inspect enumerations and counts when extending a concept. Update
-`README.md` for user-visible behaviour; `V2a` did, under its own section.
+published history. **The standing workflow authorizes exactly one review per
+increment pull request and nothing else**; #19's is spent, and #19's two fixes
+were therefore never reviewed by the installed plugin. Merging remains the user's
+decision. Preserve unrelated changes. Inspect enumerations and counts when
+extending a concept. Update `README.md` for user-visible behaviour.
 
 **Reconcile the roadmap's own handoff text before you finish.** #18's overview
 reviewer found the exact-next-increment section still naming the increment that
