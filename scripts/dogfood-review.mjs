@@ -23,6 +23,11 @@ assert(/^[1-9]\d*$/.test(number ?? ""), "Usage: node scripts/dogfood-review.mjs 
 // makes it, and never silently selects findings for one.
 assert(flags.includes("--no-comment"), "Pass --no-comment: this runner does not publish.");
 assert(!flags.includes("--comment"), "Refusing --comment: publication needs its own explicit authorization.");
+// This runner exists to capture an increment's own evidence: the models and
+// efforts actually used, the credit cost, the tool calls and denials, the
+// coverage diagnostics. All of that is read out of the lines --quiet suppresses,
+// so a dogfood run may never be the run that hid its own evidence.
+assert(!flags.includes("--quiet"), "Refusing --quiet: this runner records the whole timeline as an increment's evidence.");
 
 const cwd = realpathSync(process.cwd());
 const head = (await runGit(["rev-parse", "HEAD"], cwd)).trim();

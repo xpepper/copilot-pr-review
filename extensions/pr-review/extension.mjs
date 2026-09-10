@@ -20,7 +20,7 @@ const help = [
   "",
   "Usage: /pr-review [status|help|models|fixture model1=ID effort1=LEVEL model2=ID effort2=LEVEL]",
   "       /pr-review NUMBER [--balanced|--full|--deep|--quick|--major-only] [--comment|--no-comment] [--all]",
-  "                         [--verify] [--include-drafts] [--include-closed|--review-closed]",
+  "                         [--verify] [--quiet] [--include-drafts] [--include-closed|--review-closed]",
   "                         [heavyModel=ID] [heavyEffort=LEVEL]",
   "       /pr-review NUMBER --capture-only [--include-drafts] [--include-closed|--review-closed]",
   "",
@@ -64,6 +64,17 @@ const help = [
   "          leaves this review's own coverage alone; a passing preflight is still an ordinary review of the",
   "          selected mode. It is orthogonal to the mode and posting flags, cannot be combined with --capture-only,",
   "          and is not a configuration key: no saved or trusted-project setting can turn verification on.",
+  "--quiet   Print less of the same review: the evidence JSON lines (the target, the context, the mode's",
+  "          binding, the settled run, the selection) and each reviewer's raw untrusted output, including",
+  "          the adjudicator's, are left out. Everything that decides whether the result can be trusted",
+  "          stays at every verbosity: the effective assignments, per-reviewer progress, every refusal and",
+  "          failure, the coverage report and its diagnostics, the safeguard discovery, approval and",
+  "          execution summaries, the findings, and every publication outcome including an uncertain write.",
+  "          Verbose is the default and a run without the flag prints exactly what it printed before. The",
+  "          flag changes presentation only: the same review settles the same way and the retained record",
+  "          still holds every reviewer's own output. It authorizes nothing, opens no gate, and is not a",
+  "          configuration key, so no saved or trusted-project setting can quieten a run. It cannot be",
+  "          combined with --capture-only, whose entire output is the evidence it would suppress.",
   "--capture-only  Capture and bind the target, then stop: no reviewers, no inference, no publication.",
   "Reviewers additionally read this checkout, so it must be the reviewed revision:",
   "local HEAD must equal the captured PR head, the PR head must not have moved, and no tracked",
@@ -121,6 +132,9 @@ const status = [
   "read-only gh requests against the captured revisions, never the local checkout.",
   "Reviewers may read the local checkout read-only, but only after it is proven to be",
   "exactly the reviewed head revision; otherwise the review refuses to start.",
+  "--quiet prints the same review without the evidence JSON lines and without the reviewers' raw untrusted",
+  "output. Coverage, refusals, failures, safeguard summaries and publication outcomes are never suppressed,",
+  "so a quiet run cannot be mistaken for a clean one. Verbose is the default.",
   "--verify additionally requires the PR's head branch and no untracked path before any reviewer starts,",
   "then presents the safeguard commands this project's own instruction files declare, with their source,",
   "and asks which of them may run. An approved command runs in this checkout, as you, before any reviewer",
@@ -208,7 +222,7 @@ const session = await joinSession({
               // starts. An ordinary run's output is unchanged.
               if (options.verify) await session.log(verificationNotice);
               startRun((client, lifecycle) => executeRetainedReview(session, client, options, assignments, lifecycle,
-                { autoPostReviews: configuration.autoPostReviews }));
+                { autoPostReviews: configuration.autoPostReviews }), { quiet: options.quiet });
               return;
             }
             const experiment = args.trim().split(/\s+/)[0];
@@ -246,7 +260,7 @@ function assertIdle() {
   if (shuttingDown) throw new Error("Extension is shutting down.");
 }
 
-function startRun(execute, { ownsRuntime = true } = {}) {
+function startRun(execute, { ownsRuntime = true, quiet = false } = {}) {
   assertIdle();
   // Publication owns no inference runtime; it must still hold the active-run
   // slot so a concurrent review cannot race it, and stay cancellable.
@@ -264,7 +278,9 @@ function startRun(execute, { ownsRuntime = true } = {}) {
   }).finally(clearRun);
   // Return dispatch so cancel remains available. Parent transport loss can prevent timeline delivery.
   void run.done.then(async (outcome) => {
-    if (outcome.retention) await session.log(`P2 evidence: ${JSON.stringify(outcome.retention)}`);
+    // O1: the retention dump belongs to the review that asked to be quiet.
+    // Publish-later takes no flag of its own, so its evidence is never quiet.
+    if (outcome.retention && !quiet) await session.log(`P2 evidence: ${JSON.stringify(outcome.retention)}`);
     if (outcome.publishLater) await session.log(`P5 evidence: ${JSON.stringify(outcome.publishLater)}`);
   }).catch(async (error) => {
     console.error(`Review run failed: ${String(error)}`);

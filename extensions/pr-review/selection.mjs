@@ -98,11 +98,15 @@ export async function finishSelection(parent, outcome, options, controller) {
     `This is not a clean-review claim.${selection.error ? ` ${selection.error}` : ""}`,
   { level: ["failed", "unavailable", "cancelled"].includes(selection.status) ? "error" : "info" });
   applyCancellation();
-  await parent.log(`P1 evidence: ${JSON.stringify({
-    invocation: report.invocation, binding: report.binding, selection: report.selection,
-    reviewComplete: report.reviewComplete, complete: report.complete, coverage: report.coverage,
-    cancelled: report.cancelled, noComment: report.noComment, cleanupErrors: report.cleanupErrors,
-  })}`);
+  // O1: the selection's own outcome is stated in the line above, which a quiet
+  // run keeps. This dump repeats it as JSON alongside the binding, so it goes.
+  if (options.quiet !== true) {
+    await parent.log(`P1 evidence: ${JSON.stringify({
+      invocation: report.invocation, binding: report.binding, selection: report.selection,
+      reviewComplete: report.reviewComplete, complete: report.complete, coverage: report.coverage,
+      cancelled: report.cancelled, noComment: report.noComment, cleanupErrors: report.cleanupErrors,
+    })}`);
+  }
   applyCancellation();
   return report;
 }

@@ -23,6 +23,12 @@ import {
 } from "./safeguards.mjs";
 
 const settingKeys = ["heavyModel", "heavyEffort"];
+// O1: the one verbosity control. It asks for less output and authorizes
+// nothing, which is why it is a flag and deliberately not a configuration key:
+// there is no saved state to make a run quieter than the person running it
+// expects. Verbose stays the default, because this project's own increment
+// evidence is read out of the lines it suppresses.
+export const quietFlag = "--quiet";
 
 export function parseReviewArgs(args) {
   const [number, ...tokens] = args.trim().split(/\s+/);
@@ -32,7 +38,7 @@ export function parseReviewArgs(args) {
   for (const token of tokens) {
     if (seen.has(token)) throw new Error(`Duplicate review argument: ${token}`);
     seen.add(token);
-    if ([...modeFlags, captureOnlyFlag, verifyFlag, "--comment", "--no-comment", "--all"].includes(token)) continue;
+    if ([...modeFlags, captureOnlyFlag, verifyFlag, quietFlag, "--comment", "--no-comment", "--all"].includes(token)) continue;
     if (token.includes("=")) {
       const [key, value, extra] = token.split("=");
       if (!settingKeys.includes(key) || !value || extra !== undefined || key in settings) {
@@ -52,14 +58,15 @@ export function parseReviewArgs(args) {
   // Capture-only is the diagnostic path that stops after the bound snapshot, so
   // it takes no mode, posting, selection or model argument of its own.
   if (seen.has(captureOnlyFlag)) {
-    const conflicting = [...chosen, ...["--comment", "--no-comment", "--all", verifyFlag].filter((flag) => seen.has(flag)),
+    const conflicting = [...chosen,
+      ...["--comment", "--no-comment", "--all", verifyFlag, quietFlag].filter((flag) => seen.has(flag)),
       ...Object.keys(settings)];
     if (conflicting.length) {
       throw new Error(`${captureOnlyFlag} captures the target without reviewing it, ` +
         `so it cannot be combined with ${conflicting.join(", ")}.`);
     }
     return { mode: undefined, captureOnly: true, captureArgs, settings,
-      all: false, comment: false, noComment: false, verify: false };
+      all: false, comment: false, noComment: false, verify: false, quiet: false };
   }
   const mode = chosen.length ? modeForFlag(chosen[0]) : reviewMode(defaultModeId);
   const { policy } = postingAuthority({ comment: seen.has("--comment"), noComment: seen.has("--no-comment") });
@@ -69,6 +76,11 @@ export function parseReviewArgs(args) {
     // Verification opts the run into the stricter checkout profile. It selects a
     // gate, never a mode or a posting authority, so it constrains no other option.
     verify: seen.has(verifyFlag),
+    // Quiet decides how much of the run is printed, and nothing else. It selects
+    // no mode, no gate and no posting authority, and it can never suppress
+    // anything a person needs in order to judge whether the review is
+    // trustworthy.
+    quiet: seen.has(quietFlag),
   };
 }
 
@@ -287,8 +299,12 @@ export async function executeReviewRun(parent, client, options, assignments, {
   let discovery;
   let approval;
   let safeguards;
+  // O1: one flag decides how much of this run is printed. It is read here and
+  // handed to every stage that prints an evidence dump; nothing else consults it,
+  // and no stage may use it to withhold a refusal, a failure or a coverage state.
+  const quiet = options.quiet === true;
   const outcome = await executeOwnedRun(parent, client, {
-    controller, onStopped, subject: mode.label, evidencePrefix: prefix,
+    controller, onStopped, subject: mode.label, evidencePrefix: prefix, quiet,
     details: () => ({
       mode: mode.id, noComment: options.noComment, verify: options.verify === true,
       invocation, binding, validation, adjudicator, discovery, approval, safeguards,
@@ -305,14 +321,15 @@ export async function executeReviewRun(parent, client, options, assignments, {
         signal.throwIfAborted();
         return gh(args, directory, { signal });
       };
-      const target = await executeTargetCapture(parent, options.captureArgs, { signal, gh: request });
+      const target = await executeTargetCapture(parent, options.captureArgs, { signal, gh: request, quiet });
       signal.throwIfAborted();
       if (!target.snapshot) {
         return { coverage: "not-started", disposition: target.disposition, reason: target.reason, reviewers: [] };
       }
       binding = reviewBinding(target.snapshot, target.context);
       cwd = target.workingDirectory;
-      await parent.log(`${prefix} binding: ${JSON.stringify(binding)}\nUnvalidated candidates cannot publish; only final selected, authorized findings can.`);
+      const bindingRule = "Unvalidated candidates cannot publish; only final selected, authorized findings can.";
+      await parent.log(quiet ? bindingRule : `${prefix} binding: ${JSON.stringify(binding)}\n${bindingRule}`);
       // Reviewers read the checkout, so it must provably be the reviewed
       // revision. A mismatch refuses the review; it never degrades to a
       // context-only run, and never touches the checkout.
@@ -383,7 +400,7 @@ export async function executeReviewRun(parent, client, options, assignments, {
         signal.throwIfAborted();
       }
       const report = await reviewAssignments(parent, client, assignments, {
-        signal, systemMessage: { mode: "append", content: reviewInstructions(mode) }, access,
+        signal, quiet, systemMessage: { mode: "append", content: reviewInstructions(mode) }, access,
         verifyResult: envelopeVerifier(reviewKey(binding), "candidates"),
         intro: `${prefix} ${mode.label.toLowerCase()}. ${assignments.length} reviewer(s); ` +
           "outputs are untrusted, unvalidated candidates.",
@@ -412,7 +429,7 @@ export async function executeReviewRun(parent, client, options, assignments, {
         const assessment = await reviewAssignments(parent, client, [{
           ...heavy, label: "evidence-validator",
         }], {
-          signal, systemMessage: { mode: "append", content: validationInstructions(mode.policy) },
+          signal, quiet, systemMessage: { mode: "append", content: validationInstructions(mode.policy) },
           verifyResult: envelopeVerifier(boundary.key, "decisions"),
           intro: "Q4 validation pass: source-grounded adversarial adjudication, not another review specialist.",
           outputLabel: "Untrusted adjudication output",

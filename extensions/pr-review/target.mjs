@@ -191,7 +191,7 @@ export function contextSummary(context, limit = 20) {
   };
 }
 
-export async function executeTargetCapture(session, args, { gh = runGh, signal } = {}) {
+export async function executeTargetCapture(session, args, { gh = runGh, signal, quiet = false } = {}) {
   const options = parseTargetArgs(args);
   signal?.throwIfAborted();
   const metadata = await session.rpc.metadata.snapshot();
@@ -205,16 +205,24 @@ export async function executeTargetCapture(session, args, { gh = runGh, signal }
   });
   signal?.throwIfAborted();
   // Keep PR-controlled text and the complete diff out of the parent timeline.
-  await session.log(`Q1 target: ${JSON.stringify({
-    disposition: outcome.disposition, reason: outcome.reason,
-    repository: outcome.repository, number: outcome.pull.number, state: outcome.pull.state,
-    draft: outcome.pull.draft, head: outcome.pull.head.sha, base: outcome.pull.base.sha,
-    changedFiles: outcome.pull.changedFiles,
-    ...(outcome.snapshot ? {
-      diffSha256: outcome.snapshot.diffSha256, diffBytes: outcome.snapshot.diffBytes,
-      capturedAt: outcome.snapshot.capturedAt,
-    } : {}),
-  })}\nNo PR review performed; no clean-review claim. Nothing published.`);
+  // O1: a quiet run drops the JSON dump, never the decision it records. A
+  // skipped or refused target is the whole reason nothing was reviewed, so it is
+  // stated in words rather than left to a suppressed line.
+  await session.log(`${quiet
+    ? `Target ${outcome.repository.nameWithOwner}#${outcome.pull.number}: ${outcome.disposition}` +
+      `${outcome.reason ? `; ${outcome.reason}` : ""}. State ${outcome.pull.state}` +
+      `${outcome.pull.draft ? " (draft)" : ""}, head ${outcome.pull.head.sha}, ` +
+      `${outcome.pull.changedFiles} changed file(s).`
+    : `Q1 target: ${JSON.stringify({
+      disposition: outcome.disposition, reason: outcome.reason,
+      repository: outcome.repository, number: outcome.pull.number, state: outcome.pull.state,
+      draft: outcome.pull.draft, head: outcome.pull.head.sha, base: outcome.pull.base.sha,
+      changedFiles: outcome.pull.changedFiles,
+      ...(outcome.snapshot ? {
+        diffSha256: outcome.snapshot.diffSha256, diffBytes: outcome.snapshot.diffBytes,
+        capturedAt: outcome.snapshot.capturedAt,
+      } : {}),
+    })}`}\nNo PR review performed; no clean-review claim. Nothing published.`);
   if (!outcome.snapshot) return outcome;
   // Context is bound to the captured revisions; unavailable or inconsistent source stops here.
   const context = await assembleContext(outcome.snapshot, { gh, cwd });
@@ -222,6 +230,9 @@ export async function executeTargetCapture(session, args, { gh = runGh, signal }
   const bound = "Source context comes only from the captured GitHub revisions. " +
     "The local checkout, its branch, and its uncommitted changes are never context evidence; " +
     "a review additionally requires the checkout to be exactly this head before reviewers may read it.";
-  await session.log(`Q2 context: ${JSON.stringify(contextSummary(context))}\n${bound}`);
+  // The context summary is evidence about what was captured; what the capture
+  // promises about its provenance is not, so quiet keeps the promise and drops
+  // the dump. Unavailable source still reaches the coverage report either way.
+  await session.log(quiet ? bound : `Q2 context: ${JSON.stringify(contextSummary(context))}\n${bound}`);
   return { ...outcome, context, workingDirectory: cwd };
 }
