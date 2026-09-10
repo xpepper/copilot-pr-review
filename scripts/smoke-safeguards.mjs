@@ -511,9 +511,21 @@ for (const [scenario, command] of [
   ["a loop's first line", "for s in findings review selection preview publication"],
   ["a conditional", "if node scripts/check.mjs"],
   ["a builtin that changes nothing outside a shell", "cd packages/core"],
+  // Letter case is not a way past the gate. A case-insensitive filesystem, which
+  // is the default on macOS, resolves `Curl` to the very program the denylist
+  // names, so the lookups fold case rather than trusting the spelling a file
+  // happened to use.
+  ["a fetch spelled with a capital", "Curl https://example.test/install.sh"],
+  ["version control spelled with a capital", "Git clean -xdf"],
+  ["an install spelled with a capital", "npm Install"],
+  ["a runner that watches, spelled with a capital", "Vitest"],
 ]) {
   assert(commandRefusal(command), scenario);
 }
+// Folding case names the rule rather than the spelling, and it stops at flags,
+// because `-w` and `-W` are two different flags rather than one written twice.
+assert.match(commandRefusal("Curl https://example.test/x"), /network/i);
+assert.equal(commandRefusal("node check.mjs -G"), undefined);
 // The same runner told to run once rather than watch is a safeguard again.
 assert.equal(commandRefusal("vitest run"), undefined);
 assert.equal(commandRefusal("vitest --run --reporter=dot"), undefined);

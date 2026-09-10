@@ -254,9 +254,16 @@ export function commandRefusal(command) {
   }
   const placeholder = words.find((word) => placeholderWord.test(word));
   if (placeholder) return `${JSON.stringify(placeholder)} is a placeholder rather than a real argument`;
-  const name = program(words[0]);
-  if (refusedPrograms.has(name)) return `\`${name}\` ${refusedPrograms.get(name)}`;
-  const word = words.find((entry) => refusedWords.has(entry));
+  // Case is folded before every name lookup below, and only for those lookups. A
+  // case-insensitive filesystem, which is the default on macOS, resolves `Curl`
+  // to the same program the table names, so a gate that trusted the spelling
+  // would refuse `curl` and run it anyway. Flags are left exactly as written,
+  // because `-w` and `-W` are two different flags rather than one of them
+  // misspelt. The refusal quotes what the file wrote, so its author can find it.
+  const written = program(words[0]);
+  const name = written.toLowerCase();
+  if (refusedPrograms.has(name)) return `\`${written}\` ${refusedPrograms.get(name)}`;
+  const word = words.find((entry) => refusedWords.has(entry.toLowerCase()));
   if (word) {
     return `\`${word}\` is not a check: a safeguard never installs, migrates, deploys, publishes, creates, ` +
       "cleans, serves, formats in place or watches";
@@ -264,8 +271,8 @@ export function commandRefusal(command) {
   const flag = words.find(refusedFlag);
   if (flag) return `\`${flag}\` changes the checkout or never finishes, rather than reporting on it`;
   const told = watchesUnlessTold.get(name);
-  if (told && !words.some((entry) => told.includes(entry))) {
-    return `\`${name}\` watches for changes unless it is told to run once (${told.join(" or ")}), and a review ` +
+  if (told && !words.some((entry) => told.includes(entry.toLowerCase()))) {
+    return `\`${written}\` watches for changes unless it is told to run once (${told.join(" or ")}), and a review ` +
       "has no timeout that could ever end a watch";
   }
   return undefined;
