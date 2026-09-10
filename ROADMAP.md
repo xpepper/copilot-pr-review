@@ -7335,14 +7335,14 @@ makes the review the user's call for a documentation-only pull request, because
 it costs real credits. Whether one ran is recorded in the pull-request entry
 below.
 
-**The live evidence gaps `V2a` recorded stay open and are now accepted for v1.**
-Execution has never run under the installed plugin: an `accept` carrying a
-non-empty selection, a real spawn, a real capture, a real artifact line and a
-real cancellation are demonstrated only by the controlled suites, and no
-exclusion rule has ever refused a real discovered command. Closing them costs a
-review, and closing them is no longer scheduled. They are listed under "Recorded,
-not scheduled" so that a later reader does not mistake the suites for delivery
-evidence.
+**The live evidence gaps `V2a` recorded stay open.** Execution has never run
+under the installed plugin: an `accept` carrying a non-empty selection, a real
+spawn, a real capture, a real artifact line and a real cancellation are
+demonstrated only by the controlled suites, and no exclusion rule has ever
+refused a real discovered command. Settling `V2b` without code means there is no
+review here to fold them into. They close in `D1`, whose own review is already
+required and can run with `--verify`; the next-increment section below says
+exactly how. Until then, do not mistake the suites for delivery evidence.
 
 ## Exact next increment
 
@@ -7382,6 +7382,12 @@ building. Treat a new feature idea as out of scope unless the user asks for it.
   not of the working tree. Bound citations already contain the consequence, as
   the `V2b` entry sets out; the sentence is still wrong and `D1` is where it is
   cheapest to fix, because that pull request touches user-facing text anyway.
+  **That fix is a change under `extensions/`, so `D1`'s pull request needs an
+  installed-plugin review whatever else it contains. Run that review with
+  `--verify` and approve `node scripts/smoke-safeguards.mjs` when the approval
+  UI asks.** It is the last chance to give safeguard execution live evidence
+  without spending a review on nothing else, and the reason is set out under
+  "The live evidence `V2` did not produce" below.
 
 ### The roadmap archive
 
@@ -7401,12 +7407,21 @@ all still demonstrated only by the controlled suites. **The exclusion table
 recorded no live refusal either**, because the discovery pass reported only three
 candidates and the one refusal came from the citation check.
 
-Closing either gap costs a review. `V2b` was settled without code and therefore
-without a review to fold them into, so they stay open and are now accepted as
-v1 limitations rather than scheduled work. If a later review of any increment
-runs with `--verify`, approving `node scripts/smoke-safeguards.mjs` during it is
-still the cheapest way to close them: it finishes in well under a second and
-leaves the checkout clean. Do not spend a review on that alone.
+Closing either gap costs a review, and `V2b` was settled without code and so
+without a review to fold them into. **`D1` is where they should close, at no
+extra cost.** `D1` fixes the reviewer prompt's "verified to be at" wording, and
+that is a change under `extensions/`, so `AGENTS.md` already requires `D1`'s
+pull request to be reviewed by the installed plugin. Run that one review with
+`--verify` and approve `node scripts/smoke-safeguards.mjs` when the approval UI
+asks: the suite finishes in well under a second and leaves the checkout clean,
+so the artifact line should say the checkout is unchanged. That single run gives
+execution its first live evidence, an `accept` carrying a non-empty selection, a
+real spawn, a real capture and a real artifact line, without spending a review
+on it. A live exclusion refusal still cannot be arranged, because what a
+discovery pass reports is not ours to arrange.
+
+Until `D1` runs, both remain demonstrated only by the controlled suites, and no
+entry above may be read as though the installed plugin had executed anything.
 
 ### Recorded, not scheduled
 
@@ -7430,9 +7445,9 @@ without the user saying so.
   discovered commands were offered, the host's elicitation UI accepted the
   schema and returned a documented action, and the answer approved nothing. An
   accepted subset, a cancel, and every part of execution downstream of them are
-  still demonstrated only against the controlled harness. `V2b` was settled
-  without a review to fold this into, so it is accepted as a v1 limitation; see
-  "The live evidence `V2` did not produce" above.
+  still demonstrated only against the controlled harness. `D1`'s own required
+  review closes this at no extra cost; see "The live evidence `V2` did not
+  produce" above.
 - **A live refusal from the exclusion table.** #19's discovery pass reported only
   three candidates and refused one of them by citation, so no exclusion rule has
   ever refused a real discovered command. No later review can close this
