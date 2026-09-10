@@ -425,6 +425,116 @@ The thirteen suites were rerun after these fixes and all thirteen still pass.
   and cannot be imported without a runtime. The no-inference runtime probe
   dispatches those commands and asserts only their first lines.
 
+## Increment O1, awaiting its required review
+
+**This entry is not yet a completed increment.** `O1` changes `extensions/`, so
+`AGENTS.md` requires one installed-plugin review of its pull request before it
+is demonstrated, and that review has not run at this commit. The table above
+still says `Pending`. Everything below is the controlled evidence; the review's
+evidence replaces this paragraph when it exists.
+
+**`O1` is the one increment the user scheduled after v1, and it is a quieter
+review.** A run printed a great deal, and the largest part of it was never the
+findings. `--quiet` leaves out the evidence JSON lines and the raw untrusted
+model envelopes, and leaves everything else exactly where it was.
+
+### One flag, and deliberately not a configuration key
+
+The roadmap left this open and told the session to ask rather than build both.
+**The user chose one flag and no configuration key**, on the reasoning the
+roadmap itself recorded: one flag is the smaller step and satisfies the request,
+and a saved key can still be added later if typing it per run turns out to
+annoy. `--quiet` is declared as `quietFlag` in `extensions/pr-review/review.mjs`
+beside the parser that reads it.
+
+The flag is the right shape for a second reason that is not about cost.
+Verbosity authorizes nothing, so a key would have been defensible where
+`--verify`'s is not; but a saved key can make a run quieter than the person
+running it expects, and the thing it would hide is the evidence that run was
+trustworthy. Asking for it one run at a time removes that possibility entirely.
+
+### What it leaves out, and what it can never leave out
+
+| Suppressed by `--quiet` | Where it is printed |
+| --- | --- |
+| `Q1 target:` and `Q2 context:` JSON | `executeTargetCapture` in `target.mjs` |
+| The mode's `binding:` JSON | `executeReviewRun` in `review.mjs` |
+| Every completed reviewer's raw envelope, and the adjudicator's | `reviewAssignments` in `fixture.mjs` |
+| The settled `<prefix> evidence:` JSON | `executeOwnedRun` in `fixture-run.mjs` |
+| `P1 evidence:` JSON | `finishSelection` in `selection.mjs` |
+| `P2 evidence:` JSON | `startRun` in `extension.mjs` |
+
+Nothing else changed. The effective configuration and assignments, the
+verification notice, the `R1 checkout:` line, per-reviewer progress, the `Q4
+evidence gate` count, the findings and their rejections, the coverage report and
+its diagnostics, finding selection, the review proposal and every publication
+outcome all print at both verbosities. So do the sentences that say what a
+result may not be read as: **a quiet run is still impossible to mistake for a
+clean review.**
+
+Two of the suppressed lines carried a sentence that is not evidence, and those
+sentences stay when the JSON goes: the capture's "No PR review performed; no
+clean-review claim", the context's statement that source comes only from the
+captured revisions, and the binding's rule that unvalidated candidates cannot
+publish.
+
+**A skipped or refused target needed more than that.** When capture skips a
+draft or a bot, `Q1 target:` was the only line that named the disposition and
+the reason, and no later stage prints them: a `not-started` outcome reaches
+neither `formatFindings` nor the incomplete-coverage report. A quiet run
+therefore states them in words instead, as `Target owner/repo#N: skipped;
+draft.` with the state, head and changed-file count. Suppressing that would have
+turned a skip into silence, which is exactly what the rule forbids.
+
+### The two places the flag is refused
+
+`--capture-only` refuses it, alongside the mode, posting, selection and model
+arguments it already refuses. A capture-only run's entire output is the two
+evidence lines `--quiet` would suppress, so the combination asks for nothing.
+
+**`scripts/dogfood-review.mjs` refuses it outright**, in the same shape as its
+existing refusal of `--comment`. That runner exists to capture an increment's
+own evidence, and the models and efforts actually used, the credit cost, the
+tool calls and denials and the coverage diagnostics are all read out of the
+lines this flag removes. A dogfood run may never be the run that hid its own
+evidence, and now it cannot be.
+
+### Validation
+
+All thirteen controlled suites pass. `scripts/smoke-review.mjs` carries the new
+assertions, written first and seen to fail for the right reason: the parsing
+block failed on a missing `quiet` field before the parser knew the flag, and the
+output block failed on `Q1 target:` still being printed before the suppression
+existed. Four cases were added:
+
+- the same settled balanced run printed twice, asserting that each suppressed
+  line and envelope is present by default and absent under `--quiet`, that
+  fourteen kept lines survive both, that both runs settle identically, and that
+  the retained record still holds every reviewer's own untrusted output;
+- a quiet run with a failing reviewer, asserting the reviewer names itself and
+  its error, that the run reports incomplete coverage twice over, and that
+  suppression does not resume because the run failed;
+- a quiet run of the fixture's draft pull request, asserting the skip states its
+  disposition and reason and that no reviewer session was created;
+- a quiet `--verify` run with an approved command, asserting the preflight, the
+  discovery, the approval and the execution summary with the command's own
+  output all still print.
+
+```sh
+for s in findings review selection retention preview publication publish-later \
+  checkout config context fixture target safeguards; do node scripts/smoke-$s.mjs; done
+git diff --check
+wc -c README.md ROADMAP.md
+```
+
+`git diff --check` is clean and the branch diff carries no control byte. The
+discovery collector still reads all six root files and skips none; `README.md`
+grew to 58261 bytes and has 7275 spare against the 65536-byte cap.
+
+`scripts/smoke-reviewer-tools.mjs` was not run and did not need to be:
+`read-only.mjs` was not touched, reviewer confinement is unchanged, and nothing
+about what a reviewer may read or do depends on how much the run prints.
+
 ## v1 is complete, and `O1` is the one increment scheduled after it
 
 **`D1` has landed, so v1 is delivered.** `SCOPE.md`'s must-have column and its
