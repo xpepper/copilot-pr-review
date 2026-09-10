@@ -9,10 +9,16 @@ from what has only been assumed, in your own reporting as well as in the code.
 ## Recorded state
 
 This handoff is written on branch `v2b-settled-without-code`, which carries
-`V2b` on **pull request #20**. **Confirm before anything else** whether #20 is
-merged, and start from `main` if it is. The only open pull requests should then
-be the synthetic playground ones, #1 and #2, which must never be merged or
-republished.
+`V2b` on **pull request #20**. That pull request is being merged into `main` in
+the same session that wrote this. **Confirm that before anything else**: check
+whether #20 is merged, and start from `main` if it is. The only open pull
+requests should then be the synthetic playground ones, #1 and #2, which must
+never be merged or republished.
+
+**#20 was deliberately not reviewed by the installed plugin.** It is
+documentation-only, and `AGENTS.md` makes that review the user's call rather
+than a requirement because it spends real credits. The user declined it. That is
+a recorded decision, not an omission to correct.
 
 **`V2` is closed. `V2b` was settled without code.** Its three questions were put
 to the user one at a time and all three were answered "no change": safeguard
@@ -29,22 +35,32 @@ costly-to-lose item in `SCOPE.md` is delivered. The user's direction, given afte
 justified. **Do not invent an increment, and treat a new feature idea as out of
 scope unless the user asks for it.** Finishing is the work now.
 
-## What is left, in order
+## Three increments are left, and this is their order
 
-1. **The roadmap archive.** Agreed with the user and not yet started. This file
-   passed 445KB, which is itself a functional problem: safeguard discovery skips
-   it for size, so the tool cannot read its own project. Move the completed
-   entries into a dated archive file and keep a short live roadmap. **Its own
-   pull request**, separate from #20, mechanical and documentation-only. Do not
-   move the increments table, the "Exact next increment" section, or the most
-   recent completed entries out of `ROADMAP.md`.
+**Take `A1` first. Take one increment, land it on its own branch and pull
+request, and stop.** The roadmap's "Exact next increment" section is the
+authoritative version of this list.
+
+1. **`A1`: archive the completed roadmap entries.** **This is your increment.**
+   `ROADMAP.md` passed 445KB, which is itself a functional problem: safeguard
+   discovery skips it for size, so the tool cannot read its own project. Move
+   the completed entries into a dated archive file and leave a short live
+   roadmap behind, with a pointer to the archive where they were. **Do not move
+   the increments table, the "Exact next increment" section, or the most recent
+   completed entries out of `ROADMAP.md`.** Mechanical and documentation-only,
+   so no installed-plugin review is required; ask before spending one. It goes
+   first because `D1` has to read this file and rewrite `README.md`.
 2. **`L1`: upstream licensing and attribution.** `SCOPE.md` records that
    `pi-pr-review` declares MIT but that no standalone licence text was found at
    the inspected revision. No upstream source has been reused and none should be
    until this is settled. It needs no review and spends no credits.
 3. **`D1`: the user documentation.** `README.md` is over 100KB and is skipped by
    discovery for the same reason the roadmap is, so `D1` should shorten it at
-   least as much as it extends it.
+   least as much as it extends it. It also carries the last live-evidence
+   opportunity; the next section is about that and matters more than it looks.
+
+When all three have landed, v1 is done. What remains open after that is a set of
+limitations to state in the release notes, not work to schedule.
 
 ### `D1` carries the last live-evidence opportunity, so do not waste it
 

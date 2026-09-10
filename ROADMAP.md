@@ -57,7 +57,8 @@ posting them.
 | V1 | Completed | `--verify` enforces matching branch/SHA/cleanliness before reviewers and presents discovered existing commands for approval. `V1a` added the preflight, `V1b` discovery and presentation from the project's own instruction files, `V1c` per-command approval that records the answer, executes nothing and outlives no run. Demonstrated by the thirteen controlled suites and pull request #18's balanced `--verify` review, which cost 166.859549 credits, found two real defects and produced the first live discovery evidence. **That pass found no command in this repository**, so the interactive approval path is demonstrated only by the controlled suites. Execution is `V2`. | Q1; [Safeguards](SCOPE.md#optional-project-safeguards) |
 | V2a | Completed | Execute only approved existing safeguards with installed dependencies, in the current checkout, and show evidence and artifacts without autofix or checkout manipulation. Carries the exclusions and the citation check that `V1c` deferred to `V2`. Demonstrated by the thirteen controlled suites and pull request #19's interactive balanced `--verify` review, which cost 252.771985 credits, reached the host's real approval UI for the first time and saw the citation gate refuse a constructed command live. **That run approved nothing, so execution itself is still demonstrated only by the controlled suites.** It found one validated defect and two more that its own evidence gate discarded; two of the three are fixed here. | V1; [Safeguards](SCOPE.md#optional-project-safeguards) |
 | V2b | Completed | Settled without code: safeguard output reaches no reviewer, the retained record says nothing about what ran, and the citation gate keeps accepting a prefix as a documented limitation. All three were answered "no change", so `V2` closes with `V2a`'s behaviour and the thirteen suites unchanged. The prompt's "verified to be at" wording is a recorded wording defect that bound citations already contain; it goes to `D1`. | V2a; [Safeguards](SCOPE.md#optional-project-safeguards) |
-| D1 | Pending | Document configuration, modes, incomplete coverage, cancellation, publication, cache, and safeguards with reproducible end-to-end examples. | Remaining v1 items; [Release boundary](SCOPE.md#priority-and-release-boundary) |
+| A1 | Pending | Archive the completed roadmap entries into a dated file, leaving a short live `ROADMAP.md` that safeguard discovery can actually read. Mechanical and documentation-only; the increments table, the exact-next-increment section and the most recent entries stay here. | V2b; housekeeping, no scope clause |
+| D1 | Pending | Document configuration, modes, incomplete coverage, cancellation, publication, cache, and safeguards with reproducible end-to-end examples. Also fixes the reviewer prompt's "verified to be at" wording, which makes it a behaviour change needing one installed-plugin review; run that review with `--verify` and approve the safeguards suite. | A1, L1; [Release boundary](SCOPE.md#priority-and-release-boundary) |
 
 ## Completed increment: F1
 
@@ -7360,14 +7361,30 @@ authorizations are spent. Nothing about any of them should be redone or widened.
 ### Every must-have is complete, and the port is feature-complete for v1
 
 `SCOPE.md`'s must-have column and its costly-to-lose column are both entirely
-delivered. What is left of v1 is `L1` and `D1`, and neither adds a capability.
+delivered. What is left of v1 is `A1`, `L1` and `D1`, and none of the three adds
+a capability. When all three have landed, v1 is done, and the open items further
+below are limitations to state in the release notes rather than work to
+schedule.
+
 **A later session should not invent an increment.** The user's direction, given
 after #19 merged, is that the port had grown far past the effort its goal
 justified, and that the remaining appetite belongs to finishing rather than to
 building. Treat a new feature idea as out of scope unless the user asks for it.
 
-### The next increment is `L1`, then `D1`
+### The next increment is `A1`, the roadmap archive, then `L1`, then `D1`
 
+Three increments remain and this is their order. Take one, land it on its own
+branch and pull request, and stop.
+
+- **`A1`: archive the completed roadmap entries.** This file passed 445KB and is
+  itself now a functional problem, because safeguard discovery skips it for
+  size, so the tool cannot read its own project. Move the completed entries into
+  a dated archive file and leave a short live roadmap behind. **It must not move
+  the increments table, this `Exact next increment` section, or the most recent
+  completed entries out of this file**, and it must leave a pointer to the
+  archive where the moved entries were. Mechanical and documentation-only, so no
+  review is required; ask before spending one. It goes first because `D1` has to
+  read this file and rewrite `README.md`, and both are easier once this is done.
 - **`L1`: resolve upstream licensing and attribution.** `SCOPE.md` records that
   `pi-pr-review` declares MIT but that no standalone licence text was found at
   the inspected revision. No upstream source has been reused and none should be
@@ -7389,14 +7406,6 @@ building. Treat a new feature idea as out of scope unless the user asks for it.
   without spending a review on nothing else, and the reason is set out under
   "The live evidence `V2` did not produce" below.
 
-### The roadmap archive
-
-This file passed 445KB and is itself now a functional problem, because
-safeguard discovery skips it. The user agreed to archive the completed entries
-into a dated file and keep a short live roadmap. **That is a separate pull
-request from `V2b`**, mechanical and documentation-only, and it must not move
-the increments table, the `Exact next increment` section, or the most recent
-completed entries out of this file.
 
 ### The live evidence `V2` did not produce, now accepted for v1
 
