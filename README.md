@@ -162,9 +162,12 @@ request number runs a balanced review and spends credits.
 | `--full` | The balanced five, plus one medium conventions/maintainability reviewer | Every qualifying severity, no minor cap |
 | `--deep` | One integrated heavy reviewer over the whole change | Every substantiated severity, no minor cap |
 
-Every mode also runs the adjudicator, an isolated heavy-tier session with no
-tools that validates candidates against the captured evidence. It is not a
-specialist and does not change a mode's reviewer topology.
+Every mode adjudicates the same way, in an isolated heavy-tier session with no
+tools that tries to disprove each candidate against the captured evidence. It is
+not a specialist and does not change a mode's reviewer topology. **That session
+starts only when at least one candidate survives the evidence boundary**, so a
+review whose every candidate was refused costs nothing for adjudication and
+reports no adjudicator.
 
 **Deep is holistic, not bigger.** It is not a larger parallel review and not a
 higher reasoning effort. One reviewer holds correctness, contracts, security,

@@ -16,6 +16,14 @@ fix here: the verification section says "**Nothing is executed yet**", which
 project safeguards", which `V2a` made false too. The live `README.md` states
 the current behaviour.
 
+**Its links do not resolve from this directory, and that is the cost of keeping
+it verbatim.** The body was written to sit at the repository root, so a link
+below that names `SCOPE.md`, `ROADMAP.md`, `AGENTS.md` or `docs/`-prefixed file
+means that path **relative to the repository root**, one level up from here.
+Rewriting those targets would have made the copy no longer identical to the file
+it was cut from, and that identity is what makes this an archive rather than a
+retelling, so the targets were left alone and named here instead.
+
 Read this file for a harness probe invocation the live README no longer prints,
 or for how a capability was described when its increment landed. The evidence
 of record for any increment is [ROADMAP.md](../ROADMAP.md) and
