@@ -2,7 +2,8 @@
 
 These are the completed increment entries moved out of
 [../ROADMAP.md](../ROADMAP.md) on 2026-09-10, by increment `A1` for everything
-through `V1c` and by increment `L1` for `V2a` and `V2b`. They are the project's
+through `V1c`, by increment `L1` for `V2a` and `V2b`, and by increment `D1` for
+`A1`'s own entry and then `L1`'s, which are the last two in this file. They are the project's
 evidence of record and are reproduced verbatim: nothing here was rewritten,
 condensed or corrected in either move, so a claim below still reads exactly as
 the session that demonstrated it wrote it.
@@ -22,7 +23,10 @@ Pull requests #18 and #19 both recorded that skip as live evidence. `L1` moved
 `V2a` and `V2b` for the same cap for a different reason: the live file was back
 under the cap but had only 4272 bytes of headroom, and the smaller of those two
 entries is 7547 bytes, so the next completed entry could not have fitted beside
-them.
+them. `D1` moved `A1` under the rule those two moves established, which is to
+keep the most recent completed entries live and archive the rest, and then moved
+`L1` as well so that the increment scheduled after it, `O1`, had room to write
+its own entry.
 
 **This file is deliberately not at the checkout root.**
 `collectInstructionFiles` reads the root's markdown and does not recurse into
@@ -7321,3 +7325,364 @@ refused a real discovered command. Settling `V2b` without code means there is no
 review here to fold them into. They close in `D1`, whose own review is already
 required and can run with `--verify`; the next-increment section below says
 exactly how. Until then, do not mistake the suites for delivery evidence.
+
+---
+
+## Completed increment: A1
+
+**`A1` makes this file readable by the tool it documents.** It is the only
+increment whose subject is the repository's own paperwork, and it exists because
+that paperwork had become a functional defect rather than an untidiness.
+
+### The defect it fixes, recorded live twice
+
+`instructionFileMaxBytes` in `extensions/pr-review/safeguards.mjs` caps one
+instruction file at 65536 bytes, and `collectInstructionFiles` skips an oversized
+file by name rather than truncating it, because half an instruction file is a
+worse source than none. `ROADMAP.md` had reached 464771 bytes over 7489 lines, so
+this project's own safeguard discovery skipped its roadmap for size. Pull request
+#18's discovery pass recorded the skip and #19's recorded it again with the
+figure, `ROADMAP.md` at 444530 bytes. The tool could not read its own project,
+and the file saying so was the file it could not read.
+
+### What moved, and what deliberately did not
+
+Thirty-nine sections moved verbatim into `docs/roadmap-archive-2026-09-10.md`:
+thirty-one completed-increment entries covering the twenty-nine increments from
+`F1` to `V1c`, and eight sections of working record kept between them. The
+pointer left in their place names all of it. Nothing was rewritten, condensed or
+corrected, and the move was checked rather than trusted: the extracted range and
+the archive's body hash to the same SHA-256.
+
+Three things stayed, as the increment required: the increments table, which is
+the index; the two most recent completed entries, `V2a` and `V2b`, so the closing
+state of `V2` reads without following a pointer; and the "Exact next increment"
+section, which is what a fresh session acts on. `L1` has since archived those two
+`V2` entries, for the headroom reason this entry predicted below.
+
+### The archive is not at the checkout root, and that is the point
+
+`collectInstructionFiles` reads the root's markdown and does not recurse into
+subdirectories, so an archive under `docs/` leaves the discovery candidate set
+altogether. A dated archive beside `ROADMAP.md` would have satisfied the letter
+of the increment while replacing one oversized skipped candidate with another
+413800-byte one, and discovery would still have named a file of this project it
+could not read. The subdirectory turns the skip into nothing at all.
+
+### Measured outcome
+
+Every figure in this table was measured at `A1`'s checkpoint and is kept as
+`A1`'s evidence. `L1` has since archived `V2a` and `V2b` and changed two of
+them; the `L1` entry below carries the current measurement.
+
+| File | Bytes at `A1` | Against the 65536-byte cap |
+| --- | --- | --- |
+| `ROADMAP.md` before | 464771 | skipped, 7.1x over |
+| `ROADMAP.md` after | 61264 | read, 4272 bytes spare |
+| `docs/roadmap-archive-2026-09-10.md` | 413800 | not a candidate; discovery does not recurse |
+
+Every root markdown file was under the cap at this checkpoint except
+`README.md` at 103636 bytes, which is `D1`'s to shorten. The root's readable files spend well under
+half the 262144-byte discovery budget, so nothing is near being skipped for the
+budget rather than for its own size.
+
+### Validation
+
+Documentation-only: nothing under `extensions/` or `scripts/` changed, so the
+shipped behaviour is exactly `V2a`'s. All thirteen controlled suites were run
+anyway and all thirteen pass, which is the evidence that they do not depend on
+this file. `scripts/smoke-safeguards.mjs` asserts the oversize skip against a
+synthetic project whose `ROADMAP.md` is `"x".repeat(instructionFileMaxBytes + 1)`,
+so it tests the rule and never the real file; shrinking the real file could not
+weaken it. `git diff --check` is clean and the diff carries no control byte.
+
+The increment's own outcome was demonstrated rather than inferred, by running
+this project's real `collectInstructionFiles` against this checkout. It now
+reads five root files in `conventionalInstructionFiles` order, `AGENTS.md`,
+`CLAUDE.md`, `HANDOFF.md`, `ROADMAP.md` at 61264 bytes as measured at this
+increment's checkpoint, and `SCOPE.md`, and skips exactly one, `README.md`, for
+exceeding the cap. **Before this increment
+that skipped list held `ROADMAP.md` too.**
+`docs/roadmap-archive-2026-09-10.md` appears in neither list, because
+`collectInstructionFiles` does not recurse into subdirectories.
+
+```sh
+for s in findings review selection retention preview publication publish-later \
+  checkout config context fixture target safeguards; do node scripts/smoke-$s.mjs; done
+wc -c ROADMAP.md docs/roadmap-archive-2026-09-10.md
+node --input-type=module -e '
+import { collectInstructionFiles } from "./extensions/pr-review/safeguards.mjs";
+const { files, skipped } = collectInstructionFiles(process.cwd());
+console.log("read:", files.map((f) => `${f.name} ${f.bytes}`).join(", "));
+console.log("skipped:", skipped.map((s) => `${s.name} (${s.reason})`).join(", ") || "none");
+'
+```
+
+### Pull request #22 and its review
+
+Pull request #22 carries this increment. **It was not reviewed by the installed
+plugin.** `AGENTS.md` makes the review of a documentation-only pull request the
+user's call rather than a requirement, because a review spends real credits; the
+user was asked and authorized none. That is a recorded decision, not an omission
+to correct. Nothing under `extensions/` or `scripts/` changed, so no behaviour of
+the shipped tool went undemonstrated by not reviewing it.
+
+### Remaining limitations
+
+- **The headroom does not survive the next entry, and `L1` must archive before
+  it writes one.** This file has 4272 bytes spare against the cap. The last
+  six completed entries measured 7546, 12085, 14651, 15365, 15406 and 20969
+  bytes, so even the smallest of them overruns what is left: this is not a risk
+  to watch but an arithmetic certainty. **The increment that adds the next entry
+  archives `V2a` and `V2b` first**, into the existing dated archive or a new one,
+  leaving the same kind of pointer behind; that frees about 28KB. Keeping both
+  `V2` halves here was this increment's own instruction, so `A1` did not pre-empt
+  it, and `A1`'s entry is deliberately the smallest of the recent ones at about
+  6KB. No size check enforces any of this. Run `wc -c ROADMAP.md` before opening
+  a pull request, and treat 65536 as the number that matters. **`L1` did this**,
+  archiving both `V2` halves before writing its own entry; the arithmetic held
+  and the freed 28517 bytes are recorded below.
+- **`README.md` is still skipped for size**, at 103636 bytes when this entry was
+  written, so discovery still names one file of this project it cannot read.
+  `D1` owns it.
+- **`README.md`'s discovery example is now stale in one detail.** It uses
+  `Skipped: ROADMAP.md (exceeds 65536 bytes)` to illustrate a skipped file, which
+  no longer describes this checkout. The example is hypothetical throughout, so
+  it states nothing false about a real run, but `D1` should replace that line.
+- **The archive has no index.** Finding an older increment's evidence means
+  searching it. None was added, because `D1` may want one and this increment was
+  to stay mechanical.
+
+---
+
+## Completed increment: L1
+
+**`L1` closes the last open question `SCOPE.md` carried from before
+implementation started**, and it is the only increment whose deliverable is an
+answer rather than behaviour. Nothing under `extensions/` or `scripts/` changed,
+so the shipped behaviour is exactly `V2a`'s, as it was at `A1`.
+
+The answer, its evidence and the rule it produces are in
+[docs/upstream-licensing.md](docs/upstream-licensing.md). This entry records the
+outcome and the validation; that file is the record of the work.
+
+### The answer
+
+**Upstream declares MIT, and publishes no licence text and no copyright
+notice.** Both halves are established from primary sources, and both matter.
+
+`SCOPE.md` had recorded the first half as a package-listing observation and the
+second as a research gap, with an instruction attached: confirm the obligations
+before reusing or redistributing source. The instruction is now discharged.
+Neither half was assumed from the listing: the declaration was read from the
+repository manifest at commit `457e18e30437984e2e6680802c9da25d270b82cc`, from
+the manifest inside the published tarball, from npm registry metadata and from
+the `pi.dev` listing, and the absence was measured across the whole tree, the
+whole published package, the README and GitHub's own licence detection.
+
+| What was checked, at the inspected revision unless stated | Result |
+| --- | --- |
+| `package.json` at the commit, and inside the tarball | `"license": "MIT"` in both |
+| npm registry metadata for `pi-pr-review@1.17.10` | `"license": "MIT"`, maintainer `10ego` |
+| `pi.dev` listing | "MIT License", no text, no copyright line |
+| Whole repository tree, 356 entries, untruncated | zero licence, copying, notice, copyright, legal or third-party paths |
+| `README.md`, 37687 bytes | zero word-boundary matches for licence, license, copyright or MIT |
+| All 25 files in the published tarball | zero licence text, zero copyright or SPDX headers |
+| GitHub licence detection | metadata `"license": null`, `/license` returns HTTP 404 |
+| Upstream default branch on 2026-09-10, at v1.18.1 | still no licence file |
+| Upstream issues and pull requests | zero mention licence or license |
+
+The tarball was verified as the genuine published artifact before being read:
+SHA-1 `88db35cc407c33158d2c33a512f53d6fc6caf5ec`, matching npm's recorded
+`dist.shasum`.
+
+**What it obliges.** MIT's one condition is that the copyright notice and the
+permission notice travel with copies and substantial portions. Neither artifact
+exists upstream, so a redistributor cannot discharge the condition by
+reproducing what upstream published. Writing one instead means asserting a
+copyright line on the holder's behalf, choosing a year and a name for them.
+`docs/upstream-licensing.md` sets out the pragmatic and the conservative reading
+of that and deliberately picks neither, because **the difference between them
+only bites if this project copies upstream source, and it does not.** The
+cheapest way to remove the ambiguity outright is recorded there too, and it is
+not a judgment call: ask upstream for a `LICENSE` file.
+
+### What may and may not be reused, and what has been
+
+Behaviour, interfaces and the workflow decisions already recorded in `SCOPE.md`
+may be reused, and are; `SCOPE.md` had always framed the port that way. No file
+or substantial part of one may be copied, specifically including
+`prompts/pr-review.md`, everything under `lib/` and `extensions/`, and the
+README's prose.
+
+**Nothing has been copied, and that is measured rather than asserted.** Every
+line of at least 40 characters from the 25 distributed upstream files was
+indexed after whitespace normalisation, 5544 of them, and compared against the
+56 files under this project's `extensions/` and `scripts/`. **Seven distinct
+strings appear in both, the longest 53 characters, and every one is boilerplate
+any Node.js program of this shape contains**: five `node:` import statements, a
+`Buffer.from(...).toString("utf8")` return, and an `abort` listener teardown.
+No shared prose, prompt text, identifier set or structure. The two
+implementations do not share a language either.
+
+**Attribution is not owed**, because MIT's condition attaches to copies and
+substantial portions and there are none. Credit is accurate and cheap, so the
+credit paragraph in `docs/upstream-licensing.md` states the derivation, the
+inspected revision, the declared licence and the fact that nothing was copied.
+It is deliberately not a root-level `NOTICE` file: a root markdown file would
+join this project's own discovery candidate set as noise, and the filename
+conventionally signals an obligation being discharged, which would overstate
+what is happening.
+
+### What this increment changed
+
+- `docs/upstream-licensing.md` is new: the answer, the evidence, the reuse rule,
+  the credit paragraph, and every command needed to recheck the lot.
+- `SCOPE.md`'s upstream-baseline paragraph now records the confirmed answer and
+  points at that file. The instruction it carried is discharged rather than
+  deleted, and no requirement changed.
+- `README.md`'s claim that the assessment "remains pending" was true when
+  written and is now false, so it states the settled answer instead. That is the
+  only `README.md` edit; its size and its stale discovery example remain `D1`'s.
+- `V2a` and `V2b` were archived first, for the reason `A1` recorded and this
+  increment inherited.
+
+### The archiving this entry required
+
+`A1` left 4272 bytes of headroom against the 65536-byte
+`instructionFileMaxBytes` cap and recorded that the next completed entry could
+not fit beside both `V2` halves, the smaller being 7547 bytes. That was
+arithmetic, and it held. Both entries moved verbatim into the existing dated
+archive, which was verified byte-identical against the extracted block before
+the live copy was cut, and the pointer above was widened to cover them.
+
+| File | Bytes after `L1` | Against the 65536-byte cap |
+| --- | --- | --- |
+| `ROADMAP.md` | 49253 | read, 16283 bytes spare |
+| `docs/roadmap-archive-2026-09-10.md` | 442748 | not a candidate; discovery does not recurse |
+| `docs/upstream-licensing.md` | 13731 | not a candidate; discovery does not recurse |
+| `README.md` | 103903 | still skipped, still `D1`'s |
+
+The move freed 28517 bytes. `A1`'s own figures are kept in its entry as `A1`'s
+measured evidence and labelled as measured there, rather than being rewritten to
+match this table.
+
+### Validation
+
+Documentation-only, and no behavioural change was made, so there was nothing to
+test first. All thirteen controlled suites were run anyway and all thirteen
+pass, which is the evidence that they do not depend on any file this increment
+touched. `git diff --check` is clean and the diff carries no control byte, which
+matters because a raw control byte is what refused #17's review.
+
+`scripts/smoke-reviewer-tools.mjs` was not run and did not need to be:
+`read-only.mjs` was not touched. The no-inference runtime probes were not rerun
+for the same reason. Credits were spent, once, on the review the user authorized;
+the section below records what that cost and what it found.
+
+The increment's own outcome was demonstrated rather than inferred, twice.
+This project's real `collectInstructionFiles` was run against this checkout and
+still reads five root files and skips only `README.md`, so the archiving did not
+cost the tool its own roadmap. Every reproduction command printed in
+`docs/upstream-licensing.md` was executed as written, from an empty directory,
+both before it was first recorded and again after the review's findings rewrote
+that section; each produced the result the file claims, the digest gate refuses a
+tampered tarball when tested with a wrong digest, and the audit command prints
+exactly `upstream lines 5544, local files 56, shared 7`.
+
+### Pull request #23 and its review
+
+Pull request #23 carries this increment. **The user was asked whether to spend a
+review on it and authorized one balanced review**, which `AGENTS.md` makes the
+user's call for a documentation-only pull request rather than a requirement. One
+review ran, `node scripts/dogfood-review.mjs 23 --all --no-comment`, and nothing
+was published. The plugin had to be installed from this checkout first, because
+`copilot plugin list` showed it was not installed on this machine at all.
+
+| What the run actually used | |
+| --- | --- |
+| Mode | balanced, 5 reviewers plus the adjudicator, `--no-comment` |
+| Heavy tier | `gpt-5.6-terra` at reasoning `high`: correctness, contracts, security, performance-resources, evidence-validator |
+| Light tier | `gpt-5.6-luna` at reasoning `high`: overview |
+| Fallbacks | none configured, so a discarded output had no second attempt |
+| Diff reviewed | 843 additions, 440 deletions, 5 files, 98002 diff bytes |
+| Reviewer execution | all six sessions completed; none failed, none was cancelled |
+| Credit cost | **137.46398 AI credits**, being 28.77710 correctness, 31.37626 contracts, 22.84345 security, 26.64120 performance-resources, 3.32752 overview and 24.49845 adjudicator |
+| Outcome | **0 validated findings, coverage INCOMPLETE**, 0 withheld, nothing published |
+
+**Zero validated findings here is not a clean review, and this entry does not
+read it as one.** Every reviewer completed and produced output. The run reported
+five execution failures and four coverage gaps, and the cause was the same in
+almost every case: `Citation does not exactly match a supplied context window`.
+The reviewers had quoted this repository's own markdown with the link syntax
+stripped, so `[docs/upstream-licensing.md](docs/upstream-licensing.md)` was cited
+as `docs/upstream-licensing.md` and the exact-quote gate refused it. That is the
+evidence boundary behaving exactly as `Q4` and `C5` specify, on reviewer error
+rather than on a tool defect, and `C5` made each of those discarded outputs
+eligible for a fallback attempt that no tier had configured.
+
+**The gate was right and the reviewers were also right.** Six candidates were
+produced and none survived to become a validated finding, but reading them showed
+that most described real defects in this increment's own new files. They were
+fixed on this branch as a second commit rather than dismissed, which is the same
+course `V2a` took with the two findings its evidence gate discarded:
+
+- **The documented tarball check printed a digest without enforcing it**, so a
+  reader following the reproduction would list and extract an artifact whose
+  SHA-1 did not match. Fixed: the sequence now pipes the expected digest through
+  `shasum -a 1 -c -` and chains extraction behind it, so a substituted download
+  stops there. **The adjudicator rejected this candidate**, reasoning that the
+  document never promised a machine-enforced gate. The rejection is fair on its
+  own terms and the change was made anyway, because the document does claim the
+  artifact was verified before being read and the enforcement costs one line.
+- **The reproduction section omitted the reuse audit entirely**, which two
+  reviewers raised independently and which mattered most, because the audit is
+  what closes the reuse question. The runnable command is now in the document,
+  and it prints `upstream lines 5544, local files 56, shared 7` followed by the
+  seven boilerplate strings.
+- **The reproduction claim overreached.** It said every figure came from the
+  listed commands while omitting npm, the pinned README, the upstream issue
+  search, the default-branch recheck and the audit. All are now present, and the
+  claim that no repository is needed is narrowed to the upstream checks, because
+  the audit does need this checkout.
+- **`base64 -d` was called a macOS portability defect.** The adjudicator returned
+  `uncertain` and recorded a coverage gap, correctly, because nothing in a
+  revision-bound checkout can establish a platform utility's flags. Checked
+  directly instead: `base64 -d` and `base64 -D` both work on this machine, macOS
+  26.6.2, so **the candidate's premise is false here**. The command was still
+  replaced, with `Accept: application/vnd.github.raw`, which removes the decode
+  step altogether and is shorter. The finding was wrong and the change is still
+  an improvement.
+- **The `L1` row claimed a pull-request record that did not exist yet.** True
+  when raised: this section is that record.
+- **The `D1` bullet contradicted itself on `README.md`'s size**, giving both
+  103636 and 103903 bytes in one paragraph. Fixed to the measured figure, once.
+
+Every reproduction command in `docs/upstream-licensing.md` was then executed as
+written, from an empty directory, and each produced the documented result. The
+thirteen suites were rerun after the fixes and all thirteen still pass.
+
+**This run also produced two pieces of evidence worth keeping beyond `L1`.** It
+is the first review of any mode whose reviewers all completed and whose findings
+were nonetheless all discarded at the evidence boundary, which makes it the
+clearest live demonstration so far that `C5`'s demotion path and the exact-quote
+gate do what they claim. And its citation failures share one cause, a reviewer
+normalising markdown link syntax out of a quote, which is a plausible thing to
+watch for in later documentation reviews rather than a defect to fix here.
+
+### Remaining limitations
+
+- **This settles the inspected revision, not upstream in perpetuity.** Upstream
+  is actively developed, was pushed to on 2026-09-10 and is at v1.18.1. A later
+  revision could add a `LICENSE` file, which would resolve the question in the
+  obvious direction, or change the declaration. Recheck before relying on the
+  answer for any revision other than the one `SCOPE.md` pins.
+- **The notice question is answered, not removed.** If reuse of upstream source
+  is ever wanted, the sequence is to settle the notice with upstream first, then
+  copy, then carry what they provide. Nothing here authorizes copying.
+- **Whether this project should carry a licence of its own is open, and is the
+  user's decision.** `L1` deliberately does not take it. The repository is
+  public and has no `LICENSE` file, which leaves it in the position it just
+  finished documenting upstream being in: default copyright, no grant. That may
+  be exactly right for a personal tool. It is a question to answer deliberately
+  rather than by default, and it is not an increment.

@@ -1,6 +1,6 @@
 {
   "name": "copilot-pr-review",
-  "description": "Copilot CLI PR review runtime feasibility prototype. No reviews yet.",
+  "description": "Reviews a GitHub pull request with parallel Copilot specialists, validates the findings against the reviewed revision, and publishes the ones you select as inline COMMENT review comments.",
   "version": "0.0.1",
   "extensions": ["extensions"]
 }

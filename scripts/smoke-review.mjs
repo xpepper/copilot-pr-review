@@ -626,7 +626,12 @@ for (const failure of [undefined, "reviewer", "reads", "usage", "missing-usage",
       assert.match(input.untrustedDiff, /-export const value = 1/);
       assert.match(input.untrustedContext, /1\| export const value = 2/);
       assert(s.prompt.includes(`reviewed checkout at ${checkout}`), "Reviewers are told which verified checkout they read");
-      assert(s.prompt.includes(`verified to be at ${"b".repeat(40)}`));
+      // The preflight verifies HEAD before the run. An approved safeguard may
+      // then write into the tree, so the prompt claims the revision HEAD was
+      // verified at and never that the tree still equals it.
+      assert(s.prompt.includes(`whose HEAD was verified to be ${"b".repeat(40)} before this review started`));
+      assert(!s.prompt.includes("verified to be at"),
+        "Nothing tells a reviewer the working tree is still the reviewed revision");
       assert.deepEqual(report.reviewers[index].binding, report.binding);
       assert.equal(report.reviewers[index].status, "completed");
     }
@@ -1361,8 +1366,8 @@ const instructionRoot = { "AGENTS.md": "Run node scripts/smoke-findings.mjs.",
   assert.deepEqual(report.approval.approved, declared);
 }
 for (const [scenario, approve, status] of [
-  ["declining", () => ({ action: "decline" }), "none"],
-  ["approving nothing", () => ({ action: "accept", content: { commands: [] } }), "none"],
+  ["declining", () => ({ action: "decline" }), "declined"],
+  ["approving nothing", () => ({ action: "accept", content: { commands: [] } }), "empty"],
   ["an answer this run cannot account for", () => ({ action: "accept", content: { commands: ["stale:0"] } }), "failed"],
 ]) {
   // None of these approves anything, and none of them stops the review: the
@@ -1441,7 +1446,7 @@ for (const [scenario, files, failure] of [
       structuredClone(assignments),
       { controller: h.controller, gh: fakeGh(), git: checkoutGit, effectiveConfig: { autoPostReviews: true } }));
   assert.equal(h.requests.filter(isApproval).length, 1, "An authorized run is still asked to approve");
-  assert.equal(report.approval.status, "none");
+  assert.equal(report.approval.status, "declined");
   assert.deepEqual(report.approval.approved, []);
 }
 console.log("PASS --verify asks which discovered commands may run, and approves nothing it cannot account for");
@@ -1632,6 +1637,9 @@ for (const mode of [quickMode, balancedMode]) {
   assert.match(instructions, /Never audit the repository at large or report pre-existing issues/);
   assert.match(instructions, /Every citation must come from the supplied binding paths and context windows/);
   assert.match(instructions, /cannot modify anything, run commands or safeguards/);
+  assert.match(instructions, /whose HEAD was verified to be the reviewed head revision before this review started/);
+  assert.doesNotMatch(instructions, /verified to be exactly the reviewed head revision/,
+    "An approved safeguard may write into the tree after that check");
   assert.match(instructions, /Anchor the location on the changed code you are reporting/);
   assert.match(instructions, /Breaks cites the code this change breaks/);
   assert.match(instructions, mode === quickMode
@@ -1650,6 +1658,7 @@ for (const shared of [
   /Never audit the repository at large or report pre-existing issues/,
   /Every citation must come from the supplied binding paths and context windows/,
   /cannot modify anything, run commands or safeguards/,
+  /whose HEAD was verified to be the reviewed head revision before this review started/,
   /Anchor the location on the changed code you are reporting/,
   /Breaks cites the code this change breaks/,
 ]) assert.match(deepInstructions, shared, "Deep keeps the evidence boundary of every other mode");

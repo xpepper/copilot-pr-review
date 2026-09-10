@@ -452,7 +452,7 @@ export async function approveSafeguards(parent, discovery, { invocation, binding
       controller.abort(new DOMException("Safeguard approval cancelled; nothing was approved or run.", "AbortError"));
       return result("cancelled");
     }
-    if (answer?.action === "decline") return result("none");
+    if (answer?.action === "decline") return result("declined");
     const content = answer?.content;
     if (answer?.action !== "accept" || !content || Object.keys(content).length !== 1 ||
         !Array.isArray(content.commands) || content.commands.some((value) => !choices.has(value)) ||
@@ -463,7 +463,12 @@ export async function approveSafeguards(parent, discovery, { invocation, binding
     // Canonical order is the order the commands were discovered in, never the
     // order they happened to be picked in.
     const approved = [...choices].filter(([value]) => picked.has(value)).map(([, entry]) => entry);
-    return result(approved.length ? "approved" : "none", approved);
+    // An accepted answer that named nothing is reported apart from a decline.
+    // Both approve nothing and that is deliberate, but they are not the same
+    // event: this is the shape an answer takes when someone meant to pick a
+    // command and the pick never arrived, and folding it into a decline told
+    // them their own answer had been a refusal. It changes no gate.
+    return result(approved.length ? "approved" : "empty", approved);
   } catch (error) {
     // An answer code cannot account for approves nothing: failing open is the
     // one mistake this gate exists to prevent. A cancellation is reported as
@@ -479,7 +484,9 @@ const onlyYou = "Nothing else approves a command: there is no flag, no configura
 export function describeApproval({ status, approved, offered, refused = 0, error }) {
   const headline = {
     approved: `V1c safeguard approval: ${approved.length} of ${offered} offered command(s) approved.`,
-    none: `V1c safeguard approval: none of the ${offered} offered command(s) were approved, so nothing runs.`,
+    declined: `V1c safeguard approval was declined, so nothing runs; ${offered} command(s) were offered.`,
+    empty: `V1c safeguard approval: the answer named none of the ${offered} offered command(s), so nothing ` +
+      "runs. If you meant to approve one, it did not reach this run; rerun the review to be asked again.",
     unavailable: `V1c safeguard approval could not be requested, so nothing runs: ${error}`,
     cancelled: "V1c safeguard approval was cancelled, so nothing was approved and nothing runs.",
     failed: `V1c safeguard approval did not complete, so nothing runs: ${error}`,
