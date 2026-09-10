@@ -163,15 +163,28 @@ safeguard-discovery candidate set, where it would be noise, and a `NOTICE` file
 conventionally signals a licence obligation being discharged, which would
 overstate what is happening here.
 
-## The open question this increment does not answer
+## The open question `L1` left, and the answer `D1` recorded
 
 **Whether this project should carry a licence of its own is the user's decision,
-and `L1` deliberately leaves it open.** The repository is public and currently
-has no `LICENSE` file, which puts it in the same position it just finished
-documenting upstream being in: default copyright, no grant, so nobody may reuse
-it. That may be exactly what is wanted for a personal tool. If sharing is ever
-intended, it is a five-minute decision worth taking deliberately rather than by
-default.
+and `L1` deliberately left it open.** The repository was public and had no
+`LICENSE` file, which put it in the same position it had just finished
+documenting upstream being in: default copyright, no grant, so nobody could
+reuse it. That may be exactly what is wanted for a personal tool, but it is a
+decision worth taking deliberately rather than by default.
+
+**It was taken during `D1`. This project is MIT licensed**, and the text is in
+[`LICENSE`](../LICENSE) at the root, carrying `Copyright (c) 2026 Pietro Di
+Bello`. The text is the canonical MIT template, so nothing was copied from
+upstream to produce it, and this project now does the one thing this document
+records upstream not doing: it publishes both the permission notice and a
+copyright line, so anyone reusing it can discharge the condition from what is
+published here.
+
+**This changes nothing above.** Upstream's declaration and its missing notice
+are facts about upstream, unaffected by what this project licenses itself under,
+and matching licences do not create permission to copy. The rule in
+["What may and may not be reused"](#what-may-and-may-not-be-reused) stands
+exactly as written: behaviour and interfaces yes, source no.
 
 ## Reproducing this
 
