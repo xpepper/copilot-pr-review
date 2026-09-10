@@ -56,8 +56,9 @@ posting them.
 | C5 | Completed | A completed reviewer whose output the evidence boundary discards becomes eligible for its tier's one fallback attempt, as an empty response already is. Demonstrated by the controlled suites and the installed balanced review of pull request #14, which cost 110.736851 credits across five completed reviewers with no denial. No tier had a fallback configured there, so the demotion path itself rested on scripted output until pull request #18, where the adjudicator's unparseable output produced the eligible failure live and had no fallback to take. | C3, Q4; [Fallbacks/execution](SCOPE.md#models-configuration-and-execution) |
 | V1 | Completed | `--verify` enforces matching branch/SHA/cleanliness before reviewers and presents discovered existing commands for approval. `V1a` added the preflight, `V1b` discovery and presentation from the project's own instruction files, `V1c` per-command approval that records the answer, executes nothing and outlives no run. Demonstrated by the thirteen controlled suites and pull request #18's balanced `--verify` review, which cost 166.859549 credits, found two real defects and produced the first live discovery evidence. **That pass found no command in this repository**, so the interactive approval path is demonstrated only by the controlled suites. Execution is `V2`. | Q1; [Safeguards](SCOPE.md#optional-project-safeguards) |
 | V2a | Completed | Execute only approved existing safeguards with installed dependencies, in the current checkout, and show evidence and artifacts without autofix or checkout manipulation. Carries the exclusions and the citation check that `V1c` deferred to `V2`. Demonstrated by the thirteen controlled suites and pull request #19's interactive balanced `--verify` review, which cost 252.771985 credits, reached the host's real approval UI for the first time and saw the citation gate refuse a constructed command live. **That run approved nothing, so execution itself is still demonstrated only by the controlled suites.** It found one validated defect and two more that its own evidence gate discarded; two of the three are fixed here. | V1; [Safeguards](SCOPE.md#optional-project-safeguards) |
-| V2b | Pending | Decide whether safeguard output reaches a reviewer, and what the retained record says about what ran. Both were deliberately left unanswered by `V2a`, which builds no plumbing for either. | V2a; [Safeguards](SCOPE.md#optional-project-safeguards) |
-| D1 | Pending | Document configuration, modes, incomplete coverage, cancellation, publication, cache, and safeguards with reproducible end-to-end examples. | Remaining v1 items; [Release boundary](SCOPE.md#priority-and-release-boundary) |
+| V2b | Completed | Settled without code: safeguard output reaches no reviewer, the retained record says nothing about what ran, and the citation gate keeps accepting a prefix as a documented limitation. All three were answered "no change", so `V2` closes with `V2a`'s behaviour and the thirteen suites unchanged. The prompt's "verified to be at" wording is a recorded wording defect that bound citations already contain; it goes to `D1`. | V2a; [Safeguards](SCOPE.md#optional-project-safeguards) |
+| A1 | Pending | Archive the completed roadmap entries into a dated file, leaving a short live `ROADMAP.md` that safeguard discovery can actually read. Mechanical and documentation-only; the increments table, the exact-next-increment section and the most recent entries stay here. | V2b; housekeeping, no scope clause |
+| D1 | Pending | Document configuration, modes, incomplete coverage, cancellation, publication, cache, and safeguards with reproducible end-to-end examples. Also fixes the reviewer prompt's "verified to be at" wording, which makes it a behaviour change needing one installed-plugin review; run that review with `--verify` and approve the safeguards suite. | A1, L1; [Release boundary](SCOPE.md#priority-and-release-boundary) |
 
 ## Completed increment: F1
 
@@ -7246,67 +7247,167 @@ carries the run's cancellation signal.
 per increment pull request, and it is spent. Both fixes are small, both are
 covered by the suites, and neither is demonstrated by the installed plugin.
 
+## Completed increment: V2b
+
+**`V2b` is settled without code.** Its three open questions were put to the user
+one at a time, as `V1a`, `V1b`, `V1c` and `V2a`'s were, and all three were
+answered "no change". `V2` closes here. No file under `extensions/` or
+`scripts/` was touched by this increment, so the shipped behaviour is exactly
+`V2a`'s and the thirteen controlled suites are unchanged.
+
+The user's reason for closing rather than building is recorded plainly, because
+a later reader will otherwise assume the questions were never asked: the port
+had grown far past the effort its goal justified, every must-have and every
+costly-to-lose item in `SCOPE.md` was already complete, and the remaining
+appetite belongs to `L1` and `D1` rather than to a fourth safeguard slice. That
+is a judgement about scope, not a discovery that the questions were empty. Each
+answer below is also defensible on its own merits, and the merits are what the
+entry records.
+
+### The three decisions
+
+| Question | Settled as | Why |
+|---|---|---|
+| Whether the citation gate may accept a prefix | **No change. It still accepts one.** The behaviour is now documented as a limitation instead of being tightened. | Tightening it means demanding the match reach the end of its line, and that refuses the ordinary way a project declares a command, in prose: "run `npm test` before committing". The residual risk is real but narrow and bounded by the rules on either side of it, which the next table sets out. `V2a`'s answer to the same class of question applies here too: a project whose declaration is refused writes a plain line, and this tool does not loosen a rule to accommodate prose it cannot parse. |
+| Whether safeguard output reaches a reviewer | **No. It never does, and this is now a decision rather than a deferral.** A failed safeguard therefore stays outside review coverage permanently, as `V2a` left it. | Safeguard output is pull-request controlled text produced by pull-request controlled code. Handing it to a reviewer opens a prompt-injection surface that has nothing to do with running a process, and it would let a failing suite make the review's own findings look less trustworthy when the two are unrelated. `SCOPE.md` asks the flag to ground claims in evidence; it grounds them for the person who approved the command, which is who decides what to do about a red suite. |
+| What the retained record says about what ran | **Nothing. The record is unchanged and gains no schema version.** `discovery`, `approval` and `safeguards` stay out of `outcomeKeys`, as they have since `V1b`. | The record exists to let a later publish act on a settled result without rerunning reviewers. Nothing about what a safeguard did changes what may be published, so an execution record would be inert data on a durable artifact, and inert data on a durable artifact is what a later increment misreads. The argument is weaker here than for a stored approval, which is why it was asked rather than inherited, but it is the same argument and it still holds. |
+
+### What #19's one validated finding turns out to mean
+
+Contracts, P1 on #19 observed that the revision and cleanliness gate runs before
+safeguards, so a reviewer can read a file an approved safeguard changed while
+the reviewer prompt still says its working directory is "verified to be at" the
+reviewed head. Re-asserting cleanliness afterwards was refused in `V2a` and stays
+refused: `SCOPE.md` says these commands may create artifacts and forbids
+cleaning the checkout, so a re-assertion would refuse a review because the
+person's own approved tests wrote a coverage file.
+
+**What was not established at the time is that the inaccuracy cannot produce a
+finding.** `boundCitation` in `findings.mjs` resolves every citation against
+`context.files`, requires the source's `ref` and `blobSha` to equal the bound
+head or base fetched from GitHub, and then replaces the model's quote with the
+lines of that bound content. A file a safeguard wrote or changed in the working
+tree has no bound source, so a citation naming it is refused as outside bound
+provenance, and a candidate without an accepted citation never becomes a
+finding.
+
+So the prompt sentence is inaccurate about the working tree and accurate about
+`HEAD`, and the inaccuracy is contained by a check that was already there for
+another reason. It is recorded as a wording defect, not a path. Fixing the
+wording is a behaviour change under `AGENTS.md` and would cost this increment a
+review it does not otherwise need, so it is left for `D1`, which revisits the
+user-facing text anyway.
+
+### The prefix limitation, stated exactly
+
+`citationRefusal` in `safeguards.mjs` searches the cited file for the command
+text, requires the character before the match to be outside `safeCharacter`, and
+accepts the match when the character after it is outside `safeCharacter` too, or
+is a full stop, comma or colon that ends a word. Whitespace is outside
+`safeCharacter`. A prefix ending at a space therefore passes.
+
+| Consequence | Bounded by |
+|---|---|
+| `npm test` is accepted as cited from a file that declares `npm test --fix`. | The offer shows the person the exact command that would run, not the line it was cited from. Approval is per command. |
+| A command whose safety lives in a trailing argument can be offered without that argument. | `commandRefusal` runs first and refuses by program, word and flag, so the dangerous shapes the denylist names are refused whatever their arguments. The `--fix` case above is refused outright as an auto-fix. |
+| A longer declared command can be truncated at any whitespace boundary. | No shell, so a truncated line is still one program with an argument list, and it is still asserted against `commandRefusal` again in the moment before the spawn. |
+
+What a prefix cannot do is invent a command out of nothing, which is the check's
+actual purpose and the thing #19 demonstrated live: the pass put `node` in front
+of a filename that `HANDOFF.md` mentions only in prose, and the gate refused it.
+Token bounding still stops `npm run test` being carved out of `npm run
+test:unit`, because `:` is inside `safeCharacter`.
+
+### What this increment changed
+
+Documentation only. `README.md`'s safeguard section now states the settled
+answers where it previously said the questions were open, and states the prefix
+limitation where it previously implied the check was exact. The increments table
+above records `V2b` as complete.
+
+### Validation
+
+All thirteen controlled suites pass and `git diff --check` is clean. They are
+unchanged, because no behaviour is. `scripts/smoke-reviewer-tools.mjs` was not
+run and did not need to be: `read-only.mjs` is untouched.
+
+**No installed-plugin review was run for this increment by default.** `AGENTS.md`
+makes the review the user's call for a documentation-only pull request, because
+it costs real credits. Whether one ran is recorded in the pull-request entry
+below.
+
+**The live evidence gaps `V2a` recorded stay open.** Execution has never run
+under the installed plugin: an `accept` carrying a non-empty selection, a real
+spawn, a real capture, a real artifact line and a real cancellation are
+demonstrated only by the controlled suites, and no exclusion rule has ever
+refused a real discovered command. Settling `V2b` without code means there is no
+review here to fold them into. They close in `D1`, whose own review is already
+required and can run with `--verify`; the next-increment section below says
+exactly how. Until then, do not mistake the suites for delivery evidence.
+
 ## Exact next increment
 
-**`V2a` is complete and merged.** Its eight choices are settled and recorded in
-the table above; do not reopen them. In particular, do not weaken the shell gate
-to accept a command a project wrote as a chain, and do not add a timeout of any
-kind to bound a running safeguard.
+**`V2` is closed. `V2a` shipped execution and `V2b` settled its three remaining
+questions without code.** Their answers are recorded in the two completed
+entries above and are not to be reopened: no reviewer receives safeguard output,
+the retained record says nothing about what ran, the citation gate still accepts
+a prefix, the shell gate does not accept a command a project wrote as a chain,
+and no timeout of any kind bounds a running safeguard.
 
-**`V1a`, `V1b`, `V1c`, `Q7`, `C5` and `V2a` are complete and merged, from pull
-requests #19, #18, #17, #16, #15 and #14.** Their authorizations are spent.
-Nothing about any of them should be redone or widened.
+**`V1a`, `V1b`, `V1c`, `Q7`, `C5`, `V2a` and `V2b` are complete and merged, from
+pull requests #19, #18, #17, #16, #15 and #14 and this increment's own.** Their
+authorizations are spent. Nothing about any of them should be redone or widened.
 
-### The next increment is `V2b`: what execution is allowed to reach
+### Every must-have is complete, and the port is feature-complete for v1
 
-**`V2b` needs the user's go-ahead before implementation, and like every `V1` and
-`V2a` slice it must not begin with code.** Present its choices one at a time,
-each with a recommendation, the reason, and every alternative. Lead with which
-option is cheapest and which is cheapest while still pointing the right way. Be
-willing to change a recommendation when the cheap option is defensible on the
-merits, and say why rather than flipping silently: that is how `V1c`'s exclusions
-and `V2a`'s slicing were settled. The user's standing principle is that the
-smaller the increment the better, provided it stays coherent and meaningful, so
-expect `V2b` to be split too rather than taken whole.
+`SCOPE.md`'s must-have column and its costly-to-lose column are both entirely
+delivered. What is left of v1 is `A1`, `L1` and `D1`, and none of the three adds
+a capability. When all three have landed, v1 is done, and the open items further
+below are limitations to state in the release notes rather than work to
+schedule.
 
-`V2b` now has three questions. The first was added by #19's review and is the
-cheapest of the three.
+**A later session should not invent an increment.** The user's direction, given
+after #19 merged, is that the port had grown far past the effort its goal
+justified, and that the remaining appetite belongs to finishing rather than to
+building. Treat a new feature idea as out of scope unless the user asks for it.
 
-- **Whether the citation gate may accept a prefix.** It currently does: `ends()`
-  treats the whitespace after a match as a valid terminator, so `npm test` passes
-  as cited from a file that declares `npm test --fix`, and a command whose safety
-  lives in a trailing argument can be offered without it. Tightening it has a
-  real cost, because a file that declares a command mid-sentence, "run `npm test`
-  before committing", is the ordinary way projects write one, and a rule that
-  demands the match reach the end of its line refuses that too. Settle the rule
-  before writing it: what counts as a command of its own, and what a project must
-  do when its declaration is refused. `V2a`'s answer to the same class of
-  question was that the project writes two lines rather than this tool opening a
-  shell, and that answer is available here as well.
-- **Whether safeguard output reaches a reviewer.** `SCOPE.md` says the flag
-  exists to ground claims in evidence, and `V1c`'s placement plus `V2a`'s
-  execution point were both chosen to keep that possible. It is a real decision
-  and not a foregone one: safeguard output is pull-request controlled text, so
-  handing it to a reviewer is an injection surface, and it would also change
-  whether a failed safeguard is still outside review coverage. **#19's one
-  validated finding belongs to this question.** The reviewer prompt tells every
-  specialist its working directory is "verified to be at" the reviewed head,
-  which stays true of `HEAD` after a safeguard runs but need not stay true of the
-  working tree. Re-asserting cleanliness is refused, for the reason recorded
-  above; telling the reviewer what changed is one of the options here, and it is
-  not free, because a path list is still safeguard-derived text.
-- **What the retained record says about what ran.** This is the point at which a
-  record of execution is evidence rather than authority, so it may finally
-  deserve a schema version of its own. `V1b` and `V1c` both kept out of the
-  record on the argument that a stored approval is the artifact a later increment
-  could mistake for standing permission. A record of what already ran does not
-  carry that risk in the same way, and the argument should be made explicitly
-  rather than inherited. If the record is opened, note that `approveSafeguards`
-  reports `none` for both a decline and an accept that selected nothing, which
-  #19 hit live; a record that cannot tell them apart should say so rather than
-  imply it can.
+### The next increment is `A1`, the roadmap archive, then `L1`, then `D1`
 
-### The live evidence `V2a` did not produce
+Three increments remain and this is their order. Take one, land it on its own
+branch and pull request, and stop.
+
+- **`A1`: archive the completed roadmap entries.** This file passed 445KB and is
+  itself now a functional problem, because safeguard discovery skips it for
+  size, so the tool cannot read its own project. Move the completed entries into
+  a dated archive file and leave a short live roadmap behind. **It must not move
+  the increments table, this `Exact next increment` section, or the most recent
+  completed entries out of this file**, and it must leave a pointer to the
+  archive where the moved entries were. Mechanical and documentation-only, so no
+  review is required; ask before spending one. It goes first because `D1` has to
+  read this file and rewrite `README.md`, and both are easier once this is done.
+- **`L1`: resolve upstream licensing and attribution.** `SCOPE.md` records that
+  `pi-pr-review` declares MIT but that no standalone licence text was found at
+  the inspected revision. No upstream source has been reused and none should be
+  until this is settled. The outcome is a recorded answer and, if attribution is
+  owed, the text that discharges it. It needs no review and spends no credits.
+- **`D1`: the user documentation.** `README.md` is already long and already
+  large enough that safeguard discovery skips it for size, which is the tool
+  failing to read its own project. `D1` should shorten it as much as it extends
+  it. It also carries one recorded wording defect: the reviewer prompt in
+  `review.mjs` tells every specialist its working directory is "verified to be
+  at" the reviewed head, which stays true of `HEAD` after a safeguard runs but
+  not of the working tree. Bound citations already contain the consequence, as
+  the `V2b` entry sets out; the sentence is still wrong and `D1` is where it is
+  cheapest to fix, because that pull request touches user-facing text anyway.
+  **That fix is a change under `extensions/`, so `D1`'s pull request needs an
+  installed-plugin review whatever else it contains. Run that review with
+  `--verify` and approve `node scripts/smoke-safeguards.mjs` when the approval
+  UI asks.** It is the last chance to give safeguard execution live evidence
+  without spending a review on nothing else, and the reason is set out under
+  "The live evidence `V2` did not produce" below.
+
+
+### The live evidence `V2` did not produce, now accepted for v1
 
 **Execution has never run under the installed plugin.** #19's review reached the
 host's approval UI and approved nothing, so `accept` with a non-empty selection,
@@ -7315,15 +7416,25 @@ all still demonstrated only by the controlled suites. **The exclusion table
 recorded no live refusal either**, because the discovery pass reported only three
 candidates and the one refusal came from the citation check.
 
-Closing either gap costs a review, so it is the user's call and not an increment
-to schedule. The cheapest way to close both is to let `V2b`'s own authorized
-review approve `node scripts/smoke-safeguards.mjs`, which finishes in well under
-a second and leaves the checkout clean. Say so when `V2b`'s review is proposed;
-do not spend one on it alone.
+Closing either gap costs a review, and `V2b` was settled without code and so
+without a review to fold them into. **`D1` is where they should close, at no
+extra cost.** `D1` fixes the reviewer prompt's "verified to be at" wording, and
+that is a change under `extensions/`, so `AGENTS.md` already requires `D1`'s
+pull request to be reviewed by the installed plugin. Run that one review with
+`--verify` and approve `node scripts/smoke-safeguards.mjs` when the approval UI
+asks: the suite finishes in well under a second and leaves the checkout clean,
+so the artifact line should say the checkout is unchanged. That single run gives
+execution its first live evidence, an `accept` carrying a non-empty selection, a
+real spawn, a real capture and a real artifact line, without spending a review
+on it. A live exclusion refusal still cannot be arranged, because what a
+discovery pass reports is not ours to arrange.
+
+Until `D1` runs, both remain demonstrated only by the controlled suites, and no
+entry above may be read as though the installed plugin had executed anything.
 
 ### Recorded, not scheduled
 
-These stay open and none is scheduled. Do not start one instead of `V2b`
+These stay open and none is scheduled. Do not start one instead of `L1` or `D1`
 without the user saying so.
 
 - **A review against a substantial code diff**, the oldest and largest open
@@ -7343,13 +7454,13 @@ without the user saying so.
   discovered commands were offered, the host's elicitation UI accepted the
   schema and returned a documented action, and the answer approved nothing. An
   accepted subset, a cancel, and every part of execution downstream of them are
-  still demonstrated only against the controlled harness. Closing the rest costs
-  a review, so fold it into `V2b`'s own authorized review rather than spending
-  one on it; see "The live evidence `V2a` did not produce" above.
+  still demonstrated only against the controlled harness. `D1`'s own required
+  review closes this at no extra cost; see "The live evidence `V2` did not
+  produce" above.
 - **A live refusal from the exclusion table.** #19's discovery pass reported only
   three candidates and refused one of them by citation, so no exclusion rule has
-  ever refused a real discovered command. The same `V2b` review can close this
-  only by chance, because what a pass reports is not ours to arrange.
+  ever refused a real discovered command. No later review can close this
+  deliberately, because what a discovery pass reports is not ours to arrange.
 - `L1` remains pending; copy no upstream source.
 
 `F6`'s marker contract has live evidence from five of six reviewers on #7, both

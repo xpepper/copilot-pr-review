@@ -468,6 +468,18 @@ Code also checks that a command really appears in the file it cites, as a comman
 of its own, so an invented command cannot borrow a real file's name. `npm run
 test` is not carved out of `npm run test:unit`.
 
+**That check accepts a prefix, deliberately.** A match may end at whitespace, so
+`npm test` passes as cited from a file that declares `npm test --fix`, and a
+command whose safety lives in a trailing argument can be offered without it. The
+alternative is to demand that the match reach the end of its line, and that
+refuses the ordinary way a project declares a command, in prose: "run `npm test`
+before committing". Three things bound what a prefix can do. The offer shows you
+the exact command that would run, not the line it came from. The rules above run
+first, so the shapes they name are refused whatever arguments follow, and the
+`--fix` case is refused outright as an auto-fix. And there is no shell, so a
+truncated line is still one program with an argument list, re-checked against
+those rules in the moment before it starts.
+
 Commands run one at a time, in the order they were discovered. Output is captured
 with a bound per stream and the end of it is shown, which is where a failing
 suite says what failed; reaching the bound truncates the capture and says so, and
@@ -486,11 +498,25 @@ Cancelling the review kills the running command and every process it started,
 because a test runner's workers must not outlive the review that started them.
 There is no timer anywhere in this: only you end a running safeguard.
 
-A safeguard grounds no finding in this release. No reviewer receives its output,
-so a failing suite is reported loudly and still leaves the review's own coverage
-exactly as it was. Whether that output should reach a reviewer at all, and what
-the retained result should say about what ran, are the next slice's questions and
-are deliberately unanswered here.
+**A safeguard grounds no finding, and this is settled rather than pending.** No
+reviewer ever receives safeguard output, so a failing suite is reported loudly
+to you and still leaves the review's own coverage exactly as it was. The output
+is text produced by the code under review, and handing it to a reviewer would
+open a prompt-injection surface that has nothing to do with running a process.
+It grounds claims for the person who approved the command, which is who decides
+what a red suite means.
+
+The retained result says nothing about what ran, for the same reason discovery
+and approval are absent from it: what a safeguard did changes nothing about what
+may be published later, so recording it would put inert data on a durable
+artifact.
+
+One consequence is worth stating. An approved safeguard may leave artifacts in
+your checkout, and a reviewer reads that checkout, so a reviewer can read a file
+a safeguard wrote. It cannot report one. Every citation is resolved against the
+head and base blobs fetched from GitHub for the reviewed commit, and a file that
+is not part of that bound source is refused as outside provenance, so a claim
+about a safeguard's leftovers never becomes a finding.
 
 ### Balanced review mode (M1)
 
