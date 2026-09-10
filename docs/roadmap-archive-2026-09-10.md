@@ -2,7 +2,8 @@
 
 These are the completed increment entries moved out of
 [../ROADMAP.md](../ROADMAP.md) on 2026-09-10, by increment `A1` for everything
-through `V1c` and by increment `L1` for `V2a` and `V2b`. They are the project's
+through `V1c`, by increment `L1` for `V2a` and `V2b`, and by increment `D1` for
+`A1`'s own entry, which is last in this file. They are the project's
 evidence of record and are reproduced verbatim: nothing here was rewritten,
 condensed or corrected in either move, so a claim below still reads exactly as
 the session that demonstrated it wrote it.
@@ -22,7 +23,9 @@ Pull requests #18 and #19 both recorded that skip as live evidence. `L1` moved
 `V2a` and `V2b` for the same cap for a different reason: the live file was back
 under the cap but had only 4272 bytes of headroom, and the smaller of those two
 entries is 7547 bytes, so the next completed entry could not have fitted beside
-them.
+them. `D1` moved `A1` under the rule those two moves established, which is to
+keep the two most recent completed entries live and archive the rest; after
+`D1` those two are `L1` and `D1`.
 
 **This file is deliberately not at the checkout root.**
 `collectInstructionFiles` reads the root's markdown and does not recurse into
@@ -7321,3 +7324,130 @@ refused a real discovered command. Settling `V2b` without code means there is no
 review here to fold them into. They close in `D1`, whose own review is already
 required and can run with `--verify`; the next-increment section below says
 exactly how. Until then, do not mistake the suites for delivery evidence.
+
+---
+
+## Completed increment: A1
+
+**`A1` makes this file readable by the tool it documents.** It is the only
+increment whose subject is the repository's own paperwork, and it exists because
+that paperwork had become a functional defect rather than an untidiness.
+
+### The defect it fixes, recorded live twice
+
+`instructionFileMaxBytes` in `extensions/pr-review/safeguards.mjs` caps one
+instruction file at 65536 bytes, and `collectInstructionFiles` skips an oversized
+file by name rather than truncating it, because half an instruction file is a
+worse source than none. `ROADMAP.md` had reached 464771 bytes over 7489 lines, so
+this project's own safeguard discovery skipped its roadmap for size. Pull request
+#18's discovery pass recorded the skip and #19's recorded it again with the
+figure, `ROADMAP.md` at 444530 bytes. The tool could not read its own project,
+and the file saying so was the file it could not read.
+
+### What moved, and what deliberately did not
+
+Thirty-nine sections moved verbatim into `docs/roadmap-archive-2026-09-10.md`:
+thirty-one completed-increment entries covering the twenty-nine increments from
+`F1` to `V1c`, and eight sections of working record kept between them. The
+pointer left in their place names all of it. Nothing was rewritten, condensed or
+corrected, and the move was checked rather than trusted: the extracted range and
+the archive's body hash to the same SHA-256.
+
+Three things stayed, as the increment required: the increments table, which is
+the index; the two most recent completed entries, `V2a` and `V2b`, so the closing
+state of `V2` reads without following a pointer; and the "Exact next increment"
+section, which is what a fresh session acts on. `L1` has since archived those two
+`V2` entries, for the headroom reason this entry predicted below.
+
+### The archive is not at the checkout root, and that is the point
+
+`collectInstructionFiles` reads the root's markdown and does not recurse into
+subdirectories, so an archive under `docs/` leaves the discovery candidate set
+altogether. A dated archive beside `ROADMAP.md` would have satisfied the letter
+of the increment while replacing one oversized skipped candidate with another
+413800-byte one, and discovery would still have named a file of this project it
+could not read. The subdirectory turns the skip into nothing at all.
+
+### Measured outcome
+
+Every figure in this table was measured at `A1`'s checkpoint and is kept as
+`A1`'s evidence. `L1` has since archived `V2a` and `V2b` and changed two of
+them; the `L1` entry below carries the current measurement.
+
+| File | Bytes at `A1` | Against the 65536-byte cap |
+| --- | --- | --- |
+| `ROADMAP.md` before | 464771 | skipped, 7.1x over |
+| `ROADMAP.md` after | 61264 | read, 4272 bytes spare |
+| `docs/roadmap-archive-2026-09-10.md` | 413800 | not a candidate; discovery does not recurse |
+
+Every root markdown file was under the cap at this checkpoint except
+`README.md` at 103636 bytes, which is `D1`'s to shorten. The root's readable files spend well under
+half the 262144-byte discovery budget, so nothing is near being skipped for the
+budget rather than for its own size.
+
+### Validation
+
+Documentation-only: nothing under `extensions/` or `scripts/` changed, so the
+shipped behaviour is exactly `V2a`'s. All thirteen controlled suites were run
+anyway and all thirteen pass, which is the evidence that they do not depend on
+this file. `scripts/smoke-safeguards.mjs` asserts the oversize skip against a
+synthetic project whose `ROADMAP.md` is `"x".repeat(instructionFileMaxBytes + 1)`,
+so it tests the rule and never the real file; shrinking the real file could not
+weaken it. `git diff --check` is clean and the diff carries no control byte.
+
+The increment's own outcome was demonstrated rather than inferred, by running
+this project's real `collectInstructionFiles` against this checkout. It now
+reads five root files in `conventionalInstructionFiles` order, `AGENTS.md`,
+`CLAUDE.md`, `HANDOFF.md`, `ROADMAP.md` at 61264 bytes as measured at this
+increment's checkpoint, and `SCOPE.md`, and skips exactly one, `README.md`, for
+exceeding the cap. **Before this increment
+that skipped list held `ROADMAP.md` too.**
+`docs/roadmap-archive-2026-09-10.md` appears in neither list, because
+`collectInstructionFiles` does not recurse into subdirectories.
+
+```sh
+for s in findings review selection retention preview publication publish-later \
+  checkout config context fixture target safeguards; do node scripts/smoke-$s.mjs; done
+wc -c ROADMAP.md docs/roadmap-archive-2026-09-10.md
+node --input-type=module -e '
+import { collectInstructionFiles } from "./extensions/pr-review/safeguards.mjs";
+const { files, skipped } = collectInstructionFiles(process.cwd());
+console.log("read:", files.map((f) => `${f.name} ${f.bytes}`).join(", "));
+console.log("skipped:", skipped.map((s) => `${s.name} (${s.reason})`).join(", ") || "none");
+'
+```
+
+### Pull request #22 and its review
+
+Pull request #22 carries this increment. **It was not reviewed by the installed
+plugin.** `AGENTS.md` makes the review of a documentation-only pull request the
+user's call rather than a requirement, because a review spends real credits; the
+user was asked and authorized none. That is a recorded decision, not an omission
+to correct. Nothing under `extensions/` or `scripts/` changed, so no behaviour of
+the shipped tool went undemonstrated by not reviewing it.
+
+### Remaining limitations
+
+- **The headroom does not survive the next entry, and `L1` must archive before
+  it writes one.** This file has 4272 bytes spare against the cap. The last
+  six completed entries measured 7546, 12085, 14651, 15365, 15406 and 20969
+  bytes, so even the smallest of them overruns what is left: this is not a risk
+  to watch but an arithmetic certainty. **The increment that adds the next entry
+  archives `V2a` and `V2b` first**, into the existing dated archive or a new one,
+  leaving the same kind of pointer behind; that frees about 28KB. Keeping both
+  `V2` halves here was this increment's own instruction, so `A1` did not pre-empt
+  it, and `A1`'s entry is deliberately the smallest of the recent ones at about
+  6KB. No size check enforces any of this. Run `wc -c ROADMAP.md` before opening
+  a pull request, and treat 65536 as the number that matters. **`L1` did this**,
+  archiving both `V2` halves before writing its own entry; the arithmetic held
+  and the freed 28517 bytes are recorded below.
+- **`README.md` is still skipped for size**, at 103636 bytes when this entry was
+  written, so discovery still names one file of this project it cannot read.
+  `D1` owns it.
+- **`README.md`'s discovery example is now stale in one detail.** It uses
+  `Skipped: ROADMAP.md (exceeds 65536 bytes)` to illustrate a skipped file, which
+  no longer describes this checkout. The example is hypothetical throughout, so
+  it states nothing false about a real run, but `D1` should replace that line.
+- **The archive has no index.** Finding an older increment's evidence means
+  searching it. None was added, because `D1` may want one and this increment was
+  to stay mechanical.
