@@ -12,41 +12,84 @@ do not need unless you want an older increment's evidence. The README that used
 to carry them is in `docs/readme-archive-2026-09-10.md`, which you need only for
 a harness probe invocation the live `README.md` no longer prints.
 
-## v1 is finished, and there is no next increment
+## Take `O1`, and nothing else
 
-**`D1` was the last increment, and it has landed on pull request #24.** Every
-row in the roadmap's increments table now reads Completed. `SCOPE.md`'s
-must-have column, its costly-to-lose column and its additional agreed v1
-capability are all delivered.
+**v1 is delivered. `D1` was its last increment and it merged on pull request
+#24.** The user then scheduled exactly one more increment, **`O1`: quieter review
+output**, which is yours. The roadmap's "The next increment is `O1`" section is
+the authoritative version of what follows.
 
-**So there is nothing scheduled, and you should not invent something.** The
-user's standing direction, given after #19 merged, is that this port had already
-grown far past the effort its goal justified and that the remaining appetite
-belonged to finishing rather than building. Treat any new feature idea as out of
-scope unless the user asks for it in this session.
+**A review prints a great deal and the user has asked for a way to quieten it.**
+The request has been recorded and deferred since `V2b`. Deliver **one opt-in
+flag** that suppresses the evidence JSON lines (`Q1 target:`, `Q2 context:`, the
+mode's `binding:` line, the `evidence:` lines) and the raw untrusted model
+envelopes. Between them they dwarf the findings, which is what the reader came
+for.
 
-**Note that issue #21 exists**, a feature request about incremental re-reviews
-and unattended non-interactive execution. It is not scheduled and it is not in
-the increments table. Do not start it.
+Four things bound it, and the roadmap says why:
 
-**Confirm git state before anything else.** Check whether #24 is merged and
-start from `main` if it is. The only open pull requests should then be the
-synthetic playground pair, **#1 and #2, which must never be merged or
-republished**. Several merged increment branches still exist on the remote;
-deleting them is tidying, not work, and needs the user to ask.
+- **Verbose stays the default.** This project reads its own increment evidence
+  out of those lines: models and efforts actually used, credit cost, tool calls,
+  denials, coverage diagnostics. **`scripts/dogfood-review.mjs` must keep
+  printing the whole timeline**, so an increment's own review is never the run
+  that hid its own evidence.
+- **Nothing about trustworthiness may be suppressed at any verbosity**: coverage
+  and its diagnostics, incomplete coverage, every refusal and failure, the "not a
+  clean-review claim" statements, the safeguard discovery, approval and execution
+  summaries, and every publication outcome including an uncertain write. A quiet
+  run must still be impossible to mistake for a clean review.
+- **Settle the flag against a configuration key deliberately, and ask first.**
+  `--verify` is deliberately not a configuration key because it authorizes
+  execution; verbosity authorizes nothing, so a personal key is defensible. One
+  flag is the smaller step and satisfies the request. Do not build both unasked.
+- **Acceptance**: a quiet run prints the effective assignments, per-reviewer
+  progress, the findings, the coverage report and the settled outcome, and omits
+  the envelopes and the evidence JSON. **A run without the flag is unchanged.**
+  Both are covered by the thirteen suites, written test-first.
 
-If the user does schedule further work, it lands the same way as every increment
-before it: a branch, a pull request, one review of that pull request with this
-plugin, and the outcome recorded in `ROADMAP.md`. `main` refuses direct pushes
-and grants no bypass. Merging stays the user's call.
+**`O1` is the whole of what is scheduled.** Do not invent a second increment.
+**Issue #21 exists**, a feature request about incremental re-reviews and
+unattended execution: it is not scheduled and you should not start it. Treat any
+other feature idea as out of scope unless the user asks for it in your session.
+
+## `O1`'s review is pre-authorized, and it must approve a safeguard
+
+`O1` changes `extensions/`, so `AGENTS.md` requires one installed-plugin review
+of its pull request. **The user has already authorized that one review, and has
+asked that it be `--verify` with a command approved at the question**, because
+that is the only way left to capture live safeguard-execution evidence. Do not
+spend a second review on anything without asking.
+
+    /pr-review NUMBER --deep --verify --all --no-comment
+
+**You cannot dispatch it yourself.** `scripts/dogfood-review.mjs` registers no
+elicitation handler and answers every permission request with
+`denied-no-approval-rule`, so it can never approve a command. Ask the user to
+type it in an interactive Copilot session and to **approve `node
+scripts/smoke-safeguards.mjs`** when the question appears; that suite finishes in
+well under a second and leaves the checkout clean, so the artifact line should
+say the checkout is unchanged.
+
+Before they run it: the tree must be clean with **no untracked path**, on the
+pull request's head branch, at its head commit, and **`copilot plugin list` must
+show the plugin**, reinstalled from that head. `--verify` refuses otherwise.
+
+**Watch the approval outcome.** If it prints the `empty` message, the selection
+did not reach the run and nothing was approved; say so and ask whether to try
+again rather than recording a decline. That distinction exists because #24 lost
+its approval exactly that way.
+
+What a successful run finally demonstrates, none of which any suite can prove: a
+non-empty `accept`, a real spawn, a real capture, a real artifact line. Record it
+in `ROADMAP.md` with the rest of the review's evidence.
 
 ## What `D1` did, and the one thing it failed to do
 
 `D1` replaced `README.md` with a task-organised user guide, moved the previous
 one verbatim to `docs/readme-archive-2026-09-10.md`, fixed three shipped strings
 that told the user something false, corrected the reviewer prompt's claim about
-the working tree, archived `A1`'s roadmap entry, and recorded the user's decision
-to license this project MIT.
+the working tree, archived the `A1` and `L1` roadmap entries, and recorded the
+user's decision to license this project MIT.
 
 **It did not deliver the live safeguard-execution evidence it was meant to.**
 Read that part of the roadmap before you form any impression of the safeguard
@@ -70,10 +113,9 @@ path from the controlled suites.
   now separate statuses and the `empty` message tells you to rerun. **Execution
   still keys only on `approved`; no gate changed.** If you run a `--verify`
   review and see the `empty` message, your pick did not reach the run.
-- Closing that needs a review authorized for the purpose, because approval sits
-  after discovery inside a running review. **Do not spend it unasked.** The
-  cheapest honest version is one `--deep --verify` review of a small pull
-  request, approving one fast command.
+- **`O1`'s review is where that gets bought**, and the user has authorized it in
+  advance. Approval sits after discovery inside a running review, so there is no
+  cheaper way to reach it. See the section above for how to set that run up.
 
 Both of #24's discarded candidates described real defects and were fixed on the
 branch: a roadmap that contradicted itself about `D1`'s own status, and the
@@ -130,11 +172,12 @@ console.log("skipped:", skipped.map((s) => `${s.name} (${s.reason})`).join(", ")
 **It should read all six root files and skip none**, which is `D1`'s own
 outcome and was confirmed live by #24's discovery pass. If a file starts
 appearing in the skipped list it has crossed 65536 bytes. **The margins are thin
-now**: `README.md` has 9463 bytes spare and `ROADMAP.md` has 4996,
+now**: `README.md` has 9463 bytes spare and `ROADMAP.md` has 16030,
 against a 65536-byte cap. Measure with `wc -c` before extending either, and put
 new material in `docs/`, which discovery does not recurse into, rather than
-growing a root file. If `ROADMAP.md` needs room, archive the `L1` entry the way
-`D1` archived `A1`'s, leaving the same kind of pointer.
+growing a root file. `D1` archived both the `A1` and `L1` entries so `O1` has room to write its
+own; a session after `O1` archives `D1`'s the same way, leaving the same kind of
+pointer.
 
 **Check `copilot plugin list` immediately before dispatching any review.** During
 `D1` an install that had reported success, and that the list then showed, was
