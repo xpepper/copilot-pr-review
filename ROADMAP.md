@@ -64,7 +64,7 @@ posting them.
 | V2a | Completed | Execute only approved existing safeguards with installed dependencies, in the current checkout, and show evidence and artifacts without autofix or checkout manipulation. Carries the exclusions and the citation check that `V1c` deferred to `V2`. Demonstrated by the thirteen controlled suites and pull request #19's interactive balanced `--verify` review, which cost 252.771985 credits, reached the host's real approval UI for the first time and saw the citation gate refuse a constructed command live. **That run approved nothing, so execution itself is still demonstrated only by the controlled suites.** It found one validated defect and two more that its own evidence gate discarded; two of the three are fixed here. | V1; [Safeguards](SCOPE.md#optional-project-safeguards) |
 | V2b | Completed | Settled without code: safeguard output reaches no reviewer, the retained record says nothing about what ran, and the citation gate keeps accepting a prefix as a documented limitation. All three were answered "no change", so `V2` closes with `V2a`'s behaviour and the thirteen suites unchanged. The prompt's "verified to be at" wording is a recorded wording defect that bound citations already contain; it goes to `D1`. | V2a; [Safeguards](SCOPE.md#optional-project-safeguards) |
 | A1 | Completed | Completed entries `F1` through `V1c` moved verbatim into `docs/roadmap-archive-2026-09-10.md`, leaving a live `ROADMAP.md` that this project's own safeguard discovery reads instead of skipping for size. The increments table, the two most recent completed entries and the exact-next-increment section stayed. Pull request #22; documentation-only, so no installed-plugin review, and the user was asked rather than charged. | V2b; housekeeping, no scope clause |
-| D1 | Pending | User documentation: `README.md` reorganised by task with reproducible examples for configuration, modes, incomplete coverage, cancellation, publication, the cache and safeguards, shortened from 103903 to 55195 bytes so this project's own discovery now reads every root file and skips none. Also fixes the reviewer prompt's "verified to be at" wording and two shipped `help`/`status` strings that denied safeguards are ever executed, which makes it a behaviour change needing one installed-plugin review; that review is `--verify` with the safeguards suite approved. Awaiting that review at this checkpoint. | A1, L1; [Release boundary](SCOPE.md#priority-and-release-boundary) |
+| D1 | Pending | User documentation: `README.md` reorganised by task with reproducible examples for configuration, modes, incomplete coverage, cancellation, publication, the cache and safeguards, shortened from 103903 to 55195 bytes so this project's own discovery now reads every root file and skips none. Also fixes the reviewer prompt's "verified to be at" wording and two shipped `help`/`status` strings that denied safeguards are ever executed, which makes it a behaviour change needing one installed-plugin review; that review is `--verify` with the safeguards suite approved. Pull request #24; awaiting that review at this checkpoint. | A1, L1; [Release boundary](SCOPE.md#priority-and-release-boundary) |
 
 ## Completed increments `F1` through `A1` are archived
 
@@ -438,7 +438,7 @@ cut, and the archive's own pointer was widened to cover it.
 | File | Bytes after `D1` | Against the 65536-byte cap |
 | --- | --- | --- |
 | `README.md` | 55195, from 103903 | read, was the only root file still skipped |
-| `ROADMAP.md` | 50048 | read, 15488 bytes spare |
+| `ROADMAP.md` | 50131 | read, 15405 bytes spare |
 | `HANDOFF.md` | 15861 | read |
 | `docs/readme-archive-2026-09-10.md` | 105434 | not a candidate; discovery does not recurse |
 | `docs/roadmap-archive-2026-09-10.md` | 450090 | not a candidate; discovery does not recurse |
@@ -446,7 +446,7 @@ cut, and the archive's own pointer was widened to cover it.
 **Discovery now reads every root markdown file of this project and skips none.**
 That was demonstrated rather than inferred, by running the real
 `collectInstructionFiles` against this checkout; the six files it reads spend
-143876 bytes of the 262144-byte budget, so nothing is near being
+143959 bytes of the 262144-byte budget, so nothing is near being
 skipped for the budget either.
 
 ### Validation
@@ -479,9 +479,10 @@ ordinary and a `--verify` review on a mismatched checkout, and its assertions
 that no model turn, subagent or tool execution occurred. It spends no credits.
 It had not been rerun since before `V1b`.
 
-### Pull request and its review
+### Pull request #24 and its review
 
-**Not yet run at this checkpoint.** This increment changes `extensions/`, so
+Pull request #24 carries this increment. **Its required review has not run at
+this checkpoint.** This increment changes `extensions/`, so
 `AGENTS.md` requires one installed-plugin review of its pull request, and that
 review must be `--verify` with the safeguards suite approved, for the reason the
 closing section gives. It cannot be dispatched by an agent:
