@@ -455,7 +455,9 @@ tells you nothing about what a line will do.
 On top of that, code refuses a command that is not a check at all: anything that
 installs, migrates, deploys, publishes, creates, cleans, serves, formats in place,
 auto-fixes or watches, and any program that changes the machine, moves data over
-the network, drives version control, or provisions and deploys. Watching is the
+the network, drives version control, or provisions and deploys. Those names are
+matched without regard to letter case, because a filesystem that ignores case
+would otherwise run `Curl` after the rule refused `curl`. Watching is the
 sharp case, because this tool imposes no review timeout by design and an approved
 watch command would have nothing to end it. **The rule is a heuristic**, and
 surviving it is never a judgement that a command is safe. It will refuse checks
@@ -476,6 +478,9 @@ a review that has no timeout to rescue it.
 One `git status --porcelain` afterwards reports what running project code left in
 your checkout. The preflight already proved the tree was clean, so anything named
 there was left by a safeguard. Nothing is reverted, stashed or cleaned.
+
+That status read belongs to the review, so cancelling stops it too, and the run
+then says the checkout could not be inspected rather than waiting on it.
 
 Cancelling the review kills the running command and every process it started,
 because a test runner's workers must not outlive the review that started them.
