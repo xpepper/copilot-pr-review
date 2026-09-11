@@ -73,7 +73,7 @@ posting them.
 | U1 | Completed | Unattended, non-interactive execution. All four questions a review can ask already had a no-person branch and none of them blocked, so `--unattended` is a declaration checked at parse time rather than a new capability: it refuses, before capture and before a credit is spent, any invocation that would need somebody. Without `--all`, without `--comment` or `--no-comment`, with `--verify`, or with `--capture-only`. An unattended capture also offers no closed-PR confirmation even where the host has one. It grants no authority, opens no gate and is not a configuration key; `scripts/dogfood-review.mjs` requires it. Pull request #28, reviewed once with this plugin at the user's authorization: deep, 77.45399 credits, 114.5 s of model work, 13 approved tool calls and no denial, incomplete coverage on one execution failure, 0 validated findings and one accepted candidate the evidence boundary discarded because the adjudicator's own citation named fifteen lines for a sixteen-line quote. That candidate was right and is fixed here. | E1; [Publication controls](SCOPE.md#selection-publication-and-cached-results), [Safeguards](SCOPE.md#optional-project-safeguards) |
 | I1a | Completed | Prior-review discovery. Capture reports whether this tool has already reviewed this pull request, the head that review evaluated, its inline comments retained with verbatim bodies and normalised anchors, and how the reviewed head relates to that one: `none`, `same-head`, `incremental`, `diverged` or an honestly unmeasured `unknown`. A review counts only when the authenticated identity submitted it and it carries the body `preview.mjs` builds, so a hand-written review is considered and never treated as a prior one. Read-only, no credits, no change to any reviewer's input, and a failed discovery is reported as itself. The first of `I1`'s three slices, agreed with the user before anything was built. | U1; [Targets](SCOPE.md#targets-and-local-behavior) |
 | I1b | Completed | `--incremental` confines fresh hunting to the commits added since an earlier review of the same pull request, so a re-review stops reporting hunks that review already covered. A range diff that cannot be shown complete refuses rather than confines, and the reviewers are told both the confined head-side ranges and every path those commits touched, because a deleted file's only possible anchor is base-side. Opt-in, at the user's decision, and a request rather than a parse-time contract: any relationship but `incremental`, an unreadable range, or added commits that change no file each narrow nothing and say which it was. The captured binding, its context windows, the provenance checks and every citation rule are unchanged; the reviewers are given the confined head-side ranges and code sets aside any candidate anchored outside them, before adjudication, reported with its location and never refuted. One informational caveat carries the confinement into the published body, because a confined review does not cover the whole pull request. Pull request #31, reviewed once with this plugin at the user's authorization: deep, 68.53836 credits, 91.5 s of model work, 16 approved tool calls and no denial, 0 candidates and 0 validated findings, and one coverage gap that is exact and unfixable here, namely that the confinement path has fixture coverage only and no live run has ever reported the incremental relationship. | I1a; [Targets](SCOPE.md#targets-and-local-behavior), [Modes/findings](SCOPE.md#review-modes-and-findings) |
-| I1c | Completed | Revalidating the findings an earlier review of the same pull request published, as resolved, still open or obsolete. The parser `I1a` deferred reads this tool's own emitted comment prose back into a structured finding, and is held to the emitter's own template: a parse counts only when rebuilding it reproduces the body byte for byte. Every review then reports the verdicts code can prove and spends nothing on them: lines the newer commits never touched are still open, an anchor GitHub can no longer place or a file those commits deleted is obsolete, and nothing is ever proved resolved without reading the code. `--revalidate` buys one model pass over exactly what is left; a proved verdict is never put to it and never overturned by it, and a pass that fails settles nothing. A settled verdict is answered on the earlier review's own thread, under the review's own posting authority and never any other, which makes this the first write set in this tool that is more than one request: each reply is journalled before it is sent, a definite rejection does not stop the others, and one unknown outcome stops the set with every thread after it left unattempted. The retained record carries the verdicts and the reply dispositions, which is the schema change `I1a` and `I1b` each deferred to the increment that would consume it. | I1a, I1b; [Modes/findings](SCOPE.md#review-modes-and-findings), [Publication controls](SCOPE.md#selection-publication-and-cached-results) |
+| I1c | Completed | Revalidating the findings an earlier review of the same pull request published, as resolved, still open or obsolete. The parser `I1a` deferred reads this tool's own emitted comment prose back into a structured finding, and is held to the emitter's own template: a parse counts only when rebuilding it reproduces the body byte for byte. Every review then reports the verdicts code can prove and spends nothing on them: lines the newer commits never touched are still open, an anchor GitHub can no longer place or a file those commits deleted is obsolete, and nothing is ever proved resolved without reading the code. `--revalidate` buys one model pass over exactly what is left; a proved verdict is never put to it and never overturned by it, and a pass that fails settles nothing. A settled verdict is answered on the earlier review's own thread, under the review's own posting authority and never any other, which makes this the first write set in this tool that is more than one request: each reply is journalled before it is sent, a definite rejection does not stop the others, and one unknown outcome stops the set with every thread after it left unattempted. The retained record carries the verdicts and the reply dispositions, which is the schema change `I1a` and `I1b` each deferred to the increment that would consume it. Pull request #32, reviewed once with this plugin at the user's authorization: deep, 144.23376 credits, 0 validated findings on INCOMPLETE coverage, and three discarded or uncertain candidates that all described real defects and are all fixed here, one of them a crash that would have thrown whenever a review settled less than every earlier finding. | I1a, I1b; [Modes/findings](SCOPE.md#review-modes-and-findings), [Publication controls](SCOPE.md#selection-publication-and-cached-results) |
 | G1 | Pending | Gap analysis against the field, then a proposal. Compare this tool behaviourally with upstream `pi-pr-review` and with other code-review agents and skills now in the open, on capability and on user experience, and propose what is worth adopting. Research is extensive and the output is a written analysis plus a recommendation, not code. **`L1`'s rule binds this absolutely: no upstream or third-party source, prompt text or documentation may be copied.** Any adoption is behavioural and re-implemented. Anything it proposes is a scope decision for the user. | I1c; [Upstream baseline](SCOPE.md#upstream-baseline) |
 
 ## Completed increments `F1` through `I1b` are archived
@@ -262,7 +262,59 @@ discovery collector reads all six root files and skips none.
 was written, on the one-live-entry rule: 7364 bytes were spare and no increment
 entry has ever been that small.
 
-### Pull request and its review
+### Pull request #32 and its review
+
+`I1c` landed through pull request **#32**, on branch
+`i1c-prior-finding-revalidation`, reviewed once with this plugin at the user's
+standing authorization: **deep, `gpt-5.6-terra` at high effort, 144.23376
+credits**, one integrated reviewer and one adjudicator, **0 validated findings on
+INCOMPLETE coverage** from two execution failures and three coverage gaps.
+
+**Zero validated findings, and three real defects.** Two candidates were
+discarded at the evidence boundary because their citations did not exactly match
+a supplied context window, and the third was adjudicated `uncertain` because the
+captured context did not include `finishPreview`. **All three described real
+defects, and all three are fixed on this branch**, each with a test written to
+reproduce it first.
+
+| Reported | Verdict | Disposition |
+| --- | --- | --- |
+| The retained record refuses the proof an unsettled verdict carries | Real | Fixed; `codeProofs` now admits `touched` |
+| The parser accepts a body that admits more than one split | Real | Fixed; ambiguity is refused |
+| Replies read the review's selection rather than its posting authority | Real | Fixed; authority comes from the policy |
+
+- **The first was a crash.** `codeVerdict` returns `proof: "touched"` for an
+  ordinary unsettled finding, and the retained record's code-proof list did not
+  admit it, so **any review that revalidated and settled less than everything
+  would have thrown when it journalled itself.** Every test in this increment's
+  own suite had missed it by judging its unsettled entries away before retaining
+  them.
+- **The second is the one this increment argued itself into.** Anchoring the
+  parse pattern at both ends makes the round-trip check automatic for any match,
+  which is exactly why it proves nothing about *which* split was chosen. A field
+  whose prose opens a paragraph with one of the five labels admits several
+  splits and every one rebuilds the same bytes. A body that admits more than one
+  split is now unreadable, which is the contract the parser states.
+- **The third contradicted a decision the user had taken.** Replies read
+  `preview.authorized`, which an empty selection leaves false, so a re-review
+  that found nothing new answered no thread. That is the case the feature exists
+  for. Authority now comes from the posting policy; what an empty selection
+  really removes is the *confirmation*, so in that one case the replies ask for
+  themselves, and `--unattended` still cannot reach that question.
+
+**The coverage gap is exact and nothing was changed in response, because nothing
+can be.** Both the reviewer and the adjudicator reported, independently, that the
+reply flow has fixture coverage only and that no live run has ever exercised the
+real replies endpoint, the paginated comment response shape or the
+acknowledgment payload. **That is the honest limit on what #32 demonstrates.**
+
+**This is the second review in ten to find nothing its own evidence gate would
+let through, and the first whose discarded candidates were all correct.** Read
+the run's own word, which is INCOMPLETE.
+
+**The three fixes changed `extensions/` and have not themselves been reviewed by
+this plugin**, because the standing workflow authorizes one review per pull
+request and #32 has spent it.
 
 ## v1 is complete, `I1` is sliced, and two increments remain
 
