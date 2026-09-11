@@ -254,3 +254,172 @@ const range = newRangeFrom(validationDiff, { priorHead, head, commits: 2 });
     { resolved: 0, stillOpen: 0, obsolete: 0, unsettled: 0, unreadable: 0 });
   console.log("PASS I1c no prior review and no prior comment each revalidate nothing");
 }
+
+// ---------------------------------------------------------------------------
+// The paid half: one model pass, asked only about what the code half could not
+// settle, and never able to overturn what it could.
+
+import { outputEnd, outputStart } from "../extensions/pr-review/findings.mjs";
+import {
+  applyJudgedVerdicts, describeRevalidation, revalidateFlag, revalidationInstructions,
+  revalidationPrompt, revalidationSummary, unsettledEntries,
+} from "../extensions/pr-review/revalidation.mjs";
+
+const key = "fixture-review-key";
+const envelope = (payload) => `${outputStart}\n${JSON.stringify(payload)}\n${outputEnd}`;
+const judged = (verdicts, overrides = {}) => ({
+  label: "revalidator", status: "completed",
+  result: envelope({ schemaVersion: 2, reviewKey: key, verdicts, limitations: [] }),
+  ...overrides,
+});
+
+// The three files the range settles differently, so one result carries a
+// code-proved still-open, a code-proved obsolete and two unsettled entries.
+function mixed() {
+  return revalidatePrior(found("incremental", [
+    priorComment({ path: "shipping.js", line: 3 }),
+    priorComment({ outdated: true, line: undefined }),
+    priorComment({ path: "total.js", line: 3 }),
+    priorComment({ path: "total.js", line: 3 }),
+  ]), head, { range });
+}
+
+{
+  assert.equal(revalidateFlag, "--revalidate");
+  const instructions = revalidationInstructions();
+  for (const word of ["resolved", "still-open", "obsolete"]) {
+    assert(instructions.includes(`"${word}"`), `The contract must name ${word}`);
+  }
+  assert.match(instructions, /never generate new findings|not generate new findings/i);
+  assert(instructions.includes(outputStart) && instructions.includes(outputEnd),
+    "The pass uses the same marker contract every other structured output does");
+  console.log("PASS I1c the revalidation contract names the three verdicts and forbids new findings");
+}
+
+// Only the unsettled entries are put to the model. Paying to judge a finding
+// whose verdict is already proved is exactly what the code half exists to avoid.
+{
+  const result = mixed();
+  const unsettled = unsettledEntries(result);
+  assert.equal(unsettled.length, 2);
+  const prompt = revalidationPrompt(result, key);
+  assert(prompt.includes(key), "The prompt carries the review key the envelope must echo");
+  for (const entry of unsettled) assert(prompt.includes(String(entry.commentId)));
+  const settled = result.entries.filter((entry) => entry.verdict !== "unsettled");
+  for (const entry of settled) {
+    assert(!prompt.includes(String(entry.commentId)), "A proved verdict is never put to the model");
+  }
+  assert(prompt.includes(finding.title), "The model is given the finding it is judging");
+  assert(prompt.includes(finding.trigger) && prompt.includes(finding.expected),
+    "and every part of it, because a verdict on a title alone is a guess");
+  console.log("PASS I1c only the unsettled findings are put to the model, with their whole text");
+}
+
+// A judged verdict replaces the unsettled one and says a model decided it.
+{
+  const result = mixed();
+  const [first, second] = unsettledEntries(result);
+  const applied = applyJudgedVerdicts(result, judged([
+    { commentId: first.commentId, verdict: "resolved", reason: "the multiplication is restored at line 3" },
+    { commentId: second.commentId, verdict: "still-open", reason: "the addition is still there" },
+  ]), key);
+  assert.equal(applied.judged.status, "completed");
+  assert.equal(applied.judged.decided, 2);
+  const byId = new Map(applied.entries.map((entry) => [entry.commentId, entry]));
+  assert.equal(byId.get(first.commentId).verdict, "resolved");
+  assert.equal(byId.get(first.commentId).decidedBy, "model");
+  assert.equal(byId.get(first.commentId).reason, "the multiplication is restored at line 3");
+  assert.equal(byId.get(second.commentId).verdict, "still-open");
+  assert.deepEqual(revalidationCounts(applied),
+    { resolved: 1, stillOpen: 2, obsolete: 1, unsettled: 0, unreadable: 0 });
+  console.log("PASS I1c a judged verdict replaces the unsettled one and records that a model decided it");
+}
+
+// A code-proved verdict is not the model's to change. The proof stands.
+{
+  const result = mixed();
+  const proved = result.entries.find((entry) => entry.verdict === "still-open");
+  const applied = applyJudgedVerdicts(result, judged([
+    { commentId: proved.commentId, verdict: "resolved", reason: "I think this one is fine now" },
+  ]), key);
+  const after = applied.entries.find((entry) => entry.commentId === proved.commentId);
+  assert.equal(after.verdict, "still-open", "A proved verdict is not the model's to overturn");
+  assert.equal(after.decidedBy, "code");
+  assert.equal(applied.judged.decided, 0);
+  assert(applied.judged.ignored.some((entry) => entry.commentId === proved.commentId));
+  console.log("PASS I1c a verdict the code proved is not the model's to overturn");
+}
+
+// A verdict for something that was never asked about, and a word that is not a
+// verdict, are both ignored rather than trusted.
+{
+  const result = mixed();
+  const [first] = unsettledEntries(result);
+  const applied = applyJudgedVerdicts(result, judged([
+    { commentId: 999999, verdict: "resolved", reason: "about nothing in this run" },
+    { commentId: first.commentId, verdict: "probably-fine", reason: "not one of the three" },
+  ]), key);
+  assert.equal(applied.judged.decided, 0);
+  assert.equal(applied.judged.ignored.length, 2);
+  assert(applied.entries.every((entry) => entry.decidedBy === "code"));
+  assert.deepEqual(revalidationCounts(applied),
+    { resolved: 0, stillOpen: 1, obsolete: 1, unsettled: 2, unreadable: 0 });
+  console.log("PASS I1c an unknown comment and an invalid verdict are ignored, never trusted");
+}
+
+// A pass that did not complete, or whose envelope will not parse, leaves every
+// unsettled verdict unsettled and says why. It is a failure of the revalidation
+// and never of the review.
+{
+  const result = mixed();
+  for (const [what, reviewer] of Object.entries({
+    incomplete: { label: "revalidator", status: "incomplete", error: "transport closed" },
+    unparseable: judged([], { result: "I had a look and they seem fine" }),
+    "wrong binding": { label: "revalidator", status: "completed",
+      result: envelope({ schemaVersion: 2, reviewKey: "another-review", verdicts: [], limitations: [] }) },
+  })) {
+    const applied = applyJudgedVerdicts(result, reviewer, key);
+    assert.equal(applied.judged.status, "failed", `${what} must fail the pass`);
+    assert(applied.judged.reason, `${what} must say why`);
+    assert.equal(revalidationCounts(applied).unsettled, 2, `${what} must settle nothing`);
+    assert.equal(revalidationCounts(applied).stillOpen, 1, `${what} must lose no proved verdict`);
+  }
+  console.log("PASS I1c a revalidation pass that fails settles nothing and loses no proved verdict");
+}
+
+// A finding the model was asked about and said nothing about stays unsettled.
+{
+  const result = mixed();
+  const [first] = unsettledEntries(result);
+  const applied = applyJudgedVerdicts(result, judged([
+    { commentId: first.commentId, verdict: "obsolete", reason: "the function was removed entirely" },
+  ]), key);
+  assert.equal(applied.judged.decided, 1);
+  assert.equal(revalidationCounts(applied).unsettled, 1, "Silence about a finding is not a verdict on it");
+  assert.equal(revalidationCounts(applied).obsolete, 2);
+  console.log("PASS I1c silence about a finding leaves it unsettled");
+}
+
+// What the run prints, and what the evidence line carries.
+{
+  const before = mixed();
+  const applied = applyJudgedVerdicts(before, judged(unsettledEntries(before).map((entry) => ({
+    commentId: entry.commentId, verdict: "resolved", reason: "fixed on the newer commits",
+  }))), key);
+  const described = describeRevalidation(applied, false);
+  assert.match(described, /2 resolved/);
+  assert.match(described, /1 still open/);
+  assert.match(described, /1 obsolete/);
+  assert.match(described, /earlier review/i);
+  const summary = revalidationSummary(applied);
+  assert.equal(summary.counts.resolved, 2);
+  assert.equal(summary.basis, "range");
+  assert.equal(summary.reviewedBefore, priorHead);
+  assert(!JSON.stringify(summary).includes(finding.trigger),
+    "Comment prose stays out of the evidence line, as every other captured prose does");
+  // Without the flag the run says plainly that it judged nothing and why.
+  const unasked = describeRevalidation(mixed(), false);
+  assert.match(unasked, new RegExp(revalidateFlag));
+  assert.match(unasked, /2 not settled/);
+  console.log("PASS I1c the run states the verdicts, and states what it did not settle");
+}
