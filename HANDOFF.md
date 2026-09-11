@@ -16,7 +16,7 @@ is in `docs/readme-archive-2026-09-10.md`, and the `--verify` guide now lives in
 
 At 65536 bytes this project's own safeguard discovery stops reading a file,
 silently, and the tool can no longer read its own project. **`README.md` has
-7474 bytes spare and `ROADMAP.md` has 12146.** That is room for one increment's
+7217 bytes spare and `ROADMAP.md` has 8556.** That is room for one increment's
 writing and not obviously two, so measure before you write and do not assume.
 
 - **`ROADMAP.md`'s escape is archiving, and `I1b` used it twice.** `U1`'s entry
@@ -57,7 +57,7 @@ commit ranges and never about what an earlier comment said.
 - **Ask the user before building anything unsettled**, as `U1`, `I1a` and `I1b`
   each did. Do not invent a fourth slice and do not start `G1` early.
 
-## What `I1b` did, and the five things worth carrying forward
+## What `I1b` did, and the six things worth carrying forward
 
 `I1b` added `--incremental`, which confines fresh hunting to the commits added
 since an earlier review of the same pull request, so a re-review stops reporting
@@ -90,7 +90,17 @@ hunks that review already covered. Pull request #31 carries all of it.
 - **A base-side anchor cannot be placed in the new range at all**, because it
   names the captured base revision the comparison never saw. The filter removes
   only what it can prove an earlier turn covered, which is the safe direction for
-  a feature whose job is to cover less. Keep that asymmetry.
+  a feature whose job is to cover less. Keep that asymmetry, and keep the
+  reviewer contract agreeing with it: `confinedTo` carries `basePaths` as well as
+  `paths` because **a file the new commits deleted has no head-side line at all**,
+  so a base-side anchor is the only one such a defect can have.
+- **A parser is not a completeness check.** `parseDiffFiles` accepts a diff cut
+  mid-hunk and reports fewer changed lines rather than failing, which would set
+  every candidate in the truncated file aside as already covered.
+  `assertCompleteDiff` in `target.mjs` is the shared structural rule and
+  `newRangeFrom` asserts it; **do not confine to a range that has not passed
+  it.** It caught an arithmetic error in this increment's own fixture on its
+  first run.
 
 ## Validation and runtime caveats
 
@@ -121,9 +131,11 @@ console.log("skipped:", skipped.map((s) => `${s.name} (${s.reason})`).join(", ")
 **It should read all six root files and skip none.**
 
 `scripts/smoke-incremental.mjs` covers the range parse and its head-side line
-grouping, all five cases the filter decides including both base-side ones, all
-four non-confined outcomes with their prose, the `gh` call shape and its diff
-media type, the four relationships that cost no request at all, a cancellation
+grouping, four shapes of incomplete range diff and the parser's silence on one of
+them, a range that deletes a file and the base-side anchor that is then the only
+one such a defect can have, all five cases the filter decides, all four
+non-confined outcomes with their prose, the `gh` call shape and its diff media
+type, the four relationships that cost no request at all, a cancellation
 re-thrown rather than reported, a set-aside candidate at a real evidence boundary
 with its caveat and its untouched coverage, what `formatFindings` and the
 published body then say, the reviewer instruction and prompt with and without a
@@ -261,7 +273,7 @@ one. Citations remain limited to captured diff and context windows.
 
 ## State at this handoff
 
-`I1b` landed through pull request **#31**, five commits on branch
+`I1b` landed through pull request **#31**, nine commits on branch
 `i1b-incremental-confinement`, and was reviewed once with this plugin at the
 user's authorization: deep, 68.53836 credits, 91.5 s of model work, 16 approved
 tool calls and no denial, **0 candidates and 0 validated findings**, on
@@ -282,10 +294,21 @@ its paperwork**, after #18, #23, #24, #25, #26, #28 and #29 each caught it
 disagreeing with itself. **Do not read that as a clean result**; read the run's
 own words, which say INCOMPLETE.
 
-**GitHub's own Copilot reviewer left nothing on #31 or on #30**, having reviewed
-#29 automatically and found two real defects there for no cost. Its silence is a
-change worth noticing rather than a result, and nothing is claimed about why.
-Check for it anyway on your own pull request: it costs this project nothing.
+**GitHub's own Copilot reviewer then found three things the plugin review and
+all fifteen suites had missed**, for no cost, arriving after the plugin review
+had finished and after this file had already recorded its silence. Two were
+defects in the shipped behaviour and one was this branch's paperwork; all three
+are fixed, replied to and resolved, and the roadmap entry records each with its
+disposition. **It is slower than the plugin review, so do not conclude from an
+empty pull request that it is not coming.** Check again before you finish, and
+treat what it leaves like any other reviewer: **check the premise of a finding
+before implementing it**, because the first of these three was right about the
+harm and wrong about its stated cause, and the fix that followed was different
+from the one it asked for.
+
+**The three fixes changed `extensions/` and have not been reviewed by this
+plugin**, because the standing workflow authorizes one review per pull request
+and #31 has spent it. A further review needs the user's explicit authorization.
 
 **Pull request #31 is open and unmerged at this handoff**, and merging is always
 the user's decision. Confirm the branch and pull-request state from git rather

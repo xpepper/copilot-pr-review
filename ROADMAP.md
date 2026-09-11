@@ -72,7 +72,7 @@ posting them.
 | E1 | Completed | The tool is used for real, on work that is not this repository. One authorized deep review of `xpepper/pr-review-gemini#28`, 1427 changed lines over 16 files: 81.48022 credits, 93 s of model work, 16 approved tool calls and no denial, one validated finding that is real and exact, and one blocked assessment reported twice. Six items came out of it; the coverage-gap consolidation defect is fixed here, two are documentation fixes, and three are recorded as limitations with reasons. Pull request #26, reviewed once with this plugin at the user's instruction: deep, 45.98955 credits, incomplete coverage, 3 validated findings all real and all fixed here, and one discarded candidate that was also right and is also fixed. | O1; [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | U1 | Completed | Unattended, non-interactive execution. All four questions a review can ask already had a no-person branch and none of them blocked, so `--unattended` is a declaration checked at parse time rather than a new capability: it refuses, before capture and before a credit is spent, any invocation that would need somebody. Without `--all`, without `--comment` or `--no-comment`, with `--verify`, or with `--capture-only`. An unattended capture also offers no closed-PR confirmation even where the host has one. It grants no authority, opens no gate and is not a configuration key; `scripts/dogfood-review.mjs` requires it. Pull request #28, reviewed once with this plugin at the user's authorization: deep, 77.45399 credits, 114.5 s of model work, 13 approved tool calls and no denial, incomplete coverage on one execution failure, 0 validated findings and one accepted candidate the evidence boundary discarded because the adjudicator's own citation named fifteen lines for a sixteen-line quote. That candidate was right and is fixed here. | E1; [Publication controls](SCOPE.md#selection-publication-and-cached-results), [Safeguards](SCOPE.md#optional-project-safeguards) |
 | I1a | Completed | Prior-review discovery. Capture reports whether this tool has already reviewed this pull request, the head that review evaluated, its inline comments retained with verbatim bodies and normalised anchors, and how the reviewed head relates to that one: `none`, `same-head`, `incremental`, `diverged` or an honestly unmeasured `unknown`. A review counts only when the authenticated identity submitted it and it carries the body `preview.mjs` builds, so a hand-written review is considered and never treated as a prior one. Read-only, no credits, no change to any reviewer's input, and a failed discovery is reported as itself. The first of `I1`'s three slices, agreed with the user before anything was built. | U1; [Targets](SCOPE.md#targets-and-local-behavior) |
-| I1b | Completed | `--incremental` confines fresh hunting to the commits added since an earlier review of the same pull request, so a re-review stops reporting hunks that review already covered. Opt-in, at the user's decision, and a request rather than a parse-time contract: any relationship but `incremental`, an unreadable range, or added commits that change no file each narrow nothing and say which it was. The captured binding, its context windows, the provenance checks and every citation rule are unchanged; the reviewers are given the confined head-side ranges and code sets aside any candidate anchored outside them, before adjudication, reported with its location and never refuted. One informational caveat carries the confinement into the published body, because a confined review does not cover the whole pull request. Pull request #31, reviewed once with this plugin at the user's authorization: deep, 68.53836 credits, 91.5 s of model work, 16 approved tool calls and no denial, 0 candidates and 0 validated findings, and one coverage gap that is exact and unfixable here, namely that the confinement path has fixture coverage only and no live run has ever reported the incremental relationship. | I1a; [Targets](SCOPE.md#targets-and-local-behavior), [Modes/findings](SCOPE.md#review-modes-and-findings) |
+| I1b | Completed | `--incremental` confines fresh hunting to the commits added since an earlier review of the same pull request, so a re-review stops reporting hunks that review already covered. A range diff that cannot be shown complete refuses rather than confines, and the reviewers are told both the confined head-side ranges and every path those commits touched, because a deleted file's only possible anchor is base-side. Opt-in, at the user's decision, and a request rather than a parse-time contract: any relationship but `incremental`, an unreadable range, or added commits that change no file each narrow nothing and say which it was. The captured binding, its context windows, the provenance checks and every citation rule are unchanged; the reviewers are given the confined head-side ranges and code sets aside any candidate anchored outside them, before adjudication, reported with its location and never refuted. One informational caveat carries the confinement into the published body, because a confined review does not cover the whole pull request. Pull request #31, reviewed once with this plugin at the user's authorization: deep, 68.53836 credits, 91.5 s of model work, 16 approved tool calls and no denial, 0 candidates and 0 validated findings, and one coverage gap that is exact and unfixable here, namely that the confinement path has fixture coverage only and no live run has ever reported the incremental relationship. | I1a; [Targets](SCOPE.md#targets-and-local-behavior), [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | I1c | Pending | Revalidate the prior findings `I1a` retains as resolved, still open or obsolete. Needs the parser that reads this tool's own emitted comment prose back into a finding, deliberately not shipped by `I1a` because nothing consumed it there. Needs one live review. | I1a, I1b; [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | G1 | Pending | Gap analysis against the field, then a proposal. Compare this tool behaviourally with upstream `pi-pr-review` and with other code-review agents and skills now in the open, on capability and on user experience, and propose what is worth adopting. Research is extensive and the output is a written analysis plus a recommendation, not code. **`L1`'s rule binds this absolutely: no upstream or third-party source, prompt text or documentation may be copied.** Any adoption is behavioural and re-implemented. Anything it proposes is a scope decision for the user. | I1c; [Upstream baseline](SCOPE.md#upstream-baseline) |
 
@@ -254,14 +254,16 @@ for s in findings review selection retention preview publication publish-later \
 ```
 
 `scripts/smoke-incremental.mjs` covers the range parse and its head-side line
-grouping, all five cases the filter decides including both base-side ones, every
-outcome in the table above with its prose, the `gh` call shape and media type,
-the four relationships that cost no request at all, a cancellation re-thrown
-rather than reported, the set-aside candidate at a real evidence boundary with
-its caveat and its untouched coverage, what `formatFindings` and the published
-body then say, the reviewer instruction and prompt with and without a
-confinement, the two branches of the prior-review sentence, and the wiring into
-capture verbosely, quietly and not at all. `scripts/smoke-review.mjs` gained the
+grouping, four shapes of incomplete range diff and the parser's silence on one
+of them, a range that deletes a file and the base-side anchor that is then the
+only one such a defect can have, all five cases the filter decides including
+both base-side ones, every outcome in the table above with its prose, the `gh`
+call shape and media type, the four relationships that cost no request at all, a
+cancellation re-thrown rather than reported, the set-aside candidate at a real
+evidence boundary with its caveat and its untouched coverage, what
+`formatFindings` and the published body then say, the reviewer instruction and
+prompt with and without a confinement, the two branches of the prior-review
+sentence, and the wiring into capture verbosely, quietly and not at all. `scripts/smoke-review.mjs` gained the
 parse cases and the two refusals. `scripts/smoke-reviewer-tools.mjs` was not
 run: nothing here touches `read-only.mjs`.
 
@@ -330,10 +332,60 @@ requests #1 and #2, both still at the head they evaluated. Arranging one means
 publishing a real review or pushing a commit to a playground branch, and both
 are the user's call. **Playground #1 and #2 must never be merged.**
 
-**GitHub's own Copilot reviewer left nothing on #31, or on #30.** It reviewed
-#29 automatically and found two real defects there for no cost, so its silence
-here is a change worth noticing rather than a result. Nothing was inferred about
-why.
+### GitHub's own Copilot reviewer, on the same pull request
+
+**#31 was also reviewed by GitHub's built-in Copilot code reviewer**, which is
+not this tool and costs this project nothing. It arrived later than the plugin
+review, after this entry had already recorded its silence, and it raised three
+inline comments. **All three were real and all three are fixed.** All are
+replied to and resolved.
+
+| Comment | Disposition |
+| --- | --- |
+| A truncated commit range diff is confined to anyway, creating false negatives | **Fixed**, cause rejected |
+| The reviewer contract forbids the base-side anchor the code filter keeps | **Fixed** |
+| The archive boundary says `U1` where the same file says `I1a` | **Fixed** |
+
+**The first was right about the harm and wrong about the cause.** It said
+compare responses are bounded to 300 changed files; that cap is on the compare
+JSON `files` array, and this code fetches the diff media type, which is not
+bounded the same way. `cli/cli` `v2.40.0...v2.60.0` returns 541 file sections in
+one diff response, which settles it. **The harm is real by another route**, and
+it reproduces: `parseDiffFiles` is a parser and not a completeness check, so a
+diff cut mid-hunk parses without error and reports zero changed head lines for
+the file it truncated, and every candidate in that file would then be set aside
+as already covered. That is the one direction this filter promised never to go.
+The structural half of `validateDiff` is now shared as `assertCompleteDiff` and
+`newRangeFrom` asserts it, so a range that cannot be shown complete reports
+`failed` and the run proceeds unconfined. **The new check immediately caught an
+arithmetic error in this increment's own test fixture**, whose hunk header
+declared five new lines for six. The authoritative file-set cross-check the
+comment asked for was not added, because the only candidate for it is the
+`files` array that is itself capped.
+
+**The second is the one worth keeping.** The reviewer instruction said to report
+a location only when it anchors on a head-side line in the confined ranges,
+while `withinNewRange` keeps a base-side anchor in any touched file and
+`README.md` promised exactly that. **A file the new commits deleted has no
+head-side line at all**, never enters `changed`, and was therefore absent from
+the confined input, so a reviewer was told not to emit the only anchor such a
+defect can have. `confinedTo` now carries `basePaths`, the touched set the
+filter actually tests against, and the instruction permits a base-side location
+there and says why the two lists differ. `scripts/smoke-incremental.mjs` builds
+a range that deletes a file and pins the whole shape.
+
+**The third was this branch's own.** `U1`'s entry was archived first and
+`I1a`'s afterwards; line 79 and the handoff were updated for the second move and
+line 10 was not.
+
+**Two reviewers, and this time the free one found everything.** The plugin's
+deep review produced no candidate and one honest coverage gap; GitHub's reviewer
+found two real defects in the shipped behaviour and one in the paperwork.
+**Neither of the behaviour defects was reachable by any of the fifteen suites**,
+which is the honest limit on what controlled coverage establishes here. **The
+three fixes changed `extensions/` and have not themselves been reviewed by this
+plugin**, because the standing workflow authorizes one review per pull request
+and #31 has spent it.
 
 ## v1 is complete, `I1` is sliced, and two increments remain
 
