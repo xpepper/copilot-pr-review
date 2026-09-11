@@ -41,6 +41,21 @@ function selectedFindings(outcome) {
   return selected;
 }
 
+// The published shape of one finding, built in one place so the increment that
+// reads it back reconstructs from the same template it was written with. I1c's
+// parser rebuilds a parsed body with this function and requires byte equality,
+// so the reader and the writer can never drift apart unnoticed.
+export function commentBody(finding) {
+  return [
+    `[${finding.severity}] ${finding.title}`,
+    `When: ${finding.trigger}`,
+    `Expected: ${finding.expected}`,
+    `Actual: ${finding.actual}`,
+    `Introduced by this diff: ${finding.introduction}`,
+    `Confidence: ${finding.confidence}. Reported by: ${[...new Set(finding.reportedBy)].join(", ")}.`,
+  ].join("\n\n");
+}
+
 function inlineComment(finding, binding, policy) {
   const location = finding.location;
   requirePreview(finding.validation?.kind === "source-grounded-model-adjudication" &&
@@ -65,14 +80,7 @@ function inlineComment(finding, binding, policy) {
     path: files[0].path,
     line: location.endLine, side,
     ...(location.startLine !== location.endLine ? { start_line: location.startLine, start_side: side } : {}),
-    body: [
-      `[${finding.severity}] ${finding.title}`,
-      `When: ${finding.trigger}`,
-      `Expected: ${finding.expected}`,
-      `Actual: ${finding.actual}`,
-      `Introduced by this diff: ${finding.introduction}`,
-      `Confidence: ${finding.confidence}. Reported by: ${[...new Set(finding.reportedBy)].join(", ")}.`,
-    ].join("\n\n"),
+    body: commentBody(finding),
   };
 }
 
