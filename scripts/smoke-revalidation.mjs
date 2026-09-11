@@ -261,8 +261,8 @@ const range = newRangeFrom(validationDiff, { priorHead, head, commits: 2 });
 
 import { outputEnd, outputStart } from "../extensions/pr-review/findings.mjs";
 import {
-  applyJudgedVerdicts, describeRevalidation, revalidateFlag, revalidationInstructions,
-  revalidationPrompt, revalidationSummary, unsettledEntries,
+  applyJudgedVerdicts, describeRevalidation, retainedRevalidation, revalidateFlag,
+  revalidationInstructions, revalidationPrompt, revalidationSummary, unsettledEntries,
 } from "../extensions/pr-review/revalidation.mjs";
 
 const key = "fixture-review-key";
@@ -422,4 +422,103 @@ function mixed() {
   assert.match(unasked, new RegExp(revalidateFlag));
   assert.match(unasked, /2 not settled/);
   console.log("PASS I1c the run states the verdicts, and states what it did not settle");
+}
+
+// ---------------------------------------------------------------------------
+// The retained record, which is where this increment's schema change lands.
+// I1a retained none of its discovery and I1b none of its confinement, on the
+// rule that the increment which consumes something is the one that retains it.
+
+import { retainedRecord, validateRecord } from "../extensions/pr-review/retention.mjs";
+import { retentionFixture } from "./retention-fixture.mjs";
+import { randomUUID } from "node:crypto";
+
+const sessionId = randomUUID();
+const base = await retentionFixture(sessionId);
+
+function retained(revalidation) {
+  return retainedRecord({ ...base, revalidation });
+}
+
+// A record carrying the verdicts round-trips through the strict validator, and
+// the finding text is retained rather than the body, because the body rebuilds
+// from it exactly and two copies of one thing can disagree.
+{
+  const before = mixed();
+  before.head = base.binding.head;
+  const applied = applyJudgedVerdicts(before, judged(unsettledEntries(before).map((entry) => ({
+    commentId: entry.commentId, verdict: "resolved", reason: "restored on the newer commits",
+  }))), key);
+  const record = retained(retainedRevalidation(applied));
+  validateRecord(record, sessionId);
+  assert.equal(record.outcome.revalidation.entries.length, 4);
+  assert.equal(record.outcome.revalidation.judged.decided, 2);
+  const kept = record.outcome.revalidation.entries[0];
+  assert.equal(commentBody(kept.finding), commentBody(finding),
+    "The published body rebuilds from what the record keeps");
+  assert(!JSON.stringify(record).includes('"body"'), "The record keeps the finding, not a second copy of the body");
+  console.log("PASS I1c the retained record carries the verdicts and the findings they are about");
+}
+
+// Every cross-check the record makes about a verdict, each tested by breaking it.
+{
+  const before = mixed();
+  before.head = base.binding.head;
+  const applied = applyJudgedVerdicts(before, judged(unsettledEntries(before).map((entry) => ({
+    commentId: entry.commentId, verdict: "still-open", reason: "unchanged in the current code",
+  }))), key);
+  const good = retainedRevalidation(applied);
+  const broken = {
+    "code proving a finding resolved": (value) => {
+      const entry = value.entries.find((one) => one.decidedBy === "code");
+      entry.verdict = "resolved";
+    },
+    "a judged verdict with no pass behind it": (value) => { delete value.judged; },
+    "a judged verdict left unsettled": (value) => {
+      value.entries.find((one) => one.decidedBy === "model").verdict = "unsettled";
+    },
+    "a judged verdict with no reason": (value) => {
+      delete value.entries.find((one) => one.decidedBy === "model").reason;
+    },
+    "a code verdict carrying a model's proof": (value) => {
+      value.entries.find((one) => one.decidedBy === "code").proof = "judged";
+    },
+    "a pass count disagreeing with the verdicts": (value) => { value.judged.decided = 1; },
+    "a failed pass that decided something": (value) => {
+      value.judged = { status: "failed", reason: "transport closed", decided: 2 };
+    },
+    "a basis disagreeing with the relationship": (value) => { value.basis = "same-head"; },
+    "a revalidation of another head": (value) => { value.head = "9".repeat(40); },
+    "a review head disagreeing with the revalidated one": (value) => { value.review.head = "9".repeat(40); },
+    "a duplicate comment": (value) => { value.entries[1].commentId = value.entries[0].commentId; },
+    "an unknown verdict": (value) => { value.entries[0].verdict = "probably-fine"; },
+    "an unknown proof": (value) => { value.entries[0].proof = "vibes"; },
+    "a confidence outside the findings policy": (value) => { value.entries[0].finding.confidence = 0.1; },
+    "an extra field": (value) => { value.entries[0].note = "something"; },
+  };
+  for (const [what, breakIt] of Object.entries(broken)) {
+    const value = structuredClone(good);
+    breakIt(value);
+    assert.throws(() => validateRecord(retained(value), sessionId), /Invalid retained result/,
+      `${what} must not survive the strict validator`);
+  }
+  validateRecord(retained(structuredClone(good)), sessionId);
+  console.log("PASS I1c the retained verdicts survive only when every cross-check holds");
+}
+
+// A comment this tool could not read back is retained as unreadable, and never
+// as a finding with a guessed verdict.
+{
+  const result = revalidatePrior(found("same-head", [
+    priorComment(), priorComment({ body: "Looks wrong to me." }),
+  ]), base.binding.head);
+  const record = retained(retainedRevalidation(result));
+  validateRecord(record, sessionId);
+  assert.equal(record.outcome.revalidation.entries.length, 1);
+  assert.equal(record.outcome.revalidation.unreadable.length, 1);
+  const clash = structuredClone(record.outcome.revalidation);
+  clash.unreadable[0].commentId = clash.entries[0].commentId;
+  assert.throws(() => validateRecord(retained(clash), sessionId), /Invalid retained result/,
+    "One comment cannot be both read and unread");
+  console.log("PASS I1c an unreadable prior comment is retained as one, and never as a verdict");
 }

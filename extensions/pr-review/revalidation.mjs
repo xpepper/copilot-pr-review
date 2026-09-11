@@ -65,10 +65,18 @@ const sideOf = (comment) => (comment.side === "LEFT" ? "base" : "head");
 // The anchor as the range's own coordinates see it. GitHub's `line` is already
 // the comment's position in the current head's file, so a placeable comment
 // needs no translation; `startLine` is absent for a single-line anchor.
-const anchorOf = (comment) => ({
-  side: sideOf(comment), path: comment.path,
-  startLine: comment.startLine ?? comment.line, endLine: comment.line,
-});
+//
+// Once GitHub can no longer place a comment it nulls that pair, and what is left
+// is the line it was written at. I1a kept both for exactly this: the record of
+// an obsolete finding should still say where it used to point. A comment with
+// neither is one nothing can place at all, and it carries no anchor rather than
+// a made-up one.
+const anchorOf = (comment) => {
+  const placeable = comment.line !== undefined && comment.line !== null;
+  const endLine = placeable ? comment.line : comment.originalLine;
+  const startLine = (placeable ? comment.startLine : comment.originalStartLine) ?? endLine;
+  return { side: sideOf(comment), path: comment.path, ...(endLine === undefined ? {} : { startLine, endLine }) };
+};
 
 function codeVerdict(comment, relationship, range) {
   // GitHub nulls the line once an anchor has fallen out of the current diff.
@@ -86,6 +94,7 @@ function codeVerdict(comment, relationship, range) {
     return range.touched.has(anchor.path)
       ? { verdict: "unsettled", proof: "touched" } : { verdict: "still-open", proof: "untouched" };
   }
+  if (anchor.endLine === undefined) return { verdict: "unsettled", proof: "no-range" };
   const lines = range.changed.get(anchor.path);
   if (!lines) {
     // A path those commits touched but left with no head side at all was moved
@@ -119,7 +128,8 @@ export function revalidatePrior(prior, head, read) {
     const anchor = anchorOf(comment);
     entries.push({
       commentId: comment.id, url: comment.url, path: comment.path, side: anchor.side,
-      startLine: anchor.startLine, endLine: anchor.endLine, outdated: comment.outdated,
+      ...(anchor.endLine === undefined ? {} : { startLine: anchor.startLine, endLine: anchor.endLine }),
+      outdated: comment.outdated,
       finding, ...codeVerdict(comment, prior.relationship, range), decidedBy: "code",
     });
   }
@@ -294,4 +304,34 @@ export function describeRevalidation(result, requested) {
     lines.push("This is the free half of revalidation: it reports what it can prove and spends nothing.");
   }
   return lines.join("\n");
+}
+
+// What the record keeps. The finding is retained and its published body is not,
+// because `commentBody` rebuilds that body from these parts exactly and two
+// copies of one thing are two things that can disagree. The pass keeps its
+// counts rather than the verdicts it returned: what it decided is already in the
+// entries, and what it got wrong is reported in the run rather than retained.
+export function retainedRevalidation(result) {
+  if (!result) return undefined;
+  return {
+    reviewedBefore: result.reviewedBefore, head: result.head, relationship: result.relationship,
+    basis: result.basis, ...(result.rangeError ? { rangeError: result.rangeError } : {}),
+    review: {
+      id: result.review.id, url: result.review.url, submittedAt: result.review.submittedAt,
+      head: result.review.head, mode: result.review.mode, label: result.review.label,
+      declaredFindings: result.review.declaredFindings,
+    },
+    entries: result.entries.map((entry) => ({
+      commentId: entry.commentId, url: entry.url, path: entry.path, side: entry.side,
+      ...(entry.endLine === undefined ? {} : { startLine: entry.startLine, endLine: entry.endLine }),
+      outdated: entry.outdated,
+      finding: { ...entry.finding }, verdict: entry.verdict, proof: entry.proof,
+      decidedBy: entry.decidedBy, ...(entry.reason ? { reason: entry.reason } : {}),
+    })),
+    unreadable: result.unreadable.map((entry) => ({ ...entry })),
+    ...(result.judged ? { judged: result.judged.status === "completed" ? {
+      status: "completed", reviewer: result.judged.reviewer, asked: result.judged.asked,
+      decided: result.judged.decided, ignored: result.judged.ignored.length,
+    } : { status: "failed", reviewer: result.judged.reviewer, reason: result.judged.reason } } : {}),
+  };
 }
