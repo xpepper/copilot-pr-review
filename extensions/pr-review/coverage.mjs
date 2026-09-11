@@ -62,13 +62,45 @@ function overlap(left, right) {
   return (2 * shared) / (left.size + right.size);
 }
 
+// Two gaps are comparable only when they name the same code, and a reviewer names
+// it either in backticks or bare. E1's real review produced a pair that named
+// isModelUnavailableError without them, so a backtick-only rule showed one blocked
+// assessment twice while its impact clauses overlapped 0.645 against the 0.35
+// threshold. Only shapes ordinary prose does not have count as a bare name: an
+// internal capital after a lowercase letter, or an underscore.
+const identifierPattern =
+  /`[^`]+`|\b[a-z][A-Za-z0-9]*[A-Z][A-Za-z0-9]*\b|\b[A-Za-z][A-Za-z0-9]*(?:_[A-Za-z0-9]+)+\b/g;
+
+function namedIdentifiers(message) {
+  return new Set(message.match(identifierPattern) ?? []);
+}
+
+const withinName = (character) => /[A-Za-z0-9_$]/.test(character ?? "");
+
+// A backticked name carries its own delimiters, so a plain search cannot run past
+// its end. A bare one does not, and `loadUser` must never be found inside
+// `loadUserProfile`, so it has to match a whole word.
+function namesSameCode(left, right) {
+  for (const name of namedIdentifiers(left)) {
+    if (name.startsWith("`")) {
+      if (right.includes(name)) return true;
+      continue;
+    }
+    for (let at = right.indexOf(name); at !== -1; at = right.indexOf(name, at + 1)) {
+      if (!withinName(right[at - 1]) && !withinName(right[at + name.length])) return true;
+    }
+  }
+  return false;
+}
+
 function equivalentGaps(left, right) {
   const leftParts = gapParts(left.message);
   const rightParts = gapParts(right.message);
   if (!leftParts || !rightParts) return false;
-  const leftIdentifiers = new Set(left.message.match(/`[^`]+`/g) ?? []);
-  const sharesIdentifier = [...leftIdentifiers].some((identifier) => right.message.includes(identifier));
-  return sharesIdentifier && overlap(gapTokens(leftParts.impact), gapTokens(rightParts.impact)) >= 0.35;
+  // Naming the same code is what makes two gaps comparable; it never decides that
+  // they are the same gap. The impact clauses still have to agree.
+  return namesSameCode(left.message, right.message) &&
+    overlap(gapTokens(leftParts.impact), gapTokens(rightParts.impact)) >= 0.35;
 }
 
 export function presentationDiagnostics(diagnostics) {

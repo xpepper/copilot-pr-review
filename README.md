@@ -105,6 +105,13 @@ credits. What you see, in order:
 6. **Adjudication**, one isolated session that tries to disprove each candidate.
 7. **The findings**, then the selection step, then the publication step.
 
+**Most of that output is evidence, not findings.** On a substantial code diff a
+single reviewer's raw untrusted output can fill the screen by itself, and a
+terminal truncates the long JSON evidence lines at the window edge. Add
+`--quiet` when you are reading a review rather than recording its evidence;
+nothing about coverage, refusals, failures, safeguards or publication is
+suppressed at any verbosity.
+
 To see the target without spending anything, add `--capture-only`:
 
 ```text
@@ -197,14 +204,16 @@ this diff changed and must pass exactly the same evidence checks as a P0.
 ### What a review costs
 
 Reviews spend Copilot credits, and the cost is dominated by diff size and
-reviewer count, not by the mode's name. These are real reported figures from
-this project's own pull requests, all on `gpt-5.6-terra` at `high` effort unless
-noted:
+reviewer count, not by the mode's name. These are real reported figures, all on
+`gpt-5.6-terra` at `high` effort unless noted. All but one are this project's own
+pull requests; the 16-file deep review is of somebody else's JavaScript, 1427
+changed lines of it:
 
 | Run | Reported AI credits |
 | --- | --- |
 | Deep, one reviewer, small diff (#8) | 68.27393 |
 | Balanced, 4 files (#4) | 79.82605 |
+| Deep, one reviewer, 16 files of real code | 81.48022 |
 | Balanced, 7 files (#14) | 110.736851 |
 | Balanced, 5 files, documentation-heavy (#23) | 137.46398 |
 | Balanced with `--verify`, 12 files (#19) | 252.771985 |
@@ -215,6 +224,13 @@ because prose diffs are large. And **if you leave the light tier unset it
 inherits your heavy tier**, so a balanced review runs its "light" overview
 reviewer on your heavy model at heavy effort. Configuring a genuinely light
 model for that tier is the single biggest saving available.
+
+A third consequence, measured on that deep review of real code: **adjudication
+is a fixed cost, not a per-finding one.** It re-reads the whole diff and the
+whole bound context, so judging a single candidate cost 29.6565 of those
+81.48022 credits, in one request. A large diff pays that once any candidate
+survives the evidence boundary, however few survive. A review where none
+survives starts no adjudicator and pays nothing for one.
 
 Missing charges mean unknown cost, not zero.
 
