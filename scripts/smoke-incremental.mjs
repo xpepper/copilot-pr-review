@@ -8,6 +8,7 @@ import {
   confineToNewCommits, confinedPaths, confinementCaveat, confinementInput, confinementSummary,
   describeConfinement, isConfined, lineRanges, newRangeFrom, withinNewRange,
 } from "../extensions/pr-review/incremental.mjs";
+import { parseDiffFiles } from "../extensions/pr-review/context.mjs";
 import { describePrior } from "../extensions/pr-review/prior.mjs";
 import { reviewModes } from "../extensions/pr-review/modes.mjs";
 import { reviewBinding, reviewInstructions, reviewPrompt } from "../extensions/pr-review/review.mjs";
@@ -51,7 +52,9 @@ assert.deepEqual(lineRanges([]), []);
 const wide = newRangeFrom([
   "diff --git a/total.js b/total.js",
   `index ${blobSha(validationBaseSource)}..${blobSha(validationHeadSource)} 100644`,
-  "--- a/total.js", "+++ b/total.js", "@@ -1,4 +1,5 @@",
+  // Four old lines; six new, because two were added and one was replaced. The
+  // completeness check caught this header when it was written as +1,5.
+  "--- a/total.js", "+++ b/total.js", "@@ -1,4 +1,6 @@",
   " // Total is unit cents multiplied by quantity.",
   "+// added", "+// added too",
   " export function total(cents, quantity) {",
@@ -59,6 +62,27 @@ const wide = newRangeFrom([
 ].join("\n"), { priorHead, head, commits: 1 });
 assert.deepEqual(confinedPaths({ status: "confined", range: wide }), [{ path: "total.js", lines: ["2-3", "5"] }]);
 console.log("PASS I1b the new commit range is read as head-side lines in the head's own coordinates");
+
+// ---------------------------------------------------------------------------
+// A partial range is worse than no range. parseDiffFiles is a parser and not a
+// completeness check: it accepts a diff cut mid-hunk and reports fewer changed
+// lines, which would set every candidate in the truncated file aside as already
+// covered. Completeness is asserted before anything is confined to it.
+
+const rangeLines = validationDiff.split("\n");
+const midHunk = rangeLines.slice(0, 8).join("\n");
+assert.deepEqual(parseDiffFiles(midHunk)[0].changed.head, [],
+  "The parser alone reports no changed line for the file it truncated, and raises nothing");
+assert.deepEqual(parseDiffFiles(validationDiff)[0].changed.head, [3]);
+for (const [broken, what] of [
+  [midHunk, "a hunk cut before its declared lines are consumed"],
+  [validationDiff.slice(0, -1), "a diff that does not end with a newline"],
+  ["@@ -1,2 +1,2 @@\n a\n-b\n+c\n", "a diff with no file header"],
+  [rangeLines.slice(0, 5).concat([" // Total is unit cents multiplied by quantity.", "?bogus", ""]).join("\n"),
+    "an unexpected line inside a hunk"],
+]) assert.throws(() => newRangeFrom(broken, { priorHead, head, commits: 1 }),
+  /commit range diff/, what);
+console.log("PASS I1b a range diff that cannot be shown complete refuses rather than confines");
 
 // ---------------------------------------------------------------------------
 // What the filter can and cannot establish.
@@ -123,6 +147,14 @@ assert.equal(unreadable.status, "failed");
 assert.match(unreadable.reason, /404/);
 assert.match(describeConfinement(unreadable), /narrowed nothing: the commit range could not be read/);
 assert.match(describeConfinement(unreadable), /proceeds as an ordinary one/);
+
+// A truncated range reaches the same place as an unreadable one, and for the
+// same reason: nothing established the range, so nothing is confined to it.
+const truncated = await confineToNewCommits(found("incremental"), pull, repository,
+  { requested: true, gh: rangeGh(midHunk).gh, cwd });
+assert.equal(truncated.status, "failed", "A range that cannot be shown complete confines nothing");
+assert.match(truncated.reason, /commit range diff/);
+assert.match(describeConfinement(truncated), /narrowed nothing: the commit range could not be read/);
 
 const nothingChanged = await confineToNewCommits(found("incremental"), pull, repository,
   { requested: true, gh: rangeGh("").gh, cwd });

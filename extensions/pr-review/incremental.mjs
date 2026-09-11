@@ -1,5 +1,5 @@
 import { parseDiffFiles } from "./context.mjs";
-import { runGh } from "./target.mjs";
+import { assertCompleteDiff, runGh } from "./target.mjs";
 
 // I1b: the declaration that this run wants fresh hunting confined to the commits
 // added since an earlier review of the same pull request. Like the three flags
@@ -27,6 +27,12 @@ function requireRange(condition, message) {
 // comparison never saw, so nothing here pretends to place them.
 export function newRangeFrom(diff, { priorHead, head, commits } = {}) {
   requireRange(typeof diff === "string", "the comparison returned no diff");
+  // A partial range is worse than no range at all. `parseDiffFiles` is a parser
+  // and accepts a diff cut mid-hunk, reporting fewer changed lines rather than
+  // failing, and every candidate in the file it truncated would then be set
+  // aside as already covered. So completeness is asserted here, and a diff that
+  // cannot be shown complete refuses rather than confines.
+  assertCompleteDiff(diff, "commit range diff");
   const parsed = parseDiffFiles(diff);
   const touched = new Set();
   const changed = new Map();
