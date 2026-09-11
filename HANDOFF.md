@@ -7,78 +7,78 @@ conversation or reopen settled decisions. Distinguish what has been demonstrated
 from what has only been assumed, in your own reporting as well as in the code.
 
 `ROADMAP.md` is short enough to read in full, and you should. Completed entries
-through `D1` are in `docs/roadmap-archive-2026-09-10.md`, which you need only for
+through `O1` are in `docs/roadmap-archive-2026-09-10.md`, which you need only for
 an older increment's evidence. The README that used to carry them is in
 `docs/readme-archive-2026-09-10.md`.
 
-## Before you add anything to `ROADMAP.md`, archive `O1`
+## `README.md` is now the tight file, not `ROADMAP.md`
 
-**The live roadmap has 3679 bytes of headroom**, and a normal increment entry is
-five to eight kilobytes. At 65536 bytes this project's own safeguard discovery
-stops reading the file, silently. **Move `O1`'s entry verbatim into
-`docs/roadmap-archive-2026-09-10.md`** before you write your own, leaving the
-same kind of pointer the earlier moves left, and do not rewrite or condense it on
-the way. `E1`'s entry then becomes the oldest live one. Measure with `wc -c`.
-`README.md` has 5614 bytes spare, which is now the tighter of the two per entry.
-Put new material in `docs/`, which discovery does not recurse into.
+**`README.md` has 3017 bytes spare and `ROADMAP.md` has 9132.** At 65536 bytes
+this project's own safeguard discovery stops reading a file, silently. A normal
+roadmap entry is five to eight kilobytes, so **archive `E1`'s entry into
+`docs/roadmap-archive-2026-09-10.md` before you write your own**, leaving the
+same kind of pointer the earlier moves left and not rewriting or condensing it on
+the way. `U1`'s entry then becomes the oldest live one.
 
-## Take `U1`, and nothing else
+**The README has no such escape.** If your increment adds user-visible behaviour,
+it needs README prose, and there is not much room left for it. Measure with
+`wc -c`, put new material in `docs/`, which discovery does not recurse into, and
+if you cannot fit it, say so rather than shipping a README the tool cannot read.
 
-**v1 is delivered, `O1` and `E1` have landed on top of it, and three of the
-user's four scheduled increments remain: `U1`, `I1`, `G1`, in that order.**
-`ROADMAP.md`'s section "The next increment is `U1`" is authoritative and the
-increments table describes the other two.
+## Take `I1`, and nothing else
 
-**`U1` is unattended, non-interactive execution**: a run that completes with
-nobody there to answer anything, while every existing gate still holds.
+**v1 is delivered, `O1`, `E1` and `U1` have landed on top of it, and two of the
+user's four scheduled increments remain: `I1` then `G1`.** `ROADMAP.md`'s section
+"The next increment is `I1`" is authoritative and the increments table describes
+both.
 
-- `SCOPE.md` already allows `--all --comment`, and `--all` with
-  `autoPostReviews=true`, to publish unattended. `U1` is about what a run does
-  when **no elicitation UI exists at all**, not about widening that authority.
-- **Posting authority never authorizes safeguard execution**, and no gate may be
-  relaxed to let a headless run past it.
-- `E1` supplied the first piece of evidence: `scripts/dogfood-review.mjs` already
-  dispatches into a session with no UI, and `E1`'s own review of pull request #26
-  ran that way. Selection reported `unavailable` and nothing published. `U1` has
-  to make that deliberate rather than incidental.
-- **Agree the shape with the user before building it.** The first half of issue
-  #21 is a description, not a design.
+**`I1` is incremental re-reviews**: when a pull request has moved on since a
+previous review, confine fresh hunting to the new commit range and revalidate the
+prior findings as resolved, still open, or obsolete. It is the second half of
+issue #21.
 
-**Do not start `I1` or `G1` early, and do not invent a fifth increment.**
+- **It is several increments, not one. Slice it first and build nothing until the
+  user has agreed the slicing.** Discovering the prior review and the head it
+  evaluated, classifying the relationship between that head and the current one,
+  and revalidating prior findings are separable pieces.
+- **It touches head binding and the evidence boundary**, the two most settled
+  parts of the design. Every publication gate and every citation check rests on
+  them. Changing either needs the user to say so explicitly in your own session.
+- `U1` agreed its shape through three questions before a line was written. Do the
+  same.
 
-## What `E1` did, and the four things worth carrying forward
+**Do not start `G1` early, and do not invent a fifth increment.**
 
-`E1` used the tool for real on `xpepper/pr-review-gemini#28`, 1427 changed lines
-over 16 files: 81.48022 credits, 93 s of model work, 16 approved tool calls, no
-denial, **one validated finding, real and exact**. Its entry records the six
-items that came out of it. Pull request #26 carries all of it.
+## What `U1` did, and the four things worth carrying forward
 
-- **Read the discarded candidates. Always.** #26's review produced four
-  candidates. The best one was discarded at the evidence boundary because an
-  optional `breaks` citation named ten lines for a nine-line quote, while its
-  other five citations were exact. The claim was true, and is fixed on the
-  branch. `Q6`'s repair cannot rescue that shape by design, because a repair that
-  drops a named line could drop the line authorizing the anchor. **The rule
-  behaved as designed and a true finding was still lost**; do not weaken the rule
-  to catch it.
-- **A boundary-discarded candidate is not in `validation.rejected`.** It is an
-  execution-failure diagnostic. A summary reading `rejected=0` beside incomplete
-  coverage is accurate and easy to misread.
-- **The interactive UI truncates every evidence line at the window edge**, so you
-  cannot read a run's own evidence from the screen. Recover it from
-  `~/.copilot/session-state/<session-id>/events.jsonl`, which holds the `Q1`,
-  `Q2`, `M2`/mode, `P1` and `P2` lines in full. That is a Copilot implementation
-  detail, not a contract.
-- **No run reports what it cost.** Billing is collected per request and retained
-  in the evidence, and never printed; the host status bar shows the ambient
-  session's zero. `SCOPE.md` defers usage reports, so a cost line is a scope
-  decision for the user, not a defect to fix unasked.
+`U1` added `--unattended`, a declaration checked at parse time that refuses any
+invocation that would need a person: without `--all`, without `--comment` or
+`--no-comment`, with `--verify`, or with `--capture-only`. It grants no
+authority, opens no gate and is not a configuration key. Pull request #28 carries
+all of it.
 
-**Five reviews in a row have now caught this project's paperwork disagreeing with
-itself**: #18, #23, #24, #25 and #26. #26's was the closing section still telling
-the next agent to run the external review the entry above it had just recorded.
-**Before you finish, grep the live roadmap for claims your own change has made
-false**, especially present-tense sentences about what has never been done.
+- **Read the discarded candidates. Always.** #28 produced one candidate, the
+  adjudicator accepted it with `allClaimsSupported` true, and the evidence
+  boundary discarded it anyway, because the adjudicator's own third citation
+  quoted sixteen lines of `review.mjs` while naming the range 88-102. **`E1` saw
+  that shape on a reviewer's citation; this is the first time it has happened
+  after a verdict.** The finding was true and is fixed on the branch. Do not
+  weaken the rule to catch it: `Q6`'s repair cannot rescue this shape by design,
+  because a repair that drops a named line could drop the line authorizing the
+  anchor.
+- **A run reporting `0 findings, rejected=0` on incomplete coverage is still
+  accurate and still easy to misread.** A boundary discard is an
+  execution-failure diagnostic and never reaches `validation.rejected`. The
+  breakdown line underneath is what separates a failed reviewer from a caveat.
+- **`Q6`'s clipped-end repair fired live again** on #28, restoring a quote whose
+  trailing comma the model had dropped, in the same run whose other citation the
+  boundary refused. Both behaviours are working as designed.
+- **The defect was false prose written in the same commit as the feature.** The
+  new section claimed a no-UI host publishes nothing, which the README's own
+  command contract contradicted four hundred lines earlier. **Six reviews in a
+  row have now caught this project's paperwork disagreeing with itself**: #18,
+  #23, #24, #25, #26 and #28. Before you finish, grep the live roadmap and the
+  README for claims your own change has made false.
 
 ## Validation and runtime caveats
 
@@ -112,22 +112,25 @@ in the skipped list has crossed 65536 bytes.
 **Check `copilot plugin list` immediately before dispatching any review**, and
 **reinstall whenever the checkout changes**, checking out before installing and
 never the other way round. During `D1` an install that had reported success was
-gone minutes later, most likely clobbered by a concurrent `copilot` process. `E1`
-reinstalled with `copilot plugin install "$(pwd)"` and then ran `diff -rq` of
+gone minutes later, most likely clobbered by a concurrent `copilot` process.
+`U1` reinstalled with `copilot plugin install "$(pwd)"` and then ran `diff -rq` of
 `~/.copilot/installed-plugins/_direct/pr-review/extensions/pr-review` against the
 checkout, expecting no output; do the same. CLI 1.0.83 warns that direct local
 installs are deprecated for a future release.
 
 **If you cannot type a Copilot slash command, dispatch it through the SDK** with
-`node scripts/dogfood-review.mjs NUMBER --deep --no-comment`, as `AGENTS.md` says.
-It refuses `--comment` and `--quiet`, asserts a clean tree at the pull request
-head, and prints the credit total the interactive run does not.
-`PR_REVIEW_DOGFOOD_REPOSITORY` retargets it. `copilot -p "/pr-review N"` is not a
-substitute: prompt mode starts an ambient model turn instead of dispatching.
+`node scripts/dogfood-review.mjs NUMBER --deep --all --no-comment --unattended`,
+as `AGENTS.md` says. **That runner now requires `--all` and `--unattended`**,
+because its session has no elicitation UI, and it still refuses `--comment` and
+`--quiet`. It asserts a clean tree at the pull request head and prints the credit
+total the interactive run does not. `PR_REVIEW_DOGFOOD_REPOSITORY` retargets it.
+`copilot -p "/pr-review N"` is not a substitute: prompt mode starts an ambient
+model turn instead of dispatching.
 
 Both no-inference runtime probes spend no credits but need a live runtime
-connection. `node scripts/smoke-runtime.mjs --targets` was **not** rerun during
-`E1`, which changed no file it covers.
+connection. `node scripts/smoke-runtime.mjs --targets` **was rerun during `U1`**
+and passes with 71 assertions, seven of which dispatch the new refusals through
+the runtime's own command RPC without reaching a capture.
 
 ```sh
 COPILOT_CLI_PATH="$(command -v copilot)" \
@@ -135,6 +138,11 @@ COPILOT_SDK_PATH="$(ls -d "$HOME"/.copilot/pkg/*/"$(copilot --version \
   | sed -n 's/.*CLI \([0-9][0-9.]*[0-9]\).*/\1/p')"/copilot-sdk)" \
 node scripts/smoke-runtime.mjs --targets
 ```
+
+**That probe now reads back one sentence of `help` and one of `status`**, which
+is the first check this repository has ever had on either, after three false
+user-facing strings shipped from here. If you change those strings, change the
+probe with them; if you add a flag, add its sentence and assert it.
 
 `scripts/smoke-safeguards.mjs` covers the gates and execution: shapes that need a
 shell and shapes that do not, the exclusion cases including both `vitest` forms
@@ -152,26 +160,26 @@ live**, on #25's second review.
 
 **Press Space on the command before pressing Enter** in any `--verify` run, and
 in finding selection. The host's multi-select toggles only on Space; Enter on a
-merely highlighted option submits the empty default. `E1`'s selection worked
-first time because the question now says so.
+merely highlighted option submits the empty default. The question now says so.
 
 `scripts/smoke-review.mjs` covers the run, including that an approved command
 runs after approval and before the first specialist, that no reviewer prompt
 carries its output, that a failing safeguard leaves coverage completed, that
 `safeguards` stays out of the retained record, that no reviewer prompt claims the
-working tree is still the reviewed revision, and the whole quiet contract. **All
-of those are settled behaviour; keep every one.**
+working tree is still the reviewed revision, the whole quiet contract, and
+`U1`'s settled unattended run on a harness that **does** have an elicitation UI
+and is asked nothing. **All of those are settled behaviour; keep every one.**
 
 `scripts/smoke-reviewer-tools.mjs`, the confinement probe outside the thirteen,
 must be run and reported for any increment touching `read-only.mjs`. `V2a`,
-`V2b`, `A1`, `L1`, `D1`, `O1` and `E1` did not touch it. `E1`'s live run is fresh
-evidence that confinement holds: 16 tool calls, `view` and GPT's `rg` alias, all
+`V2b`, `A1`, `L1`, `D1`, `O1`, `E1` and `U1` did not touch it. #28's run is fresh
+evidence that confinement holds: 13 tool calls, `view` and GPT's `rg` alias, all
 approved by the permission handler, zero denials.
 
 The personal config probe fails its first assertion if personal
 `pr-review/config.json` exists. Move it aside only if running that probe, restore
 it afterwards, and verify with `shasum -a 256`. That file was not moved or edited
-during `E1`, and both of `E1`'s reviews read it: `heavyModel=gpt-5.6-terra`,
+during `U1`, and #28's review read it: `heavyModel=gpt-5.6-terra`,
 `lightModel=gpt-5.6-luna`, `mediumModel=claude-sonnet-5`, efforts high, high and
 medium.
 
@@ -182,8 +190,8 @@ spending a review on it.
 **Never add a timeout, deadline or stuck-reviewer heuristic**, and never add one
 to bound a running safeguard. `SCOPE.md` forbids review timeouts, and `C3`, `C5`,
 the watch exclusion and `V2a`'s cancellation all depend on their absence. A quiet
-timeline is not a hang. `E1`'s reviewer printed five identical `active` lines over
-76 seconds while making sixteen tool calls; that is the tool working.
+timeline is not a hang. #28's reviewer printed three identical `active` lines
+over 94 seconds while making thirteen tool calls; that is the tool working.
 
 **Do not weaken the shell gate.** A project that declares `npm run lint && npm
 test` gets a refusal, and the answer is for that project to declare two lines.
@@ -209,6 +217,16 @@ Citations remain limited to captured diff and context windows.
 
 ## Settled decisions, none of which is to be reopened
 
+- **`U1` is closed, and its shape is not to be widened.** `--unattended` is a
+  preflight declaration that only refuses. It does not change what a run does on
+  a host that has a UI, beyond withholding the closed-PR confirmation, and it
+  adds no machine-readable outcome. Both of those were offered to the user and
+  declined as larger. **Posting authority still never authorizes safeguard
+  execution**, and no gate may be relaxed to let a headless run past one.
+- **An unattended run must always name its posting decision.** A saved
+  `autoPostReviews` may never be what makes a headless run publish. This narrows
+  nothing outside the flag: `--all` with `autoPostReviews=true` still publishes
+  unattended on a host with no UI, exactly as `SCOPE.md` allows.
 - **`L1` is closed.** Upstream declares MIT and publishes no licence text and no
   copyright notice, so no upstream source, prompt text or documentation may be
   copied, and a line-level audit shows none has been. `docs/upstream-licensing.md`
@@ -228,14 +246,14 @@ Citations remain limited to captured diff and context windows.
 
 ## State at this handoff
 
-`E1` landed through pull request **#26**, seven commits on branch
-`e1-real-execution-feedback`, reviewed once with this plugin. The user chose to
-merge it at the end of that session, so **you should be starting from `main`
-with no increment branch open**. Confirm that from git state rather than from
-this sentence, and reconcile anything that disagrees.
+`U1` landed on branch `u1-unattended-execution` through pull request **#28**,
+reviewed once with this plugin at the user's authorization. **Merging is the
+user's decision**, so confirm from git state whether #28 is merged and whether
+you are starting from `main` with no increment branch open, and reconcile
+anything that disagrees with this sentence.
 
-**Merging is always the user's decision**, and `main` refuses direct pushes for
-everyone. Playground pull requests #1 and #2 must never be merged.
+`main` refuses direct pushes for everyone. Playground pull requests #1 and #2
+must never be merged.
 
 If you land anything at all: follow `AGENTS.md`, with meaningful validated
 checkpoint commits, a named branch and pull request, no direct `main` push, and
