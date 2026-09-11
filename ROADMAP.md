@@ -68,7 +68,7 @@ posting them.
 | A1 | Completed | Completed entries `F1` through `V1c` moved verbatim into `docs/roadmap-archive-2026-09-10.md`, leaving a live `ROADMAP.md` that this project's own safeguard discovery reads instead of skipping for size. The increments table, the two most recent completed entries and the exact-next-increment section stayed. Pull request #22; documentation-only, so no installed-plugin review, and the user was asked rather than charged. | V2b; housekeeping, no scope clause |
 | D1 | Completed | User documentation: `README.md` reorganised by task with reproducible examples for configuration, modes, incomplete coverage, cancellation, publication, the cache and safeguards, shortened from 103903 to 55195 bytes so this project's own discovery now reads every root file and skips none. Also fixes the reviewer prompt's "verified to be at" wording and two shipped `help`/`status` strings that denied safeguards are ever executed, which makes it a behaviour change needing one installed-plugin review; that review is `--verify` with the safeguards suite approved. Pull request #24, reviewed once with this plugin at the user's authorization: deep with `--verify`, 136.8324 credits, 0 validated findings on incomplete coverage, and two discarded candidates that both described real defects, fixed on the branch. The offered safeguards were not approved, so `D1` bought no live execution evidence; `O1`'s second review did. | A1, L1; [Release boundary](SCOPE.md#priority-and-release-boundary) |
 | O1 | Completed | A review's output can be asked to be quiet: `--quiet` suppresses the evidence JSON lines and every raw untrusted model envelope, including the safeguard discovery pass's, and suppresses nothing about coverage, refusals, failures, safeguards or publication. Verbose stays the default and `scripts/dogfood-review.mjs` refuses the flag, because this project's own roadmap evidence is read from those lines. The user chose one flag and no configuration key. Pull request #25, reviewed once with this plugin at the user's authorization: deep with `--verify`, 57.6814 credits, completed coverage, 2 validated findings of which one was real and is fixed here and one was false and is rejected with a reproduction. Reviewed a second time at the user's further authorization after the approval fix, 98.84322 credits, completed coverage, one real finding: **that run approved and executed a safeguard, which is the first time the installed plugin has ever run one.** | D1; [Modes/findings](SCOPE.md#review-modes-and-findings) |
-| E1 | Pending | The tool is used for real, on work that is not this repository, and what that use reveals is collected and acted on. Deliver: at least one authorized review of a substantial code diff in another repository, a written record of what the reviewers actually did well and badly on it, and the defects and usability problems that surfaced, fixed or recorded with a reason. This is the first scheduled increment because everything after it should be informed by how the tool behaves on real work rather than on its own small diffs. | O1; [Modes/findings](SCOPE.md#review-modes-and-findings) |
+| E1 | In progress | The tool is used for real, on work that is not this repository. One authorized deep review of `xpepper/pr-review-gemini#28`, 1427 changed lines over 16 files, ran on 2026-09-11: 81.48022 credits, 93 s of model work, 16 approved tool calls and no denial, one validated finding that is real and exact, and one blocked assessment reported twice. Six items came out of it; the coverage-gap consolidation defect is fixed here, two are documentation fixes, and three are recorded with reasons. Entry below. **Completion needs this increment's own pull request reviewed with the plugin and that review recorded.** | O1; [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | U1 | Pending | Unattended, non-interactive execution: a run that completes in a headless environment without a person answering anything, while every existing gate still holds. `SCOPE.md` already allows `--all --comment` and `--all` with `autoPostReviews=true` to publish unattended, so this is about what a run does when no elicitation UI exists at all, and about making that explicit rather than incidental. Posting authority still never authorizes safeguard execution. The first half of issue #21, taken first because it is the smaller half. | E1; [Publication controls](SCOPE.md#selection-publication-and-cached-results), [Safeguards](SCOPE.md#optional-project-safeguards) |
 | I1 | Pending | Incremental re-reviews: when a pull request has moved on since a previous review, confine fresh hunting to the new commit range and revalidate the prior findings as resolved, still open, or obsolete. Requires discovering the prior review and the head it evaluated, and classifying the relationship between that head and the current one. Several increments rather than one, so the first step is slicing it. The second half of issue #21. It touches head binding and the evidence boundary, which are the most settled parts of the design; changing either needs the user to say so. | U1; [Targets](SCOPE.md#targets-and-local-behavior), [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | G1 | Pending | Gap analysis against the field, then a proposal. Compare this tool behaviourally with upstream `pi-pr-review` and with other code-review agents and skills now in the open, on capability and on user experience, and propose what is worth adopting. Research is extensive and the output is a written analysis plus a recommendation, not code. **`L1`'s rule binds this absolutely: no upstream or third-party source, prompt text or documentation may be copied.** Any adoption is behavioural and re-implemented. Anything it proposes is a scope decision for the user. | I1; [Upstream baseline](SCOPE.md#upstream-baseline) |
@@ -109,8 +109,8 @@ read from the archive rather than from this file.
 [docs/upstream-licensing.md](docs/upstream-licensing.md) is still the record of
 that licence work and did not move.
 
-**`O1`'s entry is the only one kept live**, along with the increments table above
-and the closing section at the end. The rule these moves established is to keep
+**`O1`'s and `E1`'s entries are the ones kept live**, along with the increments
+table above and the closing section at the end. The rule these moves established is to keep
 the most recent entries and archive the rest, measuring this file with `wc -c`
 against the 65536-byte cap before opening a pull request. `O1` archived `D1`
 after its second review found the live file contradicting itself: `D1`'s
@@ -375,6 +375,139 @@ learned by writing it down; take it as a standing check rather than a warning.
 It is fixed by archiving `D1`'s entry, which this file needed anyway for
 headroom. The entry moved verbatim, because the sentence was true when `D1`
 wrote it, and the live file now answers the question on its own.
+
+## Increment E1: feedback from real execution
+
+**`E1` is the first time this tool reviewed code that nobody here wrote for it.**
+Every increment before it was demonstrated on this repository's own pull
+requests, which are small and mostly prose; the largest was #10 at 984 additions
+over twelve files. The one earlier exception is in the archive: a `--quick` run
+against private `primait/starsky#8126` on 2026-09-07, four changed paths, zero
+findings, recorded as manual feedback rather than as an increment.
+
+**The target was agreed with the user before anything was spent**:
+`xpepper/pr-review-gemini#28`, a sibling port of this tool to another CLI, merged
+the same day. 1427 changed lines over 16 files, of which about 510 lines are new
+production JavaScript and 650 are new tests. The user chose deep, and chose not
+to run `--verify`.
+
+### The run
+
+Reviewed from a clone pinned at the pull request head rather than from the
+user's own working copy of that repository, because another session was
+committing in it while we worked. `/pr-review 28 --deep --no-comment`, typed
+interactively, with the installed plugin byte-identical to `main` at `6de2d75`.
+A free `--capture-only` dispatch went first and proved the capture before any
+credit was spent.
+
+| Measure | Value |
+| --- | --- |
+| Bound input | 92844 byte diff, 279673 bytes of context over 29 blobs |
+| Reviewer `integrated`, heavy, `gpt-5.6-terra` high | 76.3 s, 5 requests, 51.82372 credits |
+| Adjudicator, `gpt-5.6-terra` high | 12.3 s, 1 request, 29.6565 credits |
+| Total | 81.48022 credits, 93 s of model work |
+| Tool calls | 16, all approved, zero denials: `view` x8, `rg` x8 |
+| Result | 1 candidate, 1 validated finding, 0 rejected, 0 capped, 0 duplicates |
+| Coverage | INCOMPLETE: 0 execution failures, 2 coverage gaps, 0 caveats |
+
+**The largest input this tool has ever bound cost less than any balanced review
+of this repository's own small pull requests.** Reviewer count dominates, as the
+README said; this run is the first measurement that isolates it.
+
+### What the reviewers did well
+
+**The one finding is real, and it is the sharpest defect in the diff.** [P2]
+"Preserve a signal-terminated child review as failure", `scripts/dogfood-pr.mjs`
+lines 79-80, confidence 0.96: the new wrapper's `code ?? 0` turns the null exit
+code Node reports for a signal-killed child into a successful exit, so an
+interrupted review reports success to whatever called it. The anchor, the exact
+quote and the blob identity are all correct, and the claim was verified by hand
+against Node's documented behaviour rather than taken from the adjudicator.
+
+**It engaged with the riskiest new code and declined to assert.** The diff's
+`isModelUnavailableError` matches model-catalog failures by regular expression
+over error text, and the reviewer's coverage gap says exactly why it could not
+be judged: the repository contains only synthetic fixtures, so whether the
+matcher recognises the host's real failures cannot be established from the
+captured revision. That is the evidence boundary working as designed, at the
+reviewer's own initiative.
+
+**Three gates ran live on someone else's repository for the first time**: the
+merged pull request confirmation, which asked and was answered yes; the revision
+gate against a foreign checkout; and finding selection, where the user selected
+the finding with Space and submitted with Enter. `O1`'s fix to that question
+carried over, and nothing was published.
+
+### What it did badly, and the honest limit on saying so
+
+**One finding from 1427 changed lines.** Nothing was discarded, so this was the
+reviewer's own output rather than a gate: `rejected` and `capped` are both
+empty. An independent reading of the same production diff, written down
+before the run settled and kept verbatim in
+[docs/e1-independent-reading.md](docs/e1-independent-reading.md), raised six
+further candidates, the strongest being basename-only file matching in the new
+`isMatchingFile`, which lets a finding about any same-named file in any directory
+satisfy a benchmark. **That reading is one reader's opinion and is not ground
+truth**, and its own author later weakened two of its seven entries, so what this
+increment establishes is precision, which was 1 for 1, and not recall, which
+remains unmeasured. A recall number needs a defect corpus with agreed ground
+truth, which this project does not have and has not scheduled. The design trades recall for precision deliberately;
+this is the first evidence of what that costs on a substantial diff.
+
+**Coverage read INCOMPLETE with zero execution failures.** Both gaps were the
+same honest statement about unverifiable evidence. On real code a reviewer will
+usually have something it cannot verify, so the headline word will usually be
+INCOMPLETE, and the breakdown line underneath is what actually distinguishes a
+failed reviewer from a caveat.
+
+### The six items this run produced, and what was done about each
+
+| # | Item | Disposition |
+| --- | --- | --- |
+| 1 | Coverage-gap consolidation could not fire on real wording | **Fixed here** |
+| 2 | A review never reports what it cost | Recorded; scope defers usage reports |
+| 3 | Evidence lines are unreadable in the interactive UI | Recorded |
+| 4 | Per-reviewer progress says nothing for 76 seconds | Recorded |
+| 5 | Verbose is the wrong default for reading | **Fixed here**, in `README.md` |
+| 6 | Adjudication is a fixed cost, not a per-finding one | **Recorded in `README.md`** |
+
+**Item 1 is a defect with two live instances and a measured cause.** The
+reviewer and the adjudicator blocked the same assessment in almost the same
+words, and the user was shown both. `presentationDiagnostics` refused the merge
+because `equivalentGaps` required a backticked identifier shared between the two
+messages, and neither reviewer used backticks. The similarity rule was never
+reached: the Dice overlap of the two impact clauses is 0.645 against a 0.35
+threshold, and the shared tokens include the function's own name. A bare name
+now counts as a name when it has a shape prose does not, being an internal
+capital after a lowercase letter or an underscore. Naming the same code still
+only makes two gaps comparable, the impact clauses still have to agree, and raw
+diagnostics are still retained unmerged. Replaying this run's two real gaps
+through the fixed module yields one gap with two reports. The archive's earlier
+instance, `primait/starsky#8126`, still does not merge and should not: its
+overlaps were 0.323, 0.207 and 0.188, all genuinely below the threshold.
+
+**Item 2 is the one a user feels every time.** Billing is collected per request
+and retained in the evidence, but nothing prints it, and the host's own status
+bar reports the ambient session's zero rather than what the reviewers spent.
+This run's 81.48022 was recovered afterwards from Copilot's session state on
+disk. `SCOPE.md` defers detailed timing and usage reports to nice-to-have, so a
+cost line is a scope decision rather than a defect to fix inside `E1`.
+
+**Item 3 is why item 2 was hard.** Each evidence line is a single very long line
+of JSON, and the interactive UI truncates it at the window edge, so this
+increment's own evidence could not be read from the screen at all. The project's
+record-keeping depends on those lines. The workaround used here was to parse
+`~/.copilot/session-state/<id>/events.jsonl`, which is a Copilot implementation
+detail and not a contract.
+
+**Item 4**: five identical `active` lines over 76 seconds, while the reviewer was
+making sixteen tool calls. `SCOPE.md` requires basic per-reviewer progress and
+defers a live scrolling view, and this sits between them.
+
+**Items 5 and 6 are documentation.** The first-review walkthrough now says that
+most of a run's output is evidence rather than findings and points at `--quiet`
+for reading, and the cost table carries this review as its one row from another
+repository together with the adjudicator's 29.6565 share of it.
 
 ## v1 is complete, and four increments are scheduled after it
 
