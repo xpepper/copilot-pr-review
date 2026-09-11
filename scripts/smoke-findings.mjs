@@ -307,6 +307,25 @@ const distinctBareIdentifierGap = {
 };
 assert.equal(presentationDiagnostics([...repeatedBareIdentifierGaps, distinctBareIdentifierGap]).length, 2,
   "A shared bare identifier must not merge substantively different blocked assessments");
+// A bare name carries no delimiter of its own, so it must match a whole word.
+// Backticks used to do that job: `loadUser` could never match `loadUserProfile`.
+const prefixIdentifierGaps = [
+  {
+    kind: "coverage-gap",
+    message: "correctness: The session fixtures are not captured. Blocked assessment: Whether loadUser rejects an expired token before the profile request cannot be determined from this revision.",
+  },
+  {
+    kind: "coverage-gap",
+    message: "contracts: The session fixtures are not captured. Blocked assessment: Whether loadUserProfile rejects an expired token before the profile request cannot be determined from this revision.",
+  },
+];
+assert.equal(presentationDiagnostics(prefixIdentifierGaps).length, 2,
+  "A bare name must not match inside a longer name");
+assert.equal(presentationDiagnostics([
+  prefixIdentifierGaps[0],
+  { ...prefixIdentifierGaps[0], message: prefixIdentifierGaps[0].message.replace("correctness:", "security:") },
+]).length, 1, "The same bare name in both messages still consolidates");
+
 // Ordinary prose must not become an identifier. These two share no code name at
 // all, and their impact clauses are deliberately near-identical, so only the
 // identifier rule can keep them apart.
