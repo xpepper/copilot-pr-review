@@ -32,8 +32,23 @@ const bodyPattern = new RegExp(
   "\\n\\nIntroduced by this diff: ([\\s\\S]+?)" +
   "\\n\\nConfidence: (0(?:\\.\\d+)?|1(?:\\.0+)?)\\. Reported by: ([^\\n]+)\\.$");
 
+// Anchoring the pattern at both ends makes the round-trip automatic for any
+// match, which is exactly why it proves nothing about which split was chosen: a
+// field whose own prose opens a paragraph with one of these labels admits more
+// than one split, and every one of them rebuilds the same bytes. So ambiguity is
+// refused before the split is trusted. That is the safe direction and the
+// contract this parser states: a body is either recovered exactly or reported
+// unreadable, never misread into fields it did not have.
+const separators = ["When", "Expected", "Actual", "Introduced by this diff", "Confidence"]
+  .map((label) => `\n\n${label}: `);
+
+const unambiguous = (body) => separators.every((separator) => {
+  const first = body.indexOf(separator);
+  return first !== -1 && body.indexOf(separator, first + 1) === -1;
+});
+
 export function parseCommentFinding(body) {
-  if (typeof body !== "string") return undefined;
+  if (typeof body !== "string" || !unambiguous(body)) return undefined;
   const match = bodyPattern.exec(body);
   if (!match) return undefined;
   const [, severity, title, trigger, expected, actual, introduction, confidence, reporters] = match;

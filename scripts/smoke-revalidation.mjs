@@ -530,7 +530,7 @@ function retained(revalidation) {
 
 import {
   answerableEntries, describeReplies, dispatchReplies, interpretReplyWrite, isOurReply,
-  planReplies, publishReplies, replyBody,
+  planReplies, publishReplies, replyAuthority, replyBody,
 } from "../extensions/pr-review/replies.mjs";
 
 const them = { login: "someone-else", id: 4242 };
@@ -777,6 +777,7 @@ const okResponse = (comment) => `HTTP/2.0 201 Created\r\nserver: github\r\n\r\n$
 // that proves them is read once whether or not the run also confines.
 
 import { executeTargetCapture } from "../extensions/pr-review/target.mjs";
+import { parseReviewArgs } from "../extensions/pr-review/review.mjs";
 import { identity, respond } from "./target-fixture.mjs";
 import { isPriorReview, toolReviewBody } from "../extensions/pr-review/prior.mjs";
 
@@ -906,4 +907,87 @@ const rangeRequests = (calls) => calls.filter((args) =>
     commit_id: base.binding.head, submitted_at: "2026-09-12T09:00:00Z", body: null,
   }, identity), false, "An implicit review carrying a reply is not a prior review of ours");
   console.log("PASS I1c a reply never comes back as a finding or as a review this tool wrote");
+}
+
+// ---------------------------------------------------------------------------
+// Three defects the deep review of pull request #32 reported, each reproduced
+// before it was fixed. Two of them this suite had missed entirely.
+
+// #32 integrated:2. The ordinary unsettled verdict carries proof "touched", and
+// the retained record's code-proof list did not admit it, so any review that
+// revalidated and left one finding unsettled threw when it journalled itself.
+// Every earlier test here judged its unsettled entries away before retaining.
+{
+  const result = revalidatePrior(found("incremental", [priorComment({ path: "total.js", line: 3 })]),
+    base.binding.head, { range });
+  assert.equal(result.entries[0].verdict, "unsettled");
+  assert.equal(result.entries[0].proof, "touched");
+  validateRecord(retained(retainedRevalidation(result)), sessionId);
+  // The base-side half of the same proof, which reaches it by another path.
+  const baseSide = revalidatePrior(found("incremental",
+    [priorComment({ path: "total.js", side: "LEFT", line: 2 })]), base.binding.head, { range });
+  assert.equal(baseSide.entries[0].proof, "touched");
+  validateRecord(retained(retainedRevalidation(baseSide)), sessionId);
+  // And the rename proof, which no earlier test retained either.
+  const moved = revalidatePrior(found("diverged", [priorComment()]), base.binding.head);
+  assert.equal(moved.entries[0].proof, "no-range");
+  validateRecord(retained(retainedRevalidation(moved)), sessionId);
+  console.log("PASS I1c an unsettled verdict survives being retained, by every proof that reaches it");
+}
+
+// #32 integrated:3. Anchoring the pattern at both ends makes the round-trip
+// automatic for any match, which is exactly why it proves nothing about which
+// split was chosen. A field whose own prose opens a paragraph with one of the
+// five labels admits more than one split, and each rebuilds the same bytes.
+{
+  const ambiguous = { ...finding, trigger: "any call\n\nExpected: something the reviewer wrote" };
+  const body = commentBody(ambiguous);
+  const parsed = parseCommentFinding(body);
+  assert.equal(parsed, undefined,
+    "A body that admits more than one split is unreadable, never silently misread");
+  for (const label of ["When", "Expected", "Actual", "Introduced by this diff", "Confidence"]) {
+    const collision = commentBody({ ...finding, actual: `it fails\n\n${label}: more prose` });
+    assert.equal(parseCommentFinding(collision), undefined, `A repeated ${label} label is ambiguous`);
+  }
+  // A label that is not at a paragraph start is ordinary prose and reads fine.
+  const inline = { ...finding, trigger: "any call where Expected: is written inline" };
+  assert.deepEqual(parseCommentFinding(commentBody(inline))?.trigger, inline.trigger);
+  console.log("PASS I1c a body admitting more than one split is unreadable, not misread");
+}
+
+// #32 integrated:1. Replies must carry the review's posting authority, and an
+// empty selection is not an absence of authority: it is the case the feature
+// exists for. finishPreview leaves an empty selection unauthorized, so reading
+// preview.authorized meant a re-review that found nothing new answered nothing.
+{
+  const result = settled();
+  const withPolicy = (policy, status) => ({
+    ...base, revalidation: retainedRevalidation(result),
+    preview: { policy, status, authorized: ["flag-authorized", "config-authorized", "confirmed"].includes(status) },
+  });
+  const flagged = replyAuthority(withPolicy({ comment: true, noComment: false, autoPostReviews: false }, "empty"));
+  assert.equal(flagged.authorized, true, "--comment authorizes replies with no review to publish");
+  const configured = replyAuthority(withPolicy({ comment: false, noComment: false, autoPostReviews: true }, "empty"));
+  assert.equal(configured.authorized, true, "autoPostReviews does too");
+  const suppressed = replyAuthority(withPolicy({ comment: false, noComment: true, autoPostReviews: false }, "empty"));
+  assert.equal(suppressed.status, "suppressed");
+  assert.equal(suppressed.authorized, false, "--no-comment means post nothing, replies included");
+  const declined = replyAuthority(withPolicy({ comment: false, noComment: false, autoPostReviews: true }, "declined"));
+  assert.equal(declined.authorized, false, "A declined review proposal is never re-asked as a reply question");
+  const confirmed = replyAuthority(withPolicy({ comment: false, noComment: false, autoPostReviews: false }, "confirmed"));
+  assert.equal(confirmed.authorized, true, "One confirmation covers the review and the replies");
+  const asks = replyAuthority(withPolicy({ comment: false, noComment: false, autoPostReviews: false }, "empty"));
+  assert.equal(asks.status, "confirmation-required");
+  assert.equal(asks.authorized, false,
+    "With nothing published there was no confirmation to cover them, so the replies ask for themselves");
+  // U1's guarantee holds through this too: --unattended is refused at parse time
+  // without --comment or --no-comment, so the reply question can never be the
+  // one a headless run has nobody to answer.
+  for (const args of ["1 --deep --all --no-comment --unattended", "1 --deep --all --comment --unattended"]) {
+    const options = parseReviewArgs(args);
+    const policy = { comment: options.comment, noComment: options.noComment, autoPostReviews: false };
+    assert.notEqual(replyAuthority(withPolicy(policy, "empty")).status, "confirmation-required",
+      "An unattended run can never reach the reply question");
+  }
+  console.log("PASS I1c replies carry the review's posting authority, not its selection");
 }

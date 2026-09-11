@@ -1,3 +1,4 @@
+import { waitForInteraction } from "./interaction.mjs";
 import { identityFrom } from "./prior.mjs";
 import { responseParts, verifyPublicationTarget } from "./publication.mjs";
 import { runGh } from "./target.mjs";
@@ -148,29 +149,89 @@ export async function dispatchReplies(outcome, binding, planned, { controller, c
   return outcome;
 }
 
+// The review's posting authority, read from the policy rather than from whether
+// the review had anything to publish. The deep review of #32 caught this: an
+// empty selection leaves `preview.authorized` false, so reading that flag meant
+// a re-review which found nothing new answered no thread, and a re-review which
+// finds nothing new is the case this feature exists for.
+//
+// What an empty selection really removes is the confirmation, because there was
+// no proposal to confirm. So the replies ask for themselves in that one case,
+// and in no other: a flag or a saved setting already authorizes them, a
+// confirmed proposal already covers them, and a declined one already refused
+// them and is never re-asked.
+export function replyAuthority(outcome) {
+  const preview = outcome.preview;
+  if (!preview?.policy) return { status: "unavailable", authorized: false };
+  if (preview.policy.noComment) return { status: "suppressed", authorized: false };
+  if (preview.status === "declined") return { status: "declined", authorized: false };
+  if (preview.authorized) return { status: preview.status, authorized: true };
+  if (preview.policy.comment) return { status: "flag-authorized", authorized: true };
+  if (preview.policy.autoPostReviews) return { status: "config-authorized", authorized: true };
+  return { status: "confirmation-required", authorized: false };
+}
+
+async function confirmReplies(parent, outcome, planned, controller) {
+  if (!parent.capabilities.ui?.elicitation) {
+    return { status: "unavailable", authorized: false,
+      reason: "this host has no confirmation UI, and no flag or setting authorized the replies" };
+  }
+  const binding = outcome.binding;
+  const answer = await waitForInteraction(controller.signal, () => parent.ui.elicitation({
+    message: `Answer ${planned.length} thread(s) of an earlier review of ` +
+      `${binding.repository.nameWithOwner}#${binding.number} at head ${binding.head}?\n` +
+      "This run published no review, so nothing has confirmed these replies yet. Each reply states one " +
+      "earlier finding's verdict on its own thread and reports no new finding. This does not authorize safeguards.",
+    requestedSchema: {
+      type: "object",
+      properties: { authorize: { type: "boolean", title: "Answer the earlier review's threads", default: false } },
+      required: ["authorize"],
+    },
+  }));
+  if (answer?.action === "cancel") {
+    controller.abort(new DOMException("Reply confirmation cancelled; no reply was written.", "AbortError"));
+    controller.signal.throwIfAborted();
+  }
+  if (answer?.action === "decline") return { status: "declined", authorized: false };
+  requireReplies(answer?.action === "accept" && answer.content &&
+    Object.keys(answer.content).length === 1 && typeof answer.content.authorize === "boolean",
+  "invalid reply confirmation answer");
+  return answer.content.authorize
+    ? { status: "confirmed", authorized: true } : { status: "declined", authorized: false };
+}
+
 export async function publishReplies(parent, outcome, {
   controller, cwd, gh = runGh, persist,
 }) {
   requireReplies(!outcome.replies, "this invocation already has a reply disposition");
   outcome.replies = { status: "not-attempted", attempted: false, entries: [] };
   const planned = answerableEntries(outcome.revalidation);
-  // Every reason not to write, each stated rather than left as silence.
-  const refusal =
-    controller.signal.aborted || outcome.cancelled ? "the run was cancelled"
-      : !outcome.revalidation ? undefined
-        : !outcome.preview?.authorized ? "this run has no posting authority"
-          : !planned.length ? "no earlier finding reached a settled verdict"
-            : ["in-flight", "uncertain"].includes(outcome.publication?.status)
-              ? "the review write's outcome is unknown, and an unknown remote state is never compounded"
-              : undefined;
   if (!outcome.revalidation) return outcome;
-  if (refusal) {
-    outcome.replies.reason = refusal;
-    await parent.log(`No thread was answered: ${refusal}. ${planned.length} settled verdict(s) were retained ` +
-      "and nothing was written.");
-    return outcome;
-  }
+  // Every reason not to write, each stated rather than left as silence, and each
+  // settled before anything is asked so a question is never put for a write that
+  // would be refused anyway.
+  let refusal =
+    controller.signal.aborted || outcome.cancelled ? "the run was cancelled"
+      : !planned.length ? "no earlier finding reached a settled verdict"
+        : ["in-flight", "uncertain"].includes(outcome.publication?.status)
+          ? "the review write's outcome is unknown, and an unknown remote state is never compounded"
+          : undefined;
   try {
+    if (!refusal) {
+      let authority = replyAuthority(outcome);
+      if (authority.status === "confirmation-required") {
+        authority = await confirmReplies(parent, outcome, planned, controller);
+      }
+      if (!authority.authorized) {
+        refusal = authority.reason ?? `the replies are ${authority.status}`;
+      }
+    }
+    if (refusal) {
+      outcome.replies.reason = refusal;
+      await parent.log(`No thread was answered: ${refusal}. ${planned.length} settled verdict(s) were retained ` +
+        "and nothing was written.");
+      return outcome;
+    }
     const request = (args) => {
       controller.signal.throwIfAborted();
       return gh(args, cwd, { signal: controller.signal });

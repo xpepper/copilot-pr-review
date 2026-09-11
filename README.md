@@ -312,10 +312,13 @@ re-review of this pull request.
 
 Replies carry **the review's own posting authority and no other**. `--no-comment`
 suppresses them exactly as it suppresses the review, `--comment` and
-`autoPostReviews` authorize them, and one confirmation covers both. What they do
-not need is a review: a re-review that selects no finding and has three earlier
-findings to answer is the case this exists for. An unsettled verdict is never
-posted, because replying that this tool could not tell is noise.
+`autoPostReviews` authorize them, a confirmed review proposal covers them, and a
+declined one refuses them and is never re-asked. What they do not need is a
+review: a re-review that selects no finding and has three earlier findings to
+answer is the case this exists for. **When there was no review proposal to
+confirm, the replies ask for themselves**, because nothing else had the chance
+to. An unsettled verdict is never posted, because replying that this tool could
+not tell is noise.
 
 A thread already carrying this run's answer **at this head** is skipped rather
 than answered twice. A thread answered at an older head is answered again,

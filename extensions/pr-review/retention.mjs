@@ -185,7 +185,13 @@ function validation(value, target, policy) {
 // each rung implies the one below it: 4 implies publication implies preview. A
 // revalidation is orthogonal to all of it, so hanging it off that ladder would
 // either break the nesting or overwrite what rung 4 already says.
-const codeProofs = ["unchanged-head", "untouched", "anchor-unplaceable", "file-deleted", "path-moved", "no-range"];
+// Every proof `codeVerdict` can reach, including the two that leave a finding
+// unsettled. Omitting "touched" made any review that revalidated and settled
+// less than everything throw when it journalled itself, which the deep review
+// of #32 caught and every test here had missed by judging its unsettled
+// entries away before retaining them.
+const codeProofs = ["unchanged-head", "untouched", "anchor-unplaceable", "file-deleted",
+  "path-moved", "touched", "no-range"];
 const verdicts = ["resolved", "still-open", "obsolete", "unsettled"];
 
 function revalidationEntry(value, judged) {
