@@ -191,7 +191,9 @@ export function contextSummary(context, limit = 20) {
   };
 }
 
-export async function executeTargetCapture(session, args, { gh = runGh, signal, quiet = false } = {}) {
+export async function executeTargetCapture(session, args, {
+  gh = runGh, signal, quiet = false, unattended = false,
+} = {}) {
   const options = parseTargetArgs(args);
   signal?.throwIfAborted();
   const metadata = await session.rpc.metadata.snapshot();
@@ -200,7 +202,11 @@ export async function executeTargetCapture(session, args, { gh = runGh, signal, 
   const cwd = metadata.workingDirectory;
   const outcome = await captureTarget(options, {
     cwd, gh,
-    confirm: session.capabilities.ui?.elicitation
+    // U1: an unattended run offers no confirmation even where the host has one,
+    // so a closed or merged pull request stops here with the message naming the
+    // two override flags. Withholding the question can only refuse a capture; it
+    // can never accept one on somebody's behalf.
+    confirm: !unattended && session.capabilities.ui?.elicitation
       ? (message) => waitForInteraction(signal, () => session.ui.confirm(message)) : undefined,
   });
   signal?.throwIfAborted();

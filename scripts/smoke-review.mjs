@@ -36,12 +36,12 @@ const fullMode = reviewModes.full;
 const deepMode = reviewModes.deep;
 const options = parseReviewArgs("1 --quick --no-comment");
 assert.deepEqual(options, { mode: "quick", captureOnly: false, captureArgs: "1", settings: {},
-  all: false, comment: false, noComment: true, verify: false, quiet: false });
+  all: false, comment: false, noComment: true, verify: false, quiet: false, unattended: false });
 assert.deepEqual(parseReviewArgs("  1 --major-only --no-comment  "), options);
 assert.deepEqual(parseReviewArgs("2 --quick --no-comment --include-drafts heavyModel=other heavyEffort=low"),
   { mode: "quick", captureOnly: false, captureArgs: "2 --include-drafts",
     settings: { heavyModel: "other", heavyEffort: "low" }, all: false, comment: false, noComment: true,
-    verify: false, quiet: false });
+    verify: false, quiet: false, unattended: false });
 assert.deepEqual(parseReviewArgs("1 --major-only --all --no-comment"), { ...options, all: true });
 assert.deepEqual(parseReviewArgs("1 --quick"), { ...options, noComment: false });
 assert.deepEqual(parseReviewArgs("1 --quick --all --comment"), { ...options, all: true, comment: true, noComment: false });
@@ -89,9 +89,46 @@ assert.deepEqual(parseReviewArgs("2 --full --quiet --no-comment --include-drafts
 assert.equal(parseReviewArgs("2 --quiet --include-drafts").captureArgs, "2 --include-drafts");
 assert.throws(() => parseTargetArgs("2 --quiet"), /Unsupported/);
 
+// U1: --unattended declares that this invocation leaves no question for a
+// person, and is checked here so a run that could not finish alone is refused
+// before capture and before a single credit is spent. It grants no authority,
+// opens no gate and selects no mode; every other parsed option is untouched.
+assert.deepEqual(parseReviewArgs("1 --quick --all --no-comment --unattended"),
+  { ...options, all: true, unattended: true });
+assert.deepEqual(parseReviewArgs("1 --all --comment --unattended"),
+  { ...balancedOptions, all: true, comment: true, noComment: false, unattended: true });
+assert.deepEqual(parseReviewArgs("1 --deep --all --comment --unattended"),
+  { ...options, mode: "deep", all: true, comment: true, noComment: false, unattended: true });
+assert.deepEqual(parseReviewArgs("1 --deep --all --no-comment --quiet --unattended"),
+  { ...options, mode: "deep", all: true, quiet: true, unattended: true });
+assert.deepEqual(parseReviewArgs("2 --full --unattended --all --no-comment --include-drafts"),
+  { ...options, mode: "full", captureArgs: "2 --include-drafts", all: true, unattended: true });
+// Like every other review flag, it never reaches target capture.
+assert.equal(parseReviewArgs("2 --unattended --all --no-comment --include-drafts").captureArgs,
+  "2 --include-drafts");
+assert.throws(() => parseTargetArgs("2 --unattended"), /Unsupported/);
+// Each refusal names the one thing that is missing, because the whole point of
+// the flag is that nobody is there to read a vague one.
+assert.throws(() => parseReviewArgs("1 --quick --no-comment --unattended"),
+  /--unattended needs --all/, "selection is a question, and --all is what settles it");
+assert.throws(() => parseReviewArgs("1 --all --unattended"),
+  /--unattended needs --comment or --no-comment/,
+  "no saved setting may decide whether an unattended run publishes");
+assert.throws(() => parseReviewArgs("1 --quick --all --no-comment --verify --unattended"),
+  /--unattended cannot be combined with --verify/,
+  "nothing but the approval question approves a safeguard command");
+// The publication refusal cites the invocation only: it must not depend on, or
+// mention, a saved autoPostReviews that could differ between machines.
+const postingRefusal = (() => {
+  try { parseReviewArgs("1 --all --unattended"); return ""; } catch (error) { return String(error); }
+})();
+assert.match(postingRefusal, /--comment or --no-comment/);
+assert.doesNotMatch(postingRefusal, /autoPostReviews/,
+  "the refusal is about the invocation, not about saved configuration");
+
 // Capture-only keeps the diagnostic capture path reachable without a reviewer.
 assert.deepEqual(parseReviewArgs("1 --capture-only"), { mode: undefined, captureOnly: true, captureArgs: "1",
-  settings: {}, all: false, comment: false, noComment: false, verify: false, quiet: false });
+  settings: {}, all: false, comment: false, noComment: false, verify: false, quiet: false, unattended: false });
 assert.equal(parseReviewArgs("2 --capture-only --include-drafts").captureArgs, "2 --include-drafts");
 for (const args of [
   "1 --quick --major-only --no-comment", "1 --quick --balanced --no-comment", "1 --balanced --major-only",
@@ -112,6 +149,9 @@ for (const args of [
   "1 --capture-only --quick", "1 --capture-only --balanced", "1 --capture-only --full",
   "1 --capture-only --all", "1 --capture-only --verify", "1 --verify --capture-only",
   "1 --capture-only --no-comment", "1 --capture-only heavyModel=heavy", "1 --capture-only --capture-only",
+  "1 --quick --all --no-comment --verify --unattended",
+  "1 --quick --all --no-comment --unattended --unattended",
+  "1 --capture-only --unattended", "1 --unattended --capture-only",
 ]) assert.throws(() => parseReviewArgs(args),
   /mutually exclusive|Duplicate|Invalid|Unsupported|integer|Conflicting|cannot be combined/, args);
 const assignments = await reviewerAssignments(parentModels, quickMode, {});
@@ -2036,6 +2076,50 @@ console.log("PASS a settled full run: six tiered reviewers, an uncapped minor po
   assert.throws(() => validateRecord(asQuick, h.parent.sessionId), /outside this mode's findings policy/);
 }
 console.log("PASS a settled deep run: one integrated heavy reviewer, an uncapped policy, retention and the proposed body");
+
+// U1: a settled unattended run, on a harness that does have an elicitation UI.
+// The point of the flag is that the run behaves the same way whether or not a
+// person could have been asked, so the host here is the interactive one and the
+// run must still ask it nothing.
+{
+  const h = harness({
+    mode: deepMode, withCandidate: true, acceptCandidate: true, severity: "nit", candidateFrom: [0],
+    approve: () => { throw new Error("An unattended run must ask no question"); },
+  });
+  assert.equal(h.parent.capabilities.ui?.elicitation, true, "The host under test can ask questions");
+  const unattendedRun = parseReviewArgs("1 --deep --all --no-comment --unattended");
+  assert.equal(unattendedRun.unattended, true);
+  const report = await executeReviewRun(h.parent, h.client, unattendedRun, structuredClone(layeredDeep), {
+    controller: h.controller, gh: fakeGh(), git: checkoutGit,
+  });
+  assert.deepEqual(h.requests, [], "Nothing was elicited from a host that could have answered");
+  assert.equal(report.complete, true);
+  assert.equal(report.unattended, true, "The run records what it was");
+  // --all settles selection, and the selection itself authorizes no posting.
+  assert.equal(report.selection.status, "selected");
+  assert.equal(report.selection.findingIds.length, 1);
+  assert.notEqual(report.selection.status, "unavailable",
+    "An unattended run never ends by reporting that it needed a person to select");
+  // --no-comment settles publication, so no confirmation is reachable either.
+  assert.equal(report.preview.status, "suppressed");
+  assert.equal(report.publication.attempted, false);
+  assert.equal(report.coverage, "completed");
+  validateRecord(retainedRecord(report), h.parent.sessionId);
+  assert(h.messages.some((message) => message.startsWith("M2 evidence: ") && message.includes('"unattended":true')),
+    "The evidence line states that the run was unattended");
+  // An ordinary run of the same pull request is unchanged and says so.
+  const attended = harness({
+    mode: deepMode, withCandidate: true, acceptCandidate: true, severity: "nit", candidateFrom: [0],
+  });
+  const ordinary = await executeReviewRun(attended.parent, attended.client,
+    { ...parseReviewArgs("1 --deep --no-comment"), all: true }, structuredClone(layeredDeep),
+    { controller: attended.controller, gh: fakeGh(), git: checkoutGit });
+  assert.equal(ordinary.unattended, false);
+  assert.deepEqual(ordinary.validation.findings.map((finding) => finding.id),
+    report.validation.findings.map((finding) => finding.id),
+    "The flag changes what is asked, never what is found");
+}
+console.log("PASS U1 an unattended run asks an interactive host nothing and settles on its flags alone");
 
 
 // O1: the same run, printed two ways. Quiet drops the evidence JSON lines and

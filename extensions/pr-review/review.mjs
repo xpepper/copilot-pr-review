@@ -29,6 +29,14 @@ const settingKeys = ["heavyModel", "heavyEffort"];
 // expects. Verbose stays the default, because this project's own increment
 // evidence is read out of the lines it suppresses.
 export const quietFlag = "--quiet";
+// U1: the declaration that this invocation leaves no question for a person.
+// Like the two flags above it is a flag and deliberately not a configuration
+// key, and it is the weakest of the three: it grants no authority, opens no
+// gate and selects no mode. All it does is refuse, at parse time, a run that
+// would need somebody, so the refusal arrives before the target is captured and
+// before a single credit is spent rather than after the reviewers have been
+// paid for.
+export const unattendedFlag = "--unattended";
 
 export function parseReviewArgs(args) {
   const [number, ...tokens] = args.trim().split(/\s+/);
@@ -38,7 +46,8 @@ export function parseReviewArgs(args) {
   for (const token of tokens) {
     if (seen.has(token)) throw new Error(`Duplicate review argument: ${token}`);
     seen.add(token);
-    if ([...modeFlags, captureOnlyFlag, verifyFlag, quietFlag, "--comment", "--no-comment", "--all"].includes(token)) continue;
+    if ([...modeFlags, captureOnlyFlag, verifyFlag, quietFlag, unattendedFlag,
+      "--comment", "--no-comment", "--all"].includes(token)) continue;
     if (token.includes("=")) {
       const [key, value, extra] = token.split("=");
       if (!settingKeys.includes(key) || !value || extra !== undefined || key in settings) {
@@ -59,17 +68,39 @@ export function parseReviewArgs(args) {
   // it takes no mode, posting, selection or model argument of its own.
   if (seen.has(captureOnlyFlag)) {
     const conflicting = [...chosen,
-      ...["--comment", "--no-comment", "--all", verifyFlag, quietFlag].filter((flag) => seen.has(flag)),
+      ...["--comment", "--no-comment", "--all", verifyFlag, quietFlag, unattendedFlag]
+        .filter((flag) => seen.has(flag)),
       ...Object.keys(settings)];
     if (conflicting.length) {
       throw new Error(`${captureOnlyFlag} captures the target without reviewing it, ` +
         `so it cannot be combined with ${conflicting.join(", ")}.`);
     }
     return { mode: undefined, captureOnly: true, captureArgs, settings,
-      all: false, comment: false, noComment: false, verify: false, quiet: false };
+      all: false, comment: false, noComment: false, verify: false, quiet: false, unattended: false };
   }
   const mode = chosen.length ? modeForFlag(chosen[0]) : reviewMode(defaultModeId);
   const { policy } = postingAuthority({ comment: seen.has("--comment"), noComment: seen.has("--no-comment") });
+  // An unattended run is refused here, while a refusal is still free. Each of
+  // these three names the single missing thing, because nobody is there to
+  // interpret a general complaint, and none of them can be satisfied by saved
+  // state: an invocation that cannot finish alone is the same invocation on
+  // every machine.
+  if (seen.has(unattendedFlag)) {
+    if (seen.has(verifyFlag)) {
+      throw new Error(`${unattendedFlag} cannot be combined with ${verifyFlag}. A safeguard command is ` +
+        "approved by the question this run cannot ask, and deliberately by nothing else, so an unattended " +
+        "verification run could only ever run none of them.");
+    }
+    if (!seen.has("--all")) {
+      throw new Error(`${unattendedFlag} needs --all. Finding selection is a question like any other, and ` +
+        "--all is the only thing that settles it without a person. It selects every validated finding and " +
+        "authorizes no posting.");
+    }
+    if (!policy.comment && !policy.noComment) {
+      throw new Error(`${unattendedFlag} needs --comment or --no-comment, so that what this run may publish ` +
+        "is visible in the invocation itself. Nothing saved decides it instead.");
+    }
+  }
   return {
     mode: mode.id, captureOnly: false, captureArgs, settings,
     all: seen.has("--all"), comment: policy.comment, noComment: policy.noComment,
@@ -81,6 +112,11 @@ export function parseReviewArgs(args) {
     // anything a person needs in order to judge whether the review is
     // trustworthy.
     quiet: seen.has(quietFlag),
+    // Unattended decides nothing about the review at all. By the time it is
+    // recorded here it has already done its whole job, which was to refuse the
+    // invocations above; what remains is a fact the run states about itself and
+    // one place downstream that must not offer a question nobody can answer.
+    unattended: seen.has(unattendedFlag),
   };
 }
 
@@ -311,6 +347,9 @@ export async function executeReviewRun(parent, client, options, assignments, {
     controller, onStopped, subject: mode.label, evidencePrefix: prefix, quiet,
     details: () => ({
       mode: mode.id, noComment: options.noComment, verify: options.verify === true,
+      // A run says whether it was unattended for the same reason it says whether
+      // it was verified: the evidence line is how this project reads its own runs.
+      unattended: options.unattended === true,
       invocation, binding, validation, adjudicator, discovery, approval, safeguards,
       executionComplete: execution?.complete ?? false,
       reviewers: assignments.map((assignment) => ({
@@ -325,7 +364,11 @@ export async function executeReviewRun(parent, client, options, assignments, {
         signal.throwIfAborted();
         return gh(args, directory, { signal });
       };
-      const target = await executeTargetCapture(parent, options.captureArgs, { signal, gh: request, quiet });
+      // U1: the one place downstream that the flag reaches. Capture is the only
+      // stage that can ask a question before a reviewer starts, so an unattended
+      // run must not be offered one there either.
+      const target = await executeTargetCapture(parent, options.captureArgs,
+        { signal, gh: request, quiet, unattended: options.unattended === true });
       signal.throwIfAborted();
       if (!target.snapshot) {
         return { coverage: "not-started", disposition: target.disposition, reason: target.reason, reviewers: [] };

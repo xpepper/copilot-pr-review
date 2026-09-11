@@ -110,6 +110,11 @@ try {
     ["  status  ", "Copilot PR Review: entry point ready."],
     ["help", "Usage: /pr-review [status|help|models|fixture"],
     ["--help", "Usage: /pr-review [status|help|models|fixture"],
+    // Three false user-facing strings have shipped here, each surviving several
+    // increments because nothing dispatches these commands and reads the text.
+    // A flag the help does not mention is a flag nobody can find.
+    ["help", "--unattended  Declare that this run leaves no question for anybody to answer"],
+    ["status", "--unattended declares that a run leaves nothing for a person to answer"],
     ["cancel", "No review is running."],
   ]) {
     const before = (await session.getEvents()).length;
@@ -174,6 +179,16 @@ try {
     [`123 --balanced --no-comment heavyModel=${available.id} heavyEffort=invalid-effort`, /Unsupported reasoning/],
     [`123 --full --no-comment heavyModel=${available.id} heavyEffort=invalid-effort`, /Unsupported reasoning/],
     [`123 --deep --no-comment heavyModel=${available.id} heavyEffort=invalid-effort`, /Unsupported reasoning/],
+    // U1: an unattended run is refused through the real dispatch path too, and
+    // each refusal names the one flag that is missing. None of these reaches a
+    // capture, let alone a reviewer, so the whole set costs nothing.
+    ["123 --unattended", /--unattended needs --all/],
+    ["123 --deep --no-comment --unattended", /--unattended needs --all/],
+    ["123 --all --unattended", /--unattended needs --comment or --no-comment/],
+    ["123 --deep --all --unattended", /--unattended needs --comment or --no-comment/],
+    ["123 --quick --all --no-comment --verify --unattended", /--unattended cannot be combined with --verify/],
+    ["123 --capture-only --unattended", /cannot be combined/],
+    ["123 --deep --all --no-comment --unattended --unattended", /Duplicate review argument/],
   ]) {
     const before = (await session.getEvents()).length;
     const result = await session.rpc.commands.execute({ commandName: "pr-review", args });
