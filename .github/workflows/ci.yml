@@ -34,7 +34,7 @@ jobs:
         run: |
           set -euo pipefail
           for s in findings review selection retention preview publication publish-later \
-            checkout config context fixture target safeguards prior incremental; do
+            checkout config context fixture target safeguards prior incremental revalidation; do
             echo "--- smoke-$s"
             node "scripts/smoke-$s.mjs"
           done

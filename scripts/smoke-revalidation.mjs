@@ -771,3 +771,115 @@ const okResponse = (comment) => `HTTP/2.0 201 Created\r\nserver: github\r\n\r\n$
   validateRecord(retainedRecord({ ...outcome, replies: structuredClone(good) }), sessionId);
   console.log("PASS I1c the retained reply set survives only when every cross-check holds");
 }
+
+// ---------------------------------------------------------------------------
+// Wired into capture: every review reports the free verdicts, and the range
+// that proves them is read once whether or not the run also confines.
+
+import { executeTargetCapture } from "../extensions/pr-review/target.mjs";
+import { identity, respond } from "./target-fixture.mjs";
+
+const repository = {
+  id: "R_fixture", nameWithOwner: "fixture/repository", host: "github.com",
+  url: "https://github.com/fixture/repository",
+};
+const capturedPriorHead = "1".repeat(40);
+const toolReview = {
+  id: 5130714400, state: "COMMENTED", commit_id: capturedPriorHead,
+  user: { login: identity.login, id: identity.id, type: "User" },
+  submitted_at: "2026-09-07T10:11:11Z",
+  html_url: `${repository.url}/pull/13#pullrequestreview-5130714400`,
+  body: "Deep review: 2 selected validated finding(s). Review coverage: completed. This is not a clean-review claim.",
+};
+const captured = (overrides = {}) => ({
+  id: 3948685900, pull_request_review_id: 5130714400,
+  html_url: `${repository.url}/pull/13#discussion_r3948685900`,
+  path: "shipping.js", side: "RIGHT", start_side: null, line: 3, start_line: null,
+  original_line: 3, original_start_line: null,
+  commit_id: "b".repeat(40), original_commit_id: capturedPriorHead,
+  body: commentBody(finding), ...overrides,
+});
+
+const capturingGh = (comments) => {
+  const calls = [];
+  const gh = async (args, directory) => {
+    calls.push(args);
+    const path = args[5];
+    const response = path?.endsWith("/reviews?per_page=100") ? JSON.stringify([[toolReview]])
+      : path?.endsWith("/comments?per_page=100") ? JSON.stringify([comments])
+        : path?.startsWith(`repos/${repository.nameWithOwner}/compare/`)
+          ? (args[7] === "Accept: application/vnd.github.diff"
+            ? validationDiff
+            : JSON.stringify({ status: "ahead", ahead_by: 2, behind_by: 0, total_commits: 2,
+              merge_base_commit: { sha: capturedPriorHead } }))
+          : respond(args, directory, []);
+    return response;
+  };
+  return { gh, calls };
+};
+const session = (sink) => ({
+  rpc: { metadata: { snapshot: async () => ({ workingDirectory: process.cwd(), isRemote: false }) } },
+  capabilities: {}, log: async (message) => sink.push(message),
+});
+const rangeRequests = (calls) => calls.filter((args) =>
+  args[5]?.startsWith(`repos/${repository.nameWithOwner}/compare/`) &&
+  args[7] === "Accept: application/vnd.github.diff").length;
+
+// An ordinary review, with no flag at all, still reports what it can prove.
+{
+  const { gh, calls } = capturingGh([captured(), captured({ id: 3948685901, path: "total.js", line: 3 })]);
+  const sink = [];
+  const run = await executeTargetCapture(session(sink), "13", { gh });
+  assert.equal(run.revalidation.basis, "range");
+  assert.deepEqual(revalidationCounts(run.revalidation),
+    { resolved: 0, stillOpen: 1, obsolete: 0, unsettled: 1, unreadable: 0 });
+  const evidence = sink.find((line) => line.startsWith("I1c revalidation: "));
+  assert(evidence, "A verbose run dumps the revalidation evidence like every other stage");
+  assert.match(evidence, /"verdict":"still-open"/);
+  assert(!evidence.includes(finding.trigger), "Comment prose stays out of the parent timeline");
+  assert(sink.some((line) => /0 resolved, 1 still open, 0 obsolete, 1 not settled/.test(line)));
+  assert(sink.some((line) => line.includes(revalidateFlag)),
+    "A run that settled nothing says which flag would have");
+  assert.equal(rangeRequests(calls), 1, "The range that proves a verdict is read once");
+  console.log("PASS I1c an ordinary review reports the verdicts it can prove, for one free request");
+}
+
+// Quiet drops the dump and never the verdicts.
+{
+  const { gh } = capturingGh([captured()]);
+  const sink = [];
+  await executeTargetCapture(session(sink), "13", { gh, quiet: true });
+  assert(!sink.some((line) => line.startsWith("I1c revalidation: ")), "Quiet drops the evidence dump");
+  assert(sink.some((line) => /1 still open/.test(line)), "Quiet never drops what the run decided");
+  console.log("PASS I1c a quiet run drops the revalidation dump and keeps its verdicts");
+}
+
+// Confining and revalidating in one run read the comparison once between them.
+{
+  const { gh, calls } = capturingGh([captured()]);
+  const sink = [];
+  const run = await executeTargetCapture(session(sink), "13", { gh, incremental: true, revalidate: true });
+  assert.equal(run.confinement.status, "confined");
+  assert.equal(run.revalidation.basis, "range");
+  assert.equal(rangeRequests(calls), 1, "One read serves the confinement and the revalidation both");
+  console.log("PASS I1c a run that confines and revalidates reads the comparison once");
+}
+
+// A pull request this tool has never reviewed revalidates nothing and asks for
+// no comparison diff at all.
+{
+  const calls = [];
+  const gh = async (args, directory) => {
+    calls.push(args);
+    const path = args[5];
+    return path?.endsWith("/reviews?per_page=100") ? JSON.stringify([[]])
+      : path?.endsWith("/comments?per_page=100") ? JSON.stringify([[]])
+        : respond(args, directory, []);
+  };
+  const sink = [];
+  const run = await executeTargetCapture(session(sink), "13", { gh });
+  assert.equal(run.revalidation, undefined);
+  assert.equal(rangeRequests(calls), 0, "Nothing to revalidate costs no comparison request");
+  assert(!sink.some((line) => line.includes("I1c revalidation")));
+  console.log("PASS I1c a pull request with no earlier review revalidates nothing and costs nothing");
+}

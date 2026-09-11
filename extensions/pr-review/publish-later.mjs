@@ -75,6 +75,18 @@ export async function publishRetained(parent, { controller, gh = runGh, store, a
   }
   await parent.log("Publish-later COMMENT review payload, rebuilt from the retained selection and " +
     `refetched evidence:\n${JSON.stringify(request, null, 2)}`);
+  // I1c: this command publishes the retained review and deliberately answers no
+  // thread. A revalidation verdict is grounded in a read of the checkout at the
+  // reviewed head, and this command never touches a checkout: it refetches
+  // GitHub evidence and nothing else. Posting a verdict about code without
+  // re-establishing what that code was would be publishing a claim this command
+  // cannot stand behind, so it says so instead.
+  if (outcome.revalidation && !outcome.replies?.attempted) {
+    await parent.log(`This retained result also holds ${outcome.revalidation.entries.length} revalidated ` +
+      "finding(s) from an earlier review. Publish-later does not answer their threads: a verdict about the " +
+      "current code was grounded in a read of the checkout at the reviewed head, and this command never " +
+      "reads a checkout. Rerun the review to answer them.");
+  }
   await recheck();
   guard();
   onOutcome?.(outcome);

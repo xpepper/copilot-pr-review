@@ -4,8 +4,9 @@ import { isAbsolute } from "node:path";
 import { promisify } from "node:util";
 import { assembleContext } from "./context.mjs";
 import {
-  confineToNewCommits, confinementSummary, describeConfinement, isConfined,
+  confineToNewCommits, confinementSummary, describeConfinement, isConfined, readRangeOnce,
 } from "./incremental.mjs";
+import { describeRevalidation, revalidatePrior, revalidationSummary } from "./revalidation.mjs";
 import { waitForInteraction } from "./interaction.mjs";
 import { collectPriorReview, describePrior, priorSummary } from "./prior.mjs";
 
@@ -224,7 +225,7 @@ export function contextSummary(context, limit = 20) {
 }
 
 export async function executeTargetCapture(session, args, {
-  gh = runGh, signal, quiet = false, unattended = false, incremental = false,
+  gh = runGh, signal, quiet = false, unattended = false, incremental = false, revalidate = false,
 } = {}) {
   const options = parseTargetArgs(args);
   signal?.throwIfAborted();
@@ -288,8 +289,18 @@ export async function executeTargetCapture(session, args, {
   // produces a filter that a later stage applies over the captured diff. It is
   // settled before the prior review is reported, because what that report says
   // this run does with the prior review depends on how this read turned out.
+  //
+  // I1c: the same range also proves what became of that review's own findings,
+  // and it proves it for free, so it is read whenever there is either a
+  // confinement to build or a retained comment to revalidate. One read serves
+  // both: a relationship with no forward range still costs no request at all,
+  // and a pull request with nothing to revalidate and no confinement asked for
+  // costs none either.
+  const read = incremental || prior.comments.length
+    ? await readRangeOnce(prior, outcome.pull, outcome.repository, { gh, cwd, signal }) : undefined;
+  signal?.throwIfAborted();
   const confinement = await confineToNewCommits(prior, outcome.pull, outcome.repository,
-    { requested: incremental, gh, cwd, signal });
+    { requested: incremental, read, gh, cwd, signal });
   signal?.throwIfAborted();
   const confined = isConfined(confinement);
   const described = describePrior(prior, outcome.pull.head.sha, confined);
@@ -298,5 +309,16 @@ export async function executeTargetCapture(session, args, {
     await session.log(quiet ? describeConfinement(confinement)
       : `I1b confinement: ${JSON.stringify(confinementSummary(confinement))}\n${describeConfinement(confinement)}`);
   }
-  return { ...outcome, context, prior, confinement, workingDirectory: cwd };
+  // The free half of revalidation, which every review reports. It reads the
+  // comments discovery already retained and the range already read, spends
+  // nothing, and settles only what the code can prove. The prose of those
+  // comments stays out of the evidence line exactly as the diff and the source
+  // context do; the anchors and the verdicts are evidence and stay in.
+  const revalidation = revalidatePrior(prior, outcome.pull.head.sha, read);
+  if (revalidation) {
+    const report = describeRevalidation(revalidation, revalidate);
+    await session.log(quiet ? report
+      : `I1c revalidation: ${JSON.stringify(revalidationSummary(revalidation))}\n${report}`);
+  }
+  return { ...outcome, context, prior, confinement, revalidation, workingDirectory: cwd };
 }

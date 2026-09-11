@@ -6,6 +6,11 @@ import {
 } from "./config.mjs";
 import { reviewAssignments, validateModelAssignment } from "./fixture.mjs";
 import { confinementInput, confinementSummary, incrementalFlag, isConfined } from "./incremental.mjs";
+import { publishReplies, describeReplies } from "./replies.mjs";
+import {
+  applyJudgedVerdicts, describeRevalidation, retainedRevalidation, revalidateFlag,
+  revalidationInstructions, revalidationPrompt, unsettledEntries,
+} from "./revalidation.mjs";
 import { finishSelection } from "./selection.mjs";
 import { finishPreview, postingAuthority } from "./preview.mjs";
 import { publishCurrent } from "./publication.mjs";
@@ -48,7 +53,7 @@ export function parseReviewArgs(args) {
     if (seen.has(token)) throw new Error(`Duplicate review argument: ${token}`);
     seen.add(token);
     if ([...modeFlags, captureOnlyFlag, verifyFlag, quietFlag, unattendedFlag, incrementalFlag,
-      "--comment", "--no-comment", "--all"].includes(token)) continue;
+      revalidateFlag, "--comment", "--no-comment", "--all"].includes(token)) continue;
     if (token.includes("=")) {
       const [key, value, extra] = token.split("=");
       if (!settingKeys.includes(key) || !value || extra !== undefined || key in settings) {
@@ -69,15 +74,16 @@ export function parseReviewArgs(args) {
   // it takes no mode, posting, selection or model argument of its own.
   if (seen.has(captureOnlyFlag)) {
     const conflicting = [...chosen,
-      ...["--comment", "--no-comment", "--all", verifyFlag, quietFlag, unattendedFlag, incrementalFlag]
-        .filter((flag) => seen.has(flag)),
+      ...["--comment", "--no-comment", "--all", verifyFlag, quietFlag, unattendedFlag, incrementalFlag,
+        revalidateFlag].filter((flag) => seen.has(flag)),
       ...Object.keys(settings)];
     if (conflicting.length) {
       throw new Error(`${captureOnlyFlag} captures the target without reviewing it, ` +
         `so it cannot be combined with ${conflicting.join(", ")}.`);
     }
     return { mode: undefined, captureOnly: true, captureArgs, settings, all: false, comment: false,
-      noComment: false, verify: false, quiet: false, unattended: false, incremental: false };
+      noComment: false, verify: false, quiet: false, unattended: false, incremental: false,
+      revalidate: false };
   }
   const mode = chosen.length ? modeForFlag(chosen[0]) : reviewMode(defaultModeId);
   const { policy } = postingAuthority({ comment: seen.has("--comment"), noComment: seen.has("--no-comment") });
@@ -124,6 +130,14 @@ export function parseReviewArgs(args) {
     // parse time, and a run that asks for it on a pull request with no earlier
     // review of ours narrows nothing and says so.
     incremental: seen.has(incrementalFlag),
+    // I1c: the second request rather than contract, and for the same reason.
+    // Whether an earlier review left a finding this run cannot settle for free
+    // is a fact about that pull request, so a run that asks for this on one with
+    // nothing unsettled judges nothing, spends nothing and says so. It gates the
+    // model pass alone: the verdicts code can prove are reported in every review
+    // and answered on the threads whatever this flag says, because proving them
+    // costs nothing and withholding them would be withholding a free answer.
+    revalidate: seen.has(revalidateFlag),
   };
 }
 
@@ -368,6 +382,7 @@ export async function executeReviewRun(parent, client, options, assignments, {
   let boundary;
   let cwd;
   let confinement;
+  let revalidation;
   let discovery;
   let approval;
   let safeguards;
@@ -386,6 +401,9 @@ export async function executeReviewRun(parent, client, options, assignments, {
       // the line this project reads its own runs out of, because a confined
       // review and an ordinary one report different things about the same PR.
       incremental: options.incremental === true, confinement: confinementSummary(confinement),
+      // I1c: the record's first word about an earlier review of this pull
+      // request. It is retained because the replies are journalled against it.
+      revalidate: options.revalidate === true, revalidation: retainedRevalidation(revalidation),
       invocation, binding, validation, adjudicator, discovery, approval, safeguards,
       executionComplete: execution?.complete ?? false,
       reviewers: assignments.map((assignment) => ({
@@ -405,7 +423,7 @@ export async function executeReviewRun(parent, client, options, assignments, {
       // run must not be offered one there either.
       const target = await executeTargetCapture(parent, options.captureArgs,
         { signal, gh: request, quiet, unattended: options.unattended === true,
-          incremental: options.incremental === true });
+          incremental: options.incremental === true, revalidate: options.revalidate === true });
       signal.throwIfAborted();
       if (!target.snapshot) {
         return { coverage: "not-started", disposition: target.disposition, reason: target.reason, reviewers: [] };
@@ -413,6 +431,7 @@ export async function executeReviewRun(parent, client, options, assignments, {
       binding = reviewBinding(target.snapshot, target.context);
       cwd = target.workingDirectory;
       confinement = target.confinement;
+      revalidation = target.revalidation;
       const bindingRule = "Unvalidated candidates cannot publish; only final selected, authorized findings can.";
       await parent.log(quiet ? bindingRule : `${prefix} binding: ${JSON.stringify(binding)}\n${bindingRule}`);
       // Reviewers read the checkout, so it must provably be the reviewed
@@ -533,6 +552,28 @@ export async function executeReviewRun(parent, client, options, assignments, {
         adjudicator = assessment.reviewers[0];
         validation = adjudicateCandidates(collected, adjudicator, boundary, mode.policy);
       }
+      // I1c: the paid half, asked only about what the code half could not prove
+      // and only when this invocation asked for it. It reads the checkout the
+      // revision gate has already proved is the reviewed head, which is what
+      // makes a verdict about the current code possible at all. It grounds
+      // nothing any finding depends on, so like discovery and confinement its
+      // failure is reported as itself and never becomes this review's coverage.
+      if (options.revalidate && unsettledEntries(revalidation).length && !signal.aborted) {
+        const heavy = assignments.find(({ tier }) => tier === "heavy");
+        if (!heavy) throw new Error("Revalidating an earlier finding requires a heavy-tier assignment.");
+        const pass = await reviewAssignments(parent, client, [{ ...heavy, label: "revalidator" }], {
+          signal, quiet, access,
+          systemMessage: { mode: "append", content: revalidationInstructions() },
+          verifyResult: envelopeVerifier(boundary.key, "verdicts"),
+          intro: `I1c revalidation pass: what became of ${unsettledEntries(revalidation).length} earlier ` +
+            "finding(s) the code could not settle. It reports no new finding and judges nothing else.",
+          outputLabel: "Untrusted revalidation output",
+          prompt: () => revalidationPrompt(revalidation, boundary.key),
+        });
+        revalidation = applyJudgedVerdicts(revalidation, pass.reviewers[0], boundary.key);
+        await parent.log(describeRevalidation(revalidation, true),
+          { level: revalidation.judged.status === "failed" ? "error" : "info" });
+      }
       return {
         ...execution, validation, adjudicator,
         complete: report.complete && validation.complete && !signal.aborted,
@@ -545,5 +586,16 @@ export async function executeReviewRun(parent, client, options, assignments, {
   }
   const selected = await finishSelection(parent, outcome, options, controller);
   const proposal = await finishPreview(parent, selected, options, controller, boundary, effectiveConfig);
-  return publishCurrent(parent, proposal, boundary, { controller, cwd, gh, persist });
+  const published = await publishCurrent(parent, proposal, boundary, { controller, cwd, gh, persist });
+  // I1c: the reply write set, which is its own set under the review's own
+  // authority. It runs after the review so an unknown review outcome can stop
+  // it, and it runs whether or not a review was published, because a re-review
+  // that selects no finding and has three earlier findings to answer is the case
+  // this exists for.
+  const answered = await publishReplies(parent, published, { controller, cwd, gh, persist });
+  const replies = describeReplies(answered);
+  if (replies) {
+    await parent.log(replies, { level: answered.replies.status === "uncertain" ? "error" : "info" });
+  }
+  return answered;
 }

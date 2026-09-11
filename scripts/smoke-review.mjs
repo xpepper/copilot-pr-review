@@ -37,12 +37,12 @@ const deepMode = reviewModes.deep;
 const options = parseReviewArgs("1 --quick --no-comment");
 assert.deepEqual(options, { mode: "quick", captureOnly: false, captureArgs: "1", settings: {},
   all: false, comment: false, noComment: true, verify: false, quiet: false, unattended: false,
-  incremental: false });
+  incremental: false, revalidate: false });
 assert.deepEqual(parseReviewArgs("  1 --major-only --no-comment  "), options);
 assert.deepEqual(parseReviewArgs("2 --quick --no-comment --include-drafts heavyModel=other heavyEffort=low"),
   { mode: "quick", captureOnly: false, captureArgs: "2 --include-drafts",
     settings: { heavyModel: "other", heavyEffort: "low" }, all: false, comment: false, noComment: true,
-    verify: false, quiet: false, unattended: false, incremental: false });
+    verify: false, quiet: false, unattended: false, incremental: false, revalidate: false });
 assert.deepEqual(parseReviewArgs("1 --major-only --all --no-comment"), { ...options, all: true });
 assert.deepEqual(parseReviewArgs("1 --quick"), { ...options, noComment: false });
 assert.deepEqual(parseReviewArgs("1 --quick --all --comment"), { ...options, all: true, comment: true, noComment: false });
@@ -130,8 +130,21 @@ assert.doesNotMatch(postingRefusal, /autoPostReviews/,
 // Capture-only keeps the diagnostic capture path reachable without a reviewer.
 assert.deepEqual(parseReviewArgs("1 --capture-only"), { mode: undefined, captureOnly: true, captureArgs: "1",
   settings: {}, all: false, comment: false, noComment: false, verify: false, quiet: false, unattended: false,
-  incremental: false });
+  incremental: false, revalidate: false });
 assert.equal(parseReviewArgs("2 --capture-only --include-drafts").captureArgs, "2 --include-drafts");
+
+// I1c: the second request rather than contract, recorded at parse time and
+// acted on only once capture has said whether anything is unsettled. It gates
+// the model pass alone, so it combines with every other review flag, and a
+// capture that reviews nothing takes no review flag at all.
+assert.deepEqual(parseReviewArgs("1 --quick --no-comment --revalidate"), { ...options, revalidate: true });
+assert.deepEqual(parseReviewArgs("1 --deep --all --no-comment --unattended --incremental --revalidate"),
+  { ...options, mode: "deep", all: true, noComment: true, unattended: true, incremental: true,
+    revalidate: true });
+assert.equal(parseReviewArgs("1 --quick --no-comment").revalidate, false,
+  "a run without the flag judges nothing and pays for nothing");
+assert.throws(() => parseReviewArgs("1 --capture-only --revalidate"), /captures the target without reviewing it/);
+assert.throws(() => parseReviewArgs("1 --quick --no-comment --revalidate --revalidate"), /Duplicate review argument/);
 
 // I1b: the flag is a request, so it is recorded and nothing else happens at
 // parse time. It selects no mode, settles no question and grants no authority,
