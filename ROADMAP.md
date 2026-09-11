@@ -65,23 +65,23 @@ posting them.
 | V2a | Completed | Execute only approved existing safeguards with installed dependencies, in the current checkout, and show evidence and artifacts without autofix or checkout manipulation. Carries the exclusions and the citation check that `V1c` deferred to `V2`. Demonstrated by the thirteen controlled suites and pull request #19's interactive balanced `--verify` review, which cost 252.771985 credits, reached the host's real approval UI for the first time and saw the citation gate refuse a constructed command live. **That run approved nothing, so execution itself is still demonstrated only by the controlled suites.** It found one validated defect and two more that its own evidence gate discarded; two of the three are fixed here. | V1; [Safeguards](SCOPE.md#optional-project-safeguards) |
 | V2b | Completed | Settled without code: safeguard output reaches no reviewer, the retained record says nothing about what ran, and the citation gate keeps accepting a prefix as a documented limitation. All three were answered "no change", so `V2` closes with `V2a`'s behaviour and the thirteen suites unchanged. The prompt's "verified to be at" wording is a recorded wording defect that bound citations already contain; it goes to `D1`. | V2a; [Safeguards](SCOPE.md#optional-project-safeguards) |
 | A1 | Completed | Completed entries `F1` through `V1c` moved verbatim into `docs/roadmap-archive-2026-09-10.md`, leaving a live `ROADMAP.md` that this project's own safeguard discovery reads instead of skipping for size. The increments table, the two most recent completed entries and the exact-next-increment section stayed. Pull request #22; documentation-only, so no installed-plugin review, and the user was asked rather than charged. | V2b; housekeeping, no scope clause |
-| D1 | Completed | User documentation: `README.md` reorganised by task with reproducible examples for configuration, modes, incomplete coverage, cancellation, publication, the cache and safeguards, shortened from 103903 to 55195 bytes so this project's own discovery now reads every root file and skips none. Also fixes the reviewer prompt's "verified to be at" wording and two shipped `help`/`status` strings that denied safeguards are ever executed, which makes it a behaviour change needing one installed-plugin review; that review is `--verify` with the safeguards suite approved. Pull request #24, reviewed once with this plugin at the user's authorization: deep with `--verify`, 136.8324 credits, 0 validated findings on incomplete coverage, and two discarded candidates that both described real defects, fixed on the branch. The offered safeguards were not approved, so execution still has no live evidence. | A1, L1; [Release boundary](SCOPE.md#priority-and-release-boundary) |
-| O1 | Completed | A review's output can be asked to be quiet: `--quiet` suppresses the evidence JSON lines and every raw untrusted model envelope, including the safeguard discovery pass's, and suppresses nothing about coverage, refusals, failures, safeguards or publication. Verbose stays the default and `scripts/dogfood-review.mjs` refuses the flag, because this project's own roadmap evidence is read from those lines. The user chose one flag and no configuration key. Pull request #25, reviewed once with this plugin at the user's authorization: deep with `--verify`, 57.6814 credits, completed coverage, 2 validated findings of which one was real and is fixed here and one was false and is rejected with a reproduction. | D1; [Modes/findings](SCOPE.md#review-modes-and-findings) |
+| D1 | Completed | User documentation: `README.md` reorganised by task with reproducible examples for configuration, modes, incomplete coverage, cancellation, publication, the cache and safeguards, shortened from 103903 to 55195 bytes so this project's own discovery now reads every root file and skips none. Also fixes the reviewer prompt's "verified to be at" wording and two shipped `help`/`status` strings that denied safeguards are ever executed, which makes it a behaviour change needing one installed-plugin review; that review is `--verify` with the safeguards suite approved. Pull request #24, reviewed once with this plugin at the user's authorization: deep with `--verify`, 136.8324 credits, 0 validated findings on incomplete coverage, and two discarded candidates that both described real defects, fixed on the branch. The offered safeguards were not approved, so `D1` bought no live execution evidence; `O1`'s second review did. | A1, L1; [Release boundary](SCOPE.md#priority-and-release-boundary) |
+| O1 | Completed | A review's output can be asked to be quiet: `--quiet` suppresses the evidence JSON lines and every raw untrusted model envelope, including the safeguard discovery pass's, and suppresses nothing about coverage, refusals, failures, safeguards or publication. Verbose stays the default and `scripts/dogfood-review.mjs` refuses the flag, because this project's own roadmap evidence is read from those lines. The user chose one flag and no configuration key. Pull request #25, reviewed once with this plugin at the user's authorization: deep with `--verify`, 57.6814 credits, completed coverage, 2 validated findings of which one was real and is fixed here and one was false and is rejected with a reproduction. Reviewed a second time at the user's further authorization after the approval fix, 98.84322 credits, completed coverage, one real finding: **that run approved and executed a safeguard, which is the first time the installed plugin has ever run one.** | D1; [Modes/findings](SCOPE.md#review-modes-and-findings) |
 
-## Completed increments `F1` through `L1` are archived
+## Completed increments `F1` through `D1` are archived
 
-Forty-three sections were here and three increments moved every one of them
+Forty-four sections were here and four increments moved every one of them
 verbatim to
-[docs/roadmap-archive-2026-09-10.md](docs/roadmap-archive-2026-09-10.md) on
-2026-09-10: `A1` moved the thirty-nine through `V1c`, `L1` moved `V2a` and `V2b`
-because this file had 4272 bytes of headroom left and the smaller of the two is
-7547, and `D1` moved `A1`'s entry and then `L1`'s, in that order, which are the
-last two in that file. Thirty-five are completed-increment entries, covering the
-thirty-three increments `F1`, `F2`, `F3`, `Q1`, `Q2`, `Q3`, `Q4`, `P1`, `P2`,
+[docs/roadmap-archive-2026-09-10.md](docs/roadmap-archive-2026-09-10.md): `A1`
+moved the thirty-nine through `V1c`, `L1` moved `V2a` and `V2b` because this
+file had 4272 bytes of headroom left and the smaller of the two is 7547, `D1`
+moved `A1`'s entry and then `L1`'s, and **`O1` moved `D1`'s**, which is the last
+in that file. Thirty-six are completed-increment entries, covering the
+thirty-four increments `F1`, `F2`, `F3`, `Q1`, `Q2`, `Q3`, `Q4`, `P1`, `P2`,
 `P3`, `P4`, `P5`, `C1`, `C2`, `F4`, `R1`, `M1`, `F5`, `F6`, `M2`, `C3`, `C4`,
-`Q5`, `Q6`, `C5`, `Q7`, `V1a`, `V1b`, `V1c`, `V2a`, `V2b`, `A1` and `L1`, with
-`R1` and `M1` each recorded in two halves. The remaining eight are the working
-record kept between them:
+`Q5`, `Q6`, `C5`, `Q7`, `V1a`, `V1b`, `V1c`, `V2a`, `V2b`, `A1`, `L1` and `D1`,
+with `R1` and `M1` each recorded in two halves. The remaining eight are the
+working record kept between them:
 
 - the `Q4` acceptance criteria recorded at the `Q3` checkpoint;
 - the manual-test blocker about CLI discovery without a harness override;
@@ -104,328 +104,15 @@ read from the archive rather than from this file.
 [docs/upstream-licensing.md](docs/upstream-licensing.md) is still the record of
 that licence work and did not move.
 
-**`D1`'s and `O1`'s entries are the only two kept live**, along with the
-increments table above and the closing section at the end. The rule these moves
-established is to keep the most recent entries and archive the rest, measuring
-this file with `wc -c` against the 65536-byte cap before opening a pull request.
-`D1` archived `L1` as well as `A1` so that `O1` had room to write its own entry,
-and `O1` used it: **this file has little headroom left**. The next session to
-land anything should archive `D1`'s entry the same way first, and leave the same
-kind of pointer.
-
-## Completed increment: D1
-
-**`D1` is the last increment, and it is the user documentation.** It ships no
-capability. It rewrites the documentation a reader actually uses, fixes three
-shipped strings that told the user something false, settles the licence question
-`L1` left to the user, and gives safeguard execution its first live evidence.
-
-### The README was the tool's own blind spot
-
-`README.md` was 103903 bytes. `instructionFileMaxBytes` in
-`extensions/pr-review/safeguards.mjs` caps one instruction file at 65536 bytes
-and `collectInstructionFiles` skips an oversized file by name rather than
-truncating it, so this project's own safeguard discovery skipped its README, and
-after `A1` it was the only root file it still skipped. That is exactly the
-defect `A1` fixed for `ROADMAP.md`, and it is fixed the same way.
-
-The previous README is kept verbatim in
-[docs/readme-archive-2026-09-10.md](docs/readme-archive-2026-09-10.md), under
-`docs/` because `collectInstructionFiles` reads the root and does not recurse,
-so a file there is not a candidate that must be skipped. The move was checked
-rather than trusted: the archived body hashes to the same SHA-256 as the file it
-was cut from, `b60e985e05728b559022732fb7cb1ccdf71d9be5c566e4fa9b2f4625d1a66ea1`.
-
-The live `README.md` is organised by what a reader wants to do rather than by
-increment ID: install, a first review, the modes and what they cost, models and
-configuration, reading a result, selection, publication, the cache,
-cancellation, safeguards, a command reference, the deliberate limits, and how to
-reproduce each behaviour. Every section `D1` was asked to document is there with
-a runnable or typeable example, and the stale `Skipped: ROADMAP.md (exceeds
-65536 bytes)` line in the discovery example is replaced with a hypothetical file
-that describes no real checkout.
-
-### Three shipped strings were false, and one was the tool lying about itself
-
-The README was not the only stale documentation. Two strings shipped inside the
-plugin told the user that safeguards are never executed, which `V2a` made false:
-
-- `/pr-review help` said "Project safeguards are discovered and presented under
-  `--verify`; approving and running one is not implemented", and its `--verify`
-  paragraph said "Nothing is approved, nothing is run".
-- `/pr-review status` said "It executes nothing: no project safeguard is
-  approved or run in any mode".
-- `plugin.json`'s description, which `copilot plugin list` prints, still read
-  "Copilot CLI PR review runtime feasibility prototype. No reviews yet."
-
-**The first two are the serious ones.** A person reading `/pr-review help`
-before their first `--verify` run was told the tool would not run their project's
-commands, and then it asked to run them. All three now describe what the tool
-does. `verificationNotice`, which a `--verify` run prints at the start, was
-already correct and is unchanged.
-
-### The wording fix, and the gate that stays as it is
-
-`V2b` recorded that the reviewer prompt tells every specialist its working
-directory is "verified to be at" the reviewed head. That stays true of `HEAD`
-after an approved safeguard runs and stops being true of the working tree, which
-such a command may write into. The same over-claim appeared twice: in
-`reviewPrompt`, which `V2b` named, and in `reviewInstructions`, which says the
-checkout "has been verified to be exactly the reviewed head revision".
-
-Both now claim what was actually proven: the checkout's `HEAD` was verified to
-be the reviewed head revision **before this review started**. Test-first, in
-`scripts/smoke-review.mjs`: the new assertions were written and run first and
-failed on the old wording, and the same suite additionally asserts that no
-reviewer prompt carries the old sentence.
-
-**The gate did not change and must not.** `SCOPE.md` says these commands may
-create artifacts and forbids cleaning the checkout, so re-asserting cleanliness
-after execution would refuse a review because the person's own approved tests
-wrote a coverage file. The consequence was contained already: `boundCitation` in
-`findings.mjs` resolves every citation against the head and base blobs fetched
-from GitHub, so a reviewer can read a file a safeguard wrote and can never cite
-one. The sentence was what was wrong, so the sentence is what changed.
-
-### The licence question is answered, by the user
-
-`L1` deliberately left one question open and called it the user's rather than an
-increment's: whether this project should carry a licence of its own. **The user
-answered it during `D1`. This project is MIT licensed**, and `LICENSE` carries
-the canonical MIT text with `Copyright (c) 2026 Pietro Di Bello`.
-
-Nothing was copied from upstream to produce it: the text is the standard
-template, which is why it can be used at all given that upstream publishes no
-licence text. The decision changes nothing `L1` settled, and
-`docs/upstream-licensing.md` now records both the answer and that fact. The
-reuse rule stands exactly as written: behaviour and interfaces yes, source no.
-The repository is no longer in the position it documented upstream being in.
-
-### The archiving this entry required
-
-`L1` left 16283 bytes of headroom against the 65536-byte cap, and a completed
-entry does not fit in that. `A1`'s entry, at 7086 bytes, moved verbatim into the
-existing dated archive under the rule the two earlier moves established: keep the
-most recent completed entries live and archive the rest.
-
-**`L1`'s own entry, 14359 bytes, moved too, once `O1` was scheduled**, so that
-the next increment starts with room to write its own entry rather than having to
-archive before it can record anything. `docs/upstream-licensing.md` is the record
-of that licence work and did not move. Both copies were verified byte-identical
-against the extracted block before the live copy was cut, and both pointers were
-widened to cover them.
-
-| File | Bytes after `D1` | Against the 65536-byte cap |
-| --- | --- | --- |
-| `README.md` | 56073, from 103903 | read, was the only root file still skipped |
-| `ROADMAP.md` | 49506 | read, 16030 bytes spare |
-| `HANDOFF.md` | 17620 | read |
-| `docs/readme-archive-2026-09-10.md` | 105975 | not a candidate; discovery does not recurse |
-| `docs/roadmap-archive-2026-09-10.md` | 464544 | not a candidate; discovery does not recurse |
-
-**Discovery now reads every root markdown file of this project and skips none.**
-That was demonstrated rather than inferred, by running the real
-`collectInstructionFiles` against this checkout; the six files it reads spend
-145971 bytes of the 262144-byte budget, so nothing is near being
-skipped for the budget either.
-
-### Validation
-
-All thirteen controlled suites pass. `scripts/smoke-review.mjs` carries the new
-assertions for both prompt sentences, written first and seen to fail on the old
-wording. `git diff --check` is clean and the branch diff carries no control
-byte, which matters because a raw control byte is what refused #17's review.
-
-```sh
-for s in findings review selection retention preview publication publish-later \
-  checkout config context fixture target safeguards; do node scripts/smoke-$s.mjs; done
-wc -c README.md ROADMAP.md docs/readme-archive-2026-09-10.md
-node --input-type=module -e '
-import { collectInstructionFiles } from "./extensions/pr-review/safeguards.mjs";
-const { files, skipped } = collectInstructionFiles(process.cwd());
-console.log("read:", files.map((f) => `${f.name} ${f.bytes}`).join(", "));
-console.log("skipped:", skipped.map((s) => `${s.name} (${s.reason})`).join(", ") || "none");
-'
-```
-
-`scripts/smoke-reviewer-tools.mjs` was not run and did not need to be:
-`read-only.mjs` was not touched, reviewer confinement is unchanged, and
-execution is a separate path no reviewer can reach. **The no-inference installed-plugin probe was rerun**, because
-`extension.mjs` changed and its `help` and `status` text is what that probe
-dispatches. The plugin was reinstalled from this checkout first, then
-`node scripts/smoke-runtime.mjs --targets` passed in full: command dispatch,
-every argument refusal, the capture and lifecycle gates, the refusal of both an
-ordinary and a `--verify` review on a mismatched checkout, and its assertions
-that no model turn, subagent or tool execution occurred. It spends no credits.
-It had not been rerun since before `V1b`.
-
-**One operational caveat came out of that**, and it is not a defect in this
-project. An install that had reported success, and that `copilot plugin list`
-then showed, was gone from the list and from
-`~/.copilot/installed-plugins/_direct/` minutes later, with a concurrent
-`copilot` process the likeliest cause. The install was repeated, the installed
-`extension.mjs` and `review.mjs` were diffed against this checkout and are
-byte-identical, the probe was rerun against that copy and passed, and the copy
-survived. **Check `copilot plugin list` immediately before dispatching a review**:
-the installed copy is what a review actually exercises, and a silently missing
-or stale one would be reviewed as though it were this branch.
-
-### Pull request #24 and its review
-
-Pull request #24 carries this increment, and the user authorized one review of
-it. **They chose `--deep` over the `--balanced` run the handoff had prescribed**,
-because this pull request's diff is 328477 bytes, 3.3 times #23's, and deep runs
-two sessions where balanced runs six. It was typed in an interactive Copilot
-session, as it had to be: `scripts/dogfood-review.mjs` registers no elicitation
-handler and answers every permission request with `denied-no-approval-rule`, so
-it can never approve a command.
-
-    /pr-review 24 --deep --verify --all --no-comment
-
-| What the run actually used | |
-| --- | --- |
-| Mode | deep, 1 integrated reviewer plus the adjudicator, `--verify --all --no-comment` |
-| Heavy tier | `gpt-5.6-terra` at reasoning `high`, for the reviewer, the adjudicator and the discovery pass |
-| Fallbacks | none configured, so a discarded output had no second attempt |
-| Diff reviewed | 10 files, 328477 diff bytes, 482503 context bytes over 18 sources |
-| Reviewer reads | 21 confined tool calls, `rg` and `view`, **zero permission denials and zero tool denials** |
-| Credit cost | **136.8324 reported AI credits**, being 82.56705 for the integrated reviewer over five turns and 54.26535 for the adjudicator. The discovery pass's own charge is not reported on the evidence line |
-| Outcome | **0 validated findings, coverage INCOMPLETE**, 0 withheld, nothing published |
-
-**The safeguard suite was offered and not approved, so execution still has no
-live evidence.** This was the run that was meant to close that gap, and it did
-not. The `--verify` path ran to the gate and stopped there:
-
-| The `--verify` path, step by step | What happened |
-| --- | --- |
-| Preflight | passed on head branch `d1-user-documentation`, no untracked path |
-| Discovery | read `AGENTS.md`, `CLAUDE.md`, `README.md`, `HANDOFF.md`, `ROADMAP.md`, `SCOPE.md`; **skipped none** |
-| Commands found | `node scripts/smoke-safeguards.mjs` and `node scripts/smoke-review.mjs`, both cited to `AGENTS.md` |
-| Exclusion table | **0 refused**, so no exclusion rule fired live here either |
-| Approval | **none of the 2 offered commands approved** |
-| Execution | `not-started`; no command ran, and no artifact line was printed |
-
-Two things follow, and both are worth keeping. **Making `README.md` readable did
-not widen what discovery reported.** The README now inside discovery's reach
-contains lines like `copilot plugin install "$(pwd)"` and `gh pr checkout
-NUMBER`, which the exclusion table would refuse, and the pass reported neither.
-What a discovery pass reports is a model's judgment over prose, not an
-enumeration of every command-shaped line, which is exactly why this roadmap has
-always said a live exclusion refusal cannot be arranged deliberately. And
-**approval remains the one gate nothing else can open**: the run offered, waited
-127 seconds, received an answer naming no command, and ran nothing, which is the
-behaviour `V1c` specifies. **This is
-also the first run in which discovery read every root file of this project**,
-which is `D1`'s own outcome observed live rather than in a probe.
-
-**Zero validated findings here is not a clean review, and this entry does not
-read it as one.** The reviewer completed and produced two candidates. One was
-refused at the evidence boundary with `Citation does not exactly match a
-supplied context window`, the same reviewer habit #23 recorded. The other reached
-the adjudicator and was rejected. **Both described real defects in this
-increment's own new files, and both were fixed on this branch rather than
-dismissed**, which is the course `V2a` and `L1` also took:
-
-- **The roadmap contradicted itself about `D1`'s own status.** The introduction
-  said v1 was done while the increments table still said `Pending` and this entry
-  said the review had not run. The adjudicator **rejected** the candidate, on the
-  ground that it called the table row newly added when the diff modified an
-  existing row. The rejection is fair on its own terms and the contradiction was
-  real: it is resolved here, in the direction the review itself made true.
-- **The archived README's links no longer resolved.** Moving the file under
-  `docs/` left root-relative targets such as `[SCOPE.md](SCOPE.md)` pointing at
-  `docs/SCOPE.md`. This candidate never reached adjudication, because its own
-  citation did not match exactly. The defect is real and newly introduced; the
-  roadmap archive never had it, because those entries carry no markdown links at
-  all. **The fix was deliberately not to rewrite the targets**: the archive's
-  body is byte-identical to the README it was cut from, that identity is what
-  makes it evidence rather than a retelling, and rewriting links would end it.
-  The header now states that a root-relative link in the body means that path
-  from the repository root.
-- **The coverage gap was a real defect too, and the reviewer could not prove
-  it.** It reported that the bound context for `review.mjs` did not include the
-  block deciding whether to start the adjudicator, so it could not assess the new
-  README's claim that every mode runs one. Checked directly here: `review.mjs`
-  starts that session only `if (collected.candidates.length && !signal.aborted)`,
-  so a review whose every candidate is refused runs no adjudicator and is charged
-  for none. **The README's claim was an over-claim** and now says so. This is the
-  clearest case yet of a coverage gap carrying a finding the evidence boundary
-  would not let a reviewer make.
-
-The clipped-quote repair fired live again, restoring one citation on the
-candidate that reached adjudication. That is `Q6` observed live for the second
-time, after #18.
-
-**The run also produced a defect no reviewer found, and it is the most valuable
-thing this review returned.** The operator reports having selected `node
-scripts/smoke-safeguards.mjs`, and the run recorded that nothing was approved.
-The session's own event log shows the question was open for **127 seconds**, so
-nothing auto-answered it, and `approveSafeguards` returned a status rather than
-an error, so the answer was well formed. What could not be determined is which
-well-formed answer it was, **because `V1c` reported a decline and an accepted
-answer naming nothing identically, both as `none`**. No elicitation payload is
-logged by the session events, the process log or the extension log, so the raw
-answer is unrecoverable and the two cases cannot be told apart after the fact.
-
-The gate behaved correctly throughout: an answer naming no command approves no
-command, and failing open is the one mistake this gate exists to prevent. **The
-reporting was the defect.** A person whose selection never arrived was told, in
-the same words a refusal gets, that nothing was approved, with nothing to
-suggest their own answer had been empty rather than negative. That is very
-likely why this review did not produce the live execution evidence it was run
-for.
-
-`D1` fixes it, test-first, and changes no gate. `declined` and `empty` are now
-distinct statuses, execution still keys only on `approved`, and the `empty`
-message says what happened and what to do:
-
-    V1c safeguard approval: the answer named none of the 2 offered command(s), so nothing
-    runs. If you meant to approve one, it did not reach this run; rerun the review to be
-    asked again.
-
-**This is the clearest vindication of the dogfooding workflow this project has
-recorded.** No controlled suite could have found it, because both cases were
-asserted to produce exactly the status the code produced; the suite agreed with
-the code about a distinction neither of them drew. It took a person approving a
-command in a real run and noticing that the tool disagreed with them.
-
-The thirteen suites were rerun after these fixes and all thirteen still pass.
-
-### Remaining limitations
-
-- **`D1` did not deliver the live safeguard-execution evidence it was meant to.**
-  Its one review offered both discovered commands and neither was approved, so a
-  non-empty `accept`, a spawn, a capture and an artifact line are all still
-  demonstrated only by the controlled suites. The `--verify` path is now
-  demonstrated live as far as the approval gate and no further. This was the last
-  increment, so there is no later increment's review to fold it into: closing it
-  needs a review authorized for that purpose, and the closing section says what
-  the cheapest one would be.
-- **`README.md` has 9463 bytes of headroom, not a lot.** It is 56073 bytes
-  against the 65536-byte cap, so roughly 10KB of further documentation would put
-  it back where `D1` found it, skipped by this project's own discovery. Measure
-  with `wc -c` before extending it, and move material into `docs/` rather than
-  growing the root file.
-- **The two archives have no index.** Finding an older increment's evidence, or
-  an older description of a capability, means searching
-  `docs/roadmap-archive-2026-09-10.md` or
-  `docs/readme-archive-2026-09-10.md`. `A1` recorded this and left it to `D1`;
-  `D1` leaves it undone deliberately, because the increments table above already
-  indexes the roadmap archive by increment and the finished project does not
-  need a second index to maintain.
-- **The README's example outputs are illustrative.** The discovery, approval and
-  execution transcripts show the real shapes those steps print, with a
-  hypothetical project's files in them. They are not captured from a run of this
-  repository, and the discovery example deliberately describes no real checkout.
-- **The review output is still verbose.** The user has asked for a way to
-  quieten it. Nothing is designed and nothing is scheduled, and `D1` did not
-  start it, because it is a capability rather than documentation.
-- **The stale-string class is not closed by a check.** Three false user-facing
-  strings survived several increments because nothing tests the text of
-  `help`, `status` or `plugin.json`. They cannot be asserted by a controlled
-  suite as things stand, because `extension.mjs` joins a session at module load
-  and cannot be imported without a runtime. The no-inference runtime probe
-  dispatches those commands and asserts only their first lines.
+**`O1`'s entry is the only one kept live**, along with the increments table above
+and the closing section at the end. The rule these moves established is to keep
+the most recent entries and archive the rest, measuring this file with `wc -c`
+against the 65536-byte cap before opening a pull request. `O1` archived `D1`
+after its second review found the live file contradicting itself: `D1`'s
+remaining-limitations list still said a quieter review was undesigned and
+unscheduled, directly above the entry that shipped `--quiet`. **That sentence was
+true when `D1` wrote it**, which is why the entry moved verbatim rather than
+being corrected; the archive is history, and the live file is the answer.
 
 ## Completed increment: O1
 
@@ -607,8 +294,9 @@ says validation is not execution or formal proof.
 
 #### The approval question came back `empty` for the second time
 
-**Safeguard execution still has no live evidence.** Discovery read all six root
-files, skipped none, and offered both `node scripts/smoke-safeguards.mjs` and
+**At this point safeguard execution still had no live evidence**; the second
+review below is what changed that. Discovery read all six root files, skipped
+none, and offered both `node scripts/smoke-safeguards.mjs` and
 `node scripts/smoke-review.mjs`, refusing neither. The recorded approval is
 `{"status":"empty","approved":[],"offered":2,"refused":0}` and the run printed
 the `empty` message `D1` added, which says the selection did not reach the run
@@ -617,10 +305,11 @@ and to rerun to be asked again.
 **This is now the third `--verify` review to reach the host's approval UI and
 approve nothing**, and the second in which the operator reports having picked a
 command. #19 offered two and approved none, #24 offered two and recorded an
-answer naming neither, and #25 did the same. **A non-empty `accept`, a real
-spawn, a real capture, a real artifact line and a live cancellation are still
-demonstrated only by `scripts/smoke-safeguards.mjs`.** Nothing in this file may
-be read as though the installed plugin had ever executed a safeguard.
+answer naming neither, and #25's first run did the same. At that point a
+non-empty `accept`, a real spawn, a real capture, a real artifact line and a live
+cancellation were all demonstrated only by `scripts/smoke-safeguards.mjs`, and
+nothing here could be read as though the installed plugin had ever executed a
+safeguard. **The second review changed all of that except the cancellation.**
 
 `D1`'s fix did its job: the run said plainly that nothing arrived rather than
 recording a decline. **What it did not do is explain why.** No elicitation
@@ -629,6 +318,58 @@ three runs and no live approval the question of whether the fault is in the host
 UI, the array-of-`const` schema shape or the plugin's reading of the answer
 cannot be settled from what exists. It is recorded below as an open limitation,
 not scheduled.
+
+### The second review, and the first safeguard this tool has ever run
+
+The user authorized a second review of #25 after the approval fix landed, to find
+out whether the fix worked. **It did.** The plugin was reinstalled from the new
+head first and diffed byte-identical; the stale installed copy did not carry the
+fix, so that step was the difference between a real test and a meaningless one.
+
+    /pr-review 25 --deep --verify --all --no-comment
+
+| What the second run actually used | |
+| --- | --- |
+| Mode | deep, 1 integrated reviewer plus the adjudicator, `--verify --all --no-comment` |
+| Heavy tier | `gpt-5.6-terra` at reasoning `high`, for the reviewer, the adjudicator and discovery |
+| Diff reviewed | 13 files, 95214 diff bytes, 355049 context bytes over 26 sources |
+| Reviewer reads | 28 confined tool calls, `rg` and `view`, **zero permission denials and zero tool denials** |
+| Credit cost | **98.84322 reported AI credits**, being 66.00162 for the reviewer over six turns and 32.8416 for the adjudicator |
+| Outcome | **1 validated finding, coverage `completed`**, 0 rejected, 0 withheld, no caveat, nothing published |
+
+**The safeguard ran.** This is the thing three previous reviews could not buy,
+and no controlled suite can prove:
+
+| What only a live run could show | What #25's second run showed |
+| --- | --- |
+| A non-empty `accept` | `{"status":"approved","approved":[{"command":"node scripts/smoke-safeguards.mjs","file":"AGENTS.md"}],"offered":2,"refused":0}` |
+| A real spawn | `node scripts/smoke-safeguards.mjs`, exit 0, 500 ms |
+| A real capture | its ten `PASS` lines on stdout, empty stderr, nothing truncated |
+| A real artifact line | `artifacts.paths: []`, printed as "The checkout is unchanged: no safeguard left a modified or untracked path behind" |
+| The ordering the design promises | the `V2a` block printed after approval and before the reviewer started |
+
+**The Space diagnosis was right.** The same person, the same two offered
+commands, the same schema; the only thing that changed was a sentence telling
+them which key selects. The approval status went from `empty` to `approved` on
+the next attempt.
+
+**One thing downstream is still unproven live: cancelling a running safeguard**,
+including killing a grandchild process. `scripts/smoke-safeguards.mjs` covers it
+and nothing else does, because arranging it live means cancelling a real review
+mid-command.
+
+#### What the second review found
+
+One P3, and it was real: **the live roadmap contradicted itself.** `D1`'s
+remaining-limitations list still said a quieter review output was undesigned and
+unscheduled, sitting directly above the completed `O1` entry that ships
+`--quiet`. **This is the fourth review in a row to catch this project's paperwork
+disagreeing with itself**, after #18, #23 and #24. The lesson has not been
+learned by writing it down; take it as a standing check rather than a warning.
+
+It is fixed by archiving `D1`'s entry, which this file needed anyway for
+headroom. The entry moved verbatim, because the sentence was true when `D1`
+wrote it, and the live file now answers the question on its own.
 
 ## v1 is complete, and so is `O1`; nothing is scheduled
 
@@ -700,14 +441,9 @@ example uses `minItems: 1`; we do not, and the suite now asserts its absence.
 Approving nothing must stay expressible and must stay the default, because the
 safe answer to "may I run this?" is no.
 
-**Safeguard execution therefore still has no live evidence**, and no entry in
-this file may be read as though the installed plugin had ever executed anything.
-A non-empty `accept`, a real spawn, a real capture, a real artifact line and a
-live cancellation are demonstrated only by `scripts/smoke-safeguards.mjs`. The
-`--verify` path is demonstrated live as far as the approval gate and no further.
-Closing it still costs a review, because approval sits after discovery inside a
-running review; **the difference is that a next attempt now has a reason to
-succeed.**
+**The next attempt worked**, and the evidence is in the section below. Before it,
+safeguard execution had no live evidence at all and the `--verify` path was
+demonstrated only as far as the approval gate.
 
 **A live refusal from the exclusion table is still not demonstrated either.**
 #24's discovery pass read a `README.md` full of command lines the exclusion table
@@ -734,17 +470,16 @@ not a backlog. Do not start one without the user saying so.
   decision, because a discarded output would then spend a second attempt. #18's
   adjudicator produced exactly the eligible failure and had no fallback to take,
   which is what a configured one would have answered.
-- **A live approval that approves something, and everything downstream of it.**
-  Three reviews have now reached the host's approval UI and approved nothing:
-  #19, #24 and #25, the last two against the operator's own account of what they
-  picked. So a non-empty `accept`, a real spawn, a real capture, a real artifact
-  line, and cancelling a running command and its grandchildren are all still
-  demonstrated only against the controlled harness. This is the largest remaining
-  gap between what the suites prove and what the shipped tool has been seen to
-  do. **The cause is now known, is recorded above, and is fixed**: the host's
-  multi-select toggles on Space, and Enter on a merely focused option submits the
-  empty default, so the question now says which key selects. A next attempt has a
-  reason to succeed that the previous three did not.
+- **Cancelling a running safeguard, including its grandchildren.** This is what
+  is left of the old approval gap. **The gap itself is closed**: #25's second
+  review approved `node scripts/smoke-safeguards.mjs`, spawned it, captured its
+  output and reported the checkout unchanged, after three reviews (#19, #24 and
+  #25's first run) approved nothing because the host's multi-select toggles on
+  Space and Enter on a merely focused option submits the empty default. The
+  question now says which key selects, and the next attempt worked. What no live
+  run has shown is a cancellation while a safeguard is running, because arranging
+  one means cancelling a real review mid-command;
+  `scripts/smoke-safeguards.mjs` covers it and nothing else does.
 - **A live refusal from the exclusion table.** #19's discovery pass reported only
   three candidates and refused one of them by citation, so no exclusion rule has
   ever refused a real discovered command. No later review can close this
