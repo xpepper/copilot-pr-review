@@ -7,7 +7,7 @@ An item is complete only with repository evidence. Later items may be split
 further when their implementation context is known, without changing scope.
 The standing checkpoint-commit, pull-request and fresh-session handoff workflow
 is recorded in [AGENTS.md](AGENTS.md); the replaceable next-session prompt lives
-in [HANDOFF.md](HANDOFF.md). Completed entries through `U1` were moved verbatim
+in [HANDOFF.md](HANDOFF.md). Completed entries through `I1a` were moved verbatim
 to [docs/roadmap-archive-2026-09-10.md](docs/roadmap-archive-2026-09-10.md) by
 `A1`, `L1`, `D1`, `O1`, `U1`, `I1a` and `I1b`, so this file keeps the increments
 table, the most recent completed entry and the closing section, and stays
