@@ -91,6 +91,12 @@ for (const rejected of [
   `Balanced review: 2 selected validated findings. ${closing}`,
   "Balanced review: 2 selected validated finding(s). Review coverage: completed.",
   `A Balanced review: 2 selected validated finding(s). ${closing}`,
+  // #29's discarded candidate: matching the opening and the closing alone let
+  // anything at all sit between them. Every body reviewRequest builds states the
+  // coverage, in both of its branches, so requiring that narrows the shape
+  // without coupling this to formatCoverage's exact wording, which has to stay
+  // recognisable in reviews published by older versions of this tool.
+  `Balanced review: 2 selected validated finding(s). Ship it. ${closing}`,
 ]) assert.equal(toolReviewBody(rejected), undefined, `Not this tool's review body: ${JSON.stringify(rejected)}`);
 console.log("PASS I1a only this tool's own code-built review body identifies a prior review");
 

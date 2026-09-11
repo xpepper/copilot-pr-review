@@ -8,6 +8,7 @@ const shaPattern = /^[0-9a-f]{40}$/;
 // than a guess about somebody's prose. A review written by hand by the same
 // person matches neither, and is deliberately never treated as a prior review.
 const claimSentence = "This is not a clean-review claim.";
+const coverageSentence = "Review coverage: ";
 const openingPattern = new RegExp(`^(${Object.values(reviewModes).map((mode) => mode.label).join("|")})` +
   ": (\\d+) selected validated finding\\(s\\)\\. ");
 
@@ -16,7 +17,14 @@ function requirePrior(condition, message) {
 }
 
 export function toolReviewBody(body) {
-  if (typeof body !== "string" || !body.endsWith(claimSentence)) return undefined;
+  // The opening and the closing alone would let anything sit between them.
+  // Every body `reviewRequest` builds states the coverage, in both of its
+  // branches, so requiring that narrows the shape at no cost to stability: a
+  // review published by an older version of this tool must stay recognisable,
+  // and the coverage wording between these three fixed parts is the half most
+  // likely to change.
+  if (typeof body !== "string" || !body.endsWith(claimSentence) ||
+      !body.includes(coverageSentence)) return undefined;
   const opening = openingPattern.exec(body);
   if (!opening) return undefined;
   const mode = Object.values(reviewModes).find(({ label }) => label === opening[1]);

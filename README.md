@@ -168,9 +168,11 @@ earlier review saw. It reads GitHub only, spends no credits, and `--capture-only
 reports it too.
 
 A review counts only when your authenticated GitHub identity submitted it **and**
-it carries the review body this tool builds. A review you wrote by hand is
-counted as considered and never treated as a prior one, because its comments
-carry no severity, no anchor and no reviewed head this tool set.
+it carries the review body this tool builds: one of four mode labels, a count of
+selected validated findings, a stated coverage, and the closing claim sentence.
+An ordinary hand-written review matches none of that and is counted as
+considered rather than treated as a prior one. A body deliberately written to
+imitate all four parts would still be taken for ours.
 
 | Reported | Meaning |
 | --- | --- |

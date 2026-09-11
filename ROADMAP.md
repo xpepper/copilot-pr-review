@@ -376,9 +376,11 @@ moved. Arranging one means publishing a real review, which is the user's call.
   depends on, so a failed read is reported as itself and the review proceeds,
   exactly as safeguard discovery does. A cancellation is not one of these and
   belongs to the run.
-- **Nothing is silently truncated.** Both listings are read with `--paginate
-  --slurp`, so a page boundary can never be the reason a prior review looks
-  absent.
+- **Nothing is silently truncated.** Every listing it reads is read with
+  `--paginate --slurp`, so a page boundary can never be the reason a prior
+  review looks absent. The review listing is always read; the comment listing is
+  read only once a qualifying review has been found, and a run that finds none
+  never asks for it.
 
 ### Validation
 
@@ -411,6 +413,70 @@ against a substantial code diff, which `E1` did. The first is replaced by the
 cost line that is genuinely unbuilt, the second by recall, which is what
 actually stays open. **`E1`'s entry moved verbatim to the archive** before this
 one was written, under the rule earlier moves established.
+
+### Pull request #29 and its review
+
+Reviewed once with this plugin at the user's authorization, dispatched with
+`node scripts/dogfood-review.mjs 29 --deep --all --no-comment --unattended`. The
+plugin was reinstalled from the branch head and `diff -rq`'d against the
+checkout first, so the review exercised this increment's own `prior.mjs` and not
+a stale copy.
+
+| Measure | Value |
+| --- | --- |
+| Diff | 994 additions, 251 deletions, 8 files |
+| Bound input | 90442 byte diff, 227839 bytes of context over 14 sources |
+| Reviewer `integrated`, heavy, `gpt-5.6-terra` high | 106.5 s, 5 requests, 51.76615 credits |
+| Adjudicator, `gpt-5.6-terra` high | 8.9 s, 1 request, 24.786 credits |
+| Total | 76.55215 credits, 115.4 s of model work |
+| Tool calls | 22, all approved, zero denials: `view` x11, GPT's `rg` alias x10, `glob` x1 |
+| Result | 2 candidates, 1 validated finding, 0 rejected, 0 capped, 0 duplicates |
+| Coverage | INCOMPLETE: 1 execution failure, 0 coverage gaps, 1 informational caveat |
+
+**The one validated finding was real and is fixed here.** [nit], confidence
+0.98: this entry claimed that both listings are read with `--paginate --slurp`,
+and discovery returns early when no qualifying review is found, so on that path
+it never reads the comment listing at all. The conclusion it drew, that a page
+boundary can never hide a prior review, was sound; the sentence supporting it
+was not. It now says which listing is always read and which is read only after a
+qualifying review is found. **That is the seventh review in a row to catch this
+project's paperwork disagreeing with itself**, after #18, #23, #24, #25, #26 and
+#28, and the second in a row where the false sentence was written in the same
+commit as the code it described.
+
+**The discarded candidate was right too, and is also fixed here.** [P3],
+confidence 0.95: matching only the opening and the closing sentence let
+arbitrary text sit between them, so a body carrying both would be taken for
+ours. It cited `README.md`'s own promise that a hand-written review is never
+treated as a prior one, which was an absolute this code did not honour. **Both
+halves are answered**: every body `reviewRequest` builds states the coverage in
+both of its branches, so `toolReviewBody` now requires that too, which narrows
+the shape without coupling it to `formatCoverage`'s exact wording; a review
+published by an older version of this tool has to stay recognisable, and the
+coverage prose between the three fixed parts is the half most likely to change.
+The README now says what the four parts are and admits plainly that a body
+deliberately written to imitate all four would still be taken for ours.
+
+**It was discarded for the shape that has now refused a true finding three times
+running.** Its location quoted the nine lines of `toolReviewBody`, lines 18 to
+26, while naming the range 18-25, which spans eight. `E1` saw this on a
+reviewer's citation, `U1` on the adjudicator's own after a verdict, and this is
+a reviewer's again. **Do not weaken the rule**: `Q6`'s clipped-end repair cannot
+rescue this shape by design, because a repair that drops a named line could drop
+the line authorizing the anchor. The count is now three true findings lost to a
+model that cannot count its own quoted lines, and every one of them was
+recovered by reading the discarded candidate.
+
+**The caveat is the honest one.** The reviewer reported that it did not
+independently exercise the installed plugin or live GitHub responses, which is
+exactly right: it read the diff and the checkout, and the live GitHub evidence
+in the table above was gathered outside it.
+
+**A live transient discovery failure was observed**, separately from the review.
+One run against playground #2 returned `failed` with the relationship `unknown`
+while three runs before and after it returned `found`. The reason was not
+captured, so nothing is claimed about its cause. What it demonstrates is the
+behaviour that matters: a failed discovery reported itself and refused nothing.
 
 ## v1 is complete, `I1` is sliced, and three increments remain
 
