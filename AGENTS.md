@@ -60,8 +60,10 @@ the work, not an extra.
   different one.
 - If your agent cannot type a Copilot CLI slash command, dispatch the same
   command through the SDK with `node scripts/dogfood-review.mjs NUMBER --all
-  --no-comment`, using the `COPILOT_CLI_PATH` and `COPILOT_SDK_PATH` settings
-  the other runtime probes use. `copilot -p "/pr-review NUMBER"` is not a
+  --no-comment --unattended`, using the `COPILOT_CLI_PATH` and `COPILOT_SDK_PATH`
+  settings the other runtime probes use. That session has no elicitation UI, so
+  the runner requires `--unattended` and the flags that settle selection and
+  publication without anybody. `copilot -p "/pr-review NUMBER"` is not a
   substitute: prompt mode starts an ambient model turn instead of dispatching
   the command, as the F1 integration caveats in `ROADMAP.md` record.
 

@@ -18,7 +18,8 @@ const sdkPath = process.env.COPILOT_SDK_PATH;
 const cliPath = process.env.COPILOT_CLI_PATH;
 assert(sdkPath && cliPath, "Set COPILOT_SDK_PATH to the bundled SDK directory and COPILOT_CLI_PATH to the CLI");
 const [number, ...flags] = process.argv.slice(2);
-assert(/^[1-9]\d*$/.test(number ?? ""), "Usage: node scripts/dogfood-review.mjs NUMBER [--all] [mode/model flags]");
+assert(/^[1-9]\d*$/.test(number ?? ""),
+  "Usage: node scripts/dogfood-review.mjs NUMBER --all --no-comment --unattended [mode/model flags]");
 // Publication is a separate, explicitly authorized decision; this runner never
 // makes it, and never silently selects findings for one.
 assert(flags.includes("--no-comment"), "Pass --no-comment: this runner does not publish.");
@@ -28,6 +29,15 @@ assert(!flags.includes("--comment"), "Refusing --comment: publication needs its 
 // coverage diagnostics. All of that is read out of the lines --quiet suppresses,
 // so a dogfood run may never be the run that hid its own evidence.
 assert(!flags.includes("--quiet"), "Refusing --quiet: this runner records the whole timeline as an increment's evidence.");
+// U1: this runner is the headless case. It creates a session with no elicitation
+// UI at all, so nothing here can answer a question, and saying so in the
+// invocation is what makes that deliberate rather than incidental. The plugin
+// refuses the combination that would need somebody; these two assertions only
+// make the refusal local, and name the runner that caused it.
+assert(flags.includes("--unattended"),
+  "Pass --unattended: this runner's session has no elicitation UI, so nothing here can answer a question.");
+assert(flags.includes("--all"),
+  "Pass --all: --unattended needs it, because nothing here can answer the selection question. It publishes nothing.");
 
 const cwd = realpathSync(process.cwd());
 const head = (await runGit(["rev-parse", "HEAD"], cwd)).trim();

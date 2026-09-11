@@ -34,6 +34,7 @@ and how to reproduce each behaviour yourself.
 | [Selecting findings](#selecting-findings) | The selection step and `--all` |
 | [Publishing](#publishing) | Posting authority, gates, uncertain writes |
 | [Publishing later](#publishing-later) | The retained result and `/pr-review publish` |
+| [Unattended runs](#unattended-runs-with---unattended) | `--unattended`: a run with nobody to answer it |
 | [Cancelling a run](#cancelling-a-run) | `/pr-review cancel`, and why there is no timeout |
 | [Project safeguards](#project-safeguards-with---verify) | `--verify`: preflight, discovery, approval, execution |
 | [Command reference](#command-reference) | Every command, flag and configuration key |
@@ -560,7 +561,9 @@ run can still have useful findings. An empty result skips the form.
 rejected candidates or duplicate aliases, and it **does not authorize posting**.
 A host with no elicitation support reports selection `unavailable` and selects
 nothing, even with `--comment`. Rerunning with `--all` is an explicit new
-review, not a hidden select-all fallback.
+review, not a hidden select-all fallback. If you know in advance that nobody
+will be there, say so with [`--unattended`](#unattended-runs-with---unattended)
+and the run is refused before it costs anything.
 
 Answers are bound to a unique invocation, the originating session, repository,
 pull request and reviewed head, plus the full review-binding digest. Unknown,
@@ -691,6 +694,40 @@ have no resumable event history, so resuming one reports `Session not found`
 even though the retained file survives; the plugin does not manufacture history
 or spend credits to work around that. A forked or new session cannot inspect
 another session's result.
+
+## Unattended runs with `--unattended`
+
+A headless environment, a CI pipeline or an autonomous loop has nobody to answer
+a question. Such a run already works: a host with no elicitation support reports
+selection, final confirmation and safeguard approval as `unavailable` and
+publishes nothing. The trouble is *when* it says so. A run that could never have
+finished alone still pays for its reviewers first and reports the problem
+afterwards.
+
+`--unattended` says up front that this run leaves nothing for anybody to answer.
+It is checked before the target is captured and before a single credit is spent:
+
+```text
+/pr-review 123 --deep --all --no-comment --unattended
+```
+
+| Refused | Why |
+| --- | --- |
+| Without `--all` | Finding selection is a question, and `--all` is the only thing that settles it without a person |
+| Without `--comment` or `--no-comment` | What a run may publish belongs in the invocation, not in a saved setting |
+| With `--verify` | A safeguard command is approved by the question an unattended run cannot ask, and deliberately by nothing else |
+| With `--capture-only` | Capture takes no review flag at all |
+
+A closed or merged pull request is not confirmed either. An unattended run is
+never offered that question, even on a host that could ask it, so it stops at
+capture unless `--include-closed` or `--review-closed` was given.
+
+**The flag authorizes nothing and relaxes nothing.** `--all` still authorizes no
+posting, every publication gate still runs against the current head, reviewer
+reads stay confined to the verified checkout, and no safeguard ever runs. It is
+not a configuration key, so no saved or trusted project setting can turn it on.
+Adding it to a run that already had everything it needed changes that run in one
+way only: a closed pull request is refused instead of asked about.
 
 ## Cancelling a run
 
@@ -991,6 +1028,7 @@ Review flags:
 | `--no-comment` | Suppress posting for this run. Conflicts with `--comment` |
 | `--include-drafts` | Review a draft. Never permits publishing one |
 | `--include-closed`, `--review-closed` | Review a closed or merged pull request |
+| `--unattended` | Declare that nothing is left for a person to answer. Refuses at parse time without `--all` and one of `--comment`/`--no-comment`, and refuses `--verify`. Authorizes nothing |
 | `--capture-only` | Stop after capture. Takes no mode, posting or model argument |
 | `heavyModel=ID`, `heavyEffort=LEVEL` | Override the heavy tier for this invocation only |
 
@@ -1107,7 +1145,7 @@ copilot plugin install "$(pwd)"
 COPILOT_CLI_PATH="$(command -v copilot)" \
 COPILOT_SDK_PATH="$(ls -d "$HOME"/.copilot/pkg/*/"$(copilot --version \
   | sed -n 's/.*CLI \([0-9][0-9.]*[0-9]\).*/\1/p')"/copilot-sdk)" \
-node scripts/dogfood-review.mjs NUMBER --all --no-comment
+node scripts/dogfood-review.mjs NUMBER --all --no-comment --unattended
 ```
 
 **Check out before installing, never the other way round.** `copilot plugin
