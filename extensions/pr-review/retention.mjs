@@ -273,11 +273,61 @@ function revalidation(value, target) {
   "the revalidation pass count disagrees with the judged verdicts");
 }
 
+// The reply write set. It is the first thing in this record that journals more
+// than one remote write, so partial completion is an ordinary state here rather
+// than an error: some threads answered, at most one unknown, the rest never
+// attempted. Every thread carries its own disposition, because "we wrote some of
+// them" is not something a person can act on.
+const dispositions = ["not-attempted", "in-flight", "written", "skipped", "failed", "uncertain"];
+
+function replies(value, revalidation) {
+  object(value, ["status", "attempted", "entries"], ["reason"]);
+  requireValue(["not-attempted", "in-flight", "completed", "partial", "uncertain"].includes(value.status) &&
+    typeof value.attempted === "boolean" && value.attempted === (value.status !== "not-attempted") &&
+    Array.isArray(value.entries), "invalid reply write state");
+  if (value.reason !== undefined) {
+    text(value.reason);
+    requireValue(!value.attempted, "an attempted reply set explains itself by its entries");
+  }
+  if (!value.attempted) {
+    requireValue(value.entries.length === 0, "an unattempted reply set wrote to a thread");
+    return;
+  }
+  requireValue(revalidation, "a reply set without the revalidation it answers");
+  const answerable = new Map(revalidation.entries
+    .filter((entry) => entry.verdict !== "unsettled").map((entry) => [entry.commentId, entry]));
+  const seen = new Set();
+  let unknown = 0;
+  for (const entry of value.entries) {
+    object(entry, ["commentId", "verdict", "disposition"], ["replyId", "url", "error", "reason"]);
+    const answered = answerable.get(entry.commentId);
+    requireValue(answered && answered.verdict === entry.verdict && !seen.has(entry.commentId),
+      "a reply to a thread this run settled no verdict for");
+    seen.add(entry.commentId);
+    requireValue(dispositions.includes(entry.disposition), "unknown reply disposition");
+    if (entry.disposition === "written") {
+      requireValue(Number.isSafeInteger(entry.replyId) && entry.replyId > 0 && !entry.error, "invalid written reply");
+      text(entry.url);
+    } else {
+      requireValue(entry.replyId === undefined && entry.url === undefined, "an unwritten reply carries a reply ID");
+    }
+    if (["failed", "uncertain"].includes(entry.disposition)) text(entry.error);
+    if (entry.reason !== undefined) text(entry.reason);
+    if (entry.disposition === "uncertain") unknown += 1;
+  }
+  // At most one unknown, because an unknown stops the set. Anything after it
+  // stays unattempted rather than becoming a second unknown.
+  requireValue(unknown <= 1, "more than one reply outcome is unknown");
+  requireValue((value.status === "uncertain") === (unknown === 1), "reply status disagrees with its entries");
+  const settled = value.entries.every((entry) => ["written", "skipped"].includes(entry.disposition));
+  requireValue((value.status === "completed") === settled, "reply status disagrees with its entries");
+}
+
 const attemptKeys = ["model", "reasoningEffort", "sessionId", "status", "error", "usage", "startedAt", "completedAt"];
 const reviewerKeys = ["label", ...attemptKeys, "fallbackFrom"];
 const outcomeKeys = ["invocation", "binding", "mode", "noComment", "complete", "reviewComplete",
   "executionComplete", "coverage", "cancelled", "error", "cleanupErrors", "disposition", "reason", "selection",
-  "preview", "publication", "revalidation"];
+  "preview", "publication", "revalidation", "replies"];
 
 // Version 4 marks a record whose write came from the explicit publish-later
 // command. Optional validation diagnostics do not change publication authority.
@@ -322,7 +372,7 @@ export function validateRecord(record, sessionId) {
   const value = record.outcome;
   object(value, ["invocation", "mode", "noComment", "complete", "reviewComplete", "executionComplete",
     "coverage", "cancelled", "cleanupErrors", "selection", "reviewers"],
-  ["binding", "validation", "adjudicator", "error", "disposition", "reason", "revalidation",
+  ["binding", "validation", "adjudicator", "error", "disposition", "reason", "revalidation", "replies",
     ...(record.schemaVersion >= 2 ? ["preview"] : []), ...(record.schemaVersion >= 3 ? ["publication"] : [])]);
   requireValue(record.digest === reviewKey(value) && isDeepStrictEqual(value.invocation, record.invocation),
     "record digest or invocation mismatch");
@@ -341,6 +391,7 @@ export function validateRecord(record, sessionId) {
     requireValue(value.binding, "revalidation without a review binding");
     revalidation(value.revalidation, value.binding);
   }
+  if (value.replies) replies(value.replies, value.revalidation);
   if (value.validation) {
     requireValue(value.binding, "validated result without review binding");
     validation(value.validation, value.binding, mode.policy);

@@ -30,7 +30,7 @@ export function cancelPublication(outcome) {
   }
 }
 
-function responseParts(stdout) {
+export function responseParts(stdout) {
   if (typeof stdout !== "string") return {};
   const match = /^HTTP\/[\d.]+ (\d{3})[^\r\n]*\r?\n(?:[^\r\n]+\r?\n)*\r?\n([\s\S]*)$/.exec(stdout);
   return match ? { status: Number(match[1]), body: match[2] } : {};

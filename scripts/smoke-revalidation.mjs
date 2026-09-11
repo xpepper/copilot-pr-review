@@ -522,3 +522,252 @@ function retained(revalidation) {
     "One comment cannot be both read and unread");
   console.log("PASS I1c an unreadable prior comment is retained as one, and never as a verdict");
 }
+
+// ---------------------------------------------------------------------------
+// The reply write set. Everything before this wrote one review in one request,
+// and every safety property publication.mjs states is stated for exactly one
+// write. A reply per thread makes partial completion an ordinary result.
+
+import {
+  answerableEntries, describeReplies, dispatchReplies, interpretReplyWrite, isOurReply,
+  planReplies, publishReplies, replyBody,
+} from "../extensions/pr-review/replies.mjs";
+
+const them = { login: "someone-else", id: 4242 };
+const us = { login: "fixture-user", id: 99 };
+
+function settled() {
+  const before = revalidatePrior(found("incremental", [
+    priorComment({ path: "shipping.js", line: 3 }),
+    priorComment({ outdated: true, line: undefined }),
+    priorComment({ path: "total.js", line: 3 }),
+  ]), base.binding.head, { range });
+  return applyJudgedVerdicts(before, judged(unsettledEntries(before).map((entry) => ({
+    commentId: entry.commentId, verdict: "resolved", reason: "the multiplication is restored",
+  }))), key);
+}
+
+const okResponse = (comment) => `HTTP/2.0 201 Created\r\nserver: github\r\n\r\n${JSON.stringify(comment)}`;
+
+// A reply names the head it revalidated at, says the verdict, gives the reason
+// and says which half decided it. The signature at both ends is what a later
+// run recognises.
+{
+  const result = settled();
+  const proved = result.entries.find((entry) => entry.decidedBy === "code" && entry.verdict === "still-open");
+  const body = replyBody(proved, base.binding.head);
+  assert(body.startsWith(`Revalidated at head ${base.binding.head}: STILL OPEN.`));
+  assert.match(body, /do not touch the lines this comment anchors on/);
+  assert.match(body, /Decided by this tool, from the commit range/);
+  assert.match(body, /not a re-review of this pull request\.$/);
+  const model = result.entries.find((entry) => entry.decidedBy === "model");
+  const judgedBody = replyBody(model, base.binding.head);
+  assert(judgedBody.startsWith(`Revalidated at head ${base.binding.head}: RESOLVED.`));
+  assert.match(judgedBody, /the multiplication is restored/);
+  assert.match(judgedBody, /Decided by one model pass reading the current code/);
+  // An unsettled verdict is not something to say on somebody's thread.
+  assert.throws(() => replyBody({ verdict: "unsettled", decidedBy: "code" }, base.binding.head), /Reply refused/);
+  assert.throws(() => replyBody(proved, "not-a-head"), /Reply refused/);
+  console.log("PASS I1c a reply states the head, the verdict, the reason and which half decided it");
+}
+
+// Recognising our own answer, and only at this head. A reply we left at an older
+// head answered a different revision and does not stop this one.
+{
+  const result = settled();
+  const body = replyBody(result.entries[0], base.binding.head);
+  assert(isOurReply({ user: us, body }, us, base.binding.head));
+  assert(!isOurReply({ user: them, body }, us, base.binding.head), "Somebody else's comment is not ours");
+  assert(!isOurReply({ user: us, body }, us, "9".repeat(40)), "An answer at another head is not this head's");
+  assert(!isOurReply({ user: us, body: `${body} PS` }, us, base.binding.head), "The closing must be the end");
+  assert(!isOurReply({ user: us, body: "Revalidated at head x: RESOLVED." }, us, base.binding.head));
+  console.log("PASS I1c this tool recognises its own answer, and only the one at this head");
+}
+
+// Planning: an unsettled verdict is never answered, and a thread already
+// carrying our answer at this head is skipped rather than answered twice.
+{
+  const result = settled();
+  assert.equal(answerableEntries(result).length, 3);
+  const first = result.entries[0];
+  const existing = [
+    { user: us, in_reply_to_id: first.commentId, body: replyBody(first, base.binding.head) },
+    { user: them, in_reply_to_id: result.entries[1].commentId, body: "I disagree" },
+    { user: us, in_reply_to_id: result.entries[2].commentId, body: replyBody(result.entries[2], "9".repeat(40)) },
+  ];
+  const plan = planReplies(result, base.binding.head, existing, us);
+  assert.deepEqual(plan.map((entry) => entry.disposition), ["skipped", "not-attempted", "not-attempted"]);
+  assert.equal(plan[0].reason, "already answered at this head");
+  assert.deepEqual(planReplies(result, base.binding.head, [], us).map((entry) => entry.disposition),
+    ["not-attempted", "not-attempted", "not-attempted"]);
+  // An unsettled finding is planned for no reply at all.
+  const unsettledOnly = revalidatePrior(found("diverged", [priorComment()]), base.binding.head);
+  assert.deepEqual(planReplies(unsettledOnly, base.binding.head, [], us), []);
+  console.log("PASS I1c only a settled verdict is answered, and never twice at one head");
+}
+
+// The acknowledgment is checked field by field, exactly as the review's is.
+{
+  const planned = { commentId: 77, body: "hello" };
+  assert.deepEqual(interpretReplyWrite(okResponse({ id: 5, in_reply_to_id: 77, body: "hello",
+    html_url: "https://example.invalid/c" }), undefined, planned),
+  { disposition: "written", replyId: 5, url: "https://example.invalid/c" });
+  for (const [what, response] of Object.entries({
+    "another thread": okResponse({ id: 5, in_reply_to_id: 78, body: "hello", html_url: "u" }),
+    "another body": okResponse({ id: 5, in_reply_to_id: 77, body: "goodbye", html_url: "u" }),
+    "no id": okResponse({ in_reply_to_id: 77, body: "hello", html_url: "u" }),
+    "no url": okResponse({ id: 5, in_reply_to_id: 77, body: "hello" }),
+    "malformed json": "HTTP/2.0 201 Created\r\n\r\nnot json",
+    "no http framing": "something went wrong",
+  })) {
+    assert.equal(interpretReplyWrite(response, undefined, planned).disposition, "uncertain",
+      `${what} is not a trustworthy acknowledgment`);
+  }
+  for (const status of [403, 404, 410, 422, 429]) {
+    const refused = interpretReplyWrite(`HTTP/2.0 ${status} No\r\n\r\n{}`, undefined, planned);
+    assert.equal(refused.disposition, "failed", "A definite rejection is known not to have been written");
+    assert.match(refused.error, new RegExp(String(status)));
+  }
+  console.log("PASS I1c a reply acknowledgment is checked field by field, and anything else is unknown");
+}
+
+// The whole set, written one thread at a time, journalled before each request.
+{
+  const result = settled();
+  const plan = planReplies(result, base.binding.head, [], us);
+  const written = [];
+  const journal = [];
+  const outcome = { ...base, revalidation: retainedRevalidation(result) };
+  const gh = async (args, directory, options) => {
+    const id = Number(args[5].match(/comments\/(\d+)\/replies$/)[1]);
+    written.push({ id, body: JSON.parse(options.input).body });
+    return okResponse({ id: 900 + written.length, in_reply_to_id: id,
+      body: JSON.parse(options.input).body, html_url: `https://example.invalid/r${id}` });
+  };
+  await dispatchReplies(outcome, base.binding, plan, {
+    controller: new AbortController(), cwd: ".", gh,
+    persist: (value) => journal.push(structuredClone(value.replies)),
+  });
+  assert.equal(written.length, 3);
+  assert.equal(outcome.replies.status, "completed");
+  assert.deepEqual(outcome.replies.entries.map((entry) => entry.disposition), ["written", "written", "written"]);
+  assert(outcome.replies.entries.every((entry) => entry.url && entry.replyId));
+  // Every thread is journalled as unknown before its request goes out, so a
+  // process that dies mid-request leaves a record naming the thread it was on.
+  for (const entry of outcome.replies.entries) {
+    assert(journal.some((state) => state.entries.some((one) =>
+      one.commentId === entry.commentId && one.disposition === "in-flight")),
+    "Each thread is journalled in-flight before its own write");
+  }
+  assert.equal(journal[0].status, "in-flight");
+  assert.equal(journal.at(-1).status, "completed");
+  validateRecord(retainedRecord(outcome), sessionId);
+  console.log("PASS I1c the set is written one thread at a time, each journalled before it is sent");
+}
+
+// One unknown outcome stops the set. The threads after it are deliberately never
+// attempted, because an unknown remote state is not compounded by more writes.
+{
+  const result = settled();
+  const plan = planReplies(result, base.binding.head, [], us);
+  const outcome = { ...base, revalidation: retainedRevalidation(result) };
+  let call = 0;
+  const gh = async (args, directory, options) => {
+    call += 1;
+    const id = Number(args[5].match(/comments\/(\d+)\/replies$/)[1]);
+    if (call === 2) return "HTTP/2.0 502 Bad Gateway\r\n\r\n{}";
+    return okResponse({ id: 900 + call, in_reply_to_id: id, body: JSON.parse(options.input).body,
+      html_url: `https://example.invalid/r${id}` });
+  };
+  await dispatchReplies(outcome, base.binding, plan, {
+    controller: new AbortController(), cwd: ".", gh, persist: () => {},
+  });
+  assert.equal(call, 2, "Nothing is written after an unknown outcome");
+  assert.equal(outcome.replies.status, "uncertain");
+  assert.deepEqual(outcome.replies.entries.map((entry) => entry.disposition),
+    ["written", "uncertain", "not-attempted"]);
+  validateRecord(retainedRecord(outcome), sessionId);
+  assert.match(describeReplies(outcome), /UNCERTAIN/);
+  assert.match(describeReplies(outcome), /Do not retry it/);
+  assert.match(describeReplies(outcome), /never compounded by more writes/);
+  console.log("PASS I1c one unknown reply stops the set and leaves the rest unattempted");
+}
+
+// A definite rejection is known not to have been written, so the next thread is
+// still safe to answer, and the set finishes partial rather than unknown.
+{
+  const result = settled();
+  const plan = planReplies(result, base.binding.head, [], us);
+  const outcome = { ...base, revalidation: retainedRevalidation(result) };
+  let call = 0;
+  const gh = async (args, directory, options) => {
+    call += 1;
+    const id = Number(args[5].match(/comments\/(\d+)\/replies$/)[1]);
+    if (call === 1) return "HTTP/2.0 404 Not Found\r\n\r\n{}";
+    return okResponse({ id: 900 + call, in_reply_to_id: id, body: JSON.parse(options.input).body,
+      html_url: `https://example.invalid/r${id}` });
+  };
+  await dispatchReplies(outcome, base.binding, plan, {
+    controller: new AbortController(), cwd: ".", gh, persist: () => {},
+  });
+  assert.equal(call, 3, "A thread GitHub definitely refused does not stop the others");
+  assert.equal(outcome.replies.status, "partial");
+  assert.deepEqual(outcome.replies.entries.map((entry) => entry.disposition),
+    ["failed", "written", "written"]);
+  validateRecord(retainedRecord(outcome), sessionId);
+  console.log("PASS I1c a thread GitHub definitely refused does not stop the rest");
+}
+
+// Every cross-check the record makes about a reply set, each tested by breaking it.
+{
+  const result = settled();
+  const outcome = { ...base, revalidation: retainedRevalidation(result) };
+  await dispatchReplies(outcome, base.binding, planReplies(result, base.binding.head, [], us), {
+    controller: new AbortController(), cwd: ".", persist: () => {},
+    gh: async (args, directory, options) => {
+      const id = Number(args[5].match(/comments\/(\d+)\/replies$/)[1]);
+      return okResponse({ id: 900 + id, in_reply_to_id: id, body: JSON.parse(options.input).body,
+        html_url: `https://example.invalid/r${id}` });
+    },
+  });
+  const good = outcome.replies;
+  const broken = {
+    "a reply to a thread with no settled verdict": (value) => { value.entries[0].commentId = 999999; },
+    "a verdict disagreeing with the revalidation": (value) => { value.entries[0].verdict = "obsolete"; },
+    "two replies to one thread": (value) => { value.entries[1].commentId = value.entries[0].commentId; },
+    "an unwritten reply carrying a reply ID": (value) => { value.entries[0].disposition = "failed"; },
+    "a written reply with no URL": (value) => { delete value.entries[0].url; },
+    "two unknown outcomes": (value) => {
+      value.status = "uncertain";
+      value.entries[0].disposition = "uncertain";
+      value.entries[0].error = "unknown";
+      delete value.entries[0].replyId;
+      delete value.entries[0].url;
+      value.entries[1].disposition = "uncertain";
+      value.entries[1].error = "unknown";
+      delete value.entries[1].replyId;
+      delete value.entries[1].url;
+    },
+    "a completed set with an unattempted thread": (value) => {
+      value.entries[2].disposition = "not-attempted";
+      delete value.entries[2].replyId;
+      delete value.entries[2].url;
+    },
+    "an unattempted set that wrote to a thread": (value) => {
+      value.status = "not-attempted";
+      value.attempted = false;
+    },
+    "an unknown disposition": (value) => { value.entries[0].disposition = "probably-sent"; },
+  };
+  for (const [what, breakIt] of Object.entries(broken)) {
+    const value = structuredClone(good);
+    breakIt(value);
+    assert.throws(() => validateRecord(retainedRecord({ ...outcome, replies: value }), sessionId),
+      /Invalid retained result/, `${what} must not survive the strict validator`);
+  }
+  // A reply set with no revalidation behind it is not a reply set.
+  assert.throws(() => validateRecord(retainedRecord({ ...base, replies: structuredClone(good) }), sessionId),
+    /Invalid retained result/);
+  validateRecord(retainedRecord({ ...outcome, replies: structuredClone(good) }), sessionId);
+  console.log("PASS I1c the retained reply set survives only when every cross-check holds");
+}
