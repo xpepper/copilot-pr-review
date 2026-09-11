@@ -526,7 +526,8 @@ this deliberately.
 **The user asked for a minimal CI pipeline in the `I1b` session**, so
 `.github/workflows/ci.yml` runs on every pull request and every push to `main`.
 It is not an increment, has no roadmap row, and was not part of what the plugin
-reviewed.
+reviewed. **It went green on #31 before that pull request was merged**, running
+all fifteen suites, reading all six instruction files and skipping none.
 
 It runs the fifteen controlled suites and two invariants this repository has
 broken before: that safeguard discovery still reads every instruction file at

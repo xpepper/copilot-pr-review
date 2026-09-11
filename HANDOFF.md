@@ -285,7 +285,7 @@ one. Citations remain limited to captured diff and context windows.
 
 ## State at this handoff
 
-`I1b` landed through pull request **#31**, ten commits on branch
+`I1b` landed through pull request **#31**, eleven commits on branch
 `i1b-incremental-confinement`, and was reviewed once with this plugin at the
 user's authorization: deep, 68.53836 credits, 91.5 s of model work, 16 approved
 tool calls and no denial, **0 candidates and 0 validated findings**, on
@@ -322,10 +322,16 @@ from the one it asked for.
 plugin**, because the standing workflow authorizes one review per pull request
 and #31 has spent it. A further review needs the user's explicit authorization.
 
-**Pull request #31 is open and unmerged at this handoff**, and merging is always
-the user's decision. Confirm the branch and pull-request state from git rather
-than from this sentence, and reconcile anything that disagrees. `main` refuses
-direct pushes for everyone, including admins and agents using their token.
+**The user chose to merge #31 at the end of that session, so you should be
+starting from `main` with no increment branch open.** Confirm that from git state
+rather than from this sentence, and reconcile anything that disagrees. **Merging
+is always the user's decision**, and `main` refuses direct pushes for everyone,
+including admins and agents using their token.
+
+**A minimal CI pipeline landed with it**, at the user's request and outside the
+increment sequence. `.github/workflows/ci.yml` runs the fifteen suites and the
+two invariants on every pull request and on every push to `main`. It went green
+on #31 before the merge, reading all six instruction files and skipping none.
 
 If you land anything at all: follow `AGENTS.md`, with meaningful validated
 checkpoint commits, a named branch and pull request, no direct `main` push, and
