@@ -152,12 +152,22 @@ assert(!logs[1].includes("export const value"), "Do not put source context in th
 assert.match(logs[1], /local checkout, its branch, and its uncommitted changes are never context evidence/);
 assert.match(logs[1], /requires the checkout to be exactly this head before reviewers may read it/);
 assert.equal(executed.context.head, "b".repeat(40));
+// I1a: capture reports what an earlier review of this pull request evaluated.
+// The shared fixture has no prior review, so the run says what it considered
+// rather than asserting that none has ever happened.
+assert.match(logs[2], /^I1 prior: /);
+assert.match(logs[2], /"status":"none"/);
+assert.match(logs[2], /No prior review by this tool: 0 submitted review\(s\) considered/);
+assert.match(logs[2], /acts on none of it/);
+assert.equal(executed.prior.status, "none");
+assert.equal(executed.prior.relationship, "none");
 assert.deepEqual(contextSummary(executed.context, 0),
   { ...contextSummary(executed.context), entries: [], undisplayedFiles: 1 },
   "Large PRs report an undisplayed-file count instead of an unbounded summary");
 session.rpc.metadata.snapshot = async () => ({ workingDirectory: cwd, isRemote: true });
 await assert.rejects(executeTargetCapture(session, "1", { gh: fake.gh }), /local Copilot session/);
-assert.equal(fake.calls.length, 6, "Capture plus both bound source sides");
+assert.equal(fake.calls.length, 8,
+  "Capture, both bound source sides, and prior-review discovery's identity and review listing");
 console.log("PASS Q1 capture, gates, strict confirmation, races, malformed metadata/diffs, command summary");
 
 // U1: an unattended run asks nothing, including the one question that is asked

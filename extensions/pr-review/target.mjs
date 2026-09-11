@@ -4,6 +4,7 @@ import { isAbsolute } from "node:path";
 import { promisify } from "node:util";
 import { assembleContext } from "./context.mjs";
 import { waitForInteraction } from "./interaction.mjs";
+import { collectPriorReview, describePrior, priorSummary } from "./prior.mjs";
 
 const execute = promisify(execFile);
 const shaPattern = /^[0-9a-f]{40}$/;
@@ -240,5 +241,17 @@ export async function executeTargetCapture(session, args, {
   // promises about its provenance is not, so quiet keeps the promise and drops
   // the dump. Unavailable source still reaches the coverage report either way.
   await session.log(quiet ? bound : `Q2 context: ${JSON.stringify(contextSummary(context))}\n${bound}`);
-  return { ...outcome, context, workingDirectory: cwd };
+  // I1a: what an earlier review of this same pull request evaluated, and how
+  // this head relates to that one. It runs here because capture is the last
+  // stage before any reviewer starts, so every review reports it and
+  // --capture-only reports it without spending a credit. It reads GitHub only,
+  // changes no reviewer's input, and a failure is reported as itself.
+  const prior = await collectPriorReview(outcome.repository, outcome.pull, { gh, cwd, signal });
+  signal?.throwIfAborted();
+  // The comment prose stays out of the parent timeline for the same reason the
+  // diff and the source context do; the anchors, which are what a re-review
+  // reasons about, are evidence and stay in.
+  await session.log(quiet ? describePrior(prior, outcome.pull.head.sha)
+    : `I1 prior: ${JSON.stringify(priorSummary(prior))}\n${describePrior(prior, outcome.pull.head.sha)}`);
+  return { ...outcome, context, prior, workingDirectory: cwd };
 }
