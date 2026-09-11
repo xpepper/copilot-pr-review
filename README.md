@@ -100,11 +100,13 @@ credits. What you see, in order:
    lifecycle, base and head SHAs, diff size and a SHA-256 of the diff.
 3. **The bound source context**, a `Q2 context:` line naming each changed file,
    the side fetched, blob identities and window ranges.
-4. **The revision gate**, which refuses the review unless this checkout is the
+4. **Any earlier review of ours**, an `I1 prior:` line naming the head it
+   evaluated and how the reviewed head relates to it. Nothing acts on it yet.
+5. **The revision gate**, which refuses the review unless this checkout is the
    reviewed head.
-5. **Per-reviewer progress**: starting, active, completed or failed.
-6. **Adjudication**, one isolated session that tries to disprove each candidate.
-7. **The findings**, then the selection step, then the publication step.
+6. **Per-reviewer progress**: starting, active, completed or failed.
+7. **Adjudication**, one isolated session that tries to disprove each candidate.
+8. **The findings**, then the selection step, then the publication step.
 
 **Most of that output is evidence, not findings.** On a substantial code diff a
 single reviewer's raw untrusted output can fill the screen by itself, and a
@@ -157,6 +159,35 @@ No diff is fetched while a confirmation is pending.
 
 `captured`, `skipped` and `declined` are not review results, and none of them
 claims a clean pull request.
+
+### What an earlier review of the same pull request evaluated
+
+Capture ends by reporting whether this tool has already reviewed this pull
+request, and how the head you are about to review relates to the head that
+earlier review saw. It reads GitHub only, spends no credits, and `--capture-only`
+reports it too.
+
+A review counts only when your authenticated GitHub identity submitted it **and**
+it carries the review body this tool builds. A review you wrote by hand is
+counted as considered and never treated as a prior one, because its comments
+carry no severity, no anchor and no reviewed head this tool set.
+
+| Reported | Meaning |
+| --- | --- |
+| `none` | No earlier review of ours. The line says how many submitted reviews were considered |
+| `same-head` | The reviewed head is exactly the head that review evaluated |
+| `incremental` | Commits were added after it, and the reviewed head still descends from it |
+| `diverged` | The reviewed head does not descend from it, including a head rewound behind it |
+| `unknown` | GitHub could no longer reach that head, so the relationship was not measured |
+
+The earlier review's inline comments are kept exactly as GitHub returns them,
+including the line each was written at, which GitHub keeps after an anchor falls
+out of the current diff.
+
+**Nothing acts on any of this yet.** Hunting is not confined to the new commits
+and the earlier findings are not revalidated, so a re-review costs and reports
+what a first review does. Discovery failure is reported as itself and never
+refuses a review.
 
 ## Review modes
 
@@ -1085,20 +1116,21 @@ command approval.
 
 ## Verify it yourself
 
-Thirteen controlled suites cover the shipped logic with test doubles. They need
+Fourteen controlled suites cover the shipped logic with test doubles. They need
 no network, no inference and no runtime connection, and each finishes in well
 under a second:
 
 ```sh
 for s in findings review selection retention preview publication publish-later \
-  checkout config context fixture target safeguards; do node scripts/smoke-$s.mjs; done
+  checkout config context fixture target safeguards prior; do node scripts/smoke-$s.mjs; done
 ```
 
 They cover PR capture and its gates, revision-bound context assembly, all four
 reviewer topologies, tier and fallback resolution, the evidence boundary and
 citation refusals, deduplication, degraded coverage, selection, retention and
 its schemas, the publication payload and its journal, publish-later, the
-configuration and trust rules, and the safeguard path end to end.
+configuration and trust rules, prior-review discovery and its head
+classification, and the safeguard path end to end.
 
 Their limits matter as much as their coverage. Their semantic accept and reject
 decisions are explicit test doubles, not live-model evidence, and their `gh` is
@@ -1183,16 +1215,21 @@ the point of this project:
 - **No exclusion rule has ever refused a real discovered command.** The
   exclusion table is demonstrated only against the controlled suites, because
   what a discovery pass reports is not something a run can arrange.
-- **No review has run against a substantial code diff.** The largest so far is
-  27 files of mostly documentation. Nothing here establishes defect-detection
-  quality on a large code change.
+- **Recall is unmeasured.** One review has run against a substantial code diff,
+  1427 changed lines over 16 files, and its single finding was real. That is
+  precision. What a review misses needs a defect corpus with agreed ground
+  truth, which this project does not have.
+- **A re-review repeats a first review.** The earlier review and the head it
+  evaluated are discovered and reported; confining fresh hunting to the new
+  commits and revalidating the earlier findings are not built.
 - **Structured runtime output is unusable on CLI 1.0.83.** Reviewers are asked
   for a marked envelope and code unwraps exactly that marker pair plus one fence
   wrapping the whole response. A missing or repeated marker, a marker sharing
   its line, prose after a fence, two fenced blocks or a truncated object each
   discard the whole output.
 - **Cold resume of command-only sessions is unsupported** by CLI 1.0.83.
-- **The review output is verbose.** No quieter mode is designed or scheduled.
+- **A run never reports what it cost.** Billing is collected per request and
+  retained in the evidence, and nothing prints it.
 - **Copilot CLI only.** Plugin-format support elsewhere does not establish
   equivalent execution, and no other client is demonstrated.
 
