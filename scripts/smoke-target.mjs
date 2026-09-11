@@ -158,7 +158,8 @@ assert.equal(executed.context.head, "b".repeat(40));
 assert.match(logs[2], /^I1 prior: /);
 assert.match(logs[2], /"status":"none"/);
 assert.match(logs[2], /No prior review by this tool: 0 submitted review\(s\) considered/);
-assert.match(logs[2], /acts on none of it/);
+assert.match(logs[2], /Fresh hunting is not confined to any commit range\./);
+assert.match(logs[2], /There is no earlier finding of ours to revalidate\./);
 assert.equal(executed.prior.status, "none");
 assert.equal(executed.prior.relationship, "none");
 assert.deepEqual(contextSummary(executed.context, 0),

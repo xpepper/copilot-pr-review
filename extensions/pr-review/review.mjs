@@ -124,8 +124,8 @@ export function parseReviewArgs(args) {
     // invocations above; what remains is a fact the run states about itself and
     // one place downstream that must not offer a question nobody can answer.
     unattended: seen.has(unattendedFlag),
-    // I1b: a request, not a contract, and the only one of the four flags that
-    // is. What it asks for depends on a relationship nothing can know until the
+    // I1b: a request, not a contract, and the first of the two flags that are.
+    // What it asks for depends on a relationship nothing can know until the
     // target has been captured, so unlike --unattended it cannot be refused at
     // parse time, and a run that asks for it on a pull request with no earlier
     // review of ours narrows nothing and says so.

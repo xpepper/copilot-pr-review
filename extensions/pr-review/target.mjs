@@ -303,18 +303,21 @@ export async function executeTargetCapture(session, args, {
     { requested: incremental, read, gh, cwd, signal });
   signal?.throwIfAborted();
   const confined = isConfined(confinement);
-  const described = describePrior(prior, outcome.pull.head.sha, confined);
+  // The free half of revalidation, which every review reports. It is settled
+  // before the prior review is reported, for the same reason the confinement is:
+  // what that report says this run does with the prior review depends on what
+  // these two stages turned out to be able to do with it.
+  const revalidation = revalidatePrior(prior, outcome.pull.head.sha, read);
+  const described = describePrior(prior, outcome.pull.head.sha, confined,
+    (revalidation?.entries.length ?? 0) > 0);
   await session.log(quiet ? described : `I1 prior: ${JSON.stringify(priorSummary(prior))}\n${described}`);
   if (confinement) {
     await session.log(quiet ? describeConfinement(confinement)
       : `I1b confinement: ${JSON.stringify(confinementSummary(confinement))}\n${describeConfinement(confinement)}`);
   }
-  // The free half of revalidation, which every review reports. It reads the
-  // comments discovery already retained and the range already read, spends
-  // nothing, and settles only what the code can prove. The prose of those
-  // comments stays out of the evidence line exactly as the diff and the source
-  // context do; the anchors and the verdicts are evidence and stay in.
-  const revalidation = revalidatePrior(prior, outcome.pull.head.sha, read);
+  // The prose of those comments stays out of the evidence line exactly as the
+  // diff and the source context do; the anchors and the verdicts are evidence
+  // and stay in.
   if (revalidation) {
     const report = describeRevalidation(revalidation, revalidate);
     await session.log(quiet ? report

@@ -778,6 +778,7 @@ const okResponse = (comment) => `HTTP/2.0 201 Created\r\nserver: github\r\n\r\n$
 
 import { executeTargetCapture } from "../extensions/pr-review/target.mjs";
 import { identity, respond } from "./target-fixture.mjs";
+import { isPriorReview, toolReviewBody } from "../extensions/pr-review/prior.mjs";
 
 const repository = {
   id: "R_fixture", nameWithOwner: "fixture/repository", host: "github.com",
@@ -882,4 +883,27 @@ const rangeRequests = (calls) => calls.filter((args) =>
   assert.equal(rangeRequests(calls), 0, "Nothing to revalidate costs no comparison request");
   assert(!sink.some((line) => line.includes("I1c revalidation")));
   console.log("PASS I1c a pull request with no earlier review revalidates nothing and costs nothing");
+}
+
+// ---------------------------------------------------------------------------
+// A reply this tool writes must never come back to it as something it wrote a
+// review for. Discovery keeps only the comments of the review it recognised, and
+// recognising a review reads the body this tool builds, so a reply is excluded
+// twice over. Both are asserted, because either one changing would make a
+// re-review revalidate its own answers.
+
+{
+  const result = settled();
+  const reply = replyBody(result.entries[0], base.binding.head);
+  assert.equal(parseCommentFinding(reply), undefined,
+    "A reply must never read back as a published finding");
+  assert.equal(toolReviewBody(reply), undefined,
+    "A reply must never read back as a review body this tool built");
+  // GitHub wraps a standalone reply in an implicit review whose body is empty.
+  // That review is not ours, so the comments hanging off it are never retained.
+  assert.equal(isPriorReview({
+    state: "COMMENTED", user: { login: identity.login, id: identity.id },
+    commit_id: base.binding.head, submitted_at: "2026-09-12T09:00:00Z", body: null,
+  }, identity), false, "An implicit review carrying a reply is not a prior review of ours");
+  console.log("PASS I1c a reply never comes back as a finding or as a review this tool wrote");
 }
