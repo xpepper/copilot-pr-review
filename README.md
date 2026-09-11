@@ -189,10 +189,70 @@ and its anchor normalised to a fixed shape: path, side, the current line, and th
 line it was written at, which GitHub keeps after an anchor falls out of the
 current diff. Every other field GitHub returns is dropped.
 
-**Nothing acts on any of this yet.** Hunting is not confined to the new commits
-and the earlier findings are not revalidated, so a re-review costs and reports
-what a first review does. Discovery failure is reported as itself and never
-refuses a review.
+One flag acts on this, and only when you ask for it: `--incremental`, in the
+section below. Without it hunting is not confined, and the earlier findings are
+not revalidated either way, so a re-review costs and reports what a first review
+does. Discovery failure is reported as itself and never refuses a review.
+
+### Confining a re-review to the new commits
+
+Pass `--incremental` to confine fresh hunting to the commits added since the
+earlier review, so a re-review stops reporting hunks that review already
+covered:
+
+```text
+/pr-review 123 --deep --no-comment --incremental
+```
+
+It is a request rather than a parse-time contract, and it is the only flag that
+is: whether a forward commit range exists at all is a fact about the pull
+request, and nothing knows it until capture has run. When capture reports the
+relationship as `incremental`, those commits are read and their head-side line
+ranges become the confined scope. On any other relationship, on a pull request
+this tool has never reviewed, when the range cannot be read, or when those
+commits change no file, the run narrows nothing and says which of those it was.
+
+**Confinement is a filter over the captured binding, never a replacement for
+it.** The captured base-to-head diff, the context windows, the provenance checks
+and every citation rule reach the reviewers exactly as they do in any other run,
+and a finding still has to anchor inside a hunk of that captured diff, because
+publication would refuse anything else. What the flag changes is only what may
+be reported: the reviewers are given the confined head-side line ranges and
+every path those commits touched on either side, and are asked to anchor there,
+and code sets aside any candidate anchored outside them, before adjudication, so
+a candidate an earlier turn covered is not paid to be judged again.
+
+A candidate set aside is **reported with its location rather than dropped**, and
+is never adjudicated, so it is neither a validated finding nor a refuted one:
+
+```text
+1 candidate(s) set aside as already covered by the earlier review: each anchors outside the
+commit range this run confined fresh hunting to, and none of them was adjudicated, so none is
+a validated finding and none is refuted:
+correctness:2: [P2] Free shipping now applies to small orders at shipping.js:3-3 (head)
+```
+
+One thing the range cannot settle is a base-side anchor, which names the
+captured base revision that comparison never saw. A base-side candidate in a
+file those commits did touch therefore stays in scope, and the reviewers are
+told which paths those are, because **a file the new commits deleted has no
+head-side line at all** and a base-side anchor is the only one such a defect can
+have. The filter removes only what it can prove an earlier turn already
+covered.
+
+**A confined review does not cover the whole pull request**, and says so in the
+run and in the published review body. It says it as an informational caveat
+rather than as incomplete coverage, because nothing failed and `INCOMPLETE` has
+to keep meaning that something did. What the run did not hunt was covered by the
+earlier review, whose own coverage this run does not read and does not vouch
+for.
+
+That is why the flag is opt-in and narrowing is not the default. Two cases
+decided it. A re-review in a heavier mode than the earlier one would otherwise
+silently never reach the hunks that lighter mode only skimmed. And the earlier
+review's own coverage cannot be read: the body signature requires a coverage
+sentence and deliberately never reads what it says, because that prose is the
+part most likely to change between versions of this tool.
 
 ## Review modes
 
@@ -869,6 +929,7 @@ Review flags:
 | `--include-drafts` | Review a draft. Never permits publishing one |
 | `--include-closed`, `--review-closed` | Review a closed or merged pull request |
 | `--unattended` | Declare that nothing is left for a person to answer. Refuses at parse time without `--all` and one of `--comment`/`--no-comment`, and refuses `--verify`. Authorizes nothing |
+| `--incremental` | Confine fresh hunting to the commits added since an earlier review of this pull request by this tool. A request, not a parse-time contract: a run with no forward commit range narrows nothing and says so. Authorizes nothing |
 | `--capture-only` | Stop after capture. Takes no mode, posting or model argument |
 | `heavyModel=ID`, `heavyEffort=LEVEL` | Override the heavy tier for this invocation only |
 
@@ -922,13 +983,13 @@ command approval.
 
 ## Verify it yourself
 
-Fourteen controlled suites cover the shipped logic with test doubles. They need
+Fifteen controlled suites cover the shipped logic with test doubles. They need
 no network, no inference and no runtime connection, and each finishes in well
 under a second:
 
 ```sh
 for s in findings review selection retention preview publication publish-later \
-  checkout config context fixture target safeguards prior; do node scripts/smoke-$s.mjs; done
+  checkout config context fixture target safeguards prior incremental; do node scripts/smoke-$s.mjs; done
 ```
 
 They cover PR capture and its gates, revision-bound context assembly, all four
@@ -936,7 +997,8 @@ reviewer topologies, tier and fallback resolution, the evidence boundary and
 citation refusals, deduplication, degraded coverage, selection, retention and
 its schemas, the publication payload and its journal, publish-later, the
 configuration and trust rules, prior-review discovery and its head
-classification, and the safeguard path end to end.
+classification, the confinement of a re-review to the new commits, and the
+safeguard path end to end.
 
 Their limits matter as much as their coverage. Their semantic accept and reject
 decisions are explicit test doubles, not live-model evidence, and their `gh` is
@@ -1025,9 +1087,15 @@ the point of this project:
   1427 changed lines over 16 files, and its single finding was real. That is
   precision. What a review misses needs a defect corpus with agreed ground
   truth, which this project does not have.
-- **A re-review repeats a first review.** The earlier review and the head it
-  evaluated are discovered and reported; confining fresh hunting to the new
-  commits and revalidating the earlier findings are not built.
+- **A re-review revalidates nothing.** The earlier review, the head it evaluated
+  and its inline comments are discovered and reported, and `--incremental`
+  confines fresh hunting to the commits added since. Deciding whether each
+  earlier finding is now resolved, still open or obsolete is not built.
+- **No confined run has been watched end to end.** `--incremental` narrows only
+  where capture reports `incremental`, and no live run has ever reported that
+  relationship: the only two reviews this tool has published are on playground
+  pull requests still at the head they evaluated. The suites cover every branch
+  of the path; live evidence covers none of it.
 - **Structured runtime output is unusable on CLI 1.0.83.** Reviewers are asked
   for a marked envelope and code unwraps exactly that marker pair plus one fence
   wrapping the whole response. A missing or repeated marker, a marker sharing

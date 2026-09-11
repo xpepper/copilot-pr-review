@@ -1,0 +1,69 @@
+# Minimal CI for a repository with no dependencies and no build step.
+#
+# It runs exactly what AGENTS.md already asks of an agent before a checkpoint
+# commit, and nothing that costs money: the controlled suites use test doubles,
+# need no network and no inference, and each finishes in well under a second.
+# The plugin review of a pull request is the increment's real integration test
+# and is deliberately not automated here, because it spends Copilot credits and
+# that stays the user's explicit decision.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  suites:
+    name: Controlled suites and self-readability
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+
+      # There is no package.json, no dependency and no build step: the suites
+      # are plain ES modules run directly. A missing suite fails the job rather
+      # than being skipped silently, which is why the list is explicit.
+      - name: Controlled suites
+        run: |
+          set -euo pipefail
+          for s in findings review selection retention preview publication publish-later \
+            checkout config context fixture target safeguards prior incremental; do
+            echo "--- smoke-$s"
+            node "scripts/smoke-$s.mjs"
+          done
+
+      # This project's own safeguard discovery stops reading an instruction file
+      # at 65536 bytes, silently, and the tool then cannot read the project it
+      # documents. That has happened here before, so the invariant is checked
+      # rather than remembered: nothing at the checkout root may be skipped.
+      - name: The tool can read its own instruction files
+        run: |
+          node --input-type=module -e '
+          import { collectInstructionFiles } from "./extensions/pr-review/safeguards.mjs";
+          const { files, skipped } = collectInstructionFiles(process.cwd());
+          console.log("read:", files.map((f) => `${f.name} ${f.bytes}`).join(", "));
+          if (skipped.length) {
+            console.error("skipped:", skipped.map((s) => `${s.name} (${s.reason})`).join(", "));
+            console.error("A skipped instruction file means this tool can no longer read its own project.");
+            process.exit(1);
+          }
+          console.log("skipped: none");
+          '
+
+      # A raw control byte in a fixture is what refused pull request #17's
+      # review. It is invisible in a diff and cheap to check for.
+      - name: No control bytes in tracked text
+        run: |
+          set -euo pipefail
+          if git grep -In -P '[\x00-\x08\x0B\x0C\x0E-\x1F]' -- '*.md' '*.mjs' '*.js' '*.json' '*.yml'; then
+            echo "Tracked text carries a control byte; see the matches above."
+            exit 1
+          fi
+          echo "No control byte in tracked text."

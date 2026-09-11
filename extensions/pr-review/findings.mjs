@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
 import { formatContext, parseDiffFiles } from "./context.mjs";
 import { blockingIssues, formatCoverage } from "./coverage.mjs";
+import { confinementCaveat, isConfined, withinNewRange } from "./incremental.mjs";
 import { admitsMinor, capsMinor, isMinor, reviewModes, severityRank } from "./modes.mjs";
 
 export const minimumConfidence = 0.8;
@@ -322,9 +323,17 @@ function candidate(value, boundary, policy, diagnostics, id) {
     evidence: value.evidence.map((entry, index) => cite(entry, `evidence[${index}]`)) };
 }
 
-export function collectCandidates(reviewers, boundary, policy) {
+// I1b: a confined run applies one extra filter here, after the evidence
+// boundary has bound the citation and before anything is adjudicated. Setting a
+// candidate aside before adjudication is deliberate: it is the whole saving, and
+// a candidate an earlier review already covered should not be paid to be judged
+// again. The filter is applied by code because the instruction that asks a
+// reviewer for the same thing is a request to an untrusted model, and this
+// project decides with code what a model may only propose.
+export function collectCandidates(reviewers, boundary, policy, confinement) {
   const candidates = [];
   const diagnostics = [];
+  const outside = [];
   for (const reviewer of reviewers) {
     if (reviewer.status !== "completed") {
       diagnostics.push({ kind: "execution-failure", message:
@@ -342,13 +351,31 @@ export function collectCandidates(reviewers, boundary, policy) {
     for (const [index, value] of output.candidates.entries()) {
       const id = `${reviewer.label}:${index + 1}`;
       try {
-        candidates.push({ ...candidate(value, boundary, policy, diagnostics, id), id, reviewer: reviewer.label });
+        const entry = { ...candidate(value, boundary, policy, diagnostics, id), id, reviewer: reviewer.label };
+        // Outside the confined range is not a refusal and not a failure: the
+        // candidate passed every check an unconfined run makes, and this run
+        // was asked not to report that part of the diff. It is kept and shown,
+        // because a candidate dropped in silence could not be told apart from
+        // one no reviewer ever made.
+        if (isConfined(confinement) && !withinNewRange(entry.location, confinement.range)) {
+          outside.push({ id, reviewer: reviewer.label, severity: entry.severity, title: entry.title,
+            location: entry.location });
+          continue;
+        }
+        candidates.push(entry);
       } catch (error) {
         diagnostics.push({ kind: "execution-failure", message: `${id}: rejected at evidence boundary: ${String(error)}` });
       }
     }
   }
-  return { candidates, diagnostics, issues: blockingIssues(diagnostics) };
+  // One caveat for the whole confinement, carrying the count, so the published
+  // review body states plainly that this review did not cover the whole pull
+  // request. It is a caveat and not a coverage gap: nothing failed and no
+  // assessment was blocked, and a confined run reporting INCOMPLETE would make
+  // that word mean both "something went wrong" and "you asked for less".
+  const caveat = confinementCaveat(confinement, outside.length);
+  if (caveat) diagnostics.push(caveat);
+  return { candidates, outside, diagnostics, issues: blockingIssues(diagnostics) };
 }
 
 export function adjudicateCandidates(collected, reviewer, boundary, policy) {
@@ -357,9 +384,10 @@ export function adjudicateCandidates(collected, reviewer, boundary, policy) {
   const rejected = [];
   let duplicates = [];
   const capped = [];
+  const outside = collected.outside ?? [];
   const result = () => {
     const issues = blockingIssues(diagnostics);
-    return { complete: issues.length === 0, findings, rejected, duplicates, capped, issues, diagnostics };
+    return { complete: issues.length === 0, findings, rejected, duplicates, capped, outside, issues, diagnostics };
   };
   if (!collected.candidates.length) return result();
   if (reviewer?.status !== "completed") {
@@ -476,6 +504,7 @@ export function formatFindings(outcome) {
     ? ` ${outcome.binding.repository.nameWithOwner}#${outcome.binding.number} at ${outcome.binding.head}` : "";
   const label = reviewModes[outcome.mode]?.label ?? "Review";
   const capped = validation.capped ?? [];
+  const outside = validation.outside ?? [];
   const heading = `${label}${target}: ${validation.findings.length} validated finding(s); ` +
     `${outcome.complete ? "completed" : "incomplete"} coverage. Findings are not a clean-review claim.`;
   const sections = validation.findings.map((finding) => [
@@ -496,6 +525,11 @@ export function formatFindings(outcome) {
     ...validation.rejected.map((entry) => `${entry.id}: ${entry.verdict}: ${entry.reason}`),
     ...(capped.length ? [`${capped.length} minor finding(s) withheld by the ${label.toLowerCase()} findings policy:\n` +
       capped.map((entry) => `${entry.id}: [${entry.severity}] ${entry.title}: ${entry.reason}`).join("\n")] : []),
+    ...(outside.length ? [`${outside.length} candidate(s) set aside as already covered by the earlier review: ` +
+      "each anchors outside the commit range this run confined fresh hunting to, and none of them was " +
+      `adjudicated, so none is a validated finding and none is refuted:\n` +
+      outside.map((entry) => `${entry.id}: [${entry.severity}] ${entry.title} at ${entry.location.path}:` +
+        `${entry.location.startLine}-${entry.location.endLine} (${entry.location.side})`).join("\n")] : []),
     "Validation combines exact source/diff checks with fallible model adjudication, not execution or formal proof.",
     "No accepted findings is not proof of a clean PR.",
   ].join("\n\n");

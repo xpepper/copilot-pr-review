@@ -3,6 +3,9 @@ import { createHash } from "node:crypto";
 import { isAbsolute } from "node:path";
 import { promisify } from "node:util";
 import { assembleContext } from "./context.mjs";
+import {
+  confineToNewCommits, confinementSummary, describeConfinement, isConfined,
+} from "./incremental.mjs";
 import { waitForInteraction } from "./interaction.mjs";
 import { collectPriorReview, describePrior, priorSummary } from "./prior.mjs";
 
@@ -108,12 +111,21 @@ export function skipReason(pull, options) {
   return undefined;
 }
 
-export function validateDiff(diff, pull) {
-  if (typeof diff !== "string") throw new Error("Missing PR diff.");
+// The structural half of diff validation, with nothing in it that depends on a
+// pull request: a non-empty diff opens with a file header and ends with a
+// newline, every hunk consumes exactly the lines its header declares, and no
+// unexpected line appears inside one. It is shared rather than duplicated
+// because `parseDiffFiles` is a parser and not a completeness check: a diff cut
+// mid-hunk parses without complaint and simply reports fewer changed lines,
+// which is silence in the one direction a consumer must never accept.
+export function assertCompleteDiff(diff, subject = "PR diff") {
+  if (typeof diff !== "string") throw new Error(`Missing ${subject}.`);
   const files = diff.match(/^diff --git /gm)?.length ?? 0;
-  if ((pull.changedFiles === 0 && diff !== "") || files !== pull.changedFiles ||
-      (files > 0 && (!diff.startsWith("diff --git ") || !diff.endsWith("\n")))) {
-    throw new Error("Missing, truncated, or inconsistent PR diff.");
+  // Anything but the empty diff has to open with a file header, so a body of
+  // bare hunks cannot pass as "no files changed". Only the empty diff is
+  // allowed to carry no header at all.
+  if (diff !== "" && (!diff.startsWith("diff --git ") || !diff.endsWith("\n"))) {
+    throw new Error(`Missing or truncated ${subject}.`);
   }
   let additions = 0;
   let deletions = 0;
@@ -122,7 +134,7 @@ export function validateDiff(diff, pull) {
   for (const line of diff.split("\n")) {
     const hunk = /^@@ -\d+(?:,(\d+))? \+\d+(?:,(\d+))? @@/.exec(line);
     if (hunk || line.startsWith("diff --git ")) {
-      if (oldRemaining || newRemaining) throw new Error("Truncated PR diff hunk.");
+      if (oldRemaining || newRemaining) throw new Error(`Truncated ${subject} hunk.`);
       if (hunk) {
         oldRemaining = Number(hunk[1] ?? 1);
         newRemaining = Number(hunk[2] ?? 1);
@@ -131,11 +143,30 @@ export function validateDiff(diff, pull) {
       if (line.startsWith("+")) { additions++; newRemaining--; }
       else if (line.startsWith("-")) { deletions++; oldRemaining--; }
       else if (line.startsWith(" ")) { oldRemaining--; newRemaining--; }
-      else if (line !== "\\ No newline at end of file") throw new Error("Malformed PR diff hunk.");
-      if (oldRemaining < 0 || newRemaining < 0) throw new Error("Inconsistent PR diff hunk.");
+      else if (line !== "\\ No newline at end of file") throw new Error(`Malformed ${subject} hunk.`);
+      if (oldRemaining < 0 || newRemaining < 0) throw new Error(`Inconsistent ${subject} hunk.`);
     }
   }
-  if (oldRemaining || newRemaining || additions !== pull.additions || deletions !== pull.deletions) {
+  if (oldRemaining || newRemaining) throw new Error(`Truncated ${subject} line counts.`);
+  return { files, additions, deletions };
+}
+
+export function validateDiff(diff, pull) {
+  if (typeof diff !== "string") throw new Error("Missing PR diff.");
+  const declared = diff.match(/^diff --git /gm)?.length ?? 0;
+  if ((pull.changedFiles === 0 && diff !== "") || declared !== pull.changedFiles) {
+    throw new Error("Missing, truncated, or inconsistent PR diff.");
+  }
+  let counted;
+  try {
+    counted = assertCompleteDiff(diff);
+  } catch (error) {
+    // The captured diff's refusals are worded as they always were, because the
+    // messages are user-facing and several suites read them.
+    throw new Error(/Missing or truncated/.test(error.message)
+      ? "Missing, truncated, or inconsistent PR diff." : error.message);
+  }
+  if (counted.additions !== pull.additions || counted.deletions !== pull.deletions) {
     throw new Error("Truncated or inconsistent PR diff line counts.");
   }
 }
@@ -193,7 +224,7 @@ export function contextSummary(context, limit = 20) {
 }
 
 export async function executeTargetCapture(session, args, {
-  gh = runGh, signal, quiet = false, unattended = false,
+  gh = runGh, signal, quiet = false, unattended = false, incremental = false,
 } = {}) {
   const options = parseTargetArgs(args);
   signal?.throwIfAborted();
@@ -251,7 +282,21 @@ export async function executeTargetCapture(session, args, {
   // The comment prose stays out of the parent timeline for the same reason the
   // diff and the source context do; the anchors, which are what a re-review
   // reasons about, are evidence and stay in.
-  await session.log(quiet ? describePrior(prior, outcome.pull.head.sha)
-    : `I1 prior: ${JSON.stringify(priorSummary(prior))}\n${describePrior(prior, outcome.pull.head.sha)}`);
-  return { ...outcome, context, prior, workingDirectory: cwd };
+  // I1b: the commit range a confined run hunts in, read only when this
+  // invocation asked for one. It is another free GitHub read of the same pull
+  // request, and like discovery it changes no binding and no citation rule: it
+  // produces a filter that a later stage applies over the captured diff. It is
+  // settled before the prior review is reported, because what that report says
+  // this run does with the prior review depends on how this read turned out.
+  const confinement = await confineToNewCommits(prior, outcome.pull, outcome.repository,
+    { requested: incremental, gh, cwd, signal });
+  signal?.throwIfAborted();
+  const confined = isConfined(confinement);
+  const described = describePrior(prior, outcome.pull.head.sha, confined);
+  await session.log(quiet ? described : `I1 prior: ${JSON.stringify(priorSummary(prior))}\n${described}`);
+  if (confinement) {
+    await session.log(quiet ? describeConfinement(confinement)
+      : `I1b confinement: ${JSON.stringify(confinementSummary(confinement))}\n${describeConfinement(confinement)}`);
+  }
+  return { ...outcome, context, prior, confinement, workingDirectory: cwd };
 }

@@ -7,15 +7,16 @@ An item is complete only with repository evidence. Later items may be split
 further when their implementation context is known, without changing scope.
 The standing checkpoint-commit, pull-request and fresh-session handoff workflow
 is recorded in [AGENTS.md](AGENTS.md); the replaceable next-session prompt lives
-in [HANDOFF.md](HANDOFF.md). Completed entries through `E1` were moved verbatim
+in [HANDOFF.md](HANDOFF.md). Completed entries through `I1a` were moved verbatim
 to [docs/roadmap-archive-2026-09-10.md](docs/roadmap-archive-2026-09-10.md) by
-`A1`, `L1`, `D1`, `O1`, `U1` and `I1a`, so this file keeps the increments table,
-the two most recent completed entries and the closing section, and stays small
-enough for this project's own safeguard discovery to read. **With `D1` complete v1 is done,
-and `O1`, `E1`, `U1` and `I1a` have since landed on top of it.** `I1` was sliced
-into three with the user before anything was built, and `I1b`, `I1c` and then
-`G1` remain scheduled in that order; the closing section describes the next one
-and records what stays open as a limitation rather than as work.
+`A1`, `L1`, `D1`, `O1`, `U1`, `I1a` and `I1b`, so this file keeps the increments
+table, the most recent completed entry and the closing section, and stays
+small enough for this project's own safeguard discovery to read. **With `D1`
+complete v1 is done, and `O1`, `E1`, `U1`, `I1a` and `I1b` have since landed on
+top of it.** `I1` was sliced into three with the user before anything was built,
+and `I1c` and then `G1` remain scheduled in that order; the closing section
+describes the next one and records what stays open as a limitation rather than
+as work.
 
 **Since 2026-09-07, every increment lands on a branch and a pull request that is
 reviewed with this plugin, and that review is the increment's real integration
@@ -71,24 +72,24 @@ posting them.
 | E1 | Completed | The tool is used for real, on work that is not this repository. One authorized deep review of `xpepper/pr-review-gemini#28`, 1427 changed lines over 16 files: 81.48022 credits, 93 s of model work, 16 approved tool calls and no denial, one validated finding that is real and exact, and one blocked assessment reported twice. Six items came out of it; the coverage-gap consolidation defect is fixed here, two are documentation fixes, and three are recorded as limitations with reasons. Pull request #26, reviewed once with this plugin at the user's instruction: deep, 45.98955 credits, incomplete coverage, 3 validated findings all real and all fixed here, and one discarded candidate that was also right and is also fixed. | O1; [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | U1 | Completed | Unattended, non-interactive execution. All four questions a review can ask already had a no-person branch and none of them blocked, so `--unattended` is a declaration checked at parse time rather than a new capability: it refuses, before capture and before a credit is spent, any invocation that would need somebody. Without `--all`, without `--comment` or `--no-comment`, with `--verify`, or with `--capture-only`. An unattended capture also offers no closed-PR confirmation even where the host has one. It grants no authority, opens no gate and is not a configuration key; `scripts/dogfood-review.mjs` requires it. Pull request #28, reviewed once with this plugin at the user's authorization: deep, 77.45399 credits, 114.5 s of model work, 13 approved tool calls and no denial, incomplete coverage on one execution failure, 0 validated findings and one accepted candidate the evidence boundary discarded because the adjudicator's own citation named fifteen lines for a sixteen-line quote. That candidate was right and is fixed here. | E1; [Publication controls](SCOPE.md#selection-publication-and-cached-results), [Safeguards](SCOPE.md#optional-project-safeguards) |
 | I1a | Completed | Prior-review discovery. Capture reports whether this tool has already reviewed this pull request, the head that review evaluated, its inline comments retained with verbatim bodies and normalised anchors, and how the reviewed head relates to that one: `none`, `same-head`, `incremental`, `diverged` or an honestly unmeasured `unknown`. A review counts only when the authenticated identity submitted it and it carries the body `preview.mjs` builds, so a hand-written review is considered and never treated as a prior one. Read-only, no credits, no change to any reviewer's input, and a failed discovery is reported as itself. The first of `I1`'s three slices, agreed with the user before anything was built. | U1; [Targets](SCOPE.md#targets-and-local-behavior) |
-| I1b | Pending | Confine fresh hunting to the new commit range when the relationship is `incremental`, so a re-review stops reporting hunks an earlier turn already covered. The captured base-to-head binding, its context windows and every citation rule stay exactly as they are: publication requires each finding to anchor inside a hunk of that captured diff, so narrowing is a filter over it and never a replacement for it. Needs one live review. | I1a; [Targets](SCOPE.md#targets-and-local-behavior), [Modes/findings](SCOPE.md#review-modes-and-findings) |
+| I1b | Completed | `--incremental` confines fresh hunting to the commits added since an earlier review of the same pull request, so a re-review stops reporting hunks that review already covered. A range diff that cannot be shown complete refuses rather than confines, and the reviewers are told both the confined head-side ranges and every path those commits touched, because a deleted file's only possible anchor is base-side. Opt-in, at the user's decision, and a request rather than a parse-time contract: any relationship but `incremental`, an unreadable range, or added commits that change no file each narrow nothing and say which it was. The captured binding, its context windows, the provenance checks and every citation rule are unchanged; the reviewers are given the confined head-side ranges and code sets aside any candidate anchored outside them, before adjudication, reported with its location and never refuted. One informational caveat carries the confinement into the published body, because a confined review does not cover the whole pull request. Pull request #31, reviewed once with this plugin at the user's authorization: deep, 68.53836 credits, 91.5 s of model work, 16 approved tool calls and no denial, 0 candidates and 0 validated findings, and one coverage gap that is exact and unfixable here, namely that the confinement path has fixture coverage only and no live run has ever reported the incremental relationship. | I1a; [Targets](SCOPE.md#targets-and-local-behavior), [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | I1c | Pending | Revalidate the prior findings `I1a` retains as resolved, still open or obsolete. Needs the parser that reads this tool's own emitted comment prose back into a finding, deliberately not shipped by `I1a` because nothing consumed it there. Needs one live review. | I1a, I1b; [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | G1 | Pending | Gap analysis against the field, then a proposal. Compare this tool behaviourally with upstream `pi-pr-review` and with other code-review agents and skills now in the open, on capability and on user experience, and propose what is worth adopting. Research is extensive and the output is a written analysis plus a recommendation, not code. **`L1`'s rule binds this absolutely: no upstream or third-party source, prompt text or documentation may be copied.** Any adoption is behavioural and re-implemented. Anything it proposes is a scope decision for the user. | I1c; [Upstream baseline](SCOPE.md#upstream-baseline) |
 
-## Completed increments `F1` through `E1` are archived
+## Completed increments `F1` through `I1a` are archived
 
-Forty-six sections were here and six increments moved every one of them
+Forty-eight sections were here and seven increments moved every one of them
 verbatim to
 [docs/roadmap-archive-2026-09-10.md](docs/roadmap-archive-2026-09-10.md): `A1`
 moved the thirty-nine through `V1c`, `L1` moved `V2a` and `V2b` because this
 file had 4272 bytes of headroom left and the smaller of the two is 7547, `D1`
-moved `A1`'s entry and then `L1`'s, `O1` moved `D1`'s, `U1` moved `O1`'s, and
-**`I1a` moved `E1`'s**, which is the last in that file. Thirty-eight are
-completed-increment entries,
-covering the thirty-six increments `F1`, `F2`, `F3`, `Q1`, `Q2`, `Q3`, `Q4`,
+moved `A1`'s entry and then `L1`'s, `O1` moved `D1`'s, `U1` moved `O1`'s, `I1a`
+moved `E1`'s, and **`I1b` moved `U1`'s and then `I1a`'s**, the last in that
+file. Forty are completed-increment entries,
+covering the thirty-eight increments `F1`, `F2`, `F3`, `Q1`, `Q2`, `Q3`, `Q4`,
 `P1`, `P2`, `P3`, `P4`, `P5`, `C1`, `C2`, `F4`, `R1`, `M1`, `F5`, `F6`, `M2`,
 `C3`, `C4`, `Q5`, `Q6`, `C5`, `Q7`, `V1a`, `V1b`, `V1c`, `V2a`, `V2b`, `A1`,
-`L1`, `D1`, `O1` and `E1`, with `R1` and `M1` each recorded in two halves. The remaining eight are the
+`L1`, `D1`, `O1`, `E1`, `U1` and `I1a`, with `R1` and `M1` each recorded in two halves. The remaining eight are the
 working record kept between them:
 
 - the `Q4` acceptance criteria recorded at the `Q3` checkpoint;
@@ -100,21 +101,22 @@ working record kept between them:
 - the `R1` second-half harness checkpoint;
 - the documentation checkpoint for pull request #4 and its review.
 
-Nothing was rewritten, condensed or corrected in any of the six moves, so each
+Nothing was rewritten, condensed or corrected in any of the seven moves, so each
 section still reads exactly as the session that wrote it left it, and the
 archive is the evidence of record for every increment it holds: reproduction
 commands, the models and efforts actually used, credit costs, findings and
 rejections. Read it for the evidence behind an older increment. Do not redo,
 widen or reopen anything in it; those authorizations are spent. **`V2a`, `V2b`,
-`A1`, `L1`, `O1` and `E1` are all there now**, so the safeguard decisions `V2`
-settled, the archiving `A1` performed, the upstream licence answer `L1`
-established, the quiet-output decisions `O1` settled and everything `E1` learned
-from reviewing somebody else's code are read from the archive rather than from
-this file.
+`A1`, `L1`, `O1`, `E1`, `U1` and `I1a` are all there now**, so the safeguard
+decisions `V2` settled, the archiving `A1` performed, the upstream licence answer
+`L1` established, the quiet-output decisions `O1` settled, everything `E1` learned
+from reviewing somebody else's code, the unattended shape `U1` fixed and the
+three slicing decisions `I1a` took with the user are read from the archive rather
+than from this file.
 [docs/upstream-licensing.md](docs/upstream-licensing.md) is still the record of
 that licence work and did not move.
 
-**`U1`'s and `I1a`'s entries are the ones kept live**, along with the increments
+**`I1b`'s entry is the one kept live**, along with the increments
 table above and the closing section at the end. The rule these moves established is to keep
 the most recent entries and archive the rest, measuring this file with `wc -c`
 against the 65536-byte cap before opening a pull request. `O1` archived `D1`
@@ -126,455 +128,312 @@ being corrected; the archive is history, and the live file is the answer.
 `U1` archived `O1` for headroom alone: the live file had 3679 bytes spare and an
 increment entry is five to eight kilobytes, so `O1`'s had to move before this
 one could be written. It moved verbatim for the same reason every earlier one
-did. `I1a` archived `E1` under the same rule and for the same reason. **`E1`
-was the largest live entry at 10988 bytes**, and `I1` is three increments, each
-of which will want to write one, so the move buys room for all three rather than
-only for this one.
+did. `I1a` archived `E1` under the same rule and for the same reason, `E1` being
+the largest live entry at 10988 bytes. **`I1b` archived `U1`'s 7925 bytes and
+then `I1a`'s 15217** under that same rule. The first move was forced before a
+word could be written: this file had 2766 bytes spare, less than any increment
+entry ever written here. The second was forced once the entry existed, because
+it left 1369 bytes spare and the review evidence an entry ends with does not fit
+in that. **One live entry rather than two is where that rule now lands**, and the
+archive holds the rest.
 
-## Completed increment: U1
+## Completed increment: I1b
 
-**`U1` is a run that completes with nobody there to answer anything.** The
-surprise on opening the code was that this already worked. Four places in a
-review can ask a person something: the closed or merged confirmation at capture,
-safeguard approval under `--verify`, finding selection, and the final
-publication confirmation. **All four already had a no-person branch, and none of
-them blocked.** A host with no elicitation UI reported `unavailable` for each
-decision the invocation had not settled, and carried on.
+**`I1b` is the second of `I1`'s three slices, and the first one that changes
+what a reviewer may report.** `I1a` discovered that this tool had already
+reviewed a pull request and how the head being reviewed relates to the head that
+review evaluated. `I1b` acts on exactly one of those relationships: when the
+reviewed head descends from the reviewed-before head, `--incremental` confines
+fresh hunting to the commits added since, so a re-review stops reporting hunks
+that earlier review already covered.
 
-So `U1` is not about unblocking anything, and it deliberately widened no
-authority. It is about *when* a run finds out. **A run that could never have
-finished alone still paid for its reviewers first and reported the problem
-afterwards**: `E1`'s review of pull request #26 reported selection `unavailable`
-after spending 45.98955 credits.
+### Opt-in, and why, decided by the user before anything was built
 
-### The shape, agreed with the user before anything was built
+**The roadmap and the handoff both recorded this as unsettled and as the user's
+call**, so nothing was built until it was taken. Three options were put, with
+worked examples of where they differ, and **opt-in was chosen**.
 
-Three decisions, each taken by the user before a line was written, because the
-first half of issue #21 is a description rather than a design.
+- **A re-review in a heavier mode than the earlier one.** A first review runs
+  `--quick`, three specialists on P0-P2 only; the re-review runs `--deep`. A
+  default narrowing would mean the integrated reviewer never reaches the hunks
+  the quick review only skimmed, and nothing in the run would say that mattered.
+- **An earlier review whose coverage this code cannot read.** `toolReviewBody`
+  requires a coverage sentence and deliberately never reads what it says,
+  because that prose is the half most likely to change between versions of this
+  tool. So a run narrowing by default could rest on a degraded earlier review
+  and have no way to know it did.
+- **The asymmetry settles it.** A forgotten `--incremental` costs credits, which
+  a person can see. A wrong narrowing loses a finding that is never reported and
+  never mentioned. Opt-in is also the reversible direction: a later increment
+  can flip the default once `incremental` has live evidence, and today it has
+  none.
 
-- **Preflight only.** The flag is a declaration and a precondition check. It does
-  not make the run behave differently on a host that has a UI, and it adds no
-  machine-readable outcome for a caller to branch on. Those were the other two
-  options and both were declined as larger.
-- **`--all` is always required**, rather than only when the run can publish.
-  Selection is a question like any other, and a flag that means "nothing is left
-  for a person" cannot mean two different things depending on `--comment`.
-- **An explicit posting flag is always required.** A saved `autoPostReviews` may
-  never be what makes a headless run publish. This narrows nothing outside the
-  new flag: `--all` with `autoPostReviews=true` still publishes unattended on a
-  host with no UI, exactly as `SCOPE.md` allows.
+An opt-out flag over a default narrowing was the other serious option and is
+recorded here as declined rather than forgotten.
 
-### What `--unattended` refuses
+### A request, not a parse-time contract
 
-Checked at parse time, before the target is captured and before a credit is
-spent. Each refusal names the single missing thing, because nobody is there to
-interpret a general complaint.
+**`--incremental` is the only one of the four review flags that cannot be
+settled at parse time.** `--verify`, `--quiet` and `--unattended` are each a
+fact about the invocation; whether a forward commit range exists at all is a
+fact about the pull request, and nothing knows it until capture has run. So the
+flag is recorded at parse time and honoured after capture, and every outcome
+that is not a confinement says which one it was.
 
-| Refused | Why |
-| --- | --- |
-| Without `--all` | Selection is a question, and `--all` is the only thing that settles it without a person. It authorizes no posting |
-| Without `--comment` or `--no-comment` | What a run may publish belongs in the invocation, not in saved state |
-| With `--verify` | A safeguard command is approved by the question an unattended run cannot ask, and deliberately by nothing else |
-| With `--capture-only` | Capture takes no review flag at all |
+| Outcome | When | What the run does |
+| --- | --- | --- |
+| `confined` | Relationship `incremental`, range read, at least one file changed | Confines fresh hunting to those head-side line ranges |
+| `not-applicable` | Relationship `none`, `same-head`, `diverged` or `unknown`, or discovery failed | Narrows nothing; costs no request at all |
+| `failed` | The comparison could not be read | Narrows nothing; the reason is reported and the review proceeds |
+| `empty` | A forward range whose commits change no file | Narrows nothing; it is not a failure and is not called one |
 
-**One behaviour changed**, in the free capture step: an unattended run is offered
-no closed or merged confirmation even on a host that has one, so such a pull
-request stops at capture unless `--include-closed` or `--review-closed` was
-given. Withholding that question can only refuse a capture, never accept one on
-somebody's behalf, and it is what makes the contract exact: an unattended run
-asks nothing, ever.
+Its only refusal is `--capture-only`, which takes no review flag of any kind. It
+combines with `--unattended`, because a confined run asks nobody anything.
 
-**No gate was relaxed.** `--all` still authorizes no posting, every publication
-gate still runs, reviewer reads stay confined, posting authority still never
-authorizes safeguard execution, and the flag is not a configuration key, so no
-saved or trusted-project setting can turn it on.
+### Narrowing is a filter over the captured binding
 
-**`scripts/dogfood-review.mjs` now requires it.** That runner creates a session
-with no elicitation UI at all, which is how `E1`'s review came to report
-selection `unavailable`, so this project's own headless runner is the
-declaration's first user. `AGENTS.md` and `README.md` prescribe that command and
-both say so.
+**Nothing about the binding, the context windows, the provenance checks or the
+citation rules changed, and that is what kept this increment off head binding
+and off the evidence boundary.** Publication requires every finding to anchor
+inside a hunk of the captured base-to-head diff, so a range diff swapped in for
+that one would produce anchors GitHub refuses. The reviewers receive the same
+captured diff and the same context they would receive without the flag; what
+they are additionally given is `confinedTo`, the head-side line ranges those
+newer commits changed, and an instruction to anchor a candidate only there.
+
+**Code then decides what the instruction only asks for.** `collectCandidates`
+sets aside any candidate anchored outside the range, after the evidence boundary
+has bound its citation and **before adjudication**, which is where the saving
+is: a candidate an earlier turn already covered is not paid to be judged again.
+
+- **A set-aside candidate is reported, never dropped**, with its id, severity,
+  title and location, and the report says plainly that none of them was
+  adjudicated, so none is a validated finding and none is refuted.
+- **It is not a refusal and not an execution failure**, so it never blocks
+  coverage. The candidate passed every check an unconfined run makes.
+- **The comparison is read with the diff media type** and parsed by the same
+  `parseDiffFiles` the captured diff goes through, so the head-side line numbers
+  are already in the coordinate system a reviewer cites in. Nothing is
+  translated.
+- **A base-side anchor cannot be placed in the range at all**, because it names
+  the captured base revision the comparison never saw. The one thing
+  establishable about one is that its file was never touched, so a base-side
+  candidate in a file those commits did touch stays in scope. **The filter
+  removes only what it can prove an earlier turn covered**, which is the safe
+  direction for an increment whose whole job is to cover less.
+
+### A confined review does not cover the whole pull request, and says so
+
+One informational caveat carries that sentence into the run's coverage report
+and therefore into the published review body, naming the range, the count of
+set-aside candidates, and the fact that the earlier review's own coverage was
+not read and is not vouched for.
+
+**It is a caveat and deliberately not a coverage gap.** A coverage gap makes the
+run INCOMPLETE, and INCOMPLETE has to keep meaning that something failed. A
+confined review is complete over what it was asked to review, and a person asked
+for it; making the same word carry both would leave this project unable to say
+which had happened.
+
+**`describePrior` no longer promises that the run acts on none of the prior
+review.** That sentence was true when `I1a` wrote it and this increment makes it
+false, so it is now conditional on what the run actually did, and the
+confinement is settled before the prior review is reported so that the two lines
+agree. Revalidating the earlier findings is still nobody's work and is denied in
+both branches. **This is the defect seven reviews in a row have caught here**,
+and it was found by the standing check rather than by a reviewer.
 
 ### Validation
 
-The thirteen controlled suites pass. `scripts/smoke-review.mjs` gained the parse
-refusals with their exact messages, and a settled unattended run **on a harness
-that does have an elicitation UI and is asked nothing**, which is the contract
-rather than an accident of the host. `scripts/smoke-target.mjs` gained the
-closed-PR case in both directions, proving an open capture is unchanged.
-
-`node scripts/smoke-runtime.mjs --targets` passes with 71 assertions and no
-inference, against the plugin reinstalled from the checkout and `diff -rq`'d
-against it. Seven of those send the new refusals through the runtime's own
-command RPC, and none reaches a capture, so the coverage is free.
-
-**It also reads back one sentence of `help` and one of `status`, which is the
-first check this repository has ever had on either.** Three false user-facing
-strings have shipped from here, each surviving several increments because
-nothing dispatched those commands and looked at the text.
-`scripts/smoke-reviewer-tools.mjs` was not run: nothing here touches
-`read-only.mjs`.
-
-### Pull request #28 and its review
-
-Reviewed once with this plugin at the user's authorization, dispatched with
-`node scripts/dogfood-review.mjs 28 --deep --all --no-comment --unattended`,
-which is the first live run of the flag itself.
-
-| Measure | Value |
-| --- | --- |
-| Diff | 552 additions, 295 deletions, 11 files |
-| Bound input | 72767 byte diff, 322949 bytes of context over 22 blobs |
-| Reviewer `integrated`, heavy, `gpt-5.6-terra` high | 94.0 s, 3 requests, 46.70139 credits |
-| Adjudicator, `gpt-5.6-terra` high | 20.5 s, 1 request, 30.7526 credits |
-| Total | 77.45399 credits, 114.5 s of model work |
-| Tool calls | 13, all approved, zero denials: `view` x9, GPT's `rg` alias x4 |
-| Result | 1 candidate, 0 validated findings, 0 rejected, 0 capped, 0 duplicates |
-| Coverage | INCOMPLETE: 1 execution failure, 0 coverage gaps, 2 informational caveats |
-
-**The one candidate was real, and it was this increment's own new prose.** [P2],
-confidence 0.99: the added section and the matching `help` line both claimed that
-a host with no elicitation support publishes nothing. That is false, and the
-README's own command contract said so four hundred lines earlier. `--all
---comment` resolves to `flag-authorized` posting authority, which never reaches
-the final-confirmation branch, so such a run publishes on a host that could not
-have asked anything. **Both statements are corrected here**, and the accurate one
-is that a no-UI host reports `unavailable` for each decision the invocation did
-not settle, with safeguard approval the one exception whatever the posting flags
-say.
-
-**The adjudicator accepted it, and the evidence boundary discarded it anyway.**
-The candidate reached adjudication, the verdict was `accept` with
-`allClaimsSupported` true, and then the adjudication itself was refused: its
-third citation quoted sixteen lines of `review.mjs` while naming the range
-88-102, which spans fifteen. That is `E1`'s shape exactly, a line count
-disagreeing with its range, **but on the adjudicator's own citation rather than a
-reviewer's, and after the finding had already been accepted.** The gate behaved
-as designed and a true, accepted finding was still lost. Do not weaken it; `Q6`'s
-repair cannot rescue this shape by design, because a repair that drops a named
-line could drop the line authorizing the anchor.
-
-**So the run reported 0 findings and `rejected=0` on incomplete coverage**, which
-is the reading `E1` warned about: a boundary discard is an execution-failure
-diagnostic and never appears in `validation.rejected`. The breakdown line
-underneath is what says a reviewer failed rather than merely caveated.
-
-**`Q6`'s repair fired live again**, on the reviewer's own citation of the `help`
-lines, restoring a quote whose trailing comma the model had dropped. That
-candidate then reached adjudication, so the repair did its job in the same run
-the boundary refused a different citation for a different reason.
-
-**This is the sixth review in a row to catch this repository's paperwork
-disagreeing with itself**, after #18, #23, #24, #25 and #26. This time it was not
-a stale instruction but a false claim written in the same commit as the feature
-it described, contradicted by a section of the same file.
-
-## Completed increment: I1a
-
-**`I1` is three increments, and this is the first of them.** Its roadmap row and
-the handoff both said it was several, so nothing was built until the user had
-agreed how to cut it. `I1a` discovers what an earlier review of the same pull
-request evaluated and how the head being reviewed relates to that one. It
-narrows no hunting and revalidates no earlier finding, and it says so in its own
-output, because a run that claimed otherwise would be the defect this project
-keeps catching in its own paperwork.
-
-### The slicing, agreed with the user before anything was built
-
-Three decisions, each taken by the user before a line was written, following the
-precedent `U1` set.
-
-- **Three slices.** `I1a` discovers and classifies; `I1b` confines fresh hunting
-  to the new commit range; `I1c` revalidates the prior findings as resolved,
-  still open or obsolete. Two slices were offered and declined because they
-  bundled a free read-only piece with the behaviour change that narrows what a
-  reviewer may report, where a finding about one can mask the other. Four were
-  offered and declined because discovery and classification are the same free
-  GitHub read against the same pull request.
-- **Discovery runs in every run**, straight after capture and before any reviewer
-  starts, and therefore in `--capture-only` too. The alternative of putting it
-  behind a not-yet-confining `--incremental` flag was declined: a flag whose name
-  promises behaviour the code does not have is the exact shape of defect that
-  #18, #23, #24, #25, #26 and #28 each caught here.
-- **A review is a prior review only if both halves hold**, and its comments are
-  retained with verbatim bodies and normalised anchors rather than parsed.
-  Parsing this tool's own emitted comment prose
-  back into a structured finding is `I1c`'s work; shipping that parser here would
-  have shipped a reading nothing checks.
-
-### What makes a review ours
-
-Both the authenticated GitHub identity and the review body must match. The body
-is code-owned: `preview.mjs` builds it from the same mode table `prior.mjs`
-reads, so it always opens with one of four exact mode labels followed by a count
-of selected validated findings, and always closes with "This is not a
-clean-review claim." The reviewed head is the review's own `commit_id`, which
-publication sets from the binding and then asserts the acknowledgment carries
-back unchanged.
-
-**Either half alone was rejected.** Issue #21 words it as the latest review by
-the authenticated identity, which is simpler, but a review that person wrote by
-hand carries no severity, no anchor and no reviewed head this tool set, and
-`I1c` would then be classifying prose this tool never produced. Matching the
-body alone would treat a string any account can write as proof of origin. A
-hand-written review is counted in what was considered and is never a prior one.
-
-### The head relationship, and the one honest fold
-
-| GitHub `compare` status | Reported | Why |
-| --- | --- | --- |
-| `identical` | `same-head` | Settled by comparing the two heads; no request is made |
-| `ahead` | `incremental` | The reviewed head descends from the reviewed-before head |
-| `behind` | `diverged` | A rewound head; there is no forward range either |
-| `diverged` | `diverged` | No forward range to confine hunting to |
-| request refused | `unknown` | GitHub can no longer reach that head; nothing was measured |
-
-**Only `ahead` leaves a forward range**, which is the single property `I1b`
-needs, so a rewound head folds into `diverged` for the same reason a genuinely
-divergent one does. **GitHub's own word stays in the record**, so the fold loses
-nothing: a rewind reads `diverged` in the relationship and `behind` in the
-comparison beside it. An unreachable head reports `unknown` rather than
-`diverged`, because calling it diverged would assert what no request
-established.
-
-### Demonstrated against real GitHub, for nothing
-
-Discovery spends no credits and needs no inference, so its live evidence was
-free. Run against this repository through the real `gh`:
-
-| Target | Result |
-| --- | --- |
-| Playground #1, head `a68b6cd9` | `found`, `same-head`, `Quick review` recovered from the body, 1 comment |
-| Playground #2, head `64383e44` | `found`, `same-head`, `Quick review` recovered, 1 comment |
-| #26 and #28 | `none`, 0 submitted reviews considered |
-
-**Those two playground reviews are the only real ones this tool has ever
-published**, because findings stay local by default here, and both are still at
-the head they evaluated. So `same-head` and `none` have live evidence and
-`incremental` does not. The classification itself does, against five real
-comparisons in this repository:
-
-| Real pair | GitHub | Reported |
-| --- | --- | --- |
-| `5de00b0` with itself | `identical` | `same-head` |
-| `da8d0ba` to `5de00b0` | `ahead` | `incremental` |
-| `00c976f` to `5de00b0` | `ahead`, 4 commits | `incremental` |
-| `5de00b0` to `da8d0ba` | `behind` | `diverged` |
-| `a68b6cd9` to `5de00b0` | `diverged`, 42 ahead 2 behind | `diverged` |
-
-**What has not been seen is one run reporting `incremental` end to end**, which
-needs a pull request this tool has published a review on and that has since
-moved. Arranging one means publishing a real review, which is the user's call.
-
-### What it deliberately does not do
-
-- **No reviewer input changed.** No prompt, no binding, no context window and no
-  citation rule differs because a prior review exists.
-- **Not retained.** The discovery is reported, not written into the session's
-  retained record. Adding it there is a schema change, and it belongs to the
-  increment that consumes it.
-- **A failure never refuses a review.** Discovery grounds nothing a finding
-  depends on, so a failed read is reported as itself and the review proceeds,
-  exactly as safeguard discovery does. A cancellation is not one of these and
-  belongs to the run.
-- **A thread reply is never one of ours.** GitHub files every reply under a
-  review of its own, whose body is empty, so a reply carries neither the prior
-  review's id nor a body this tool recognises and both filters exclude it
-  independently. Verified against four real reply pairs, in this repository and
-  in `cli/cli`, and pinned by the suite, because it is observed API behaviour
-  rather than a documented guarantee.
-- **Nothing is silently truncated.** Every listing it reads is read with
-  `--paginate --slurp`, so a page boundary can never be the reason a prior
-  review looks absent. The review listing is always read; the comment listing is
-  read only once a qualifying review has been found, and a run that finds none
-  never asks for it.
-
-### Validation
-
-**Fourteen controlled suites now**, the new one being `scripts/smoke-prior.mjs`.
-It covers the body signature against all four mode labels, ten near-miss bodies
-and one value that is not a body at all, both halves of the identity rule, the
-validation of a review and of a comment
-including an outdated anchor that keeps the line it was written at, all four
-comparison statuses, pagination across two pages, the same-head shortcut that
-asks nothing, an unreachable head, a failed discovery, a cancellation that is
-re-thrown rather than reported, and the wiring into capture both verbosely and
-quietly.
+**Fifteen controlled suites now**, the new one being
+`scripts/smoke-incremental.mjs`. They need no inference and no network.
 
 ```sh
 for s in findings review selection retention preview publication publish-later \
-  checkout config context fixture target safeguards prior; do node scripts/smoke-$s.mjs; done
+  checkout config context fixture target safeguards prior incremental; do node scripts/smoke-$s.mjs; done
 ```
 
-`scripts/smoke-target.mjs` gained the new capture stage and its call count rose
-from six to eight: identity and the review listing. `scripts/target-fixture.mjs`
-answers both listings with one empty page, so every other suite sees a pull
-request with no prior review. `scripts/smoke-reviewer-tools.mjs` was not run:
-nothing here touches `read-only.mjs`. `git diff --check` is clean and the branch
-diff carries no control byte.
+`scripts/smoke-incremental.mjs` covers the range parse and its head-side line
+grouping, four shapes of incomplete range diff and the parser's silence on one
+of them, a range that deletes a file and the base-side anchor that is then the
+only one such a defect can have, all five cases the filter decides including
+both base-side ones, every outcome in the table above with its prose, the `gh`
+call shape and media type, the four relationships that cost no request at all, a
+cancellation re-thrown rather than reported, the set-aside candidate at a real
+evidence boundary with its caveat and its untouched coverage, what
+`formatFindings` and the published body then say, the reviewer instruction and
+prompt with and without a confinement, the two branches of the prior-review
+sentence, and the wiring into capture verbosely, quietly and not at all. `scripts/smoke-review.mjs` gained the
+parse cases and the two refusals. `scripts/smoke-reviewer-tools.mjs` was not
+run: nothing here touches `read-only.mjs`.
 
-**Two README claims were already false and are corrected here**, found by the
-standing check the handoff prescribes. Its limits list still said the review
-output is verbose with no quieter mode designed or scheduled, four hundred lines
-below its own documentation of `--quiet`; and it still said no review has run
-against a substantial code diff, which `E1` did. The first is replaced by the
-cost line that is genuinely unbuilt, the second by recall, which is what
-actually stays open. **`E1`'s entry moved verbatim to the archive** before this
-one was written, under the rule earlier moves established.
+`node scripts/smoke-runtime.mjs --targets` **passes with 75 assertions and no
+inference**, up from `U1`'s 71, against the plugin reinstalled from this
+checkout with `copilot plugin install "$(pwd)"` and `diff -rq`'d against it with
+no output. The four new ones are one sentence of `help` and one of `status`
+naming the flag, and its two refusals through the runtime's own command RPC.
+None of them reaches a capture, so the coverage is free. CLI 1.0.83.
 
-### Pull request #29, and the two reviews it got
+**`U1`'s entry moved verbatim to the archive** before this one was written, under
+the rule earlier moves established, and `README.md`'s `--verify` guide moved to
+`docs/safeguards.md` in its own documentation-only pull request beforehand for
+the same reason: neither file had room for an increment's worth of writing.
+
+### Pull request #31 and its review
 
 Reviewed once with this plugin at the user's authorization, dispatched with
-`node scripts/dogfood-review.mjs 29 --deep --all --no-comment --unattended`. The
+`node scripts/dogfood-review.mjs 31 --deep --all --no-comment --unattended`. The
 plugin was reinstalled from the branch head and `diff -rq`'d against the
-checkout first, so the review exercised this increment's own `prior.mjs` and not
-a stale copy.
+checkout with no output first, so the review exercised this increment's own
+`incremental.mjs` and not a stale copy.
 
 | Measure | Value |
 | --- | --- |
-| Diff | 994 additions, 251 deletions, 8 files |
-| Bound input | 90442 byte diff, 227839 bytes of context over 14 sources |
-| Reviewer `integrated`, heavy, `gpt-5.6-terra` high | 106.5 s, 5 requests, 51.76615 credits |
-| Adjudicator, `gpt-5.6-terra` high | 8.9 s, 1 request, 24.786 credits |
-| Total | 76.55215 credits, 115.4 s of model work |
-| Tool calls | 22, all approved, zero denials: `view` x11, GPT's `rg` alias x10, `glob` x1 |
-| Result | 2 candidates, 1 validated finding, 0 rejected, 0 capped, 0 duplicates |
-| Coverage | INCOMPLETE: 1 execution failure, 0 coverage gaps, 1 informational caveat |
+| Diff | 1391 additions, 496 deletions, 13 files |
+| Bound input | 146859 byte diff, 443594 bytes of context over 24 sources |
+| Reviewer `integrated`, heavy, `gpt-5.6-terra` high | 91.5 s, 4 requests, 68.53836 credits |
+| Adjudicator | never started; 0 candidates reached the evidence gate |
+| Total | 68.53836 credits, 91.5 s of model work |
+| Tool calls | 16, all approved, zero denials: `view` x8, GPT's `rg` alias x7, `glob` x1 |
+| Result | 0 candidates, 0 validated findings, 0 rejected, 0 capped, 0 discarded |
+| Coverage | INCOMPLETE: 0 execution failures, 1 coverage gap, 0 informational caveats |
 
-**The one validated finding was real and is fixed here.** [nit], confidence
-0.98: this entry claimed that both listings are read with `--paginate --slurp`,
-and discovery returns early when no qualifying review is found, so on that path
-it never reads the comment listing at all. The conclusion it drew, that a page
-boundary can never hide a prior review, was sound; the sentence supporting it
-was not. It now says which listing is always read and which is read only after a
-qualifying review is found. **That is the seventh review in a row to catch this
-project's paperwork disagreeing with itself**, after #18, #23, #24, #25, #26 and
-#28, and the second in a row where the false sentence was written in the same
-commit as the code it described.
+**It reported one coverage gap and no candidate at all**, which makes this the
+first review of this repository in eight to find nothing wrong with its
+paperwork. The gap is exact and is the thing this entry already records as open:
+the confinement path has fixture coverage only, and the real GitHub compare-diff
+response and its head-side line coordinates have not been established, so live
+range parsing and confinement behaviour could not be assessed. **Nothing was
+changed in response, because nothing can be**: closing it needs live evidence
+that does not exist yet, and the run was right to call that incomplete coverage
+rather than to pass over it.
 
-**The discarded candidate was right too, and is also fixed here.** [P3],
-confidence 0.95: matching only the opening and the closing sentence let
-arbitrary text sit between them, so a body carrying both would be taken for
-ours. It cited `README.md`'s own promise that a hand-written review is never
-treated as a prior one, which was an absolute this code did not honour. **Both
-halves are answered**: every body `reviewRequest` builds states the coverage in
-both of its branches, so `toolReviewBody` now requires that too, which narrows
-the shape without coupling it to `formatCoverage`'s exact wording; a review
-published by an older version of this tool has to stay recognisable, and the
-coverage prose between the three fixed parts is the half most likely to change.
-The README now says what the four parts are and admits plainly that a body
-deliberately written to imitate all four would still be taken for ours.
+**The adjudicator cost nothing**, because it starts only when a candidate
+survives the evidence boundary and none did. The whole 68.53836 credits are the
+one reviewer's four requests.
 
-**It was discarded for the shape that has now refused a true finding three times
-running.** Its location quoted the nine lines of `toolReviewBody`, lines 18 to
-26, while naming the range 18-25, which spans eight. `E1` saw this on a
-reviewer's citation, `U1` on the adjudicator's own after a verdict, and this is
-a reviewer's again. **Do not weaken the rule**: `Q6`'s clipped-end repair cannot
-rescue this shape by design, because a repair that drops a named line could drop
-the line authorizing the anchor. The count is now three true findings lost to a
-model that cannot count its own quoted lines, and every one of them was
-recovered by reading the discarded candidate.
+**The reviewer's last search is worth recording**: it went looking for
+`rename from`, `rename to` and `headerPaths`, which is a rename in the commit
+range, and reported nothing. `newRangeFrom` collects both sides' paths into
+`touched` and keys the changed lines by the head path, so a rename inside the
+new commits is handled, but **that this was checked and passed is the reviewer's
+reading, not a test**, and no suite pins it.
 
-**The caveat is the honest one.** The reviewer reported that it did not
-independently exercise the installed plugin or live GitHub responses, which is
-exactly right: it read the diff and the checkout, and the live GitHub evidence
-in the table above was gathered outside it.
+**Confinement never engaged in this run and could not have.** #31 has no prior
+review by this tool, so discovery reported `none`, the evidence line recorded
+`"incremental":false`, and the prior-review sentence printed its unconfined
+branch. That is the correct behaviour and it is not evidence about a confined
+run.
 
-**A live transient discovery failure was observed**, separately from the review.
-One run against playground #2 returned `failed` with the relationship `unknown`
-while three runs before and after it returned `found`. The reason was not
-captured, so nothing is claimed about its cause. What it demonstrates is the
-behaviour that matters: a failed discovery reported itself and refused nothing.
+**No live evidence of a confinement exists**, and none can be had cheaply. A
+confined run needs a pull request this tool has published a review on and that
+has since moved, and the only two published reviews are on playground pull
+requests #1 and #2, both still at the head they evaluated. Arranging one means
+publishing a real review or pushing a commit to a playground branch, and both
+are the user's call. **Playground #1 and #2 must never be merged.**
 
 ### GitHub's own Copilot reviewer, on the same pull request
 
-**#29 was also reviewed by GitHub's built-in Copilot code reviewer**, which is
-not this tool and costs this project nothing. It raised three inline comments,
-of which **two were right and are fixed**, and one rested on a false premise and
-is answered with evidence. All three threads are replied to and resolved.
+**#31 was also reviewed by GitHub's built-in Copilot code reviewer**, which is
+not this tool and costs this project nothing. It arrived later than the plugin
+review, after this entry had already recorded its silence, and it raised three
+inline comments. **All three were real and all three are fixed.** All are
+replied to and resolved.
 
 | Comment | Disposition |
 | --- | --- |
-| Only the body of a retained comment is verbatim, not the whole object | **Fixed** |
-| The rejected-body count disagrees between roadmap and handoff | **Fixed** |
-| Thread replies are retained as if this tool emitted them | **Rejected**, premise false |
+| A truncated commit range diff is confined to anyway, creating false negatives | **Fixed**, cause rejected |
+| The reviewer contract forbids the base-side anchor the code filter keeps | **Fixed** |
+| The archive boundary says `U1` where the same file says `I1a` | **Fixed** |
 
-**The first was worse than the reviewer knew.** It anchored on `README.md`, but
-the same overclaim was in the sentence `describePrior` actually prints, and in
-this entry and the handoff. `priorCommentFrom` renames every anchor field, turns
-nulls into `undefined`, derives `outdated` and drops the rest, so only the body
-survives untouched. The shipped sentence now says which half is which and the
-suite pins it.
+**The first was right about the harm and wrong about the cause.** It said
+compare responses are bounded to 300 changed files; that cap is on the compare
+JSON `files` array, and this code fetches the diff media type, which is not
+bounded the same way. `cli/cli` `v2.40.0...v2.60.0` returns 541 file sections in
+one diff response, which settles it. **The harm is real by another route**, and
+it reproduces: `parseDiffFiles` is a parser and not a completeness check, so a
+diff cut mid-hunk parses without error and reports zero changed head lines for
+the file it truncated, and every candidate in that file would then be set aside
+as already covered. That is the one direction this filter promised never to go.
+The structural half of `validateDiff` is now shared as `assertCompleteDiff` and
+`newRangeFrom` asserts it, so a range that cannot be shown complete reports
+`failed` and the run proceeds unconfined. **The new check immediately caught an
+arithmetic error in this increment's own test fixture**, whose hunk header
+declared five new lines for six. The authoritative file-set cross-check the
+comment asked for was not added, because the only candidate for it is the
+`files` array that is itself capped.
 
-**The second pointed the wrong way and was still a real defect.** It read as a
-handoff error; the handoff was right and this entry was stale, written before
-the plugin review's own fix added an eleventh case to the rejected-body list.
-Both now say what the list holds instead of a count.
+**The second is the one worth keeping.** The reviewer instruction said to report
+a location only when it anchors on a head-side line in the confined ranges,
+while `withinNewRange` keeps a base-side anchor in any touched file and
+`README.md` promised exactly that. **A file the new commits deleted has no
+head-side line at all**, never enters `changed`, and was therefore absent from
+the confined input, so a reviewer was told not to emit the only anchor such a
+defect can have. `confinedTo` now carries `basePaths`, the touched set the
+filter actually tests against, and the instruction permits a base-side location
+there and says why the two lists differ. `scripts/smoke-incremental.mjs` builds
+a range that deletes a file and pins the whole shape.
 
-**The third is the one worth keeping.** It claimed a reply carries the root
-review's `pull_request_review_id`, so filtering by review id retains human
-follow-ups, a malformed one could fail discovery, and `I1c` could parse reply
-prose. **None of that holds.** GitHub files every reply under a review of its
-own: across four real reply pairs, in this repository's #4 and in `cli/cli`,
-every reply's review id differed from its parent's, and each reply-generated
-review is `COMMENTED` with an empty body. So a reply is excluded twice over and
-independently, and never reaches `priorCommentFrom`. The `in_reply_to_id` filter
-it asked for would guard a shape GitHub does not produce, and was not added.
-**What it earned instead is a standing check**: the behaviour is observed rather
-than documented, so `scripts/smoke-prior.mjs` now pins both exclusions and a
-change in GitHub fails a suite rather than letting `I1c` read somebody's reply.
+**The third was this branch's own.** `U1`'s entry was archived first and
+`I1a`'s afterwards; line 79 and the handoff were updated for the second move and
+line 10 was not.
 
-**Two reviewers, two different kinds of finding.** This tool found a false claim
-about its own control flow and a body signature loose enough to admit anything
-between its ends. GitHub's reviewer found two more documents disagreeing with
-each other and with the code. **Neither found a defect in what discovery
-actually does**, which is the honest limit on what #29 establishes.
+**Two reviewers, and this time the free one found everything.** The plugin's
+deep review produced no candidate and one honest coverage gap; GitHub's reviewer
+found two real defects in the shipped behaviour and one in the paperwork.
+**Neither of the behaviour defects was reachable by any of the fifteen suites**,
+which is the honest limit on what controlled coverage establishes here. **The
+three fixes changed `extensions/` and have not themselves been reviewed by this
+plugin**, because the standing workflow authorizes one review per pull request
+and #31 has spent it.
 
-## v1 is complete, `I1` is sliced, and three increments remain
+## v1 is complete, `I1` is sliced, and two increments remain
 
-**`D1` delivered v1, and `O1`, `E1`, `U1` and `I1a` have landed on top of it.**
+**`D1` delivered v1, and `O1`, `E1`, `U1`, `I1a` and `I1b` have landed on top of
+it.**
 `SCOPE.md`'s must-have column, its costly-to-lose column and its additional
 agreed v1 capability are all delivered.
 
 **The user scheduled four increments, in this order: `E1`, `U1`, `I1`, `G1`.**
 The first two are complete, and `I1` was sliced into three with the user before
-anything was built, of which `I1a` is done. **Take `I1b`, `I1c` and `G1` one at
-a time and in that order**, and do not start a later one early. Treat any other
-feature idea as out of scope unless the user asks for it in your own session.
+anything was built, of which `I1a` and `I1b` are done. **Take `I1c` and then
+`G1`, one at a time and in that order**, and do not start the later one early.
+Treat any other feature idea as out of scope unless the user asks for it in your
+own session.
 
-### The next increment is `I1b`, confining fresh hunting
+### The next increment is `I1c`, revalidating the earlier findings
 
-**`E1`, `U1` and `I1a` are done: do not redo any of them.** `E1`'s three
+**`E1`, `U1`, `I1a` and `I1b` are done: do not redo any of them.** `E1`'s three
 recorded items stay recorded and none of them is scheduled: a run still never
 reports its own cost, the evidence lines are still truncated by the interactive
 UI, and per-reviewer progress still says nothing while a reviewer works. `U1` is
 settled as one preflight flag that refuses. **`I1a`'s slicing is settled and is
 not to be re-cut**; its entry above records the three decisions the user took.
+**`I1b` is settled as one opt-in flag that confines**, and the entry above
+records why it is opt-in rather than the default.
 
-**`I1b` confines fresh hunting to the new commit range** when `I1a` reports the
-relationship as `incremental`, so a re-review stops reporting hunks an earlier
-turn already covered. `I1a` already hands it the reviewed-before head, the
-comparison and the earlier review's anchors.
+**`I1c` revalidates the prior findings `I1a` retains** as resolved, still open
+or obsolete. It needs the parser that reads this tool's own emitted comment
+prose back into a structured finding, which `I1a` deliberately did not ship
+because nothing consumed it there and `I1b` still does not: confinement reasons
+about commit ranges and never about what an earlier comment said.
 
-- **Narrowing is a filter over the captured binding, never a replacement for
-  it.** Publication requires every finding to anchor inside a hunk of the
-  captured base-to-head diff, so replacing that diff with a range diff would
-  produce anchors GitHub refuses. The binding, the context windows and every
-  citation rule stay exactly as they are, which is what keeps this increment off
-  head binding and off the evidence boundary. **Changing either still needs the
-  user to say so, explicitly, in your own session.**
-- **Decide with the user whether it is opt-in.** `I1a` deliberately shipped no
-  `--incremental` flag, because a flag that narrowed nothing would have been a
-  false name. Whether `I1b` introduces one, or narrows automatically when the
-  relationship is `incremental`, is the user's decision and is not settled.
-- **It needs one live review to be demonstrated**, and `incremental` has never
-  been reported end to end by a real run, because the only two published reviews
-  are on playground pull requests still at the head they evaluated. Arranging
-  one means publishing a real review or pushing a commit to a playground branch.
-  Both are the user's call.
+- **`I1a` hands it the input.** Every inline comment of the prior review is
+  retained with its body exactly as posted and its anchor normalised, including
+  the line it was written at for a comment GitHub can no longer place. That is
+  what a revalidation reads.
+- **The retained record is where the schema change lands.** `I1a` deliberately
+  retains none of the discovery, and `I1b` retains none of the confinement, on
+  the rule that the increment which consumes something is the one that puts it
+  in the schema. `I1c` is that increment.
+- **It needs one live review to be demonstrated**, and so does `I1b`, which has
+  none: `incremental` has never been reported end to end by a real run, because
+  the only two published reviews are on playground pull requests still at the
+  head they evaluated. Arranging one means publishing a real review or pushing a
+  commit to a playground branch. Both are the user's call, and **playground #1
+  and #2 must never be merged.**
 
-**`I1c` follows**, revalidating the prior findings `I1a` retains, and then `G1`.
-Do not start either before its predecessor is recorded.
+**`G1` follows `I1c`.** Do not start it before its predecessor is recorded.
 
 ### `G1`'s starting references, recorded now so they are not lost
 
@@ -593,7 +452,7 @@ as well as capability.
 rule is not specific to upstream: anything adopted is adopted as behaviour and
 re-implemented here.
 
-**Nothing above `I1a` is to be redone, widened or reopened.** Every increment's
+**Nothing above `I1b` is to be redone, widened or reopened.** Every increment's
 authorization is spent, and the evidence for each is either in the two entries
 kept here or in
 [docs/roadmap-archive-2026-09-10.md](docs/roadmap-archive-2026-09-10.md).
@@ -662,6 +521,26 @@ reported neither: it reported two commands and refused none. What a discovery
 pass reports is a model's judgment over prose, so no later review can arrange
 this deliberately.
 
+### Continuous integration, added outside the increment sequence
+
+**The user asked for a minimal CI pipeline in the `I1b` session**, so
+`.github/workflows/ci.yml` runs on every pull request and every push to `main`.
+It is not an increment, has no roadmap row, and was not part of what the plugin
+reviewed. **It went green on #31 before that pull request was merged**, running
+all fifteen suites, reading all six instruction files and skipping none.
+
+It runs the fifteen controlled suites and two invariants this repository has
+broken before: that safeguard discovery still reads every instruction file at
+the checkout root, which fails the job if one crosses 65536 bytes, and that no
+tracked text carries a control byte, which is what refused #17's review. There
+is no `package.json`, no dependency and no build step, so the job checks out,
+installs Node and runs `.mjs` files directly.
+
+**It deliberately runs nothing that spends Copilot credits.** The plugin review
+of a pull request stays the increment's real integration test and stays the
+user's explicit decision, as it has been since 2026-09-07. CI proves logic, the
+same way the suites it runs do, and proves nothing about delivery.
+
 ### Recorded, not scheduled
 
 These stay open and none is scheduled. They are limitations of a finished v1,
@@ -708,6 +587,18 @@ not a backlog. Do not start one without the user saying so.
   three candidates and refused one of them by citation, so no exclusion rule has
   ever refused a real discovered command. No later review can close this
   deliberately, because what a discovery pass reports is not ours to arrange.
+- **A live confined run.** `I1b`'s whole path has fixture coverage and no live
+  evidence: `incremental` has never been reported end to end, so the real
+  compare-diff response, its head-side line coordinates and a real candidate set
+  aside have never been seen. #31's reviewer named this as a coverage gap of its
+  own accord and was right to. Closing it needs a pull request this tool has
+  published a review on and that has since moved, which means publishing a real
+  review or pushing a commit to a playground branch. Both are the user's call,
+  and **playground #1 and #2 must never be merged.**
+- **A rename inside the confined commit range.** #31's reviewer checked for one
+  and reported nothing. `newRangeFrom` collects both sides' paths and keys the
+  changed lines by the head path, so it is handled by construction, but no suite
+  pins it and no live run has produced one.
 - **An unattended run that actually publishes.** `U1`'s live evidence is
   `--all --no-comment --unattended`, because that is what the dogfood runner
   permits and it deliberately never posts. `--all --comment --unattended` is

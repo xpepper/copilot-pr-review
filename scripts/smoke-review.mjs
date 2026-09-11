@@ -36,12 +36,13 @@ const fullMode = reviewModes.full;
 const deepMode = reviewModes.deep;
 const options = parseReviewArgs("1 --quick --no-comment");
 assert.deepEqual(options, { mode: "quick", captureOnly: false, captureArgs: "1", settings: {},
-  all: false, comment: false, noComment: true, verify: false, quiet: false, unattended: false });
+  all: false, comment: false, noComment: true, verify: false, quiet: false, unattended: false,
+  incremental: false });
 assert.deepEqual(parseReviewArgs("  1 --major-only --no-comment  "), options);
 assert.deepEqual(parseReviewArgs("2 --quick --no-comment --include-drafts heavyModel=other heavyEffort=low"),
   { mode: "quick", captureOnly: false, captureArgs: "2 --include-drafts",
     settings: { heavyModel: "other", heavyEffort: "low" }, all: false, comment: false, noComment: true,
-    verify: false, quiet: false, unattended: false });
+    verify: false, quiet: false, unattended: false, incremental: false });
 assert.deepEqual(parseReviewArgs("1 --major-only --all --no-comment"), { ...options, all: true });
 assert.deepEqual(parseReviewArgs("1 --quick"), { ...options, noComment: false });
 assert.deepEqual(parseReviewArgs("1 --quick --all --comment"), { ...options, all: true, comment: true, noComment: false });
@@ -128,8 +129,20 @@ assert.doesNotMatch(postingRefusal, /autoPostReviews/,
 
 // Capture-only keeps the diagnostic capture path reachable without a reviewer.
 assert.deepEqual(parseReviewArgs("1 --capture-only"), { mode: undefined, captureOnly: true, captureArgs: "1",
-  settings: {}, all: false, comment: false, noComment: false, verify: false, quiet: false, unattended: false });
+  settings: {}, all: false, comment: false, noComment: false, verify: false, quiet: false, unattended: false,
+  incremental: false });
 assert.equal(parseReviewArgs("2 --capture-only --include-drafts").captureArgs, "2 --include-drafts");
+
+// I1b: the flag is a request, so it is recorded and nothing else happens at
+// parse time. It selects no mode, settles no question and grants no authority,
+// which is why it combines with every other review flag, --unattended included:
+// a confined run asks nobody anything.
+assert.deepEqual(parseReviewArgs("1 --quick --no-comment --incremental"), { ...options, incremental: true });
+assert.deepEqual(parseReviewArgs("1 --incremental"), { ...balancedOptions, noComment: false, incremental: true });
+assert.deepEqual(parseReviewArgs("1 --deep --all --no-comment --unattended --incremental"),
+  { ...options, mode: "deep", all: true, noComment: true, unattended: true, incremental: true });
+assert.equal(parseReviewArgs("1 --quick --no-comment").incremental, false,
+  "a run without the flag is confined by nothing");
 for (const args of [
   "1 --quick --major-only --no-comment", "1 --quick --balanced --no-comment", "1 --balanced --major-only",
   "1 --quick --quick --no-comment", "1 --quick --no-comment --no-comment",
@@ -152,6 +165,11 @@ for (const args of [
   "1 --quick --all --no-comment --verify --unattended",
   "1 --quick --all --no-comment --unattended --unattended",
   "1 --capture-only --unattended", "1 --unattended --capture-only",
+  // I1b: capture-only takes no review flag, and --incremental is one. It is
+  // also the only refusal --incremental has: everything else it could disagree
+  // with is a fact about the pull request, which parse time cannot know.
+  "1 --capture-only --incremental", "1 --incremental --capture-only",
+  "1 --quick --no-comment --incremental --incremental",
 ]) assert.throws(() => parseReviewArgs(args),
   /mutually exclusive|Duplicate|Invalid|Unsupported|integer|Conflicting|cannot be combined/, args);
 const assignments = await reviewerAssignments(parentModels, quickMode, {});
