@@ -182,9 +182,10 @@ imitate all four parts would still be taken for ours.
 | `diverged` | The reviewed head does not descend from it, including a head rewound behind it |
 | `unknown` | GitHub could no longer reach that head, so the relationship was not measured |
 
-The earlier review's inline comments are kept exactly as GitHub returns them,
-including the line each was written at, which GitHub keeps after an anchor falls
-out of the current diff.
+Each inline comment of that review is retained with its body exactly as posted
+and its anchor normalised to a fixed shape: path, side, the current line, and the
+line it was written at, which GitHub keeps after an anchor falls out of the
+current diff. Every other field GitHub returns is dropped.
 
 **Nothing acts on any of this yet.** Hunting is not confined to the new commits
 and the earlier findings are not revalidated, so a re-review costs and reports

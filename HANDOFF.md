@@ -65,7 +65,8 @@ comparison and the earlier review's anchors, on `target.prior`.
 ## What `I1a` did, and the four things worth carrying forward
 
 `I1a` made capture report whether this tool has already reviewed this pull
-request, the head that review evaluated, its inline comments kept verbatim, and
+request, the head that review evaluated, its inline comments retained with
+verbatim bodies and normalised anchors, and
 how the reviewed head relates to that one: `none`, `same-head`, `incremental`,
 `diverged`, or `unknown` when GitHub can no longer reach the earlier head. It
 narrows nothing and revalidates nothing, and its own output says so. Pull
@@ -221,7 +222,8 @@ Citations remain limited to captured diff and context windows.
 
 - **`I1a`'s slicing is settled and is not to be re-cut.** Three slices, not two
   or four; discovery in every run rather than behind a flag that would narrow
-  nothing; both identity and body required; comments kept verbatim, with the
+  nothing; both identity and body required; comment bodies kept verbatim and
+  their anchors normalised, with the
   parser that reads this tool's emitted comment prose back into a finding left
   to `I1c` because nothing consumed it in `I1a`.
 - **`I1a` retains nothing.** The discovery is reported, not written into the

@@ -77,10 +77,11 @@ function optionalSide(value, what) {
   return value;
 }
 
-// Kept as GitHub returns it. Nothing here reads the body: turning this tool's
-// emitted comment prose back into a structured finding is the revalidation
-// increment's work, and shipping that parser before anything consumes it would
-// ship a reading nothing checks.
+// The body is kept exactly as posted; the anchor is normalised to a fixed shape
+// and everything else GitHub returns is dropped. Nothing here reads the body:
+// turning this tool's emitted comment prose back into a structured finding is
+// the revalidation increment's work, and shipping that parser before anything
+// consumes it would ship a reading nothing checks.
 export function priorCommentFrom(raw) {
   requirePrior(Number.isSafeInteger(raw?.id) && raw.id > 0 &&
     typeof raw.path === "string" && raw.path && typeof raw.body === "string" && raw.body &&
@@ -223,7 +224,7 @@ export function describePrior(prior, head) {
   return [
     `Prior review: ${review.label} at head ${review.head}, submitted ${review.submittedAt}, ` +
       `declaring ${review.declaredFindings} finding(s). ${review.url}`,
-    `${prior.comments.length} inline comment(s) retained verbatim` +
+    `${prior.comments.length} inline comment(s) retained, bodies verbatim and anchors normalised` +
       `${outdated ? `, of which ${outdated} no longer anchor in the current diff` : ""}.`,
     `Relationship to this review's head: ${relationship}`,
     actsOnNone,

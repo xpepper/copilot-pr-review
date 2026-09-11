@@ -202,6 +202,11 @@ assert.equal(same.relationship, "same-head");
 assert.equal(same.comparison, undefined, "Never record a comparison no request established");
 assert(!unchanged.calls.some((call) => call.path.includes("/compare/")), "Equal heads ask nothing");
 assert.match(describePrior(same, currentHead), /unchanged\. The reviewed head/);
+// #29's Copilot review: the run said "retained verbatim" of an object whose
+// anchor fields are renamed and whose nulls become undefined. Only the body is
+// verbatim, and the sentence has to say which half is which.
+assert.match(describePrior(same, currentHead),
+  /1 inline comment\(s\) retained, bodies verbatim and anchors normalised/);
 
 for (const [status, phrase] of [["behind", /diverged\. The reviewed head/], ["diverged", /GitHub reports diverged/]]) {
   const gh = priorGh({ reviews: [[toolReview()]], compare: comparisons[status] });
