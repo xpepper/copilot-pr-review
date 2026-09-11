@@ -377,6 +377,12 @@ moved. Arranging one means publishing a real review, which is the user's call.
   depends on, so a failed read is reported as itself and the review proceeds,
   exactly as safeguard discovery does. A cancellation is not one of these and
   belongs to the run.
+- **A thread reply is never one of ours.** GitHub files every reply under a
+  review of its own, whose body is empty, so a reply carries neither the prior
+  review's id nor a body this tool recognises and both filters exclude it
+  independently. Verified against four real reply pairs, in this repository and
+  in `cli/cli`, and pinned by the suite, because it is observed API behaviour
+  rather than a documented guarantee.
 - **Nothing is silently truncated.** Every listing it reads is read with
   `--paginate --slurp`, so a page boundary can never be the reason a prior
   review looks absent. The review listing is always read; the comment listing is

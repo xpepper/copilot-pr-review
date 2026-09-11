@@ -113,6 +113,13 @@ for (const [what, review] of [
   ["another account", toolReview({ user: { login: "someone", id: 99, type: "User" } })],
   ["the same login on another id", toolReview({ user: { login: identity.login, id: 99, type: "User" } })],
   ["a hand-written review", toolReview({ body: "Looks good to me." })],
+  // #29's Copilot review argued that thread replies are mistaken for our own
+  // comments. GitHub gives every reply its own review, whose body is empty, so
+  // both filters exclude one independently. Verified against four real reply
+  // pairs in this repository and in cli/cli, where each reply's
+  // pull_request_review_id differed from its parent's. Pinned here because it is
+  // observed API behaviour rather than a documented guarantee.
+  ["the empty review a reply generates", toolReview({ body: "" })],
   ["an approval", toolReview({ state: "APPROVED" })],
   ["a pending review", toolReview({ state: "PENDING", submitted_at: undefined })],
   ["no reviewed head", toolReview({ commit_id: null })],
@@ -181,14 +188,20 @@ assert.match(describePrior(none, currentHead), /1 submitted review\(s\) consider
 const paged = priorGh({
   reviews: [[toolReview({ id: 1, submitted_at: "2026-09-07T09:00:00Z", commit_id: "9".repeat(40) })],
     [toolReview()]],
-  comments: [[toolComment({ id: 1, pull_request_review_id: 999 })], [toolComment()]],
+  comments: [[toolComment({ id: 1, pull_request_review_id: 999 })],
+    // A person answering one of our findings. GitHub files the reply under a
+    // review of its own, so it never carries the prior review's id and never
+    // reaches priorCommentFrom, let alone I1c's reader.
+    [toolComment(), toolComment({ id: 2, pull_request_review_id: 5131451227,
+      in_reply_to_id: 3948685115, body: "Thanks, fixed in abc1234." })]],
   compare: comparisons.ahead,
 });
 const incremental = await discoverPriorReview(repository, target, { gh: paged.gh, cwd });
 assert.equal(incremental.status, "found");
 assert.equal(incremental.review.id, 5130714400, "The latest of our reviews is the prior one");
 assert.equal(incremental.relationship, "incremental");
-assert.equal(incremental.comments.length, 1, "Only the prior review's own comments are kept");
+assert.equal(incremental.comments.length, 1,
+  "Only the prior review's own comments are kept: not another review's, and not a reply to ours");
 assert.equal(incremental.comments[0].id, 3948685115);
 assert.equal(paged.calls.at(-1).path,
   `repos/${repository.nameWithOwner}/compare/${reviewedHead}...${currentHead}?per_page=1`);
