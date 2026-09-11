@@ -386,8 +386,9 @@ moved. Arranging one means publishing a real review, which is the user's call.
 ### Validation
 
 **Fourteen controlled suites now**, the new one being `scripts/smoke-prior.mjs`.
-It covers the body signature against all four mode labels and ten near misses,
-both halves of the identity rule, the validation of a review and of a comment
+It covers the body signature against all four mode labels, ten near-miss bodies
+and one value that is not a body at all, both halves of the identity rule, the
+validation of a review and of a comment
 including an outdated anchor that keeps the line it was written at, all four
 comparison statuses, pagination across two pages, the same-head shortcut that
 asks nothing, an unreachable head, a failed discovery, a cancellation that is

@@ -126,9 +126,10 @@ console.log("skipped:", skipped.map((s) => `${s.name} (${s.reason})`).join(", ")
 
 **It should read all six root files and skip none.**
 
-`scripts/smoke-prior.mjs` covers the body signature against all four mode labels
-and eleven near misses, both halves of the identity rule, review and comment
-validation including an outdated anchor that keeps the line it was written at,
+`scripts/smoke-prior.mjs` covers the body signature against all four mode
+labels, ten near-miss bodies and one value that is not a body at all, both
+halves of the identity rule, review and comment validation including an
+outdated anchor that keeps the line it was written at,
 all four comparison statuses, pagination across two pages, the same-head
 shortcut that asks nothing, an unreachable head, a failed discovery, a
 cancellation re-thrown rather than reported, and the wiring into capture both
