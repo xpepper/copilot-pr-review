@@ -246,14 +246,15 @@ Citations remain limited to captured diff and context windows.
 
 ## State at this handoff
 
-`U1` landed on branch `u1-unattended-execution` through pull request **#28**,
-reviewed once with this plugin at the user's authorization. **Merging is the
-user's decision**, so confirm from git state whether #28 is merged and whether
-you are starting from `main` with no increment branch open, and reconcile
-anything that disagrees with this sentence.
+`U1` landed through pull request **#28**, eight commits on branch
+`u1-unattended-execution`, reviewed once with this plugin at the user's
+authorization. The user chose to merge it at the end of that session, so **you
+should be starting from `main` with no increment branch open.** Confirm that
+from git state rather than from this sentence, and reconcile anything that
+disagrees.
 
-`main` refuses direct pushes for everyone. Playground pull requests #1 and #2
-must never be merged.
+**Merging is always the user's decision**, and `main` refuses direct pushes for
+everyone. Playground pull requests #1 and #2 must never be merged.
 
 If you land anything at all: follow `AGENTS.md`, with meaningful validated
 checkpoint commits, a named branch and pull request, no direct `main` push, and
