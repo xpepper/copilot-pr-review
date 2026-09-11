@@ -422,7 +422,7 @@ cost line that is genuinely unbuilt, the second by recall, which is what
 actually stays open. **`E1`'s entry moved verbatim to the archive** before this
 one was written, under the rule earlier moves established.
 
-### Pull request #29 and its review
+### Pull request #29, and the two reviews it got
 
 Reviewed once with this plugin at the user's authorization, dispatched with
 `node scripts/dogfood-review.mjs 29 --deep --all --no-comment --unattended`. The
@@ -485,6 +485,50 @@ One run against playground #2 returned `failed` with the relationship `unknown`
 while three runs before and after it returned `found`. The reason was not
 captured, so nothing is claimed about its cause. What it demonstrates is the
 behaviour that matters: a failed discovery reported itself and refused nothing.
+
+### GitHub's own Copilot reviewer, on the same pull request
+
+**#29 was also reviewed by GitHub's built-in Copilot code reviewer**, which is
+not this tool and costs this project nothing. It raised three inline comments,
+of which **two were right and are fixed**, and one rested on a false premise and
+is answered with evidence. All three threads are replied to and resolved.
+
+| Comment | Disposition |
+| --- | --- |
+| Only the body of a retained comment is verbatim, not the whole object | **Fixed** |
+| The rejected-body count disagrees between roadmap and handoff | **Fixed** |
+| Thread replies are retained as if this tool emitted them | **Rejected**, premise false |
+
+**The first was worse than the reviewer knew.** It anchored on `README.md`, but
+the same overclaim was in the sentence `describePrior` actually prints, and in
+this entry and the handoff. `priorCommentFrom` renames every anchor field, turns
+nulls into `undefined`, derives `outdated` and drops the rest, so only the body
+survives untouched. The shipped sentence now says which half is which and the
+suite pins it.
+
+**The second pointed the wrong way and was still a real defect.** It read as a
+handoff error; the handoff was right and this entry was stale, written before
+the plugin review's own fix added an eleventh case to the rejected-body list.
+Both now say what the list holds instead of a count.
+
+**The third is the one worth keeping.** It claimed a reply carries the root
+review's `pull_request_review_id`, so filtering by review id retains human
+follow-ups, a malformed one could fail discovery, and `I1c` could parse reply
+prose. **None of that holds.** GitHub files every reply under a review of its
+own: across four real reply pairs, in this repository's #4 and in `cli/cli`,
+every reply's review id differed from its parent's, and each reply-generated
+review is `COMMENTED` with an empty body. So a reply is excluded twice over and
+independently, and never reaches `priorCommentFrom`. The `in_reply_to_id` filter
+it asked for would guard a shape GitHub does not produce, and was not added.
+**What it earned instead is a standing check**: the behaviour is observed rather
+than documented, so `scripts/smoke-prior.mjs` now pins both exclusions and a
+change in GitHub fails a suite rather than letting `I1c` read somebody's reply.
+
+**Two reviewers, two different kinds of finding.** This tool found a false claim
+about its own control flow and a body signature loose enough to admit anything
+between its ends. GitHub's reviewer found two more documents disagreeing with
+each other and with the code. **Neither found a defect in what discovery
+actually does**, which is the honest limit on what #29 establishes.
 
 ## v1 is complete, `I1` is sliced, and three increments remain
 

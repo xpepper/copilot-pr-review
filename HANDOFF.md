@@ -11,24 +11,27 @@ through `E1` are in `docs/roadmap-archive-2026-09-10.md`, which you need only fo
 an older increment's evidence. The README that used to carry them is in
 `docs/readme-archive-2026-09-10.md`.
 
-## `README.md` has 763 bytes left, and that is the first thing to solve
+## Both big files are nearly full, and that is the first thing to solve
 
-**`README.md` has 763 bytes spare and `ROADMAP.md` has 6018.** At 65536 bytes
-this project's own safeguard discovery stops reading a file, silently.
+**`README.md` has 651 bytes spare and `ROADMAP.md` has 2766.** At 65536 bytes
+this project's own safeguard discovery stops reading a file, silently, and the
+tool can no longer read its own project. **Neither file has room for an
+increment's worth of writing, so do this before you build, not after.**
 
-- **`ROADMAP.md` has an escape and you should use it.** A normal increment entry
-  is five to eight kilobytes, so **archive `U1`'s entry into
-  `docs/roadmap-archive-2026-09-10.md` before you write your own**, leaving the
-  same kind of pointer the six earlier moves left and not rewriting or condensing
-  it on the way. `I1a`'s entry then becomes the oldest live one.
-- **`README.md` has no escape, and 763 bytes is not an increment's worth of
-  prose.** `I1b` changes what a reviewer may report, which is user-visible and
-  needs documenting. **Solve the headroom before you write the prose**, not
-  after. `D1` shortened this file from 103903 to 55195 bytes by moving material
-  into `docs/`, which discovery does not recurse into, and
-  `docs/readme-archive-2026-09-10.md` is where that went. Doing the same again is
-  the obvious move and is worth agreeing with the user first, because it is
-  housekeeping rather than `I1b`.
+- **`ROADMAP.md` has an escape and you must use it first.** A normal increment
+  entry is five to eight kilobytes and you have 2766 bytes, so **archive `U1`'s
+  entry into `docs/roadmap-archive-2026-09-10.md` before you write anything into
+  the roadmap at all**, leaving the same kind of pointer the six earlier moves
+  left and not rewriting or condensing it on the way. `I1a`'s entry then becomes
+  the only live one. Six increments have done exactly this; the pattern is that
+  the increment needing the room does the archiving.
+- **`README.md` has no escape, and 651 bytes is nothing.** `I1b` changes what a
+  reviewer may report, which is user-visible and needs documenting. `D1`
+  shortened this file from 103903 to 55195 bytes by moving material into
+  `docs/`, which discovery does not recurse into, and
+  `docs/readme-archive-2026-09-10.md` is where that went. **Doing the same again
+  is the obvious move and is worth agreeing with the user first**, because it is
+  housekeeping rather than `I1b`, and it may deserve its own pull request.
 - Measure with `wc -c`, and run the collector check below before opening a pull
   request. A file that starts appearing in the skipped list has crossed 65536.
 
@@ -62,15 +65,14 @@ comparison and the earlier review's anchors, on `target.prior`.
 
 **Do not start `I1c` or `G1` early, and do not invent another increment.**
 
-## What `I1a` did, and the four things worth carrying forward
+## What `I1a` did, and the five things worth carrying forward
 
 `I1a` made capture report whether this tool has already reviewed this pull
 request, the head that review evaluated, its inline comments retained with
-verbatim bodies and normalised anchors, and
-how the reviewed head relates to that one: `none`, `same-head`, `incremental`,
-`diverged`, or `unknown` when GitHub can no longer reach the earlier head. It
-narrows nothing and revalidates nothing, and its own output says so. Pull
-request #29 carries all of it.
+verbatim bodies and normalised anchors, and how the reviewed head relates to
+that one: `none`, `same-head`, `incremental`, `diverged`, or `unknown` when
+GitHub can no longer reach the earlier head. It narrows nothing and revalidates
+nothing, and its own output says so. Pull request #29 carries all of it.
 
 - **Read the discarded candidates. Always.** #29 produced two candidates and the
   evidence boundary discarded the better one, because its location quoted the
@@ -88,6 +90,14 @@ request #29 carries all of it.
   in the README: a limits bullet denying a quieter mode four hundred lines below
   the documentation of `--quiet`, and one saying no review had run against a
   substantial code diff, which `E1` did.
+- **GitHub's own Copilot reviewer is a second opinion that costs nothing**, and
+  on #29 it found two more documents disagreeing with each other and with the
+  code, both fixed, plus one claim that was false and is answered with evidence
+  in the roadmap. It reviews automatically; read what it leaves and treat it
+  like any other reviewer. **Check the premise of a finding before implementing
+  it**: #29's third comment was confidently wrong about GitHub's own API, and
+  four real reply pairs settled it in a couple of minutes. The rule cuts both
+  ways, since the other two were right and one of them was worse than it knew.
 - **Free live evidence is worth gathering and this increment is the proof.**
   Discovery spends no credits and needs no inference, so it was exercised against
   real GitHub before the paid review: two playground pull requests, two of this
@@ -128,12 +138,14 @@ console.log("skipped:", skipped.map((s) => `${s.name} (${s.reason})`).join(", ")
 
 `scripts/smoke-prior.mjs` covers the body signature against all four mode
 labels, ten near-miss bodies and one value that is not a body at all, both
-halves of the identity rule, review and comment validation including an
-outdated anchor that keeps the line it was written at,
-all four comparison statuses, pagination across two pages, the same-head
-shortcut that asks nothing, an unreachable head, a failed discovery, a
-cancellation re-thrown rather than reported, and the wiring into capture both
-verbosely and quietly. **Keep every one.** `scripts/smoke-target.mjs` now
+halves of the identity rule including the empty-bodied review a reply
+generates, review and comment validation including an outdated anchor that keeps
+the line it was written at, all four comparison statuses, pagination across two
+pages, the same-head shortcut that asks nothing, a reply to one of our own
+comments that is excluded from the retained set, an unreachable head, a failed
+discovery, a cancellation re-thrown rather than reported, the sentence a run
+prints about what it retained, and the wiring into capture both verbosely and
+quietly. **Keep every one.** `scripts/smoke-target.mjs` now
 expects eight `gh` calls in a capture rather than six, the two extra being the
 identity read and the review listing.
 
@@ -261,13 +273,22 @@ Citations remain limited to captured diff and context windows.
 
 ## State at this handoff
 
-`I1a` landed through pull request **#29**, on branch
-`i1a-prior-review-discovery`, reviewed once with this plugin at the user's
-authorization: deep, 76.55215 credits, 1 validated finding and 1 discarded
-candidate, both real and both fixed on the branch. **Merging is the user's
-decision and had not happened when this was written**, so confirm the branch and
-pull request state from git rather than from this sentence, and reconcile
-anything that disagrees. `main` refuses direct pushes for everyone.
+`I1a` landed through pull request **#29**, eight commits on branch
+`i1a-prior-review-discovery`, and was reviewed twice.
+
+- **Once with this plugin**, at the user's authorization: deep, 76.55215
+  credits, 1 validated finding and 1 discarded candidate, both real and both
+  fixed on the branch. That is the increment's verification of record.
+- **Once by GitHub's own Copilot reviewer**, which costs this project nothing
+  and ran by itself: three inline comments, two right and fixed, one resting on
+  a false premise about how GitHub files thread replies, answered with evidence
+  and pinned by a new test. All three threads are replied to and resolved.
+
+**The user chose to merge #29 at the end of that session, so you should be
+starting from `main` with no increment branch open.** Confirm that from git
+state rather than from this sentence, and reconcile anything that disagrees.
+**Merging is always the user's decision**, and `main` refuses direct pushes for
+everyone, including admins and agents using their token.
 
 If you land anything at all: follow `AGENTS.md`, with meaningful validated
 checkpoint commits, a named branch and pull request, no direct `main` push, and
