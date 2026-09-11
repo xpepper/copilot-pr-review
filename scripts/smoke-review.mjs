@@ -2154,6 +2154,25 @@ console.log("PASS a settled deep run: one integrated heavy reviewer, an uncapped
   "A quiet run still shows what the command it ran printed");
   assert(!h.messages.some((message) => message.startsWith("Q3 evidence: ")));
   assert(!h.messages.some((message) => message.includes("Unvalidated candidate output for")));
+  // The discovery pass is a model pass like any other, so its raw envelope is an
+  // untrusted envelope and goes with the rest. What it found does not: the
+  // commands and the file each came from are the thing being put to a person.
+  assert(!h.messages.some((message) => message.includes("Untrusted safeguard discovery output")),
+  "A quiet run omits the discovery pass's raw envelope");
+  assert(!h.messages.some((message) => message.includes('"discoveryKey"')));
+  assert.match(h.messages.find((message) => message.startsWith("V1b safeguard discovery")),
+    /node safeguard-check\.mjs {2}\[declared in AGENTS\.md\]/,
+  "What discovery found is still presented with its source");
+}
+{
+  // A default --verify run still prints that envelope, exactly as before.
+  const h = harness({ discovered: runnable, approve: (request) =>
+    ({ action: "accept", content: { commands: approvalChoices(request) } }) });
+  await withInstructions(runnableRoot,
+    () => executeReviewRun(h.parent, h.client, { ...options, verify: true },
+      structuredClone(assignments), { controller: h.controller, gh: fakeGh(), git: checkoutGit }));
+  assert(h.messages.some((message) => message.includes("Untrusted safeguard discovery output")));
+  assert(h.messages.some((message) => message.includes('"discoveryKey"')));
 }
 console.log("PASS --quiet drops the evidence JSON and the untrusted envelopes, and nothing about coverage, failure or safeguards");
 

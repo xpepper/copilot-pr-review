@@ -242,7 +242,7 @@ export function reviewPrompt(mode, assignment, snapshot, context, binding, acces
 // the supplied file text alone. It is deliberately not a reviewer, so it takes
 // no configured fallback. A fallback answers a gap in review coverage, and
 // discovery is not part of that coverage.
-async function discoverSafeguards(parent, client, assignments, access, binding, signal) {
+async function discoverSafeguards(parent, client, assignments, access, binding, signal, quiet) {
   const collected = collectInstructionFiles(access.root);
   const sources = {
     files: collected.files.map(({ name, bytes }) => ({ name, bytes })), skipped: collected.skipped,
@@ -257,7 +257,11 @@ async function discoverSafeguards(parent, client, assignments, access, binding, 
   let report;
   try {
     report = await reviewAssignments(parent, client, [{ ...assignment, label: "safeguard-discovery" }], {
-      signal, systemMessage: { mode: "append", content: discoveryInstructions() },
+      // O1: the discovery pass is a model pass, so its raw output is an untrusted
+      // envelope like a reviewer's and goes quiet with the rest. What it found
+      // never does: the commands and their sources are what a person is asked to
+      // approve, and they are presented separately by describeDiscovery.
+      signal, quiet, systemMessage: { mode: "append", content: discoveryInstructions() },
       verifyResult: (result) => { discoveryEnvelope(result, key, supplied); },
       intro: `Reading ${supplied.length} instruction file(s) from this checkout: one pass, which is not a ` +
         "reviewer, and nothing it reports is approved or executed by this run.",
@@ -372,7 +376,7 @@ export async function executeReviewRun(parent, client, options, assignments, {
       // and no coverage state; a failed pass is reported as itself, because it
       // grounds nothing that a finding depends on.
       if (verify) {
-        discovery = await discoverSafeguards(parent, client, assignments, access, binding, signal);
+        discovery = await discoverSafeguards(parent, client, assignments, access, binding, signal, quiet);
         await parent.log(describeDiscovery(discovery));
         // V1c: the run asks which of the discovered commands may run, records
         // that answer, and still executes nothing. The question sits here, and
