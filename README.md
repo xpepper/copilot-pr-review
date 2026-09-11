@@ -831,6 +831,16 @@ The two were once reported identically, and a real run lost its approval that
 way: the person selected a command, the run recorded that none was approved, and
 nothing on screen distinguished that from their having said no.
 
+**Press Space to select, then Enter to submit.** The question is a multi-select,
+and the terminal UI toggles a command only on Space. Up and down move the
+highlight without selecting anything, and Enter submits whatever is currently
+toggled. Pressing Enter on a merely highlighted command therefore submits an
+empty answer, which is a valid way of approving nothing and reads exactly like
+the message above. Three real reviews of this project approved nothing for that
+reason before the question started saying so. An empty answer stays a real
+answer, deliberately: nothing here requires you to select something, because the
+safe reply to "may I run this?" is no.
+
 The approval is not written to the retained result, so a publish-later of that
 result carries no approval and never could.
 

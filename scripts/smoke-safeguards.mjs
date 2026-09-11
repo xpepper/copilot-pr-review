@@ -314,6 +314,18 @@ const accepted = (commands) => ({ action: "accept", content: { commands } });
   assert.match(fixture.requests[0].message, /not a sandbox|does not sandbox/i);
   assert.match(fixture.requests[0].message, /fixture\/repository#18/);
   assert.match(fixture.requests[0].message, new RegExp(approvalBinding.head));
+  // Three live reviews approved nothing because the host's multi-select toggles
+  // on Space and Enter submits whatever is toggled, so Enter on a merely
+  // highlighted command submits the empty default. The question has to say so:
+  // a person who cannot tell how to pick is offered nothing they can act on.
+  assert.match(fixture.requests[0].message, /\bSpace\b/,
+  "The question names the key that actually selects a command");
+  assert.match(fixture.requests[0].message, /\bEnter\b/);
+  // The empty answer stays a real answer, and stays the safe default: nothing
+  // here may start requiring a selection.
+  assert.match(fixture.requests[0].message, /Accept with no choices or decline/);
+  assert(!("minItems" in fixture.requests[0].requestedSchema.properties.commands),
+  "Approving nothing must stay expressible; minItems would forbid it");
 }
 {
   // Approving a subset is the point of asking per command.
