@@ -72,7 +72,7 @@ posting them.
 | E1 | Completed | The tool is used for real, on work that is not this repository. One authorized deep review of `xpepper/pr-review-gemini#28`, 1427 changed lines over 16 files: 81.48022 credits, 93 s of model work, 16 approved tool calls and no denial, one validated finding that is real and exact, and one blocked assessment reported twice. Six items came out of it; the coverage-gap consolidation defect is fixed here, two are documentation fixes, and three are recorded as limitations with reasons. Pull request #26, reviewed once with this plugin at the user's instruction: deep, 45.98955 credits, incomplete coverage, 3 validated findings all real and all fixed here, and one discarded candidate that was also right and is also fixed. | O1; [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | U1 | Completed | Unattended, non-interactive execution. All four questions a review can ask already had a no-person branch and none of them blocked, so `--unattended` is a declaration checked at parse time rather than a new capability: it refuses, before capture and before a credit is spent, any invocation that would need somebody. Without `--all`, without `--comment` or `--no-comment`, with `--verify`, or with `--capture-only`. An unattended capture also offers no closed-PR confirmation even where the host has one. It grants no authority, opens no gate and is not a configuration key; `scripts/dogfood-review.mjs` requires it. Pull request #28, reviewed once with this plugin at the user's authorization: deep, 77.45399 credits, 114.5 s of model work, 13 approved tool calls and no denial, incomplete coverage on one execution failure, 0 validated findings and one accepted candidate the evidence boundary discarded because the adjudicator's own citation named fifteen lines for a sixteen-line quote. That candidate was right and is fixed here. | E1; [Publication controls](SCOPE.md#selection-publication-and-cached-results), [Safeguards](SCOPE.md#optional-project-safeguards) |
 | I1a | Completed | Prior-review discovery. Capture reports whether this tool has already reviewed this pull request, the head that review evaluated, its inline comments retained with verbatim bodies and normalised anchors, and how the reviewed head relates to that one: `none`, `same-head`, `incremental`, `diverged` or an honestly unmeasured `unknown`. A review counts only when the authenticated identity submitted it and it carries the body `preview.mjs` builds, so a hand-written review is considered and never treated as a prior one. Read-only, no credits, no change to any reviewer's input, and a failed discovery is reported as itself. The first of `I1`'s three slices, agreed with the user before anything was built. | U1; [Targets](SCOPE.md#targets-and-local-behavior) |
-| I1b | Completed | `--incremental` confines fresh hunting to the commits added since an earlier review of the same pull request, so a re-review stops reporting hunks that review already covered. Opt-in, at the user's decision, and a request rather than a parse-time contract: any relationship but `incremental`, an unreadable range, or added commits that change no file each narrow nothing and say which it was. The captured binding, its context windows, the provenance checks and every citation rule are unchanged; the reviewers are given the confined head-side ranges and code sets aside any candidate anchored outside them, before adjudication, reported with its location and never refuted. One informational caveat carries the confinement into the published body, because a confined review does not cover the whole pull request. | I1a; [Targets](SCOPE.md#targets-and-local-behavior), [Modes/findings](SCOPE.md#review-modes-and-findings) |
+| I1b | Completed | `--incremental` confines fresh hunting to the commits added since an earlier review of the same pull request, so a re-review stops reporting hunks that review already covered. Opt-in, at the user's decision, and a request rather than a parse-time contract: any relationship but `incremental`, an unreadable range, or added commits that change no file each narrow nothing and say which it was. The captured binding, its context windows, the provenance checks and every citation rule are unchanged; the reviewers are given the confined head-side ranges and code sets aside any candidate anchored outside them, before adjudication, reported with its location and never refuted. One informational caveat carries the confinement into the published body, because a confined review does not cover the whole pull request. Pull request #31, reviewed once with this plugin at the user's authorization: deep, 68.53836 credits, 91.5 s of model work, 16 approved tool calls and no denial, 0 candidates and 0 validated findings, and one coverage gap that is exact and unfixable here, namely that the confinement path has fixture coverage only and no live run has ever reported the incremental relationship. | I1a; [Targets](SCOPE.md#targets-and-local-behavior), [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | I1c | Pending | Revalidate the prior findings `I1a` retains as resolved, still open or obsolete. Needs the parser that reads this tool's own emitted comment prose back into a finding, deliberately not shipped by `I1a` because nothing consumed it there. Needs one live review. | I1a, I1b; [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | G1 | Pending | Gap analysis against the field, then a proposal. Compare this tool behaviourally with upstream `pi-pr-review` and with other code-review agents and skills now in the open, on capability and on user experience, and propose what is worth adopting. Research is extensive and the output is a written analysis plus a recommendation, not code. **`L1`'s rule binds this absolutely: no upstream or third-party source, prompt text or documentation may be copied.** Any adoption is behavioural and re-implemented. Anything it proposes is a scope decision for the user. | I1c; [Upstream baseline](SCOPE.md#upstream-baseline) |
 
@@ -279,8 +279,49 @@ the same reason: neither file had room for an increment's worth of writing.
 
 ### Pull request #31 and its review
 
-*To be recorded.* The pull request is open; the plugin review of it needs the
-user's explicit authorization and has not been run at the time of writing.
+Reviewed once with this plugin at the user's authorization, dispatched with
+`node scripts/dogfood-review.mjs 31 --deep --all --no-comment --unattended`. The
+plugin was reinstalled from the branch head and `diff -rq`'d against the
+checkout with no output first, so the review exercised this increment's own
+`incremental.mjs` and not a stale copy.
+
+| Measure | Value |
+| --- | --- |
+| Diff | 1391 additions, 496 deletions, 13 files |
+| Bound input | 146859 byte diff, 443594 bytes of context over 24 sources |
+| Reviewer `integrated`, heavy, `gpt-5.6-terra` high | 91.5 s, 4 requests, 68.53836 credits |
+| Adjudicator | never started; 0 candidates reached the evidence gate |
+| Total | 68.53836 credits, 91.5 s of model work |
+| Tool calls | 16, all approved, zero denials: `view` x8, GPT's `rg` alias x7, `glob` x1 |
+| Result | 0 candidates, 0 validated findings, 0 rejected, 0 capped, 0 discarded |
+| Coverage | INCOMPLETE: 0 execution failures, 1 coverage gap, 0 informational caveats |
+
+**It reported one coverage gap and no candidate at all**, which makes this the
+first review of this repository in eight to find nothing wrong with its
+paperwork. The gap is exact and is the thing this entry already records as open:
+the confinement path has fixture coverage only, and the real GitHub compare-diff
+response and its head-side line coordinates have not been established, so live
+range parsing and confinement behaviour could not be assessed. **Nothing was
+changed in response, because nothing can be**: closing it needs live evidence
+that does not exist yet, and the run was right to call that incomplete coverage
+rather than to pass over it.
+
+**The adjudicator cost nothing**, because it starts only when a candidate
+survives the evidence boundary and none did. The whole 68.53836 credits are the
+one reviewer's four requests.
+
+**The reviewer's last search is worth recording**: it went looking for
+`rename from`, `rename to` and `headerPaths`, which is a rename in the commit
+range, and reported nothing. `newRangeFrom` collects both sides' paths into
+`touched` and keys the changed lines by the head path, so a rename inside the
+new commits is handled, but **that this was checked and passed is the reviewer's
+reading, not a test**, and no suite pins it.
+
+**Confinement never engaged in this run and could not have.** #31 has no prior
+review by this tool, so discovery reported `none`, the evidence line recorded
+`"incremental":false`, and the prior-review sentence printed its unconfined
+branch. That is the correct behaviour and it is not evidence about a confined
+run.
 
 **No live evidence of a confinement exists**, and none can be had cheaply. A
 confined run needs a pull request this tool has published a review on and that
@@ -288,6 +329,11 @@ has since moved, and the only two published reviews are on playground pull
 requests #1 and #2, both still at the head they evaluated. Arranging one means
 publishing a real review or pushing a commit to a playground branch, and both
 are the user's call. **Playground #1 and #2 must never be merged.**
+
+**GitHub's own Copilot reviewer left nothing on #31, or on #30.** It reviewed
+#29 automatically and found two real defects there for no cost, so its silence
+here is a change worth noticing rather than a result. Nothing was inferred about
+why.
 
 ## v1 is complete, `I1` is sliced, and two increments remain
 
@@ -469,6 +515,18 @@ not a backlog. Do not start one without the user saying so.
   three candidates and refused one of them by citation, so no exclusion rule has
   ever refused a real discovered command. No later review can close this
   deliberately, because what a discovery pass reports is not ours to arrange.
+- **A live confined run.** `I1b`'s whole path has fixture coverage and no live
+  evidence: `incremental` has never been reported end to end, so the real
+  compare-diff response, its head-side line coordinates and a real candidate set
+  aside have never been seen. #31's reviewer named this as a coverage gap of its
+  own accord and was right to. Closing it needs a pull request this tool has
+  published a review on and that has since moved, which means publishing a real
+  review or pushing a commit to a playground branch. Both are the user's call,
+  and **playground #1 and #2 must never be merged.**
+- **A rename inside the confined commit range.** #31's reviewer checked for one
+  and reported nothing. `newRangeFrom` collects both sides' paths and keys the
+  changed lines by the head path, so it is handled by construction, but no suite
+  pins it and no live run has produced one.
 - **An unattended run that actually publishes.** `U1`'s live evidence is
   `--all --no-comment --unattended`, because that is what the dogfood runner
   permits and it deliberately never posts. `--all --comment --unattended` is
