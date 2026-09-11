@@ -265,10 +265,12 @@ capture verbosely, quietly and not at all. `scripts/smoke-review.mjs` gained the
 parse cases and the two refusals. `scripts/smoke-reviewer-tools.mjs` was not
 run: nothing here touches `read-only.mjs`.
 
-`node scripts/smoke-runtime.mjs --targets` gained four assertions: one sentence
-of `help` and one of `status` naming the new flag, and its two refusals through
-the runtime's own command RPC. None of them reaches a capture, so the coverage
-is free.
+`node scripts/smoke-runtime.mjs --targets` **passes with 75 assertions and no
+inference**, up from `U1`'s 71, against the plugin reinstalled from this
+checkout with `copilot plugin install "$(pwd)"` and `diff -rq`'d against it with
+no output. The four new ones are one sentence of `help` and one of `status`
+naming the flag, and its two refusals through the runtime's own command RPC.
+None of them reaches a capture, so the coverage is free. CLI 1.0.83.
 
 **`U1`'s entry moved verbatim to the archive** before this one was written, under
 the rule earlier moves established, and `README.md`'s `--verify` guide moved to
