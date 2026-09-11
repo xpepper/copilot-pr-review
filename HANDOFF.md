@@ -44,16 +44,24 @@ states its disposition and reason in words where the suppressed JSON used to
 carry them. **The user chose one flag and deliberately no configuration key**;
 do not add one without being asked.
 
-## The approval gap: cause found, fix shipped, evidence still unbought
+## The approval gap is closed: a safeguard has finally run live
 
-**Safeguard execution has still never run under the installed plugin.** A
-non-empty `accept`, a real spawn, a real capture, a real artifact line and a
-live cancellation are demonstrated only by `scripts/smoke-safeguards.mjs`.
+**The installed plugin has now approved, spawned and captured a real safeguard.**
+#25's second review approved `node scripts/smoke-safeguards.mjs`, ran it to exit
+0 in 500 ms, showed its ten `PASS` lines, and reported the checkout unchanged.
+That is a non-empty `accept`, a real spawn, a real capture and a real artifact
+line, none of which any controlled suite can prove.
 
-**Three `--verify` reviews approved nothing** (#19, #24, #25), the last two
-against the operator's own account of what they picked. `O1`'s session found out
-why, at the user's request, by asking Copilot CLI about its own SDK for 56.63
-credits and then checking the answer by hand against the installed bundle:
+**What is left of that gap is one thing: cancelling a running safeguard**,
+including killing a grandchild. `scripts/smoke-safeguards.mjs` covers it and
+nothing else does, because arranging it live means cancelling a real review
+mid-command. Do not go looking for it; note it if it ever happens.
+
+**Three earlier `--verify` reviews approved nothing** (#19, #24, #25's first
+run), the last two against the operator's own account of what they picked.
+`O1`'s session found out why, at the user's request, by asking Copilot CLI about
+its own SDK for 56.63 credits and then checking the answer by hand against the
+installed bundle:
 
 - **The schema was never wrong.** `copilot-sdk/generated/rpc.d.ts:20500` names
   our `array` / `items.anyOf` / `const` shape `UIElicitationArrayAnyOfField`,
@@ -65,34 +73,42 @@ credits and then checking the answer by hand against the installed bundle:
   highlighted command submits the empty default**, which is a valid accepted
   answer and produces exactly the `empty` message.
 - **The question now says so**, and `README.md` says it at the approval step.
+  **That fix is what closed the gap**: same person, same commands, same schema,
+  and the approval went from `empty` to `approved` on the next attempt.
 - **`minItems` was deliberately not added and must not be.** The suite asserts
   its absence. Approving nothing must stay expressible and stay the default.
 
-**If the user ever authorizes buying that evidence**, it costs one review,
-because approval sits after discovery inside a running review. `--deep --verify`
-is the cheapest shape: #25 cost 57.6814 credits that way. **Press Space on the
-command before pressing Enter.** If the `empty` message still appears, the
-selection still did not arrive; say so and ask rather than recording a decline.
+**Press Space on the command before pressing Enter** in any future `--verify`
+run. If the `empty` message appears, the selection did not arrive; say so and ask
+rather than recording a decline.
 
-## What #25's review showed, and one thing to learn from it
+**Reinstall before any review, and prove it.** The second review only tested the
+fix because the plugin was reinstalled from the new head first: the stale
+installed copy did not carry it. `diff -rq` the installed
+`extensions/pr-review` against the checkout and expect no output.
 
-Deep, `--verify --all --no-comment`, `gpt-5.6-terra` at high for the reviewer,
-the adjudicator and discovery. **57.6814 credits, completed coverage, 2 validated
-findings, 0 rejected, 10 confined tool calls, zero denials.**
+## What #25's two reviews showed, and two things to learn from them
 
-- **One finding was real**: `--quiet` did not reach the discovery pass, so a
-  quiet `--verify` run still printed its raw envelope. Fixed on the branch.
+Both deep, `--verify --all --no-comment`, `gpt-5.6-terra` at high throughout,
+completed coverage both times, zero denials, nothing published. The first cost
+**57.6814 credits** over 10 tool calls; the second **98.84322** over 28.
+
+- **Three findings across the two runs, two of them real and fixed**: `--quiet`
+  did not reach the discovery pass, and the live roadmap contradicted itself
+  about whether quiet output existed.
 - **One finding was false, and the adjudicator accepted it.** It claimed the
   quiet capture line drops the "No PR review performed; no clean-review claim"
   notice. That sentence is appended by the outer template literal after the
   ternary closes, so both arms carry it, and the reviewer's own citation quotes
-  the proof. Two suite assertions already covered it.
-- **Read that as what it is.** `allClaimsSupported: true` means a model said so.
-  The adjudicator is a fallible source-grounded judgment, not a proof, which is
-  why the result still says validation is not execution or formal proof. Check a
-  finding against the source before you act on it, and **read the discarded
+  the proof. **`allClaimsSupported: true` means a model said so.** Check a
+  finding against the source before acting on it, and **read the discarded
   candidates too**: on #23 and #24 zero validated findings sat on top of several
   correct observations.
+- **Four reviews in a row have now caught this project's paperwork disagreeing
+  with itself**: #18, #23, #24 and #25. Writing the warning down has not worked.
+  **Before you finish, grep the live roadmap for claims your own change has made
+  false**, especially present-tense sentences about what has never been
+  demonstrated.
 
 ## Validation and runtime caveats
 
@@ -121,14 +137,13 @@ console.log("skipped:", skipped.map((s) => `${s.name} (${s.reason})`).join(", ")
 ```
 
 **It should read all six root files and skip none.** If a file starts appearing
-in the skipped list it has crossed 65536 bytes. **The margins are now thin**:
-`ROADMAP.md` has 4854 bytes spare and `README.md` has 6610. Measure with `wc -c`
-before extending either. **`ROADMAP.md` is the one to watch**: `D1` archived `A1`
-and `L1` so `O1` had room, and `O1` used it. **The next session to land anything
-should archive `D1`'s entry into `docs/roadmap-archive-2026-09-10.md` first**,
-verbatim and with the same kind of pointer left behind, before writing anything
-new. Put new material in `docs/`, which discovery does not recurse into, rather
-than growing a root file.
+in the skipped list it has crossed 65536 bytes. **`O1` archived `D1`'s entry**,
+so `ROADMAP.md` has 20911 bytes spare again; `README.md` has 6610, which is
+the tighter of the two now. Measure with `wc -c` before extending either. When
+the roadmap next runs short, archive the oldest live entry into
+`docs/roadmap-archive-2026-09-10.md` verbatim, leaving the same kind of pointer,
+rather than rewriting or condensing it. Put new material in `docs/`, which
+discovery does not recurse into, rather than growing a root file.
 
 **Check `copilot plugin list` immediately before dispatching any review.** During
 `D1` an install that had reported success, and that the list then showed, was
@@ -164,7 +179,8 @@ scan that carries the run's cancellation signal, and a cancellation that kills a
 grandchild process the safeguard started. It also asserts the module can never
 open a shell; **keep that assertion**, and do not replace it with a weaker one.
 Since `O1` it also asserts the approval question names both Space and Enter and
-that the schema carries no `minItems`. Its oversize-skip assertion uses a
+that the schema carries no `minItems`. **Everything it covers except the
+cancellation has now also been seen live**, on #25's second review. Its oversize-skip assertion uses a
 synthetic project whose `ROADMAP.md` is `"x".repeat(instructionFileMaxBytes + 1)`,
 so it tests the rule and never the real file.
 
