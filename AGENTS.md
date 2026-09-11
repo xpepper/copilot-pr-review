@@ -41,6 +41,15 @@ second. These two cover the safeguard path end to end:
 `HANDOFF.md` lists the full set and the loop that runs every one of them. Run the
 whole set before opening a pull request.
 
+GitHub Actions runs the same set on every pull request and on every push to
+`main`, in `.github/workflows/ci.yml`, along with two invariants this repository
+has broken before: that this tool can still read its own instruction files, and
+that no tracked text carries a control byte. **CI is not a substitute for running
+them locally before a checkpoint commit**, and a red run is a real failure to fix
+rather than a flake to rerun. It deliberately runs nothing that spends Copilot
+credits: the plugin review of the pull request stays the user's explicit
+decision.
+
 ## Land every increment on a reviewed pull request
 
 Every increment lands through a pull request that this plugin reviews. The

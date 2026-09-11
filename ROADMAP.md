@@ -521,6 +521,25 @@ reported neither: it reported two commands and refused none. What a discovery
 pass reports is a model's judgment over prose, so no later review can arrange
 this deliberately.
 
+### Continuous integration, added outside the increment sequence
+
+**The user asked for a minimal CI pipeline in the `I1b` session**, so
+`.github/workflows/ci.yml` runs on every pull request and every push to `main`.
+It is not an increment, has no roadmap row, and was not part of what the plugin
+reviewed.
+
+It runs the fifteen controlled suites and two invariants this repository has
+broken before: that safeguard discovery still reads every instruction file at
+the checkout root, which fails the job if one crosses 65536 bytes, and that no
+tracked text carries a control byte, which is what refused #17's review. There
+is no `package.json`, no dependency and no build step, so the job checks out,
+installs Node and runs `.mjs` files directly.
+
+**It deliberately runs nothing that spends Copilot credits.** The plugin review
+of a pull request stays the increment's real integration test and stays the
+user's explicit decision, as it has been since 2026-09-07. CI proves logic, the
+same way the suites it runs do, and proves nothing about delivery.
+
 ### Recorded, not scheduled
 
 These stay open and none is scheduled. They are limitations of a finished v1,

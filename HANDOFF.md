@@ -16,8 +16,10 @@ is in `docs/readme-archive-2026-09-10.md`, and the `--verify` guide now lives in
 
 At 65536 bytes this project's own safeguard discovery stops reading a file,
 silently, and the tool can no longer read its own project. **`README.md` has
-7217 bytes spare and `ROADMAP.md` has 8556.** That is room for one increment's
+7217 bytes spare and `ROADMAP.md` has 7507.** That is room for one increment's
 writing and not obviously two, so measure before you write and do not assume.
+**CI now fails the build if either crosses the cap**, so this stops being a thing
+you have to remember and starts being a thing you cannot miss.
 
 - **`ROADMAP.md`'s escape is archiving, and `I1b` used it twice.** `U1`'s entry
   moved before a word of `I1b`'s could be written, and `I1a`'s moved once
@@ -114,6 +116,16 @@ need no inference and no network, and all fifteen pass at this handoff. `git dif
 for s in findings review selection retention preview publication publish-later \
   checkout config context fixture target safeguards prior incremental; do node scripts/smoke-$s.mjs; done
 ```
+
+**GitHub Actions now runs that same loop on every pull request and every push to
+`main`**, in `.github/workflows/ci.yml`, together with the two invariants this
+repository has broken before: that the tool can still read its own instruction
+files, and that no tracked text carries a control byte. It needs no secret, no
+network beyond the checkout and no dependency install, because this repository
+has no `package.json` and no build step. **It is not a substitute for running the
+suites locally before a checkpoint commit**, and it deliberately runs nothing
+that spends Copilot credits. A red run is a real failure; do not rerun it hoping
+for green.
 
 This cheap check runs the real discovery collector against this checkout, needs
 no network and no inference, and tells you which of your own files the tool can
@@ -273,7 +285,7 @@ one. Citations remain limited to captured diff and context windows.
 
 ## State at this handoff
 
-`I1b` landed through pull request **#31**, nine commits on branch
+`I1b` landed through pull request **#31**, ten commits on branch
 `i1b-incremental-confinement`, and was reviewed once with this plugin at the
 user's authorization: deep, 68.53836 credits, 91.5 s of model work, 16 approved
 tool calls and no denial, **0 candidates and 0 validated findings**, on
