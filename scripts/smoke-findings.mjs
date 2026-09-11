@@ -278,6 +278,50 @@ const distinctLapinGap = {
 };
 assert.equal(presentationDiagnostics([...repeatedDependencyGaps, distinctLapinGap]).length, 2,
   "A shared identifier must not merge substantively different blocked assessments");
+// E1: the two gaps a real review of xpepper/pr-review-gemini#28 produced. The
+// reviewer and the adjudicator blocked the same assessment in almost the same
+// words, and the user was shown both, because neither of them wrapped the
+// function it named in backticks. The impact clauses overlap 0.645 against the
+// 0.35 threshold, so similarity was never what refused the merge.
+const repeatedBareIdentifierGaps = [
+  {
+    kind: "coverage-gap",
+    message: "integrated: Captured sources provide only synthetic error fixtures and do not include a recorded Copilot SDK or Copilot CLI model-catalog failure response. Blocked assessment: Whether isModelUnavailableError recognizes the host's actual catalog failures, and therefore triggers the new fallback in deployed environments, cannot be established from the captured revision.",
+  },
+  {
+    kind: "coverage-gap",
+    message: "Adjudicator: The captured sources contain only synthetic model-catalog error fixtures, not an actual Copilot SDK or Copilot CLI model-catalog failure response. Blocked assessment: Whether isModelUnavailableError recognizes the host's deployed catalog failures, and therefore activates the new automatic fallback in real environments, cannot be determined from this revision-bound context.",
+  },
+];
+const consolidatedBare = presentationDiagnostics(repeatedBareIdentifierGaps);
+assert.equal(consolidatedBare.length, 1,
+  "A code identifier named without backticks is still the same code");
+assert.equal(consolidatedBare[0].reports, 2);
+assert.deepEqual(consolidatedBare[0].reporters, ["integrated", "Adjudicator"]);
+assert.equal(repeatedBareIdentifierGaps.length, 2, "Raw diagnostics remain unchanged");
+// The identifier is what makes two gaps comparable at all; it never overrides the
+// impact comparison, and a bare one must not be weaker than a backticked one.
+const distinctBareIdentifierGap = {
+  kind: "coverage-gap",
+  message: "contracts: The published model catalog is not captured. Blocked assessment: Whether isModelUnavailableError misclassifies an ordinary bad-request rejection as a retriable model error cannot be determined.",
+};
+assert.equal(presentationDiagnostics([...repeatedBareIdentifierGaps, distinctBareIdentifierGap]).length, 2,
+  "A shared bare identifier must not merge substantively different blocked assessments");
+// Ordinary prose must not become an identifier. These two share no code name at
+// all, and their impact clauses are deliberately near-identical, so only the
+// identifier rule can keep them apart.
+const unnamedGaps = [
+  {
+    kind: "coverage-gap",
+    message: "correctness: The deployment environment is not captured. Blocked assessment: Whether the new retry path is reached in production cannot be determined from this revision.",
+  },
+  {
+    kind: "coverage-gap",
+    message: "security: The production environment is not captured. Blocked assessment: Whether the new retry path is reached in production cannot be determined from this revision.",
+  },
+];
+assert.equal(presentationDiagnostics(unnamedGaps).length, 2,
+  "Gaps that name no code stay separate; English words are not identifiers");
 const unstructuredDuplicate = { kind: "coverage-gap", message: "Changed binary content was unavailable." };
 assert.equal(presentationDiagnostics([unstructuredDuplicate, unstructuredDuplicate]).length, 2,
   "Code-owned and legacy gaps without structured reporter/impact text remain explicit");
