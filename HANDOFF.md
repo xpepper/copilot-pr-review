@@ -12,21 +12,35 @@ do not need unless you want an older increment's evidence. The README that used
 to carry them is in `docs/readme-archive-2026-09-10.md`, which you need only for
 a harness probe invocation the live `README.md` no longer prints.
 
-## Nothing is scheduled
+## Take `E1`, and nothing else
 
-**v1 is delivered and `O1` has landed on top of it.** `D1` was v1's last
-increment and merged on pull request #24; `O1`, quieter review output, is on
-pull request #25. **Every row in the increments table is complete and nothing is
-scheduled.**
+**v1 is delivered, `O1` landed on top of it, and the user has since scheduled
+four increments: `E1`, `U1`, `I1`, `G1`, in that order.** `ROADMAP.md`'s section
+"The next increment is `E1`" is the authoritative version of what follows, and
+the increments table describes the other three.
 
-**Do not invent an increment.** `ROADMAP.md`'s closing section lists what stays
-open; every item there is a limitation of a finished v1, not a backlog, and none
-is to be started without the user asking in your own session. **Issue #21
-exists**, a feature request about incremental re-reviews and unattended
-execution: it is not scheduled and you should not start it.
+**`E1` is feedback from real execution.** Every review this project has ever run
+has been of its own pull requests, which are small and mostly documentation. The
+largest is #10 at 984 additions over twelve files. **Nobody knows how this tool
+behaves on a substantial code diff**, and that is the oldest open observation in
+the roadmap.
 
-If the user does schedule something, follow `AGENTS.md` in full: a branch, a
-pull request, one review of it with this plugin, and a fresh-session handoff.
+- **Run at least one review against a substantial code diff in another
+  repository.** Agree the target with the user first and do not spend a review
+  unasked. The tool takes a pull request number for the repository owning the
+  current directory, so this means a checkout of that repository with the plugin
+  installed from this project's head.
+- **Record what the reviewers actually did**, well and badly: which findings were
+  real, which were noise, what the evidence boundary discarded that should have
+  survived, what the adjudicator accepted that it should not have, the time and
+  the credit cost.
+- **Collect usability problems, not only defects.** What was hard to read, hard
+  to answer or hard to trust belongs in this increment.
+- **Fix what is small and clearly right** on a branch and a pull request; record
+  the rest with a reason rather than widening the increment.
+
+**Do not start `U1`, `I1` or `G1` before `E1` is recorded**, and do not invent a
+fifth. `E1` exists so that what comes after it is informed by real behaviour.
 
 ## What `O1` did
 
@@ -266,6 +280,10 @@ to captured diff and context windows.
   wrote a coverage file. `D1` fixed the prompt sentence that over-claimed here;
   do not "improve" it back into a gate.
 - **`O1` is one flag, not a configuration key**, and verbose stays the default.
+- **`L1`'s no-copying rule is not specific to upstream.** `G1` will compare this
+  tool with other code-review agents and skills; anything worth adopting is
+  adopted as behaviour and re-implemented here. Copy no source, prompt text or
+  documentation from any of them.
 
 ## If you land anything at all
 

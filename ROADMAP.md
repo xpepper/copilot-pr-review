@@ -12,9 +12,10 @@ to [docs/roadmap-archive-2026-09-10.md](docs/roadmap-archive-2026-09-10.md) by
 `A1`, `L1` and `D1`, so this file keeps the increments table, the two most
 recent completed entries and the closing section, and stays small enough for
 this project's own safeguard discovery to read. **With `D1` complete v1 is done,
-and `O1` has since landed on top of it**, so every row in the table is complete
-and nothing is scheduled. The closing section records what stays open as a
-limitation rather than as work.
+and `O1` has since landed on top of it.** Four further increments are scheduled,
+`E1`, `U1`, `I1` and `G1`, to be taken in that order; the closing section
+describes the next one and records what stays open as a limitation rather than as
+work.
 
 **Since 2026-09-07, every increment lands on a branch and a pull request that is
 reviewed with this plugin, and that review is the increment's real integration
@@ -67,6 +68,10 @@ posting them.
 | A1 | Completed | Completed entries `F1` through `V1c` moved verbatim into `docs/roadmap-archive-2026-09-10.md`, leaving a live `ROADMAP.md` that this project's own safeguard discovery reads instead of skipping for size. The increments table, the two most recent completed entries and the exact-next-increment section stayed. Pull request #22; documentation-only, so no installed-plugin review, and the user was asked rather than charged. | V2b; housekeeping, no scope clause |
 | D1 | Completed | User documentation: `README.md` reorganised by task with reproducible examples for configuration, modes, incomplete coverage, cancellation, publication, the cache and safeguards, shortened from 103903 to 55195 bytes so this project's own discovery now reads every root file and skips none. Also fixes the reviewer prompt's "verified to be at" wording and two shipped `help`/`status` strings that denied safeguards are ever executed, which makes it a behaviour change needing one installed-plugin review; that review is `--verify` with the safeguards suite approved. Pull request #24, reviewed once with this plugin at the user's authorization: deep with `--verify`, 136.8324 credits, 0 validated findings on incomplete coverage, and two discarded candidates that both described real defects, fixed on the branch. The offered safeguards were not approved, so `D1` bought no live execution evidence; `O1`'s second review did. | A1, L1; [Release boundary](SCOPE.md#priority-and-release-boundary) |
 | O1 | Completed | A review's output can be asked to be quiet: `--quiet` suppresses the evidence JSON lines and every raw untrusted model envelope, including the safeguard discovery pass's, and suppresses nothing about coverage, refusals, failures, safeguards or publication. Verbose stays the default and `scripts/dogfood-review.mjs` refuses the flag, because this project's own roadmap evidence is read from those lines. The user chose one flag and no configuration key. Pull request #25, reviewed once with this plugin at the user's authorization: deep with `--verify`, 57.6814 credits, completed coverage, 2 validated findings of which one was real and is fixed here and one was false and is rejected with a reproduction. Reviewed a second time at the user's further authorization after the approval fix, 98.84322 credits, completed coverage, one real finding: **that run approved and executed a safeguard, which is the first time the installed plugin has ever run one.** | D1; [Modes/findings](SCOPE.md#review-modes-and-findings) |
+| E1 | Pending | The tool is used for real, on work that is not this repository, and what that use reveals is collected and acted on. Deliver: at least one authorized review of a substantial code diff in another repository, a written record of what the reviewers actually did well and badly on it, and the defects and usability problems that surfaced, fixed or recorded with a reason. This is the first scheduled increment because everything after it should be informed by how the tool behaves on real work rather than on its own small diffs. | O1; [Modes/findings](SCOPE.md#review-modes-and-findings) |
+| U1 | Pending | Unattended, non-interactive execution: a run that completes in a headless environment without a person answering anything, while every existing gate still holds. `SCOPE.md` already allows `--all --comment` and `--all` with `autoPostReviews=true` to publish unattended, so this is about what a run does when no elicitation UI exists at all, and about making that explicit rather than incidental. Posting authority still never authorizes safeguard execution. The first half of issue #21, taken first because it is the smaller half. | E1; [Publication controls](SCOPE.md#selection-publication-and-cached-results), [Safeguards](SCOPE.md#optional-project-safeguards) |
+| I1 | Pending | Incremental re-reviews: when a pull request has moved on since a previous review, confine fresh hunting to the new commit range and revalidate the prior findings as resolved, still open, or obsolete. Requires discovering the prior review and the head it evaluated, and classifying the relationship between that head and the current one. Several increments rather than one, so the first step is slicing it. The second half of issue #21. It touches head binding and the evidence boundary, which are the most settled parts of the design; changing either needs the user to say so. | U1; [Targets](SCOPE.md#targets-and-local-behavior), [Modes/findings](SCOPE.md#review-modes-and-findings) |
+| G1 | Pending | Gap analysis against the field, then a proposal. Compare this tool behaviourally with upstream `pi-pr-review` and with other code-review agents and skills now in the open, on capability and on user experience, and propose what is worth adopting. Research is extensive and the output is a written analysis plus a recommendation, not code. **`L1`'s rule binds this absolutely: no upstream or third-party source, prompt text or documentation may be copied.** Any adoption is behavioural and re-implemented. Anything it proposes is a scope decision for the user. | I1; [Upstream baseline](SCOPE.md#upstream-baseline) |
 
 ## Completed increments `F1` through `D1` are archived
 
@@ -371,19 +376,64 @@ It is fixed by archiving `D1`'s entry, which this file needed anyway for
 headroom. The entry moved verbatim, because the sentence was true when `D1`
 wrote it, and the live file now answers the question on its own.
 
-## v1 is complete, and so is `O1`; nothing is scheduled
+## v1 is complete, and four increments are scheduled after it
 
-**`D1` delivered v1 and `O1` has now landed on top of it.** `SCOPE.md`'s
-must-have column, its costly-to-lose column and its additional agreed v1
-capability are all delivered, and **every row in the table above is complete.**
+**`D1` delivered v1 and `O1` has landed on top of it.** `SCOPE.md`'s must-have
+column, its costly-to-lose column and its additional agreed v1 capability are all
+delivered.
 
-**Nothing is scheduled.** `O1` was the one increment the user added after v1, and
-it is done. A later session should not invent another one, and should treat any
-feature idea as out of scope unless the user asks for it in that session.
-**Issue #21 exists** as a feature request about incremental re-reviews and
-unattended execution; it is not scheduled and nobody should start it.
+**The user has since scheduled four increments, in this order: `E1`, `U1`, `I1`,
+`G1`.** They are described below. **Take them one at a time and in order**, and
+do not start a later one early: `E1` exists precisely so that what comes after it
+is informed by how the tool behaves on real work. Treat any other feature idea as
+out of scope unless the user asks for it in your own session.
 
-**Nothing above is to be redone, widened or reopened.** Every increment's
+### The next increment is `E1`, feedback from real execution
+
+**Use the tool for real, on work that is not this repository, and act on what
+that reveals.** Every review this project has run has been of its own pull
+requests, which are small and mostly documentation. The largest is #10 at 984
+additions over twelve files. Nobody knows how the reviewers behave on a
+substantial code diff, and that is the oldest open observation in this file.
+
+- **Run at least one authorized review against a substantial code diff in another
+  repository.** The user authorizes each review; do not spend one unasked, and
+  agree the target with them first. `SCOPE.md` accepts a pull request number for
+  the repository owning the current directory, so this means working from a
+  checkout of that repository with the plugin installed.
+- **Record what the reviewers actually did**, well and badly: which findings were
+  real, which were noise, what the evidence boundary discarded that should have
+  survived, what the adjudicator accepted that it should not have, how long it
+  took, and what it cost.
+- **Collect the usability problems too**, not only the defects. What was hard to
+  read, hard to answer, or hard to trust is in scope for this increment.
+- **Fix what is small and clearly right**, on a branch and a pull request as
+  usual. Record the rest with a reason rather than widening the increment.
+- **Acceptance**: a written record in this file of a real review of real code,
+  with the evidence a review entry always carries, plus the list of what it
+  revealed and what was done about each item.
+
+**`U1`, `I1` and `G1` follow**, and their rows in the table above say what each
+one is. Do not start them before `E1` is recorded.
+
+### `G1`'s starting references, recorded now so they are not lost
+
+The user named these when scheduling `G1`. The list is a starting point for
+extensive research, not its boundary, and the comparison covers user experience
+as well as capability.
+
+- Upstream: [`pi-pr-review`](https://pi.dev/packages/pi-pr-review?name=review),
+  the baseline `SCOPE.md` pins.
+- [openai/codex `.codex/skills`](https://github.com/openai/codex/tree/main/.codex/skills)
+- [channingwalton `code-reviewer`](https://github.com/channingwalton/skills/blob/main/skills/code-reviewer/SKILL.md)
+- [JPeetz `code-quality`](https://github.com/JPeetz/agent-skills/tree/main/skills/code-quality)
+- [unclecatvn `code-review`](https://github.com/unclecatvn/agent-skills/blob/main/skills/code-review/SKILL.md)
+
+**Read them; copy nothing.** `docs/upstream-licensing.md` records why, and the
+rule is not specific to upstream: anything adopted is adopted as behaviour and
+re-implemented here.
+
+**Nothing above `O1` is to be redone, widened or reopened.** Every increment's
 authorization is spent, and the evidence for each is either in the two entries
 kept here or in
 [docs/roadmap-archive-2026-09-10.md](docs/roadmap-archive-2026-09-10.md).
@@ -457,10 +507,9 @@ this deliberately.
 These stay open and none is scheduled. They are limitations of a finished v1,
 not a backlog. Do not start one without the user saying so.
 
-- **A review against a substantial code diff**, the oldest and largest open
-  observation. No review of any mode has run against one; #10 is the closest at
-  984 additions over 12 files, and #14 is 666 over seven. It is separately
-  authorizable and nobody has spent a review on it deliberately.
+- ~~**A review against a substantial code diff.**~~ **This is now scheduled as
+  `E1`** and is no longer merely recorded. #10 remains the closest any review has
+  come, at 984 additions over 12 files.
 - **A live review in which a reviewer is refused an absent path**, the only way
   to learn whether `Q7`'s reason changes what a reviewer does next. It cannot be
   arranged deliberately without inducing the request, so it is a matter of
