@@ -43,14 +43,14 @@ export const validationDiff = [
   " export function total(cents, quantity) {",
   "-  return cents * quantity;", "+  return cents + quantity;", " }", "",
 ].join("\n");
-const shippingBaseSource = [
+export const shippingBaseSource = [
   "// Orders of at least 5000 cents ship free; smaller orders cost 500 cents.",
   "export function shipping(subtotal) {",
   "  return subtotal >= 5000 ? 0 : 500;",
   "}", "",
 ].join("\n");
 export const shippingHeadSource = shippingBaseSource.replace("subtotal >= 5000", "subtotal <= 5000");
-const shippingDiff = [
+export const shippingDiff = [
   "diff --git a/shipping.js b/shipping.js",
   `index ${blobSha(shippingBaseSource)}..${blobSha(shippingHeadSource)} 100644`,
   "--- a/shipping.js", "+++ b/shipping.js", "@@ -1,4 +1,4 @@",

@@ -3,6 +3,9 @@ import { createHash } from "node:crypto";
 import { isAbsolute } from "node:path";
 import { promisify } from "node:util";
 import { assembleContext } from "./context.mjs";
+import {
+  confineToNewCommits, confinementSummary, describeConfinement, isConfined,
+} from "./incremental.mjs";
 import { waitForInteraction } from "./interaction.mjs";
 import { collectPriorReview, describePrior, priorSummary } from "./prior.mjs";
 
@@ -193,7 +196,7 @@ export function contextSummary(context, limit = 20) {
 }
 
 export async function executeTargetCapture(session, args, {
-  gh = runGh, signal, quiet = false, unattended = false,
+  gh = runGh, signal, quiet = false, unattended = false, incremental = false,
 } = {}) {
   const options = parseTargetArgs(args);
   signal?.throwIfAborted();
@@ -251,7 +254,21 @@ export async function executeTargetCapture(session, args, {
   // The comment prose stays out of the parent timeline for the same reason the
   // diff and the source context do; the anchors, which are what a re-review
   // reasons about, are evidence and stay in.
-  await session.log(quiet ? describePrior(prior, outcome.pull.head.sha)
-    : `I1 prior: ${JSON.stringify(priorSummary(prior))}\n${describePrior(prior, outcome.pull.head.sha)}`);
-  return { ...outcome, context, prior, workingDirectory: cwd };
+  // I1b: the commit range a confined run hunts in, read only when this
+  // invocation asked for one. It is another free GitHub read of the same pull
+  // request, and like discovery it changes no binding and no citation rule: it
+  // produces a filter that a later stage applies over the captured diff. It is
+  // settled before the prior review is reported, because what that report says
+  // this run does with the prior review depends on how this read turned out.
+  const confinement = await confineToNewCommits(prior, outcome.pull, outcome.repository,
+    { requested: incremental, gh, cwd, signal });
+  signal?.throwIfAborted();
+  const confined = isConfined(confinement);
+  const described = describePrior(prior, outcome.pull.head.sha, confined);
+  await session.log(quiet ? described : `I1 prior: ${JSON.stringify(priorSummary(prior))}\n${described}`);
+  if (confinement) {
+    await session.log(quiet ? describeConfinement(confinement)
+      : `I1b confinement: ${JSON.stringify(confinementSummary(confinement))}\n${describeConfinement(confinement)}`);
+  }
+  return { ...outcome, context, prior, confinement, workingDirectory: cwd };
 }

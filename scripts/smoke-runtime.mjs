@@ -115,6 +115,8 @@ try {
     // A flag the help does not mention is a flag nobody can find.
     ["help", "--unattended  Declare that this run leaves no question for anybody to answer"],
     ["status", "--unattended declares that a run leaves nothing for a person to answer"],
+    ["help", "--incremental  Ask for fresh hunting to be confined to the commits added since an earlier review"],
+    ["status", "--incremental asks for fresh hunting to be confined to the commits added since an earlier review"],
     ["cancel", "No review is running."],
   ]) {
     const before = (await session.getEvents()).length;
@@ -189,6 +191,11 @@ try {
     ["123 --quick --all --no-comment --verify --unattended", /--unattended cannot be combined with --verify/],
     ["123 --capture-only --unattended", /cannot be combined/],
     ["123 --deep --all --no-comment --unattended --unattended", /Duplicate review argument/],
+    // I1b: the flag's only refusals. Everything else it could disagree with is a
+    // fact about the pull request, which parse time cannot know, so neither of
+    // these reaches a capture either.
+    ["123 --capture-only --incremental", /cannot be combined/],
+    ["123 --deep --no-comment --incremental --incremental", /Duplicate review argument/],
   ]) {
     const before = (await session.getEvents()).length;
     const result = await session.rpc.commands.execute({ commandName: "pr-review", args });

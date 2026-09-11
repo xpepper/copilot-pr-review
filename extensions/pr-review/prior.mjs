@@ -194,13 +194,20 @@ export function priorSummary(prior, limit = 20) {
   };
 }
 
-// The one sentence that must survive every path. This increment discovers and
-// reports; it narrows no hunting and revalidates no earlier finding, and saying
-// otherwise anywhere would be a claim the code does not honour.
+// The one sentence that must survive every path, and it has to say what this
+// run actually did. I1b made confining fresh hunting possible, so the sentence
+// that used to promise it never happens is now conditional on the confinement
+// this run reached: a run that says it acts on none of the prior review while
+// confining its hunting to that review's successor commits is exactly the
+// paperwork defect this project keeps catching in itself. Revalidating the
+// earlier findings is still nobody's work, and stays denied in both branches.
 const actsOnNone = "This run reports the prior review and acts on none of it: fresh hunting is not confined " +
   "to any commit range, and the earlier findings are not revalidated.";
+const actsOnRange = "This run confines fresh hunting to the commit range reported below, which is the only " +
+  "thing it takes from the prior review: the earlier findings are not revalidated.";
 
-export function describePrior(prior, head) {
+export function describePrior(prior, head, confined = false) {
+  const acts = confined ? actsOnRange : actsOnNone;
   if (prior.status === "failed") {
     return `Prior review discovery failed: ${prior.reason}\n` +
       "The review is unaffected and proceeds as an ordinary one. No earlier review was read, " +
@@ -208,7 +215,7 @@ export function describePrior(prior, head) {
   }
   if (prior.status === "none") {
     return `No prior review by this tool: ${prior.considered} submitted review(s) considered, none both ` +
-      `submitted by ${prior.identity.login} and carrying a review body this tool builds. ${actsOnNone}`;
+      `submitted by ${prior.identity.login} and carrying a review body this tool builds. ${acts}`;
   }
   const { review, comparison } = prior;
   const outdated = prior.comments.filter((comment) => comment.outdated).length;
@@ -227,6 +234,6 @@ export function describePrior(prior, head) {
     `${prior.comments.length} inline comment(s) retained, bodies verbatim and anchors normalised` +
       `${outdated ? `, of which ${outdated} no longer anchor in the current diff` : ""}.`,
     `Relationship to this review's head: ${relationship}`,
-    actsOnNone,
+    acts,
   ].join("\n");
 }
