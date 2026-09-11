@@ -228,9 +228,14 @@ Citations remain limited to captured diff and context windows.
 
 ## State at this handoff
 
-Branch `e1-real-execution-feedback`, pull request **#26**, five commits, reviewed
-once with this plugin. **Merging is the user's decision**, and `main` refuses
-direct pushes. Playground pull requests #1 and #2 must never be merged.
+`E1` landed through pull request **#26**, seven commits on branch
+`e1-real-execution-feedback`, reviewed once with this plugin. The user chose to
+merge it at the end of that session, so **you should be starting from `main`
+with no increment branch open**. Confirm that from git state rather than from
+this sentence, and reconcile anything that disagrees.
+
+**Merging is always the user's decision**, and `main` refuses direct pushes for
+everyone. Playground pull requests #1 and #2 must never be merged.
 
 If you land anything at all: follow `AGENTS.md`, with meaningful validated
 checkpoint commits, a named branch and pull request, no direct `main` push, and
