@@ -77,18 +77,18 @@ posting them.
 
 ## Completed increments `F1` through `E1` are archived
 
-Forty-six sections were here and six increments moved every one of them
+Forty-seven sections were here and seven increments moved every one of them
 verbatim to
 [docs/roadmap-archive-2026-09-10.md](docs/roadmap-archive-2026-09-10.md): `A1`
 moved the thirty-nine through `V1c`, `L1` moved `V2a` and `V2b` because this
 file had 4272 bytes of headroom left and the smaller of the two is 7547, `D1`
-moved `A1`'s entry and then `L1`'s, `O1` moved `D1`'s, `U1` moved `O1`'s, and
-**`I1a` moved `E1`'s**, which is the last in that file. Thirty-eight are
-completed-increment entries,
-covering the thirty-six increments `F1`, `F2`, `F3`, `Q1`, `Q2`, `Q3`, `Q4`,
+moved `A1`'s entry and then `L1`'s, `O1` moved `D1`'s, `U1` moved `O1`'s, `I1a`
+moved `E1`'s, and **`I1b` moved `U1`'s**, which is the last in that file.
+Thirty-nine are completed-increment entries,
+covering the thirty-seven increments `F1`, `F2`, `F3`, `Q1`, `Q2`, `Q3`, `Q4`,
 `P1`, `P2`, `P3`, `P4`, `P5`, `C1`, `C2`, `F4`, `R1`, `M1`, `F5`, `F6`, `M2`,
 `C3`, `C4`, `Q5`, `Q6`, `C5`, `Q7`, `V1a`, `V1b`, `V1c`, `V2a`, `V2b`, `A1`,
-`L1`, `D1`, `O1` and `E1`, with `R1` and `M1` each recorded in two halves. The remaining eight are the
+`L1`, `D1`, `O1`, `E1` and `U1`, with `R1` and `M1` each recorded in two halves. The remaining eight are the
 working record kept between them:
 
 - the `Q4` acceptance criteria recorded at the `Q3` checkpoint;
@@ -100,21 +100,21 @@ working record kept between them:
 - the `R1` second-half harness checkpoint;
 - the documentation checkpoint for pull request #4 and its review.
 
-Nothing was rewritten, condensed or corrected in any of the six moves, so each
+Nothing was rewritten, condensed or corrected in any of the seven moves, so each
 section still reads exactly as the session that wrote it left it, and the
 archive is the evidence of record for every increment it holds: reproduction
 commands, the models and efforts actually used, credit costs, findings and
 rejections. Read it for the evidence behind an older increment. Do not redo,
 widen or reopen anything in it; those authorizations are spent. **`V2a`, `V2b`,
-`A1`, `L1`, `O1` and `E1` are all there now**, so the safeguard decisions `V2`
-settled, the archiving `A1` performed, the upstream licence answer `L1`
-established, the quiet-output decisions `O1` settled and everything `E1` learned
-from reviewing somebody else's code are read from the archive rather than from
-this file.
+`A1`, `L1`, `O1`, `E1` and `U1` are all there now**, so the safeguard decisions
+`V2` settled, the archiving `A1` performed, the upstream licence answer `L1`
+established, the quiet-output decisions `O1` settled, everything `E1` learned
+from reviewing somebody else's code and the unattended shape `U1` fixed are read
+from the archive rather than from this file.
 [docs/upstream-licensing.md](docs/upstream-licensing.md) is still the record of
 that licence work and did not move.
 
-**`U1`'s and `I1a`'s entries are the ones kept live**, along with the increments
+**`I1a`'s and `I1b`'s entries are the ones kept live**, along with the increments
 table above and the closing section at the end. The rule these moves established is to keep
 the most recent entries and archive the rest, measuring this file with `wc -c`
 against the 65536-byte cap before opening a pull request. `O1` archived `D1`
@@ -126,148 +126,11 @@ being corrected; the archive is history, and the live file is the answer.
 `U1` archived `O1` for headroom alone: the live file had 3679 bytes spare and an
 increment entry is five to eight kilobytes, so `O1`'s had to move before this
 one could be written. It moved verbatim for the same reason every earlier one
-did. `I1a` archived `E1` under the same rule and for the same reason. **`E1`
-was the largest live entry at 10988 bytes**, and `I1` is three increments, each
-of which will want to write one, so the move buys room for all three rather than
-only for this one.
-
-## Completed increment: U1
-
-**`U1` is a run that completes with nobody there to answer anything.** The
-surprise on opening the code was that this already worked. Four places in a
-review can ask a person something: the closed or merged confirmation at capture,
-safeguard approval under `--verify`, finding selection, and the final
-publication confirmation. **All four already had a no-person branch, and none of
-them blocked.** A host with no elicitation UI reported `unavailable` for each
-decision the invocation had not settled, and carried on.
-
-So `U1` is not about unblocking anything, and it deliberately widened no
-authority. It is about *when* a run finds out. **A run that could never have
-finished alone still paid for its reviewers first and reported the problem
-afterwards**: `E1`'s review of pull request #26 reported selection `unavailable`
-after spending 45.98955 credits.
-
-### The shape, agreed with the user before anything was built
-
-Three decisions, each taken by the user before a line was written, because the
-first half of issue #21 is a description rather than a design.
-
-- **Preflight only.** The flag is a declaration and a precondition check. It does
-  not make the run behave differently on a host that has a UI, and it adds no
-  machine-readable outcome for a caller to branch on. Those were the other two
-  options and both were declined as larger.
-- **`--all` is always required**, rather than only when the run can publish.
-  Selection is a question like any other, and a flag that means "nothing is left
-  for a person" cannot mean two different things depending on `--comment`.
-- **An explicit posting flag is always required.** A saved `autoPostReviews` may
-  never be what makes a headless run publish. This narrows nothing outside the
-  new flag: `--all` with `autoPostReviews=true` still publishes unattended on a
-  host with no UI, exactly as `SCOPE.md` allows.
-
-### What `--unattended` refuses
-
-Checked at parse time, before the target is captured and before a credit is
-spent. Each refusal names the single missing thing, because nobody is there to
-interpret a general complaint.
-
-| Refused | Why |
-| --- | --- |
-| Without `--all` | Selection is a question, and `--all` is the only thing that settles it without a person. It authorizes no posting |
-| Without `--comment` or `--no-comment` | What a run may publish belongs in the invocation, not in saved state |
-| With `--verify` | A safeguard command is approved by the question an unattended run cannot ask, and deliberately by nothing else |
-| With `--capture-only` | Capture takes no review flag at all |
-
-**One behaviour changed**, in the free capture step: an unattended run is offered
-no closed or merged confirmation even on a host that has one, so such a pull
-request stops at capture unless `--include-closed` or `--review-closed` was
-given. Withholding that question can only refuse a capture, never accept one on
-somebody's behalf, and it is what makes the contract exact: an unattended run
-asks nothing, ever.
-
-**No gate was relaxed.** `--all` still authorizes no posting, every publication
-gate still runs, reviewer reads stay confined, posting authority still never
-authorizes safeguard execution, and the flag is not a configuration key, so no
-saved or trusted-project setting can turn it on.
-
-**`scripts/dogfood-review.mjs` now requires it.** That runner creates a session
-with no elicitation UI at all, which is how `E1`'s review came to report
-selection `unavailable`, so this project's own headless runner is the
-declaration's first user. `AGENTS.md` and `README.md` prescribe that command and
-both say so.
-
-### Validation
-
-The thirteen controlled suites pass. `scripts/smoke-review.mjs` gained the parse
-refusals with their exact messages, and a settled unattended run **on a harness
-that does have an elicitation UI and is asked nothing**, which is the contract
-rather than an accident of the host. `scripts/smoke-target.mjs` gained the
-closed-PR case in both directions, proving an open capture is unchanged.
-
-`node scripts/smoke-runtime.mjs --targets` passes with 71 assertions and no
-inference, against the plugin reinstalled from the checkout and `diff -rq`'d
-against it. Seven of those send the new refusals through the runtime's own
-command RPC, and none reaches a capture, so the coverage is free.
-
-**It also reads back one sentence of `help` and one of `status`, which is the
-first check this repository has ever had on either.** Three false user-facing
-strings have shipped from here, each surviving several increments because
-nothing dispatched those commands and looked at the text.
-`scripts/smoke-reviewer-tools.mjs` was not run: nothing here touches
-`read-only.mjs`.
-
-### Pull request #28 and its review
-
-Reviewed once with this plugin at the user's authorization, dispatched with
-`node scripts/dogfood-review.mjs 28 --deep --all --no-comment --unattended`,
-which is the first live run of the flag itself.
-
-| Measure | Value |
-| --- | --- |
-| Diff | 552 additions, 295 deletions, 11 files |
-| Bound input | 72767 byte diff, 322949 bytes of context over 22 blobs |
-| Reviewer `integrated`, heavy, `gpt-5.6-terra` high | 94.0 s, 3 requests, 46.70139 credits |
-| Adjudicator, `gpt-5.6-terra` high | 20.5 s, 1 request, 30.7526 credits |
-| Total | 77.45399 credits, 114.5 s of model work |
-| Tool calls | 13, all approved, zero denials: `view` x9, GPT's `rg` alias x4 |
-| Result | 1 candidate, 0 validated findings, 0 rejected, 0 capped, 0 duplicates |
-| Coverage | INCOMPLETE: 1 execution failure, 0 coverage gaps, 2 informational caveats |
-
-**The one candidate was real, and it was this increment's own new prose.** [P2],
-confidence 0.99: the added section and the matching `help` line both claimed that
-a host with no elicitation support publishes nothing. That is false, and the
-README's own command contract said so four hundred lines earlier. `--all
---comment` resolves to `flag-authorized` posting authority, which never reaches
-the final-confirmation branch, so such a run publishes on a host that could not
-have asked anything. **Both statements are corrected here**, and the accurate one
-is that a no-UI host reports `unavailable` for each decision the invocation did
-not settle, with safeguard approval the one exception whatever the posting flags
-say.
-
-**The adjudicator accepted it, and the evidence boundary discarded it anyway.**
-The candidate reached adjudication, the verdict was `accept` with
-`allClaimsSupported` true, and then the adjudication itself was refused: its
-third citation quoted sixteen lines of `review.mjs` while naming the range
-88-102, which spans fifteen. That is `E1`'s shape exactly, a line count
-disagreeing with its range, **but on the adjudicator's own citation rather than a
-reviewer's, and after the finding had already been accepted.** The gate behaved
-as designed and a true, accepted finding was still lost. Do not weaken it; `Q6`'s
-repair cannot rescue this shape by design, because a repair that drops a named
-line could drop the line authorizing the anchor.
-
-**So the run reported 0 findings and `rejected=0` on incomplete coverage**, which
-is the reading `E1` warned about: a boundary discard is an execution-failure
-diagnostic and never appears in `validation.rejected`. The breakdown line
-underneath is what says a reviewer failed rather than merely caveated.
-
-**`Q6`'s repair fired live again**, on the reviewer's own citation of the `help`
-lines, restoring a quote whose trailing comma the model had dropped. That
-candidate then reached adjudication, so the repair did its job in the same run
-the boundary refused a different citation for a different reason.
-
-**This is the sixth review in a row to catch this repository's paperwork
-disagreeing with itself**, after #18, #23, #24, #25 and #26. This time it was not
-a stale instruction but a false claim written in the same commit as the feature
-it described, contradicted by a section of the same file.
+did. `I1a` archived `E1` under the same rule and for the same reason, `E1` being
+the largest live entry at 10988 bytes. **`I1b` archived `U1`'s 7925 bytes** under
+that same rule: this file had 2766 bytes spare, which is less than any increment
+entry ever written here, so `U1`'s had to move before this one could be written
+at all.
 
 ## Completed increment: I1a
 
