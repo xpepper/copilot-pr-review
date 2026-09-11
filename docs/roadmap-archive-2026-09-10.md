@@ -3,8 +3,9 @@
 These are the completed increment entries moved out of
 [../ROADMAP.md](../ROADMAP.md) on and after 2026-09-10, by increment `A1` for
 everything through `V1c`, by increment `L1` for `V2a` and `V2b`, by increment
-`D1` for `A1`'s own entry and then `L1`'s, by increment `O1` for `D1`'s, and by
-increment `U1` for `O1`'s, which is the last in this file. They are the project's
+`D1` for `A1`'s own entry and then `L1`'s, by increment `O1` for `D1`'s, by
+increment `U1` for `O1`'s, and by increment `I1a` for `E1`'s, which is the last
+in this file. They are the project's
 evidence of record and are reproduced verbatim: nothing here was rewritten,
 condensed or corrected in any of those moves, so a claim below still reads
 exactly as the session that demonstrated it wrote it.
@@ -8261,3 +8262,187 @@ learned by writing it down; take it as a standing check rather than a warning.
 It is fixed by archiving `D1`'s entry, which this file needed anyway for
 headroom. The entry moved verbatim, because the sentence was true when `D1`
 wrote it, and the live file now answers the question on its own.
+
+## Completed increment: E1
+
+**`E1` is the first time this tool reviewed code that nobody here wrote for it.**
+Every increment before it was demonstrated on this repository's own pull
+requests, which are small and mostly prose; the largest was #10 at 984 additions
+over twelve files. The one earlier exception is in the archive: a `--quick` run
+against private `primait/starsky#8126` on 2026-09-07, four changed paths, zero
+findings, recorded as manual feedback rather than as an increment.
+
+**The target was agreed with the user before anything was spent**:
+`xpepper/pr-review-gemini#28`, a sibling port of this tool to another CLI, merged
+the same day. 1427 changed lines over 16 files, of which about 510 lines are new
+production JavaScript and 650 are new tests. The user chose deep, and chose not
+to run `--verify`.
+
+### The run
+
+Reviewed from a clone pinned at the pull request head rather than from the
+user's own working copy of that repository, because another session was
+committing in it while we worked. `/pr-review 28 --deep --no-comment`, typed
+interactively, with the installed plugin byte-identical to `main` at `6de2d75`.
+A free `--capture-only` dispatch went first and proved the capture before any
+credit was spent.
+
+| Measure | Value |
+| --- | --- |
+| Bound input | 92844 byte diff, 279673 bytes of context over 29 blobs |
+| Reviewer `integrated`, heavy, `gpt-5.6-terra` high | 76.3 s, 5 requests, 51.82372 credits |
+| Adjudicator, `gpt-5.6-terra` high | 12.3 s, 1 request, 29.6565 credits |
+| Total | 81.48022 credits, 93 s of model work |
+| Tool calls | 16, all approved, zero denials: `view` x8, `rg` x8 |
+| Result | 1 candidate, 1 validated finding, 0 rejected, 0 capped, 0 duplicates |
+| Coverage | INCOMPLETE: 0 execution failures, 2 coverage gaps, 0 caveats |
+
+**The largest input this tool has ever bound cost less than any balanced review
+of this repository's own small pull requests.** Reviewer count dominates, as the
+README said; this run is the first measurement that isolates it.
+
+### What the reviewers did well
+
+**The one finding is real, and it is the sharpest defect in the diff.** [P2]
+"Preserve a signal-terminated child review as failure", `scripts/dogfood-pr.mjs`
+lines 79-80, confidence 0.96: the new wrapper's `code ?? 0` turns the null exit
+code Node reports for a signal-killed child into a successful exit, so an
+interrupted review reports success to whatever called it. The anchor, the exact
+quote and the blob identity are all correct, and the claim was verified by hand
+against Node's documented behaviour rather than taken from the adjudicator.
+
+**It engaged with the riskiest new code and declined to assert.** The diff's
+`isModelUnavailableError` matches model-catalog failures by regular expression
+over error text, and the reviewer's coverage gap says exactly why it could not
+be judged: the repository contains only synthetic fixtures, so whether the
+matcher recognises the host's real failures cannot be established from the
+captured revision. That is the evidence boundary working as designed, at the
+reviewer's own initiative.
+
+**Three gates ran live on someone else's repository for the first time**: the
+merged pull request confirmation, which asked and was answered yes; the revision
+gate against a foreign checkout; and finding selection, where the user selected
+the finding with Space and submitted with Enter. `O1`'s fix to that question
+carried over, and nothing was published.
+
+### What it did badly, and the honest limit on saying so
+
+**One finding from 1427 changed lines.** Nothing was discarded, so this was the
+reviewer's own output rather than a gate: `rejected` and `capped` are both
+empty. An independent reading of the same production diff, written down
+before the run settled and kept verbatim in
+[docs/e1-independent-reading.md](docs/e1-independent-reading.md), raised six
+further candidates, the strongest being basename-only file matching in the new
+`isMatchingFile`, which lets a finding about any same-named file in any directory
+satisfy a benchmark. **That reading is one reader's opinion and is not ground
+truth**, and its own author later weakened two of its seven entries, so what this
+increment establishes is precision, which was 1 for 1, and not recall, which
+remains unmeasured. A recall number needs a defect corpus with agreed ground
+truth, which this project does not have and has not scheduled. The design trades recall for precision deliberately;
+this is the first evidence of what that costs on a substantial diff.
+
+**Coverage read INCOMPLETE with zero execution failures.** Both gaps were the
+same honest statement about unverifiable evidence. On real code a reviewer will
+usually have something it cannot verify, so the headline word will usually be
+INCOMPLETE, and the breakdown line underneath is what actually distinguishes a
+failed reviewer from a caveat.
+
+### The six items this run produced, and what was done about each
+
+| # | Item | Disposition |
+| --- | --- | --- |
+| 1 | Coverage-gap consolidation could not fire on real wording | **Fixed here** |
+| 2 | A review never reports what it cost | Recorded; scope defers usage reports |
+| 3 | Evidence lines are unreadable in the interactive UI | Recorded |
+| 4 | Per-reviewer progress says nothing for 76 seconds | Recorded |
+| 5 | Verbose is the wrong default for reading | **Fixed here**, in `README.md` |
+| 6 | Adjudication is a fixed cost, not a per-finding one | **Recorded in `README.md`** |
+
+**Item 1 is a defect with two live instances and a measured cause.** The
+reviewer and the adjudicator blocked the same assessment in almost the same
+words, and the user was shown both. `presentationDiagnostics` refused the merge
+because `equivalentGaps` required a backticked identifier shared between the two
+messages, and neither reviewer used backticks. The similarity rule was never
+reached: the Dice overlap of the two impact clauses is 0.645 against a 0.35
+threshold, and the shared tokens include the function's own name. A bare name
+now counts as a name when it has a shape prose does not, being an internal
+capital after a lowercase letter or an underscore. Naming the same code still
+only makes two gaps comparable, the impact clauses still have to agree, and raw
+diagnostics are still retained unmerged. Replaying this run's two real gaps
+through the fixed module yields one gap with two reports. The archive's earlier
+instance, `primait/starsky#8126`, still does not merge and should not: its
+overlaps were 0.323, 0.207 and 0.188, all genuinely below the threshold.
+
+**Item 2 is the one a user feels every time.** Billing is collected per request
+and retained in the evidence, but nothing prints it, and the host's own status
+bar reports the ambient session's zero rather than what the reviewers spent.
+This run's 81.48022 was recovered afterwards from Copilot's session state on
+disk. `SCOPE.md` defers detailed timing and usage reports to nice-to-have, so a
+cost line is a scope decision rather than a defect to fix inside `E1`.
+
+**Item 3 is why item 2 was hard.** Each evidence line is a single very long line
+of JSON, and the interactive UI truncates it at the window edge, so this
+increment's own evidence could not be read from the screen at all. The project's
+record-keeping depends on those lines. The workaround used here was to parse
+`~/.copilot/session-state/<id>/events.jsonl`, which is a Copilot implementation
+detail and not a contract.
+
+**Item 4**: five identical `active` lines over 76 seconds, while the reviewer was
+making sixteen tool calls. `SCOPE.md` requires basic per-reviewer progress and
+defers a live scrolling view, and this sits between them.
+
+**Items 5 and 6 are documentation.** The first-review walkthrough now says that
+most of a run's output is evidence rather than findings and points at `--quiet`
+for reading, and the cost table carries this review as its one row from another
+repository together with the adjudicator's 29.6565 share of it.
+
+### This increment's own pull request, and the review that improved it
+
+Pull request #26, reviewed once with this plugin at the user's instruction.
+Dispatched with `node scripts/dogfood-review.mjs 26 --deep --no-comment`, which
+is how `AGENTS.md` says to send the same slash command when the agent cannot type
+one. The installed plugin was reinstalled from the branch head and diffed against
+the checkout first, so the review exercised the changed `coverage.mjs` and not a
+stale copy.
+
+| Measure | Value |
+| --- | --- |
+| Diff | 279 additions, 8 deletions, 5 files |
+| Reviewer `integrated`, `gpt-5.6-terra` high | 113.3 s, 4 requests, 31.54985 credits |
+| Adjudicator, `gpt-5.6-terra` high | 17.4 s, 1 request, 14.4397 credits |
+| Total | 45.98955 credits |
+| Result | 3 validated findings, 0 withheld, 0 adjudicator rejections |
+| Coverage | INCOMPLETE, on one candidate the evidence boundary discarded |
+
+**All three validated findings were real and all three are fixed here.** Two were
+defects in this increment's own new prose: the cost table's caption said the
+foreign-code row was last when it is third, and the added adjudication paragraph
+said a large diff pays that cost whatever its reviewers found, when a review with
+no surviving candidate starts no adjudicator at all. The third is the one this
+project keeps making: **the closing section still told the next agent to run an
+authorized external review**, directly below the entry recording that it had
+already happened. That is the fifth review in a row to catch this repository's
+paperwork disagreeing with itself, after #18, #23, #24 and #25.
+
+**The best candidate of the four was discarded, and it was right.** It reported
+that extracting a bare identifier kept an unbounded substring test, so `loadUser`
+would match inside `loadUserProfile` and two gaps about different code could be
+folded into one. Five of its six citations were exact. The sixth, an optional
+`breaks` citation, named lines 96-105 for a nine-line quote covering 96-104, and
+the exact-quote gate refused the whole candidate. `Q6`'s clipped-end repair
+cannot rescue it by design: it restores a quote clipped inside the last named
+line, and refuses one whose line count does not match its range, because a
+repair that drops a named line could drop the very line that authorizes the
+anchor. **The rule behaved exactly as designed and a true finding was still
+lost.** The defect it reported is fixed here, with its own failing test first,
+after checking the claim against the source.
+
+**A boundary-discarded candidate is not counted in `rejected`.** It is an
+execution-failure diagnostic, and `validation.rejected` holds only adjudicator
+rejections, so a summary reading `rejected=0` beside incomplete coverage is
+accurate and easy to misread. That is worth knowing when reading any run's
+evidence; it is not a defect.
+
+**Selection reported `unavailable`.** The SDK runner creates a session with no
+elicitation UI, so there was nothing to answer and nothing published, which is
+the shape `U1` has to make deliberate.
