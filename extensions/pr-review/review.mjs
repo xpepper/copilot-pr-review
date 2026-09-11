@@ -220,9 +220,15 @@ export function reviewInstructions(mode, confinement) {
     // replacement for it.
     ...(isConfined(confinement) ? [
       "This pull request has been reviewed by this tool before, and fresh hunting is confined to the commits",
-      "added since. Your input carries confinedTo: the head that earlier review evaluated and, per file, the",
-      "head-side line ranges those newer commits changed.",
-      "Report a candidate ONLY when its location anchors on a head-side line inside those supplied ranges.",
+      "added since. Your input carries confinedTo: the head that earlier review evaluated, the head-side line",
+      "ranges those newer commits changed in confinedTo.paths, and every path they touched on either side in",
+      "confinedTo.basePaths.",
+      "Report a head-side location ONLY when it anchors on a line inside a confinedTo.paths range.",
+      "A base-side location is in scope when its path appears in confinedTo.basePaths, and the two lists differ",
+      "deliberately: a file those commits deleted has no head-side line at all, so a base-side anchor is the only",
+      "one such a defect can have, and the comparison cannot place base-side line numbers, so the path is the",
+      "whole of what can be established about one. Anchor on the base side only when the change you are",
+      "reporting genuinely has no head-side line.",
       "A defect anchored anywhere else in the captured diff was already covered by that earlier review and is",
       "not yours to report in this run; do not restate it, and do not treat its absence here as its absence.",
       "Everything else is unchanged. Read the whole diff, the whole context and the checkout exactly as you",

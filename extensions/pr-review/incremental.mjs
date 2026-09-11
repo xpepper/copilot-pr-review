@@ -126,6 +126,14 @@ export function confinedPaths(confinement) {
     .map(([path, lines]) => ({ path, lines: lineRanges(lines) }));
 }
 
+// Every path the new commits touched, on either side. This is what
+// `withinNewRange` actually tests a base-side anchor against, so it has to
+// reach the reviewers too: a file the new commits deleted has no head-side line
+// at all and never enters `changed`, so `paths` alone would tell a reviewer not
+// to emit the only anchor such a defect can have.
+export const touchedPaths = (confinement) =>
+  (isConfined(confinement) ? [...confinement.range.touched].sort() : []);
+
 // What the reviewers are given. It is a filter expressed in the head-side
 // coordinates they already cite in, and it is supplied beside the captured diff
 // rather than in place of it: the diff, the context windows and every citation
@@ -135,7 +143,7 @@ export function confinementInput(confinement) {
   const { range } = confinement;
   return {
     reviewedBefore: range.priorHead, commitsSince: range.commits,
-    paths: confinedPaths(confinement),
+    paths: confinedPaths(confinement), basePaths: touchedPaths(confinement),
   };
 }
 

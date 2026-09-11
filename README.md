@@ -217,10 +217,10 @@ it.** The captured base-to-head diff, the context windows, the provenance checks
 and every citation rule reach the reviewers exactly as they do in any other run,
 and a finding still has to anchor inside a hunk of that captured diff, because
 publication would refuse anything else. What the flag changes is only what may
-be reported: the reviewers are given the confined ranges and asked to anchor
-there, and code sets aside any candidate anchored outside them, before
-adjudication, so a candidate an earlier turn covered is not paid to be judged
-again.
+be reported: the reviewers are given the confined head-side line ranges and
+every path those commits touched on either side, and are asked to anchor there,
+and code sets aside any candidate anchored outside them, before adjudication, so
+a candidate an earlier turn covered is not paid to be judged again.
 
 A candidate set aside is **reported with its location rather than dropped**, and
 is never adjudicated, so it is neither a validated finding nor a refuted one:
@@ -234,8 +234,11 @@ correctness:2: [P2] Free shipping now applies to small orders at shipping.js:3-3
 
 One thing the range cannot settle is a base-side anchor, which names the
 captured base revision that comparison never saw. A base-side candidate in a
-file those commits did touch therefore stays in scope. The filter removes only
-what it can prove an earlier turn already covered.
+file those commits did touch therefore stays in scope, and the reviewers are
+told which paths those are, because **a file the new commits deleted has no
+head-side line at all** and a base-side anchor is the only one such a defect can
+have. The filter removes only what it can prove an earlier turn already
+covered.
 
 **A confined review does not cover the whole pull request**, and says so in the
 run and in the published review body. It says it as an informational caveat

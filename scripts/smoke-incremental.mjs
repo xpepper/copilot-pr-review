@@ -6,7 +6,7 @@ import {
 } from "../extensions/pr-review/findings.mjs";
 import {
   confineToNewCommits, confinedPaths, confinementCaveat, confinementInput, confinementSummary,
-  describeConfinement, isConfined, lineRanges, newRangeFrom, withinNewRange,
+  describeConfinement, isConfined, lineRanges, newRangeFrom, touchedPaths, withinNewRange,
 } from "../extensions/pr-review/incremental.mjs";
 import { parseDiffFiles } from "../extensions/pr-review/context.mjs";
 import { describePrior } from "../extensions/pr-review/prior.mjs";
@@ -98,6 +98,27 @@ assert.equal(withinNewRange(at("shipping.js", "head", 3), range), false, "an unt
 assert.equal(withinNewRange(at("shipping.js", "base", 3), range), false);
 assert.equal(withinNewRange(at("total.js", "base", 3), range), true);
 assert.equal(withinNewRange(at("shipping.js", "head", 3), undefined), true, "no range confines nothing");
+// A file the new commits deleted has no head-side line at all, so a base-side
+// anchor is the only one such a defect can have. It never enters `changed`, so
+// the head-side list omits it and the touched list is what keeps it in scope.
+const deletionDiff = [
+  "diff --git a/shipping.js b/shipping.js",
+  `deleted file mode 100644`,
+  `index ${blobSha(shippingBaseSource)}..0000000`,
+  "--- a/shipping.js", "+++ /dev/null", "@@ -1,4 +0,0 @@",
+  ...shippingBaseSource.split("\n").slice(0, 4).map((line) => `-${line}`), "",
+].join("\n");
+const withDeletion = newRangeFrom(validationDiff + deletionDiff, { priorHead, head, commits: 2 });
+assert.deepEqual([...withDeletion.touched].sort(), ["shipping.js", "total.js"]);
+assert.equal(withDeletion.changed.has("shipping.js"), false, "A deleted file has no head-side line");
+assert.equal(withinNewRange(at("shipping.js", "base", 3), withDeletion), true);
+assert.equal(withinNewRange(at("shipping.js", "head", 3), withDeletion), false);
+const deletionConfinement = { status: "confined", range: withDeletion };
+assert.deepEqual(confinedPaths(deletionConfinement), [{ path: "total.js", lines: ["3"] }]);
+assert.deepEqual(touchedPaths(deletionConfinement), ["shipping.js", "total.js"]);
+assert.deepEqual(confinementInput(deletionConfinement).basePaths, ["shipping.js", "total.js"],
+  "The reviewers are told which base-side paths are in scope, or they cannot report a deletion at all");
+assert.deepEqual(touchedPaths(undefined), [], "No confinement supplies no base-side scope either");
 console.log("PASS I1b the filter removes only what it can prove an earlier turn covered");
 
 // ---------------------------------------------------------------------------
@@ -178,8 +199,8 @@ assert.match(prose, /confined to the 2 commit\(s\) added since 1{40}/);
 assert.match(prose, /does not cover the whole pull request/);
 assert.match(prose, /filter over the captured base-to-head binding and never a replacement for it/);
 assert.match(prose, /whose own coverage this run does not read and does not vouch for/);
-assert.deepEqual(confinementInput(confinement),
-  { reviewedBefore: priorHead, commitsSince: 2, paths: [{ path: "total.js", lines: ["3"] }] });
+assert.deepEqual(confinementInput(confinement), { reviewedBefore: priorHead, commitsSince: 2,
+  paths: [{ path: "total.js", lines: ["3"] }], basePaths: ["total.js"] });
 const summary = confinementSummary(confinement);
 assert.equal(summary.status, "confined");
 assert.equal(summary.reviewedBefore, priorHead);
@@ -275,7 +296,11 @@ console.log("PASS I1b the run and the published body both state that it did not 
 
 const confined = reviewInstructions(reviewModes.deep, confinement);
 assert.match(confined, /fresh hunting is confined to the commits/);
-assert.match(confined, /Report a candidate ONLY when its location anchors on a head-side line inside those supplied ranges/);
+assert.match(confined, /Report a head-side location ONLY when it anchors on a line inside a confinedTo.paths range/);
+// The instruction and the code filter must agree about the base side, or the
+// reviewers are told not to emit the only anchor a deletion can have.
+assert.match(confined, /A base-side location is in scope when its path appears in confinedTo\.basePaths/);
+assert.match(confined, /a file those commits deleted has no head-side line at all/);
 assert.match(confined, /do not treat its absence here as its absence/);
 assert.match(confined, /Read the whole diff, the whole context and the checkout exactly as you/);
 for (const off of [undefined, unreadable, nothingChanged]) {
