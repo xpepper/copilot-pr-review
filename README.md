@@ -698,11 +698,14 @@ another session's result.
 ## Unattended runs with `--unattended`
 
 A headless environment, a CI pipeline or an autonomous loop has nobody to answer
-a question. Such a run already works: a host with no elicitation support reports
-selection, final confirmation and safeguard approval as `unavailable` and
-publishes nothing. The trouble is *when* it says so. A run that could never have
-finished alone still pays for its reviewers first and reports the problem
-afterwards.
+a question. Such a run already works. A host with no elicitation support reports
+`unavailable` for each decision the invocation did not already settle, and an
+invocation that settled all of them runs straight through: `--all --comment`
+selects every validated finding and authorizes the post, so a run with both
+publishes on a host that could not have asked anything. Safeguard approval is
+the exception and stays `unavailable` whatever the posting flags say. The
+trouble is *when* a run finds out. One that could never have finished alone
+still pays for its reviewers first and reports the problem afterwards.
 
 `--unattended` says up front that this run leaves nothing for anybody to answer.
 It is checked before the target is captured and before a single credit is spent:
