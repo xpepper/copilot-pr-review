@@ -110,6 +110,11 @@ try {
     ["  status  ", "Copilot PR Review: entry point ready."],
     ["help", "Usage: /pr-review [status|help|models|fixture"],
     ["--help", "Usage: /pr-review [status|help|models|fixture"],
+    // Three false user-facing strings have shipped here, each surviving several
+    // increments because nothing dispatches these commands and reads the text.
+    // A flag the help does not mention is a flag nobody can find.
+    ["help", "--unattended  Declare that this run leaves no question for anybody to answer"],
+    ["status", "--unattended declares that a run leaves nothing for a person to answer"],
     ["cancel", "No review is running."],
   ]) {
     const before = (await session.getEvents()).length;
