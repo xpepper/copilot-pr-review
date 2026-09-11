@@ -215,6 +215,26 @@ function postResponse(args, cwd, stdin, head) {
   }));
 }
 
+// I1a: the identity every fixture pull request is authored by, and the one a
+// prior-review discovery authenticates as. A scenario that wants a prior review
+// of its own returns it by transforming these responses.
+export const identity = { login: "human", id: 4242, type: "User" };
+
+// Discovery reads two listings and asks for every page of each. The default
+// fixture has no prior review at all, which is what every suite but the
+// prior-review one expects, so both listings answer with one empty page.
+function paginatedResponse(args, cwd) {
+  if (args.length !== 10 || args[8] !== "--paginate" || args[9] !== "--slurp" ||
+      args[6] !== "-H" || args[7] !== "Accept: application/vnd.github+json" ||
+      JSON.stringify(args.slice(0, 5)) !== JSON.stringify(["api", "--hostname", "github.com", "--method", "GET"])) {
+    throw new Error(`Unexpected paginated gh command: ${JSON.stringify(args)} in ${cwd}`);
+  }
+  if (!/^repos\/fixture\/repository\/pulls\/\d+\/(reviews|comments)\?per_page=100$/.test(args[5])) {
+    throw new Error(`Unexpected paginated endpoint: ${JSON.stringify(args)} in ${cwd}`);
+  }
+  return JSON.stringify([[]]);
+}
+
 export function respond(args, cwd, history, stdin, { head = "b".repeat(40) } = {}) {
   if (!/^[0-9a-f]{40}$/.test(head)) throw new Error("Invalid fixture head");
   if (JSON.stringify(args) === JSON.stringify(["repo", "view", "--json", "id,nameWithOwner,url"])) {
@@ -223,6 +243,8 @@ export function respond(args, cwd, history, stdin, { head = "b".repeat(40) } = {
   if (args[0] === "api" && args[3] === "--method" && args[4] === "POST") {
     return postResponse(args, cwd, stdin, head);
   }
+  if (args.includes("--paginate")) return paginatedResponse(args, cwd);
+  if (args.length === 8 && args[5] === "user") return JSON.stringify(identity);
   if (args.length !== 8 || args[6] !== "-H" ||
       JSON.stringify(args.slice(0, 5)) !== JSON.stringify(["api", "--hostname", "github.com", "--method", "GET"])) {
     throw new Error(`Unexpected gh command: ${JSON.stringify(args)} in ${cwd}`);
