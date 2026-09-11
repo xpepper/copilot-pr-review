@@ -490,6 +490,41 @@ that limit are **withheld**, not dropped: they are listed in the result and in
 the retained record, outside selection and publication. Full and deep have no
 minor cap, so nothing is withheld and `capped` stays empty.
 
+### Quieter output with `--quiet`
+
+A review prints a great deal, and most of it is not the findings. `--quiet` asks
+for the same review with less of it printed:
+
+| Left out by `--quiet` | Why it is the verbose part |
+| --- | --- |
+| `Q1 target:` and `Q2 context:` | JSON dumps of the captured pull request and the bound source windows |
+| The mode's `binding:` line | The same binding again, as JSON |
+| Each reviewer's raw untrusted output | The single largest thing a run prints, once per reviewer |
+| The adjudicator's raw output | The same, for the validation pass |
+| The settled `evidence:` line, `P1` and `P2` | JSON dumps repeating most of the above |
+
+Everything that decides whether a result can be trusted stays, at every
+verbosity: the effective assignments, per-reviewer progress, every refusal and
+every failure with its error, the coverage report and its diagnostics, the
+sentences saying a result is not a clean-review claim, the safeguard discovery,
+approval and execution summaries, the findings themselves, and every publication
+outcome including an uncertain write. **A quiet run is still impossible to
+mistake for a clean review.** A skipped or refused target still says which
+disposition it took and why.
+
+**Verbose is the default**, and a run without the flag prints exactly what it
+printed before. The flag changes presentation and nothing else: the same review
+settles the same way, and the retained record still holds every reviewer's own
+output whether or not it was printed, so `/pr-review inspect` and
+`/pr-review publish` are unaffected.
+
+`--quiet` authorizes nothing and opens no gate, and it is deliberately **not a
+configuration key**: it is asked for one run at a time, so no saved or trusted
+project setting can make a run quieter than the person running it expects. It
+cannot be combined with `--capture-only`, whose entire output is the evidence
+`--quiet` would suppress. `scripts/dogfood-review.mjs` refuses it outright,
+because this project reads its own increment evidence out of those lines.
+
 ## Selecting findings
 
 The plugin stops its owned inference runtime before asking anything, so nothing
@@ -796,6 +831,16 @@ The two were once reported identically, and a real run lost its approval that
 way: the person selected a command, the run recorded that none was approved, and
 nothing on screen distinguished that from their having said no.
 
+**Press Space to select, then Enter to submit.** The question is a multi-select,
+and the terminal UI toggles a command only on Space. Up and down move the
+highlight without selecting anything, and Enter submits whatever is currently
+toggled. Pressing Enter on a merely highlighted command therefore submits an
+empty answer, which is a valid way of approving nothing and reads exactly like
+the message above. Three real reviews of this project approved nothing for that
+reason before the question started saying so. An empty answer stays a real
+answer, deliberately: nothing here requires you to select something, because the
+safe reply to "may I run this?" is no.
+
 The approval is not written to the retained result, so a publish-later of that
 result carries no approval and never could.
 
@@ -924,6 +969,7 @@ Review flags:
 | `--full` | Balanced plus a medium conventions reviewer, no minor cap |
 | `--deep` | One integrated heavy reviewer over the whole change |
 | `--verify` | Stricter preflight, then safeguard discovery, approval and execution |
+| `--quiet` | Leave out the evidence JSON and the raw reviewer output. Suppresses nothing about coverage, refusals, failures, safeguards or publication |
 | `--all` | Select every validated finding. Does not authorize posting |
 | `--comment` | Authorize posting without final confirmation |
 | `--no-comment` | Suppress posting for this run. Conflicts with `--comment` |

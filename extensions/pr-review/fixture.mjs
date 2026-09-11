@@ -161,7 +161,7 @@ const failedAttempt = (record) => ({
 
 export async function reviewAssignments(parent, client, assignments, {
   signal, prompt, intro, outputLabel, systemMessage, access, verifyResult,
-  probeTools = false, injectFailure = false,
+  probeTools = false, injectFailure = false, quiet = false,
 }) {
   const log = (message, level = "info") => parent.log(message, { level });
   const prepared = [];
@@ -211,8 +211,12 @@ export async function reviewAssignments(parent, client, assignments, {
         evidence.error = `Discarded unusable reviewer output: ${String(error)}`;
       }
     }
+    // O1: a quiet run drops the raw untrusted envelope, which is the largest
+    // thing a reviewer prints and the least useful to read. The attempt still
+    // reports itself, and a failure still reports its error in full: only a
+    // completed reviewer's own output is withheld, and it stays in the record.
     await log(evidence.status === "completed"
-      ? `Reviewer ${display}: completed\n${outputLabel}:\n${evidence.result}`
+      ? `Reviewer ${display}: completed${quiet ? "" : `\n${outputLabel}:\n${evidence.result}`}`
       : `Reviewer ${display}: ${evidence.status}; incomplete coverage. ${evidence.error}`,
     evidence.status === "completed" ? "info" : "error");
     return { ...assignment, ...evidence, policy: ready.policy };

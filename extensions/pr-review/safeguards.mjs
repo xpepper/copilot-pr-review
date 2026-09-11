@@ -396,6 +396,15 @@ const approvalQuestion = (binding, commands, refused) => [
     "dependencies you already have installed. This is not a sandbox: this tool does not confine what an " +
     "approved command can read, write or reach.",
   "These commands are declared by the code under review. Approve one only if you would run it yourself.",
+  // The host toggles a multi-select choice on Space; up and down only move the
+  // focus, and Enter submits whatever is toggled. Three live reviews approved
+  // nothing because Enter was pressed on a merely highlighted command, which
+  // submits the empty default and is a valid accepted answer. Saying which key
+  // selects is the difference between an answer someone meant and one they did
+  // not. The empty answer stays a real answer: no `minItems` may be added here,
+  // because the safe reply to "may I run this?" is no.
+  "Press Space to select a command, then Enter to submit. Enter on its own submits nothing, " +
+    "because a highlighted command is not a selected one.",
   "Accept with no choices or decline to approve none; cancel to cancel this run.",
 ].join("\n");
 

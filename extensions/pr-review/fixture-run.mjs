@@ -37,7 +37,7 @@ export async function executeFixtureRun(parent, client, settings, {
 }
 
 export async function executeOwnedRun(parent, client, {
-  controller, onStopped = () => {}, subject, evidencePrefix, execute, details = () => ({}),
+  controller, onStopped = () => {}, subject, evidencePrefix, execute, details = () => ({}), quiet = false,
 }) {
   let report;
   let error;
@@ -81,6 +81,9 @@ export async function executeOwnedRun(parent, client, {
     await parent.log(`${subject} has incomplete coverage. This is not a clean-review result. ${error ?? ""} ${cleanupErrors.join("; ")}`,
       { level: "error" });
   }
-  await parent.log(`${evidencePrefix} evidence: ${JSON.stringify(outcome)}`);
+  // O1: the settled evidence dump is the largest line a run prints and repeats
+  // most of the others. A quiet run omits it; the incomplete-coverage report
+  // above is not part of it and is never suppressed.
+  if (!quiet) await parent.log(`${evidencePrefix} evidence: ${JSON.stringify(outcome)}`);
   return outcome;
 }

@@ -36,12 +36,12 @@ const fullMode = reviewModes.full;
 const deepMode = reviewModes.deep;
 const options = parseReviewArgs("1 --quick --no-comment");
 assert.deepEqual(options, { mode: "quick", captureOnly: false, captureArgs: "1", settings: {},
-  all: false, comment: false, noComment: true, verify: false });
+  all: false, comment: false, noComment: true, verify: false, quiet: false });
 assert.deepEqual(parseReviewArgs("  1 --major-only --no-comment  "), options);
 assert.deepEqual(parseReviewArgs("2 --quick --no-comment --include-drafts heavyModel=other heavyEffort=low"),
   { mode: "quick", captureOnly: false, captureArgs: "2 --include-drafts",
     settings: { heavyModel: "other", heavyEffort: "low" }, all: false, comment: false, noComment: true,
-    verify: false });
+    verify: false, quiet: false });
 assert.deepEqual(parseReviewArgs("1 --major-only --all --no-comment"), { ...options, all: true });
 assert.deepEqual(parseReviewArgs("1 --quick"), { ...options, noComment: false });
 assert.deepEqual(parseReviewArgs("1 --quick --all --comment"), { ...options, all: true, comment: true, noComment: false });
@@ -77,10 +77,21 @@ assert.deepEqual(parseReviewArgs("2 --full --verify --no-comment --include-draft
 // same one an ordinary review of that PR captures.
 assert.equal(parseReviewArgs("2 --verify --include-drafts").captureArgs, "2 --include-drafts");
 assert.throws(() => parseTargetArgs("2 --verify"), /Unsupported/);
+// O1: --quiet asks for less output and nothing else. It selects no mode, no
+// posting authority and no gate, so every other parsed option is untouched, and
+// it never reaches target capture.
+assert.deepEqual(parseReviewArgs("1 --quick --no-comment --quiet"), { ...options, quiet: true });
+assert.deepEqual(parseReviewArgs("1 --quiet"), { ...balancedOptions, noComment: false, quiet: true });
+assert.deepEqual(parseReviewArgs("1 --deep --quiet --verify --all --comment"),
+  { ...options, mode: "deep", all: true, comment: true, noComment: false, verify: true, quiet: true });
+assert.deepEqual(parseReviewArgs("2 --full --quiet --no-comment --include-drafts"),
+  { ...options, mode: "full", captureArgs: "2 --include-drafts", quiet: true });
+assert.equal(parseReviewArgs("2 --quiet --include-drafts").captureArgs, "2 --include-drafts");
+assert.throws(() => parseTargetArgs("2 --quiet"), /Unsupported/);
 
 // Capture-only keeps the diagnostic capture path reachable without a reviewer.
 assert.deepEqual(parseReviewArgs("1 --capture-only"), { mode: undefined, captureOnly: true, captureArgs: "1",
-  settings: {}, all: false, comment: false, noComment: false, verify: false });
+  settings: {}, all: false, comment: false, noComment: false, verify: false, quiet: false });
 assert.equal(parseReviewArgs("2 --capture-only --include-drafts").captureArgs, "2 --include-drafts");
 for (const args of [
   "1 --quick --major-only --no-comment", "1 --quick --balanced --no-comment", "1 --balanced --major-only",
@@ -96,7 +107,8 @@ for (const args of [
   "1 --quick --deep --no-comment", "1 --balanced --deep --no-comment", "1 --full --deep --no-comment",
   "1 --deep --major-only --no-comment", "1 --deep --deep --no-comment", "1 --deep --no-comment --comment",
   "1 --deep --no-comment lightModel=other", "1 --deep --no-comment mediumModel=other",
-  "1 --capture-only --deep",
+  "1 --capture-only --deep", "1 --capture-only --quiet", "1 --quiet --capture-only",
+  "1 --quick --no-comment --quiet --quiet",
   "1 --capture-only --quick", "1 --capture-only --balanced", "1 --capture-only --full",
   "1 --capture-only --all", "1 --capture-only --verify", "1 --verify --capture-only",
   "1 --capture-only --no-comment", "1 --capture-only heavyModel=heavy", "1 --capture-only --capture-only",
@@ -2024,5 +2036,144 @@ console.log("PASS a settled full run: six tiered reviewers, an uncapped minor po
   assert.throws(() => validateRecord(asQuick, h.parent.sessionId), /outside this mode's findings policy/);
 }
 console.log("PASS a settled deep run: one integrated heavy reviewer, an uncapped policy, retention and the proposed body");
+
+
+// O1: the same run, printed two ways. Quiet drops the evidence JSON lines and
+// the untrusted model envelopes, and nothing else: the assignments, the
+// per-reviewer progress, the findings, the coverage report and the settled
+// outcome are all still there, and so is every sentence that says what the
+// result may not be read as.
+{
+  const settled = {
+    mode: balancedMode, withCandidate: true, acceptCandidate: true, severity: "P3", candidateFrom: [0, 1, 2, 3],
+  };
+  const settle = async (flags) => {
+    const h = harness(settled);
+    const report = await executeReviewRun(h.parent, h.client,
+      { ...parseReviewArgs(`1 --balanced ${flags}`), all: true }, structuredClone(layeredBalanced),
+      { controller: h.controller, gh: fakeGh(), git: checkoutGit });
+    return { h, report };
+  };
+  const loud = await settle("--no-comment");
+  const quiet = await settle("--no-comment --quiet");
+  // The evidence JSON: every line whose payload is a JSON dump of the run.
+  for (const prefix of ["Q1 target: ", "Q2 context: ", "M1 binding: ", "M1 evidence: ", "P1 evidence: "]) {
+    assert(loud.h.messages.some((message) => message.startsWith(prefix)), `default run prints ${prefix}`);
+    assert(!quiet.h.messages.some((message) => message.startsWith(prefix)), `quiet run omits ${prefix}`);
+  }
+  // The untrusted envelopes: each reviewer's raw output and the adjudicator's.
+  for (const envelope of ["Unvalidated candidate output for", "Untrusted adjudication output", '"schemaVersion"']) {
+    assert(loud.h.messages.some((message) => message.includes(envelope)), `default run prints ${envelope}`);
+    assert(!quiet.h.messages.some((message) => message.includes(envelope)), `quiet run omits ${envelope}`);
+  }
+  // Everything the person came for, and everything that keeps the result
+  // honest, survives at both verbosities.
+  for (const kept of [
+    "Assignment overview: model=other",
+    "Reviewer correctness: starting",
+    "Reviewer correctness: completed",
+    "R1 checkout: ",
+    "Q4 evidence gate: ",
+    // The trailers of the suppressed lines are not evidence dumps; they are what
+    // the run promises about the evidence, so they stay when the JSON goes.
+    "No PR review performed; no clean-review claim.",
+    "Source context comes only from the captured GitHub revisions.",
+    "Unvalidated candidates cannot publish; only final selected, authorized findings can.",
+    "3 validated finding(s); completed coverage. Findings are not a clean-review claim.",
+    "No accepted findings is not proof of a clean PR.",
+    "Finding selection: selected; 3 selected.",
+    "This is not a clean-review claim.",
+    "Review proposal: suppressed",
+  ]) {
+    for (const { h, label } of [{ h: loud.h, label: "default" }, { h: quiet.h, label: "quiet" }]) {
+      assert(h.messages.some((message) => message.includes(kept)), `${label} run keeps ${JSON.stringify(kept)}`);
+    }
+  }
+  // Verbosity is presentation only. The same run settles the same way, and the
+  // retained record still holds every reviewer's own untrusted output whether or
+  // not it was printed.
+  assert.equal(quiet.report.complete, loud.report.complete);
+  assert.equal(quiet.report.coverage, loud.report.coverage);
+  assert.deepEqual(quiet.report.validation.findings.map(({ id }) => id),
+    loud.report.validation.findings.map(({ id }) => id));
+  assert.deepEqual(quiet.report.validation.capped.map(({ id }) => id),
+    loud.report.validation.capped.map(({ id }) => id));
+  assert.deepEqual(quiet.report.selection.findingIds, loud.report.selection.findingIds);
+  assert.equal(quiet.report.preview.status, loud.report.preview.status);
+  assert.deepEqual(quiet.report.reviewers.map(({ label, status }) => [label, status]),
+    loud.report.reviewers.map(({ label, status }) => [label, status]));
+  assert(quiet.report.reviewers.every(({ result }) => result.includes('"schemaVersion"')),
+  "A quiet run retains what it did not print");
+  validateRecord(retainedRecord(quiet.report), quiet.h.parent.sessionId);
+}
+{
+  // A quiet run that goes wrong is still impossible to mistake for a clean one.
+  const h = harness({ mode: balancedMode, failure: "reviewer" });
+  const report = await executeReviewRun(h.parent, h.client,
+    parseReviewArgs("1 --balanced --no-comment --quiet"), structuredClone(layeredBalanced),
+    { controller: h.controller, gh: fakeGh(), git: checkoutGit });
+  assert.equal(report.coverage, "incomplete");
+  assert(h.messages.some((message) =>
+    /^Reviewer correctness: incomplete; incomplete coverage\..*failed after output/.test(message)),
+  "The failing reviewer names itself and its error");
+  assert(h.messages.some((message) => message.includes("has incomplete coverage. This is not a clean-review result.")));
+  assert(h.messages.some((message) => message.includes("incomplete coverage. Findings are not a clean-review claim.")));
+  assert(!h.messages.some((message) => message.startsWith("M1 evidence: ")),
+  "Suppression does not resume because the run failed");
+}
+{
+  // A quiet run that reviews nothing still says what it decided and why. The
+  // skip is the entire outcome, so it may never sit inside a suppressed dump.
+  const h = harness({});
+  const report = await executeReviewRun(h.parent, h.client,
+    parseReviewArgs("2 --balanced --no-comment --quiet"), structuredClone(layeredBalanced),
+    { controller: h.controller, gh: fakeGh(), git: checkoutGit });
+  assert.equal(report.coverage, "not-started");
+  assert.equal(report.disposition, "skipped");
+  assert(h.messages.some((message) => /^Target fixture\/repository#2: skipped; draft\./.test(message)),
+  "A quiet skip names its disposition and its reason");
+  assert(h.messages.some((message) => message.includes("No PR review performed; no clean-review claim.")));
+  assert(!h.messages.some((message) => message.startsWith("Q1 target: ")));
+  assert.equal(h.sessions.length, 0, "Nothing was reviewed");
+}
+{
+  // A quiet --verify run still shows the safeguard discovery, the approval and
+  // what the approved command printed: none of that is evidence JSON, and all of
+  // it is what the person is being asked to trust.
+  const h = harness({ discovered: runnable, approve: (request) =>
+    ({ action: "accept", content: { commands: approvalChoices(request) } }) });
+  const report = await withInstructions(runnableRoot,
+    () => executeReviewRun(h.parent, h.client, { ...options, verify: true, quiet: true },
+      structuredClone(assignments), { controller: h.controller, gh: fakeGh(), git: checkoutGit }));
+  assert.equal(report.safeguards.status, "passed");
+  for (const prefix of ["V1a verification preflight passed", "V1b safeguard discovery", "V1c safeguard approval",
+    "V2a safeguard execution"]) {
+    assert(h.messages.some((message) => message.includes(prefix)), `quiet --verify keeps ${prefix}`);
+  }
+  assert.match(h.messages.find((message) => message.startsWith("V2a safeguard execution")), new RegExp(evidence),
+  "A quiet run still shows what the command it ran printed");
+  assert(!h.messages.some((message) => message.startsWith("Q3 evidence: ")));
+  assert(!h.messages.some((message) => message.includes("Unvalidated candidate output for")));
+  // The discovery pass is a model pass like any other, so its raw envelope is an
+  // untrusted envelope and goes with the rest. What it found does not: the
+  // commands and the file each came from are the thing being put to a person.
+  assert(!h.messages.some((message) => message.includes("Untrusted safeguard discovery output")),
+  "A quiet run omits the discovery pass's raw envelope");
+  assert(!h.messages.some((message) => message.includes('"discoveryKey"')));
+  assert.match(h.messages.find((message) => message.startsWith("V1b safeguard discovery")),
+    /node safeguard-check\.mjs {2}\[declared in AGENTS\.md\]/,
+  "What discovery found is still presented with its source");
+}
+{
+  // A default --verify run still prints that envelope, exactly as before.
+  const h = harness({ discovered: runnable, approve: (request) =>
+    ({ action: "accept", content: { commands: approvalChoices(request) } }) });
+  await withInstructions(runnableRoot,
+    () => executeReviewRun(h.parent, h.client, { ...options, verify: true },
+      structuredClone(assignments), { controller: h.controller, gh: fakeGh(), git: checkoutGit }));
+  assert(h.messages.some((message) => message.includes("Untrusted safeguard discovery output")));
+  assert(h.messages.some((message) => message.includes('"discoveryKey"')));
+}
+console.log("PASS --quiet drops the evidence JSON and the untrusted envelopes, and nothing about coverage, failure or safeguards");
 
 rmSync(checkout, { recursive: true, force: true });
