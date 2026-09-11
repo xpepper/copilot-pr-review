@@ -160,6 +160,39 @@ await assert.rejects(executeTargetCapture(session, "1", { gh: fake.gh }), /local
 assert.equal(fake.calls.length, 6, "Capture plus both bound source sides");
 console.log("PASS Q1 capture, gates, strict confirmation, races, malformed metadata/diffs, command summary");
 
+// U1: an unattended run asks nothing, including the one question that is asked
+// before any reviewer starts and costs nothing. A host with a confirmation UI
+// makes no difference: a closed pull request stops at capture with the message
+// that names the two override flags, exactly as a host without one does. The
+// flag refuses; it never confirms on somebody's behalf.
+for (const unattended of [false, true]) {
+  let confirmed = 0;
+  const interactive = {
+    rpc: { metadata: { snapshot: async () => ({ workingDirectory: cwd, isRemote: false }) } },
+    capabilities: { ui: { elicitation: true } },
+    ui: { confirm: async () => { confirmed++; return true; } },
+    log: async () => {},
+  };
+  const closed = await executeTargetCapture(interactive, "5", { gh: fakeGh().gh, unattended });
+  assert.equal(confirmed, unattended ? 0 : 1, "Only an attended run may be asked about a closed PR");
+  assert.equal(closed.disposition, unattended ? "confirmation-required" : "captured");
+  if (unattended) {
+    assert.match(closed.reason, /--include-closed or --review-closed/,
+      "An unattended refusal names the flags that settle it in the invocation");
+    assert.equal(closed.snapshot, undefined, "A refused target captures no diff");
+  }
+}
+// An open pull request is captured identically either way: the flag removes a
+// question, and changes nothing else about what a capture does.
+for (const unattended of [false, true]) {
+  const quiet = { rpc: { metadata: { snapshot: async () => ({ workingDirectory: cwd, isRemote: false }) } },
+    capabilities: { ui: { elicitation: true } }, ui: { confirm: async () => true }, log: async () => {} };
+  const open = await executeTargetCapture(quiet, "1", { gh: fakeGh().gh, unattended });
+  assert.equal(open.disposition, "captured");
+  assert.equal(open.context.head, "b".repeat(40));
+}
+console.log("PASS U1 an unattended capture offers no closed-PR confirmation and changes nothing else");
+
 const matching = await prepareTargetSmoke({ matchingCheckout: true, allowPublish: true });
 try {
   const directory = matching.quickTarget.workingDirectory;
