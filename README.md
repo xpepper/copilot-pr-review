@@ -557,6 +557,25 @@ output reporting no candidate at all, an output whose every candidate is
 refused, a repaired quotation, or a candidate the adjudicator rejects on the
 merits. Retrying those would spend a second model on manufacturing a finding.
 
+**A reviewer whose memory the runtime compacted is a coverage gap.** When a
+pass's conversation nears its model's prompt budget, Copilot compacts it: a
+model writes a summary of everything so far, and the pass carries on from that
+summary instead of the diff and context it was sent. This tool neither asks for
+that nor can stop it, but the runtime reports it. Every reviewer, and the
+evidence validator, whose context was compacted or truncated adds one coverage
+gap naming the pass, the moment and the token figures, so the result is
+incomplete. Its findings survive and are still checked against the captured
+source. It is not a failure and starts no fallback. No file is named, because
+nothing can tell what a summary kept. Built from the figures the runtime logged
+when it compacted the deep reviewer on this project's pull request #32:
+
+```text
+Coverage gap: deep: The runtime compacted this pass's context during turn 2, after 5 tool call(s) (265318 of 272000 tokens reduced to 26129, trigger threshold, 0 message(s) removed). From then on the pass worked from a model-written summary of the captured diff and context, not their text. Code cannot know what the pass lost, so no file is named.
+```
+
+On this project's own reviews that happened to prompts of 834k characters and
+more, and never to one of 616k or less.
+
 **Empty findings never claim a clean pull request**, and neither does completed
 coverage. This project's own pull request #23 is the clearest example: all six
 sessions completed, every candidate was discarded at the exact-quote gate
@@ -1051,6 +1070,13 @@ the point of this project:
 - **A live fallback attempt has never run.** The demotion path and the single
   attempt are demonstrated by the controlled suites and by a live reviewer
   failure that had no fallback configured to take.
+- **No run has yet reported a compacted pass.** The runtime's compaction and
+  truncation events are recorded from its own session types and scripted in the
+  suites; no review since this was added has been large enough to compact.
+  Whether the cost line counts what a compaction itself charged is not known:
+  the runtime reports that charge on the compaction event, and nothing has shown
+  whether its usage events include it too. A compacted safeguard discovery pass
+  or revalidation pass adds no gap, because neither is review coverage.
 - **No exclusion rule has ever refused a real discovered command.** The
   exclusion table is demonstrated only against the controlled suites, because
   what a discovery pass reports is not something a run can arrange.
