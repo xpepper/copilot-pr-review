@@ -106,9 +106,10 @@ try {
     // a narrower one here, so the evidence this records is the evidence a user
     // sees. `--quiet` is refused above, but the line is not one of the lines it
     // would have suppressed anyway.
+    // The line already names itself, so this repeats it rather than labelling it.
     console.log(report.cost
-      ? `Credit cost: ${formatCost(report.cost)}`
-      : "Credit cost: no model pass started, so there is nothing to report.");
+      ? formatCost(report.cost)
+      : "Review cost: no model pass started, so there is nothing to report.");
     assert.equal(report.publication?.attempted ?? false, false, "This runner must not publish");
     console.log(`Outcome: mode=${report.mode} coverage=${report.coverage} ` +
       `findings=${report.validation?.findings.length ?? 0} withheld=${report.validation?.capped?.length ?? 0} ` +

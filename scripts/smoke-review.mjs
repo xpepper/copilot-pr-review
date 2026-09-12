@@ -768,12 +768,31 @@ for (const failure of [undefined, "reviewer", "reads", "usage", "missing-usage",
     // cancelled reviewer still spent whatever the runtime charged before it
     // stopped, and one that failed before its first charge spent nothing.
     const recorded = report.reviewers.flatMap((reviewer) => reviewer.billing ?? []);
+    // A reviewer whose turn started and that reported no usage event at all ran
+    // and was billed for something the runtime never named. It is the one case
+    // that cannot be summed, and `missing-usage` is exactly it.
+    const ran = report.reviewers.filter((reviewer) =>
+      Number.isFinite(reviewer.startedAt) && !(reviewer.billing ?? []).length).length;
     assert.equal(report.cost.requests, recorded.length, failure);
-    assert.equal(report.cost.credits,
-      recorded.reduce((sum, { totalNanoAiu }) => sum + totalNanoAiu, 0) / 1e9, failure);
-    assert.equal(cost[0], `Review cost: ${report.cost.credits} AI credits over ${recorded.length} request(s); ` +
-      `${(report.cost.modelMs / 1000).toFixed(1)} s of model work in ${report.cost.timedPasses} pass(es); ` +
-      `${(report.cost.elapsedMs / 1000).toFixed(1)} s elapsed.`, failure);
+    assert.equal(report.cost.uncharged, ran, failure);
+    // Three scenarios leave a pass that ran and was never charged, and all three
+    // are honest unknowns rather than zeros: the reviewer that errored after its
+    // output and before its usage event, the one whose usage event never came,
+    // and the cancelled run whose three reviewers were all stopped mid-turn.
+    assert.equal(ran > 0, ["reviewer", "missing-usage", "cancel"].includes(failure), failure);
+    if (failure === "cancel") assert.equal(ran, 3, "a cancelled run spent what it spent");
+    const tail = `${(report.cost.modelMs / 1000).toFixed(1)} s of model work in ` +
+      `${report.cost.timedPasses} pass(es); ${(report.cost.elapsedMs / 1000).toFixed(1)} s elapsed.`;
+    if (ran) {
+      assert.equal(report.cost.credits, undefined, failure);
+      assert.equal(cost[0], "Review cost: unavailable, the runtime reported no charge at all for " +
+        `${ran} pass(es) that ran, and an unreported charge is unknown rather than zero; ${tail}`, failure);
+    } else {
+      assert.equal(report.cost.credits,
+        recorded.reduce((sum, { totalNanoAiu }) => sum + totalNanoAiu, 0) / 1e9, failure);
+      assert.equal(cost[0],
+        `Review cost: ${report.cost.credits} AI credits over ${recorded.length} request(s); ${tail}`, failure);
+    }
   }
 }
 

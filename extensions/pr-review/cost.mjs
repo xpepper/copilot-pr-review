@@ -26,20 +26,28 @@ const charged = ({ totalNanoAiu }) => Number.isFinite(totalNanoAiu) && totalNano
 export function runCost(passes, elapsedMs) {
   const attempts = attemptsOf(passes);
   if (!attempts.length) return undefined;
-  // A pass that never reached inference emitted no usage event, so it has no
-  // request to charge. That is a provable zero and not an unknown; only a
-  // request the runtime did report and left uncharged is a gap.
   const charges = attempts.flatMap((attempt) => attempt.billing ?? []);
   const reported = charges.filter(charged);
   const running = attempts.filter(timed);
+  // A pass that never reached inference emitted no usage event, so it has no
+  // request to charge, and that is a provable zero. A pass whose turn started
+  // and that reported no usage event at all is the opposite: it ran, it was
+  // billed for something, and the runtime said nothing about it. The two look
+  // identical in the billing entries and are told apart by whether a turn ever
+  // started, because counting requests from the charges alone calls the second
+  // one a zero-credit pass. Reported on pull request #37 by this increment's
+  // own review.
+  const uncharged = attempts.filter((attempt) =>
+    Number.isFinite(attempt.startedAt) && !(attempt.billing ?? []).length).length;
   return {
     passes: attempts.length,
     requests: charges.length,
     reportedRequests: reported.length,
+    uncharged,
     // nano-AIU is the runtime's own unit, and this division is a change of unit
     // rather than a rounding: these figures are recorded verbatim as an
     // increment's evidence. One unreported charge leaves no total at all.
-    credits: reported.length === charges.length
+    credits: reported.length === charges.length && uncharged === 0
       ? reported.reduce((sum, { totalNanoAiu }) => sum + totalNanoAiu, 0) / 1e9
       : undefined,
     modelMs: running.reduce((sum, attempt) => sum + (attempt.completedAt - attempt.startedAt), 0),
@@ -57,8 +65,11 @@ export function formatCost(cost) {
   // answers the other's question.
   return [
     `Review cost: ${cost.credits === undefined
-      ? `unavailable, the runtime reported a charge for ${cost.reportedRequests} of ${cost.requests} ` +
-        "request(s) and an unreported charge is unknown rather than zero"
+      ? `unavailable, the runtime reported ${[
+        ...(cost.reportedRequests === cost.requests
+          ? [] : [`a charge for ${cost.reportedRequests} of ${cost.requests} request(s)`]),
+        ...(cost.uncharged ? [`no charge at all for ${cost.uncharged} pass(es) that ran`] : []),
+      ].join(" and ")}, and an unreported charge is unknown rather than zero`
       : `${cost.credits} AI credits over ${cost.requests} request(s)`}`,
     `${seconds(cost.modelMs)} of model work in ${cost.timedPasses} pass(es)`,
     ...(cost.elapsedMs === undefined ? [] : [`${seconds(cost.elapsedMs)} elapsed`]),

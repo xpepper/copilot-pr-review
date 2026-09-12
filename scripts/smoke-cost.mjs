@@ -100,8 +100,9 @@ assert.equal(runCost(undefined, 1200), undefined);
 assert.equal(runCost([pass("correctness", { charges: [-1] })], 10).credits, undefined);
 
 // A pass that failed before it ever reached inference emitted no usage event, so
-// it has no request to charge. That is a provable zero, not an unknown, and it
-// must not poison the total the way a dropped charge does.
+// it has no request to charge. Its turn never started, which is what makes that a
+// provable zero rather than an unknown, and it must not poison the total the way
+// a dropped charge does.
 {
   const cost = runCost([
     pass("correctness", { charges: [4_000_000_000], startedAt: 1000, completedAt: 3000 }),
@@ -109,10 +110,45 @@ assert.equal(runCost([pass("correctness", { charges: [-1] })], 10).credits, unde
   ], 4000);
   assert.equal(cost.passes, 2);
   assert.equal(cost.requests, 1);
+  assert.equal(cost.uncharged, 0);
   assert.equal(cost.credits, 4);
   assert.equal(cost.timedPasses, 1, "an untimed pass contributes no model time");
   assert.match(formatCost(cost), /^Review cost: 4 AI credits over 1 request\(s\); 2\.0 s of model work in 1 pass\(es\)/);
 }
+
+// The pass that looks identical to that one and is not: its turn started, so it
+// reached inference, and the runtime then reported no usage event at all for it.
+// Counting requests from the billing entries alone cannot tell the two apart and
+// calls this one a zero-credit pass, which is the plausible number T1 exists to
+// refuse. Reported on pull request #37 by the review of this increment.
+{
+  const cost = runCost([
+    pass("correctness", { charges: [4_000_000_000], startedAt: 1000, completedAt: 3000 }),
+    pass("contracts", { status: "incomplete", startedAt: 1000, completedAt: 5000 }),
+  ], 6000);
+  assert.equal(cost.requests, 1);
+  assert.equal(cost.uncharged, 1, "a pass that ran and reported no charge is an unknown, not a zero");
+  assert.equal(cost.credits, undefined);
+  const line = formatCost(cost);
+  assert.match(line, /^Review cost: unavailable, /);
+  assert.match(line, /no charge at all for 1 pass\(es\) that ran/);
+  assert.match(line, /unknown rather than zero/);
+  assert(!line.includes("4 AI credits"), "the charges it did report are not the total");
+}
+// The same pass with both causes at once names both.
+{
+  const line = formatCost(runCost([
+    pass("correctness", { charges: [4_000_000_000, undefined], startedAt: 1000, completedAt: 3000 }),
+    pass("contracts", { status: "incomplete", startedAt: 1000, completedAt: 5000 }),
+  ], 6000));
+  assert.match(line, /a charge for 1 of 2 request\(s\)/);
+  assert.match(line, /no charge at all for 1 pass\(es\) that ran/);
+}
+// A pass with no charge that never ran is still not a gap, even beside one that did.
+assert.equal(runCost([
+  pass("correctness", { charges: [4_000_000_000], startedAt: 1000, completedAt: 3000 }),
+  pass("contracts", { status: "incomplete" }),
+], 4000).credits, 4);
 // A reviewer that reached inference and then failed still spent what it spent,
 // and so does a cancelled one. Neither is refunded by its own incompleteness.
 {

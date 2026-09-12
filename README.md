@@ -280,9 +280,19 @@ run that failed or was cancelled still reports what it spent before it stopped,
 and `--quiet` does not suppress the line.
 
 Missing charges mean unknown cost, not zero. If the runtime reports no charge
-for even one request, the line says the total is unavailable and names how many
-of the requests it did report. It never prints the partial sum, because a
-partial beside a coverage line reads as the bill.
+for even one request, the line says the total is unavailable and names what it
+was not told. It never prints the partial sum, because a partial beside a
+coverage line reads as the bill. Two things count as not being told:
+
+- a request the runtime reported and left uncharged, and
+- a pass whose model turn started and that the runtime reported no charge for at
+  all. That one matters because it looks exactly like a pass that never reached
+  inference, which really did cost nothing. They are told apart by whether a
+  turn ever started.
+
+A cancelled run is usually the second case. Its reviewers were stopped
+mid-turn, so they were billed for work the runtime never reported, and the line
+says the total is unavailable rather than claiming the run was free.
 
 The figure is a report about a run that has already finished. Nothing reads it,
 nothing is bounded by it, and reviews still have no timeout.
