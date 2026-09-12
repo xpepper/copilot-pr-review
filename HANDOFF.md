@@ -7,108 +7,107 @@ conversation or reopen settled decisions. Distinguish what has been demonstrated
 from what has only been assumed, in your own reporting as well as in the code.
 
 `ROADMAP.md` is short enough to read in full, and you should. Completed entries
-through `I1b` are in `docs/roadmap-archive-2026-09-10.md`, which you need only
+through `I1c` are in `docs/roadmap-archive-2026-09-10.md`, which you need only
 for an older increment's evidence. The README material that used to carry them
-is in `docs/readme-archive-2026-09-10.md`, and the `--verify` guide now lives in
-`docs/safeguards.md`.
+is in `docs/readme-archive-2026-09-10.md`, the `--verify` guide is in
+`docs/safeguards.md`, and `G1`'s comparison against the field is in
+`docs/gap-analysis.md`.
 
-## Headroom first, and `README.md` is still the problem
+## There is nothing scheduled, and that is the important part
+
+**`G1` is complete, and it was the last increment the user scheduled.** `E1`,
+`U1`, `I1` and `G1` were the four; `I1` was sliced into three with the user and
+`I1a`, `I1b` and `I1c` are all done.
+
+**So do not start anything without the user saying so in your own session.** In
+particular, `docs/gap-analysis.md` proposes twelve adoptions and orders them into
+a five-stage sequence. **None of that is scheduled work.** A proposal in that
+document is not an authorization to start it, and neither is the sequence it sits
+in. If the user asks what to do next, the document is the menu to offer them; it
+is not a backlog to work through.
+
+Two of the twelve would change `SCOPE.md`'s settled text if the user ever wants
+them: **the default mode**, which `SCOPE.md` fixes as balanced, and **a timing
+and cost line**, which `SCOPE.md` defers as nice-to-have. Both are argued in the
+document. Neither is started.
+
+## Headroom first, and `README.md` is now the tight one
 
 At 65536 bytes this project's own safeguard discovery stops reading a file,
-silently, and the tool can no longer read its own project. **`README.md` has 2665
-bytes spare and `ROADMAP.md` has 7916.** Neither is one increment's writing, and
-the next increment that touches either has to solve that first. **CI fails the
-build if any root file crosses the cap**, so this is a thing you cannot miss
-rather than a thing you have to remember.
+silently, and the tool can no longer read its own project. **`README.md` has
+1785 bytes spare and `ROADMAP.md` has 7872.** **CI fails the build if any root
+file crosses the cap**, so this is a thing you cannot miss rather than a thing
+you have to remember.
 
-- **`README.md`'s escape is `docs/`, which discovery does not recurse into.**
-  `D1` moved the old README there, and `I1b` moved the 12922-byte `--verify`
-  section to `docs/safeguards.md` in its own documentation-only pull request,
-  #30, which the user merged without a plugin review. That is the pattern:
-  **housekeeping is worth its own pull request, and it is worth agreeing with the
-  user first.** Do not start it unasked.
-- **`ROADMAP.md`'s escape is archiving.** `I1c`'s live entry is **13015 bytes**
-  and is the only completed entry left in the file. If your own entry does not
-  fit in the 7916 spare, archive `I1c`'s the same way every earlier move was
-  done: verbatim, with the same kind of pointer, not rewritten or condensed on
-  the way. **One live completed entry rather than two is where that rule lands.**
+- **`README.md` is now the binding constraint, not the roadmap.** 1785 bytes is
+  less than one paragraph of user-facing documentation. **The next increment
+  that changes user-visible behaviour has to solve that before it can document
+  it.** Its escape is `docs/`, which discovery does not recurse into. `D1` moved
+  the old README there and `I1b` moved the 12922-byte `--verify` section to
+  `docs/safeguards.md` in its own documentation-only pull request, #30, which the
+  user merged without a plugin review. That is the pattern: **housekeeping is
+  worth its own pull request, and it is worth agreeing with the user first.** Do
+  not start it unasked.
+- **`ROADMAP.md`'s escape is archiving.** `G1`'s live entry is **8864 bytes** and
+  is the only completed entry left in the file. If your own entry does not fit in
+  the 7872 spare, and no increment entry here has ever been that small, archive
+  `G1`'s the same way every earlier move was done:
+  verbatim, with the same kind of pointer, not rewritten or condensed on the way.
+  **One live completed entry rather than two is where that rule lands.**
 - Measure with `wc -c`, and run the collector check below before opening a pull
   request. A file that starts appearing in the skipped list has crossed 65536.
 
-## Take `G1`, and nothing else
+## What `G1` did, and the seven things worth carrying forward
 
-**`I1` is complete and merged. `G1` is the only increment the user scheduled that
-is left**, and `ROADMAP.md`'s section "The next increment is `G1`" is
-authoritative.
+`G1` compares this tool behaviourally with upstream and with the code-review
+agents and skills now in the open, then proposes what is worth adopting. Pull
+request #33 carries all of it.
 
-`G1` is gap analysis against the field, then a proposal: compare this tool
-behaviourally with upstream `pi-pr-review` and with other code-review agents and
-skills now in the open, on capability and on user experience, and propose what is
-worth adopting. **The output is a written analysis and a recommendation, not
-code.** Its starting references are listed in `ROADMAP.md`; the list is a start,
-not a boundary.
-
-- **`L1`'s rule binds it absolutely.** No upstream or third-party source, prompt
-  text or documentation may be copied. Read them; copy nothing. Anything worth
-  adopting is adopted as behaviour and re-implemented here.
-- **Anything it proposes is a scope decision for the user**, not work to start.
-- Its written output is long, and `README.md` has no room for it. **`docs/` is
-  where it belongs**, and agreeing that with the user first is the pattern.
-- A documentation-only pull request still needs the pull request, but its plugin
-  review is the user's call rather than a requirement, because reviewing costs
-  real credits. **Ask; do not spend by default.**
-- **Ask the user before building anything unsettled**, as `U1`, `I1a`, `I1b` and
-  `I1c` each did. Do not start anything after `G1` without the user saying so.
-
-## What `I1c` did, and the eight things worth carrying forward
-
-`I1c` revalidates the findings an earlier review of the same pull request
-published, and answers each settled one on its own thread. Pull request #32
-carried all of it and is merged.
-
-- **Six decisions were taken with the user before anything was built**, each put
-  as a separate question, and the roadmap entry records all six with the
-  alternatives that were declined. **None is to be reopened.** In particular:
-  the free half runs in every review and the model pass is opt-in behind
-  `--revalidate`; replies go on the earlier review's own threads and *not* as a
-  line in the published review body; replies carry the review's own posting
-  authority and never a separate one.
-- **A sizing concern was recorded and the user reaffirmed anyway.** Per-comment
-  replies are a new GitHub mutation class `SCOPE.md` does not cover, and they
-  made this the first write set in the tool that is more than one request. That
-  was the user's call, it is in the roadmap entry, and it is not to be
-  relitigated.
-- **Code proves that a finding still stands and never that it has gone away.**
-  Nothing is ever proved resolved without reading the code, because absence of
-  evidence that a defect remains is not evidence that somebody fixed it. The
-  retained record enforces it: a `decidedBy: "code"` entry claiming `resolved` is
-  refused. **Keep that asymmetry**; it is the same one `withinNewRange` keeps.
-- **A round-trip check on an anchored pattern proves nothing about which split
-  it chose.** That increment argued itself into believing otherwise and #32's
-  first reviewer caught it. The parser now refuses a body that admits more than
-  one split. **Do not reintroduce the idea that rebuilding the same bytes proves
-  the fields were right.**
-- **An unknown write outcome stops the reply set**, and every thread after it
-  stays unattempted rather than becoming a second unknown. A definite rejection
-  does not stop it, because it is known not to have been written. The retained
-  record admits at most one unknown and the validator enforces that. **Do not
-  add a retry.**
-- **The retained journal is a record, never a resume point.** #32's second
-  reviewer asked whether a later run preserves or overwrites it. It overwrites,
-  and that is harmless: whether a thread already carries our answer is read fresh
-  from GitHub's paginated comment listing each run, not from the record, and
-  neither `retained-run.mjs` nor `publication.mjs` holds any reply path at all.
-  So an uncertain reply is never blindly retried. **Keep the fresh read**; it is
-  what makes that true.
-- **A reply must never come back as a finding or as a review this tool wrote.**
-  Discovery keeps only the comments of the review it recognised, and recognising
-  a review reads the body this tool builds, so a reply is excluded twice over.
-  Both are asserted in `scripts/smoke-revalidation.mjs`; **keep both**, because
-  either changing would make a re-review revalidate its own answers.
-- **Before you finish, grep the live roadmap and the README for claims your own
-  change has made false**, and for claims that were already false. `I1b` asked
-  for this check, `I1c`'s run of it found four, and #32's second review made
-  three more false in a session that changed no behaviour at all.
+- **Two decisions were taken with the user before anything was written**, each
+  put as a separate question. The user chose **the widest sweep** of three
+  offered, so ten sources were read rather than the five the roadmap named, and
+  **a ranked menu plus a proposed sequence** rather than a menu alone or one
+  recommendation argued in depth. Both are recorded in the roadmap entry.
+- **`L1`'s rule held, and it binds you too.** No upstream or third-party source,
+  prompt text, configuration or documentation was copied. Everything was read
+  into a scratchpad outside the working tree and described in this project's own
+  words. `docs/upstream-licensing.md` records why. **Read them; copy nothing.**
+- **Upstream has converged on `I1a` through `I1c`.** After the baseline
+  `SCOPE.md` pins, upstream shipped incremental re-review with the same four head
+  relationships and the same three prior-finding verdicts this project reached
+  independently. **That is corroboration, not an instruction to change anything**,
+  and `I1c`'s six decisions stay settled. Where the two differ, this project's
+  choices are the more conservative and stay as they are.
+- **The field's dominant complaint is false positives**, at 40 to 70 per cent
+  among leading agents, and that is the axis this tool is built on. **It has
+  never measured itself on it.** Upstream publishes recall against a seeded
+  corpus; this project has nothing equivalent, and its README is right to say
+  recall is unmeasured. Item five of the menu describes the shape a
+  re-implementation would take. It is unscheduled.
+- **Upstream's own numbers put this project's default in question.** Over 72
+  runs, deep matched the best recall in every band, produced no false positive,
+  left every clean control alone and was no slower at the median than the
+  five-reviewer default; full was worst on precision. Upstream labels these
+  diagnostic and no baseline gate has been accepted, so **this is a question
+  raised, not a default refuted.** `SCOPE.md` fixes balanced and `G1` changed
+  nothing.
+- **A reviewer can publish a credential it found, and this is not fixed.** There
+  is no redaction anywhere in this tool. The published inline comment carries the
+  reviewer's own prose in five fields and nothing constrains what that prose
+  contains; the citation quotes are not published, which narrows the exposure
+  without closing it. The security specialist is the reviewer explicitly pointed
+  at secrets and therefore the one most likely to quote one. It is recorded in
+  `ROADMAP.md` under "Recorded, not scheduled", in `README.md` under limits, and
+  it is item one of the menu. **`G1` did not fix it because its authorization was
+  analysis**, and a change under `extensions/` would have needed an
+  installed-plugin review it was not authorized to spend.
+- **No reviewer is told this project's conventions.** `--verify` collects the
+  checkout's instruction files for safeguard discovery and `review.mjs` says in
+  as many words that it hands them to no reviewer. Four independent tools in the
+  field steer reviews with the project's own written standards. That is the
+  largest capability gap found, and it is a scope question rather than a defect,
+  because a convention finding's evidence is a sentence in a document and this
+  tool's validation is built for provable effects in code.
 
 ## Validation and runtime caveats
 
@@ -127,11 +126,11 @@ for s in findings review selection retention preview publication publish-later \
 **GitHub Actions runs that same loop on every pull request and every push to
 `main`**, in `.github/workflows/ci.yml`, together with the two invariants this
 repository has broken before: that the tool can still read its own instruction
-files, and that no tracked text carries a control byte. It needs no secret, no
-network beyond the checkout and no dependency install. **It is not a substitute
-for running the suites locally before a checkpoint commit**, and it deliberately
-runs nothing that spends Copilot credits. A red run is a real failure; do not
-rerun it hoping for green.
+files, and that no tracked text carries a control byte. **It went green on #33.**
+It needs no secret, no network beyond the checkout and no dependency install.
+**It is not a substitute for running the suites locally before a checkpoint
+commit**, and it deliberately runs nothing that spends Copilot credits. A red run
+is a real failure; do not rerun it hoping for green.
 
 This cheap check runs the real discovery collector against this checkout, needs
 no network and no inference, and tells you which of your own files the tool can
@@ -148,15 +147,16 @@ console.log("skipped:", skipped.map((s) => `${s.name} (${s.reason})`).join(", ")
 
 **It should read all six root files and skip none.**
 
-`scripts/smoke-revalidation.mjs` covers the round-trip parser and the twelve
-shapes it refuses, ambiguity among the five labels, every code verdict including
-the rename that is not a deletion and the unsettled proofs that reach the record,
-the model pass and the four things it ignores rather than trusts, the retained
-schema through fifteen tamper cases and the reply set through nine more, the
-reply signature and the skip rule, the whole set written thread by thread with
-its journal, one unknown outcome stopping it, a definite rejection not stopping
-it, the posting authority in all seven of its states, and the capture wiring
-verbosely, quietly and with each flag. **Keep every one.**
+**Do not `cd` out of the working directory in a Bash call.** During `G1` one call
+began `cd /tmp && gh api ...` to keep scratch work out of the tree. The harness
+reset the shell's directory and the sandbox then narrowed to a per-file
+allowlist: `git` and `node` both failed with `Operation not permitted` on
+`getcwd`, directory listing of the project and of `docs/` was denied, and files
+the session had not already opened became unreadable even through the Read tool.
+A later `cd` back was stripped from the command, so it could not be corrected
+from inside, and disabling the sandbox changed nothing. **Starting a fresh
+session cleared it and nothing was lost.** Use the scratchpad by absolute path
+instead of changing directory.
 
 **Reinstall the plugin before every review, and verify it.** #32's second review
 found the installed copy stale by exactly the four files its own fixes had
@@ -208,20 +208,19 @@ Copilot's session state.
 `node scripts/smoke-runtime.mjs --targets` **has not been run since `I1b`**,
 where it passed with 75 assertions. `I1c` added four without running them, two
 `help`/`status` sentences for `--revalidate` and two parse refusals, so **the
-expected count is now 79 and that is unverified.** It spends no credits but needs
-a live runtime connection. If you change a `help` or `status` string, change the
-probe with it.
+expected count is 79 and that is still unverified.** `G1` changed no string and
+added none. It spends no credits but needs a live runtime connection. If you
+change a `help` or `status` string, change the probe with it.
 
 `scripts/smoke-reviewer-tools.mjs`, the confinement probe outside the sixteen,
 must be run and reported for any increment touching `read-only.mjs`. `V2a`,
-`V2b`, `A1`, `L1`, `D1`, `O1`, `E1`, `U1`, `I1a`, `I1b` and `I1c` did not touch
-it.
+`V2b`, `A1`, `L1`, `D1`, `O1`, `E1`, `U1`, `I1a`, `I1b`, `I1c` and `G1` did not
+touch it.
 
 The personal config probe fails its first assertion if personal
 `pr-review/config.json` exists. Move it aside only if running that probe, restore
 it afterwards, and verify with `shasum -a 256`. That file was not moved or edited
-during `I1c`, and both of #32's reviews ran on `heavyModel=gpt-5.6-terra` at high
-effort.
+during `G1`, which ran no review at all.
 
 **Press Space on the command before pressing Enter** in any `--verify` run, in
 finding selection, and in the reply confirmation. The host's multi-select toggles
@@ -235,6 +234,10 @@ spending a review on it.
 **Never add a timeout, deadline or stuck-reviewer heuristic**, and never add one
 to bound a running safeguard. `SCOPE.md` forbids review timeouts, and `C3`, `C5`,
 the watch exclusion and `V2a`'s cancellation all depend on their absence.
+**`G1` read upstream's deadline machinery in full and it is an argument for this
+refusal, not against it**: several hundred lines of interacting budgets,
+reserves, grace periods and truncation rules, with its own validation ranges and
+failure taxonomy, to answer a question this tool answers by waiting.
 
 **Do not weaken the shell gate.** A project that declares `npm run lint && npm
 test` gets a refusal, and the answer is for that project to declare two lines.
@@ -257,65 +260,63 @@ on 1.0.83 and all three would have to change.
 Cold resume of command-only records remains unsupported. Citations remain limited
 to captured diff and context windows, which is what produced #32's second
 coverage gap: the reviewer could read an unchanged file from the checkout and
-still could not cite it.
+still could not cite it. **`G1` found that upstream answers this with a
+size-triggered transport**, which is item eleven of the menu and unscheduled.
 
 ## Settled decisions, none of which is to be reopened
 
-- **`I1c`'s six decisions stand**, as recorded in its roadmap entry: the hybrid
+- **`I1c`'s six decisions stand**, as recorded in its archived entry: the hybrid
   verdict, the free half in every review with the model pass behind
   `--revalidate`, replies on threads rather than a line in the review body, both
   halves in one increment, the review's own posting authority, and skipping a
-  thread already answered at this head.
-- **`/pr-review publish` answers no thread**, deliberately. A verdict about the
-  current code was grounded in a read of the checkout at the reviewed head, and
-  that command never reads a checkout.
-- **`I1b` is opt-in and stays opt-in** unless the user says otherwise, and a
-  confined run's confinement is a caveat, never a coverage gap. Do not make a
-  confined review report INCOMPLETE.
+  thread already answered at this head. **Upstream's convergence does not reopen
+  them**, including where upstream chose differently.
+- **Code proves that a finding still stands and never that it has gone away.**
+  Nothing is ever proved resolved without reading the code. The retained record
+  enforces it: a `decidedBy: "code"` entry claiming `resolved` is refused.
+- **An unknown write outcome stops the reply set**, and every thread after it
+  stays unattempted. A definite rejection does not stop it. **Do not add a
+  retry.** The retained journal is a record, never a resume point.
+- **A reply must never come back as a finding or as a review this tool wrote.**
+  Both exclusions are asserted in `scripts/smoke-revalidation.mjs`; keep both.
+- **`/pr-review publish` answers no thread**, deliberately.
+- **`I1b` is opt-in and stays opt-in**, and a confined run's confinement is a
+  caveat, never a coverage gap.
 - **`I1a`'s slicing is settled and is not to be re-cut.** Discovery runs in every
-  run rather than behind a flag; both identity and body are required; comment
-  bodies are kept verbatim and their anchors normalised.
-- **A rewound head is `diverged`.** Only GitHub's `ahead` leaves a forward range,
-  so `behind` folds in with it. An unreachable head is `unknown`, never
-  `diverged`.
+  run rather than behind a flag; both identity and body are required.
+- **A rewound head is `diverged`.** An unreachable head is `unknown`.
 - **`toolReviewBody` deliberately does not match the coverage prose**, only that
-  a coverage sentence is present. A body written to imitate all four fixed parts
-  is taken for ours, and `README.md` says so rather than promising otherwise.
-- **`U1` is closed and its shape is not to be widened.** `--unattended` is a
-  preflight declaration that only refuses. **Posting authority still never
-  authorizes safeguard execution**, and no gate may be relaxed to let a headless
-  run past one.
-- **`L1` is closed.** Upstream declares MIT and publishes no licence text and no
-  copyright notice, so no upstream source, prompt text or documentation may be
-  copied, and a line-level audit shows none has been. `docs/upstream-licensing.md`
-  holds the evidence and the rule. **It binds `G1` absolutely.**
+  a coverage sentence is present.
+- **`U1` is closed and its shape is not to be widened.** Posting authority still
+  never authorizes safeguard execution.
+- **`L1` is closed**, and it bound `G1` absolutely. Upstream declares MIT and
+  publishes no licence text and no copyright notice, so nothing may be copied and
+  a line-level audit shows none has been.
 - **This project is MIT licensed**, `Copyright (c) 2026 Pietro Di Bello`.
 - **`V2` is closed.** No reviewer receives safeguard output, the retained record
   says nothing about what ran, the citation gate still accepts a prefix, the
   shell gate refuses a chained command, and no timeout bounds a safeguard.
 - **`O1` is one flag, not a configuration key**, and verbose stays the default.
-- **`E1`'s three unfixed items are recorded limitations, not a backlog**: no cost
-  line, truncated evidence lines, and silent progress. None is scheduled.
+- **`E1`'s three unfixed items are recorded limitations, not a backlog.** `G1`
+  ranked two of them in its menu and neither became scheduled by that.
 
 ## State at this handoff
 
-**`I1c` is complete and pull request #32 is merged into `main`**, twelve commits
-on branch `i1c-prior-finding-revalidation`. Confirm that from git rather than
-from this sentence, and reconcile anything that disagrees. **Start `G1` from a
-fresh branch off `main`.**
+**`G1` is complete and pull request #33 is open**, one commit on branch
+`g1-gap-analysis`, with this handoff a second commit on the same branch. Confirm
+that from git rather than from this sentence, and reconcile anything that
+disagrees. **CI went green on #33** before the handoff commit.
 
-**#32 was reviewed twice with this plugin, each time at the user's explicit
-authorization**, both deep on `gpt-5.6-terra` at high effort.
+**#33 has not been reviewed with this plugin.** It is documentation-only, so
+`AGENTS.md` leaves that review to the user rather than requiring it, because it
+costs real credits. **The user was asked and had not answered when the session
+ended.** If they want it: push first, then `/pr-review 33 --no-comment` from that
+branch, and record mode, model, effort, coverage, findings, withheld findings and
+credit cost in the roadmap entry. **The standing workflow authorizes exactly one
+review per pull request and nothing else.**
 
-- The **first** cost 144.23376 credits and reported 0 validated findings on
-  INCOMPLETE coverage. Its three discarded or uncertain candidates all described
-  real defects, all three are fixed, one of them a crash. **Read the discarded
-  candidates of a review, not only its validated findings.**
-- The **second** was authorized because those three fixes changed `extensions/`
-  and nothing had reviewed them. It cost 115.0322 credits, reported 0 candidates
-  on INCOMPLETE coverage, and changed nothing. It still bought two things: the
-  stale-install lesson above, and the live `Q7` absent-path refusal the roadmap
-  had recorded as impossible to arrange.
+**Merging #33 is the user's decision.** The plugin only ever emits `COMMENT`
+reviews, so its review can never satisfy an approval requirement.
 
 **Neither `I1b` nor `I1c` has live evidence, and both are blocked on the same
 thing**: a pull request this tool has published a review on and that has since
@@ -326,18 +327,16 @@ and #2 must never be merged.**
 
 **GitHub's own Copilot reviewer is slower than the plugin review but free**, and
 on #31 it found three things the plugin review and every suite had missed. **It
-reviews only when it is requested.** It was never requested on #32 and therefore
-left nothing there. Consider requesting it on your own pull request, and treat
-what it leaves like any other reviewer: **check the premise of a finding before
-implementing it.**
+reviews only when it is requested.** It was not requested on #32 or #33.
+Consider requesting it on your own pull request, and treat what it leaves like
+any other reviewer: **check the premise of a finding before implementing it.**
 
 If you land anything at all: follow `AGENTS.md`, with meaningful validated
 checkpoint commits, a named branch and pull request, no direct `main` push, and
-no force-push or amended published history. **The standing workflow authorizes
-exactly one review per pull request and nothing else**; any rerun or extra probe
-that spends credits needs a fresh explicit instruction. Keep findings local: no
-`--comment` and no publish without one. Preserve unrelated changes. Update
-`README.md` for user-visible behaviour, and solve its headroom before you do.
+no force-push or amended published history. Keep findings local: no `--comment`
+and no publish without an explicit instruction. Preserve unrelated changes.
+Update `README.md` for user-visible behaviour, and solve its 1785 bytes of
+headroom before you do.
 
 Rewrite this file as the final repository file edit before your session-ending
 commit, include it in that commit, and push it to the pull request the work lives

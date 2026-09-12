@@ -5,7 +5,8 @@ These are the completed increment entries moved out of
 everything through `V1c`, by increment `L1` for `V2a` and `V2b`, by increment
 `D1` for `A1`'s own entry and then `L1`'s, by increment `O1` for `D1`'s, by
 increment `U1` for `O1`'s, by increment `I1a` for `E1`'s, by increment `I1b`
-for `U1`'s and then `I1a`'s, and by increment `I1c` for `I1b`'s, which is the
+for `U1`'s and then `I1a`'s, by increment `I1c` for `I1b`'s, and by increment
+`G1` for `I1c`'s, which is the
 last in this file. They are the
 project's
 evidence of record and are reproduced verbatim: nothing here was rewritten,
@@ -9097,3 +9098,221 @@ which is the honest limit on what controlled coverage establishes here. **The
 three fixes changed `extensions/` and have not themselves been reviewed by this
 plugin**, because the standing workflow authorizes one review per pull request
 and #31 has spent it.
+
+## Completed increment: I1c
+
+**`I1c` is the last of `I1`'s three slices, and the one that consumes what the
+first two deliberately left unconsumed.** `I1a` retained every inline comment of
+an earlier review with its body exactly as posted and shipped no parser, because
+nothing there read one. `I1b` still read none: confinement reasons about commit
+ranges and never about what an earlier comment said. `I1c` reads them.
+
+### Six decisions taken with the user before anything was built
+
+Every one of them was put to the user as a separate question, as `U1`, `I1a` and
+`I1b` each did, and the answers shaped the increment rather than decorating it.
+
+- **Code proves what it can; one model pass judges the rest.** The alternatives
+  offered were a code-only increment that never reaches "resolved", and a single
+  model pass over every finding. The hybrid was chosen, and it keeps this
+  project's own rule that code decides what a model may only propose.
+- **The free half runs in every review; the model pass waits for a flag.** An
+  alternative gating both behind one flag was offered and declined. The verdicts
+  code can prove cost nothing, and withholding a free answer behind a flag would
+  be withholding it for no reason.
+- **A settled verdict is answered on the earlier review's own thread.** One
+  summary line in the published review body was offered and declined, as was
+  posting nothing at all. The user chose the largest of the three.
+- **Both halves land in one increment.** This session recorded the sizing
+  concern first, plainly: per-comment replies are a new GitHub mutation class
+  that `SCOPE.md` does not cover, and every safety property `publication.mjs`
+  states is stated for exactly one write. The user reaffirmed after reading it,
+  so the concern is recorded here and the full request was built.
+- **Replies carry the review's own posting authority and no other.** They are
+  their own write set under it, so `--no-comment` suppresses both, one
+  confirmation covers both, and a run that selects no finding still answers the
+  threads. A separate posting flag was offered and declined.
+- **A thread already answered at this head is skipped.** Posting regardless, and
+  refusing the whole set, were both offered and declined.
+
+### The parser is held to the emitter's template, not to a guess about it
+
+`preview.mjs` now builds every published comment body through one exported
+function, and the pattern that reads one back is that same template with its six
+parts captured and anchored at both ends. **A parse counts only when rebuilding
+it reproduces the input byte for byte.** An emitted body therefore always reads
+back, and a template change that forgot this parser fails the round-trip in the
+suite rather than misreading somebody's comment.
+
+A comment this tool cannot read back is **named and counted rather than guessed
+at**, exactly as an unparseable reviewer envelope is.
+
+### The asymmetry, which is the same one `I1b` kept
+
+Code proves that a finding still stands and never that it has gone away:
+
+| Verdict | Proved by |
+| --- | --- |
+| still open | The newer commits do not touch the lines the comment anchors on, or the heads are identical |
+| obsolete | GitHub can no longer place the anchor, or those commits deleted the file |
+| unsettled | Everything else |
+
+**Nothing is ever proved resolved without reading the code**, because absence of
+evidence that a defect remains is not evidence that somebody fixed it, and a
+wrongly resolved finding is one nobody looks at again. The retained record
+enforces exactly that: a `decidedBy: "code"` entry claiming `resolved` is
+refused by the validator.
+
+**A rename is not a deletion.** Writing this increment's own suite caught the
+first version calling a renamed file's anchor untouched, which was a false proof:
+the path had no head side left at all. A path those commits moved out from under
+an anchor now proves nothing either way.
+
+### The commit range is read once and serves both consumers
+
+`I1b` read the comparison only behind its flag. `I1c` needs the same range in
+every re-review, so the read moved into `readRangeOnce` and both consumers take
+its outcome. **A relationship with no forward range still costs no request**, and
+a pull request with nothing to revalidate and no confinement asked for costs none
+either. A run that confines and revalidates reads it once between them.
+
+### Replies: the first write set that is more than one request
+
+Everything before this wrote one review in one request, and every safety property
+`publication.mjs` states is stated for exactly one write. Partial completion is
+therefore an ordinary result here rather than an error case, and the record says
+which it was per thread.
+
+- Each reply is **journalled before it is sent**, so a process that dies
+  mid-request leaves a record naming the thread it was on.
+- **A definite rejection does not stop the others**, because it is known not to
+  have been written. **One unknown outcome stops the set**, and every thread
+  after it stays unattempted rather than becoming a second unknown. The record
+  admits at most one unknown, and the validator enforces that.
+- The review's own gates run again for this write set, so a moved head refuses a
+  reply exactly as it refuses an inline comment.
+- **A reply never comes back as a finding or as a review this tool wrote.**
+  Discovery keeps only the comments of the review it recognised, and recognising
+  a review reads the body this tool builds, so a reply is excluded twice over.
+  Both are asserted, because either one changing would make a re-review
+  revalidate its own answers.
+- **`/pr-review publish` deliberately answers no thread.** A verdict about the
+  current code was grounded in a read of the checkout at the reviewed head, and
+  that command never reads a checkout, so it says so instead of publishing a
+  claim it cannot stand behind.
+
+### The paperwork this increment made false, and fixed
+
+`I1b` asked the next session to grep the live roadmap and the README for claims
+its own change had made false. That check found four: three README sentences and
+the shipped `describePrior` string, each saying the earlier findings are never
+revalidated. Each was true when it was written. **`describePrior`'s second clause
+is now derived from the stage that settled it** rather than asserted ahead of
+one, exactly as `I1b` made the first clause conditional.
+
+### Validation
+
+The **sixteen** controlled suites pass, `smoke-revalidation` being the new one.
+`git diff --check` is clean and the branch diff carries no control byte. The
+discovery collector reads all six root files and skips none.
+
+`ROADMAP.md` archived `I1b`'s 15018-byte entry verbatim before a word of this one
+was written, on the one-live-entry rule: 7364 bytes were spare and no increment
+entry has ever been that small.
+
+### Pull request #32 and its review
+
+`I1c` landed through pull request **#32**, on branch
+`i1c-prior-finding-revalidation`, reviewed **twice** with this plugin, each time
+at the user's explicit authorization. The first run: **deep, `gpt-5.6-terra` at
+high effort, 144.23376 credits**, one integrated reviewer and one adjudicator,
+**0 validated findings on INCOMPLETE coverage** from two execution failures and
+three coverage gaps.
+
+**Zero validated findings, and three real defects.** Two candidates were
+discarded at the evidence boundary because their citations did not exactly match
+a supplied context window, and the third was adjudicated `uncertain` because the
+captured context did not include `finishPreview`. **All three described real
+defects, and all three are fixed on this branch**, each with a test written to
+reproduce it first.
+
+| Reported | Verdict | Disposition |
+| --- | --- | --- |
+| The retained record refuses the proof an unsettled verdict carries | Real | Fixed; `codeProofs` now admits `touched` |
+| The parser accepts a body that admits more than one split | Real | Fixed; ambiguity is refused |
+| Replies read the review's selection rather than its posting authority | Real | Fixed; authority comes from the policy |
+
+- **The first was a crash.** `codeVerdict` returns `proof: "touched"` for an
+  ordinary unsettled finding, and the retained record's code-proof list did not
+  admit it, so **any review that revalidated and settled less than everything
+  would have thrown when it journalled itself.** Every test in this increment's
+  own suite had missed it by judging its unsettled entries away before retaining
+  them.
+- **The second is the one this increment argued itself into.** Anchoring the
+  parse pattern at both ends makes the round-trip check automatic for any match,
+  which is exactly why it proves nothing about *which* split was chosen. A field
+  whose prose opens a paragraph with one of the five labels admits several
+  splits and every one rebuilds the same bytes. A body that admits more than one
+  split is now unreadable, which is the contract the parser states.
+- **The third contradicted a decision the user had taken.** Replies read
+  `preview.authorized`, which an empty selection leaves false, so a re-review
+  that found nothing new answered no thread. That is the case the feature exists
+  for. Authority now comes from the posting policy; what an empty selection
+  really removes is the *confirmation*, so in that one case the replies ask for
+  themselves, and `--unattended` still cannot reach that question.
+
+**The coverage gap is exact and nothing was changed in response, because nothing
+can be.** Both the reviewer and the adjudicator reported, independently, that the
+reply flow has fixture coverage only and that no live run has ever exercised the
+real replies endpoint, the paginated comment response shape or the
+acknowledgment payload. **That is the honest limit on what #32 demonstrates.**
+
+**This is the second review in ten to find nothing its own evidence gate would
+let through, and the first whose discarded candidates were all correct.** Read
+the run's own word, which is INCOMPLETE.
+
+### The second review of #32, which covered the three fixes
+
+**The three fixes changed `extensions/`, so the user authorized a second review
+of #32 on 2026-09-12**, the standing workflow having spent the first. It ran
+`--deep --all --no-comment --unattended` through `scripts/dogfood-review.mjs` on
+the same model and effort as the first: **`gpt-5.6-terra` at high effort,
+115.0322 credits, 137.4 s of model work, 50 tool calls of which 49 were approved,
+0 candidates and 0 validated findings on INCOMPLETE coverage** from 0 execution
+failures, one coverage gap and one informational caveat. Nothing was published.
+
+**The installed plugin was stale when that session found it**, differing from the
+checkout in exactly the four files the three fixes touched, so the first review
+had never seen them. It was reinstalled from the branch head and verified with a
+`diff -rq` that printed nothing, before dispatch. **Check the install before
+every review rather than assuming the last one left it current.**
+
+**Nothing was changed in response, because the run reported no candidate at
+all.** Its one coverage gap says the supplied revision-bound context does not
+include the unchanged retained-run entry point, so the captured evidence cannot
+establish whether a later run preserves or overwrites the journal of uncertain
+replies. That is the recorded citation limitation rather than a new one: the
+reviewer read `retained-run.mjs` from the checkout and still could not cite an
+unchanged file. The informational caveat repeats the first review's live-evidence
+gap about the reply mutation path and is still exact.
+
+**The question behind that gap was answered by reading the code, and the answer
+is that the journal is a record and never a resume point.** A later run's skip
+decision comes from a fresh paginated read of GitHub's comments rather than from
+the retained record, and `replies.mjs` says so where it does it: whether a thread
+already carries our answer "is a fact about GitHub now, not about when this run
+started". So an uncertain reply is never blindly retried. A later run either
+finds our reply on the thread and skips it, or does not and makes a fresh
+determination from live state. Neither `retained-run.mjs` nor `publication.mjs`
+holds any reply path at all, so a retained record can never drive a write.
+
+**This run produced the live `Q7` evidence that no review could arrange.** The
+reviewer passed a shell brace expansion as an `rg` path,
+`{README.md,HANDOFF.md,ROADMAP.md,.github/workflows/ci.yml}`, which nothing
+expands, and the permission handler refused it with `Q7`'s absent-path reason
+instead of a mute rejection. **It then reissued five separate `rg` calls with
+real paths, which is exactly what that reason told it to do.** The run's own
+evidence records the refusal as `policy.permissionDenials: ["read-absent"]`, so
+the plugin reported it without anyone reading Copilot's session state.
+`enforcement` stayed empty and correctly so: it carries deliberate
+forbidden-tool probes, not refusals that happened.
