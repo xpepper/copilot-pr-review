@@ -26,6 +26,11 @@ recording it is part of your job, and building it is not.
 **`B1`: a review that could not look closely at the whole pull request says
 which parts it skimmed, as a coverage gap rather than as silence.**
 
+That is the roadmap row's wording. **"Which parts" is answered at the level of
+the pass**: the decisions below settle that the gap names the reviewer or
+adjudicator whose context the runtime compacted or truncated, and the moment it
+happened, never files, because code cannot know what a summary kept.
+
 It changes behaviour, so it needs its own branch, its own pull request, and
 **one plugin review as its verification of record**. That review spends real
 credits. **Ask the user before you spend them**, and ask again before requesting
@@ -38,8 +43,10 @@ changed no repository file except this one. **Everything below was read from
 the installed SDK, from Copilot's session logs on disk, and from upstream's
 source; none of it has been demonstrated through this extension's own code.**
 
-**Nothing in this tool truncates.** `reviewPrompt` in `review.mjs` embeds the
-whole captured diff and every context window, and no size limit exists anywhere.
+**Nothing in this tool truncates what a reviewer is sent.** `reviewPrompt` in
+`review.mjs` embeds the whole captured diff and every context window, and no
+limit bounds that input. The byte caps elsewhere, such as discovery's 65536, apply
+to other files.
 
 **The Copilot runtime compacts reviewer sessions anyway, silently.**
 `prepareReviewer` in `fixture.mjs` never sets `infiniteSessions`, so the SDK
