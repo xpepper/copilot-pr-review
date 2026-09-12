@@ -426,7 +426,13 @@ function harness({
   failure, fallbackFailure, controller = new AbortController(), withCandidate = false, acceptCandidate = false,
   limitations = [], mode = reviewModes.quick, severity = "P2", candidateFrom = [0], clipQuotes = false,
   badAnchor = false, extraBadCandidate = false, proseFrom = [0], discovered = [], approve,
+  // T1: what the runtime reports it charged for each request. The three kinds
+  // differ so that a sum can be told apart from a count, and `charges: null`
+  // is the runtime reporting no charge at all, which must leave the run's total
+  // unavailable rather than zero.
+  charges = { reviewer: 1_000_000_000, adjudicator: 3_000_000_000, discovery: 2_000_000_000 },
 } = {}) {
+  const charged = (kind) => (charges === null ? {} : { copilotUsage: { totalNanoAiu: charges[kind] } });
   const messages = [];
   // V1c's approval needs an elicitation host. A harness without one is the
   // hostless case, which must approve nothing rather than fail the run.
@@ -535,6 +541,7 @@ function harness({
               }), outputEnd].join("\n") });
             this.emit("assistant.usage", {
               model: config.model, reasoningEffort: config.reasoningEffort ?? "low", isByok: false,
+              ...charged("discovery"),
             });
             this.emit("session.idle");
             return;
@@ -559,6 +566,7 @@ function harness({
               this.emit("assistant.message", { content: "Weighing the candidate against the diff." });
               this.emit("assistant.usage", {
                 model: config.model, reasoningEffort: config.reasoningEffort ?? "low", isByok: false,
+                ...charged("adjudicator"),
               });
               this.emit("session.idle");
               return;
@@ -578,6 +586,7 @@ function harness({
             }) });
             this.emit("assistant.usage", {
               model: config.model, reasoningEffort: config.reasoningEffort ?? "low", isByok: false,
+              ...charged("adjudicator"),
             });
             this.emit("session.idle");
             return;
@@ -600,6 +609,7 @@ function harness({
               }) });
             this.emit("assistant.usage", {
               model: this.model, reasoningEffort: this.reasoningEffort ?? "low", isByok: false,
+              ...charged("reviewer"),
             });
             this.emit("session.idle");
             return;
@@ -656,6 +666,7 @@ function harness({
               reviewer.emit("assistant.usage", {
                 model: failure === "usage" && i === 0 ? "other" : reviewer.model,
                 reasoningEffort: reviewer.reasoningEffort ?? "low", isByok: false,
+                ...charged("reviewer"),
               });
             }
             reviewer.emit("session.idle");
@@ -738,6 +749,86 @@ for (const failure of [undefined, "reviewer", "reads", "usage", "missing-usage",
     assert(report.reviewers.every((r) => r.status === "cancelled"));
   }
   if (failure === "cleanup") assert.equal(h.client.forces, 1);
+  // T1: every run that started a model pass reports what it spent, beside its
+  // coverage. A quick run has three reviewers and no adjudicator, because no
+  // candidate survives the evidence boundary here.
+  const cost = h.messages.filter((m) => m.startsWith("Review cost:"));
+  // These four fail while the reviewers are being prepared, before anything is
+  // sent to a model, so there is nothing to report and no line is printed.
+  // Printing "0 AI credits" under every refused run would be noise, and a
+  // refusal already says what happened.
+  if (["startup", "tools", "catalog", "assignment"].includes(failure)) {
+    assert.deepEqual(cost, [], `a run that started no model pass reports no cost (${failure})`);
+    assert.equal(report.cost, undefined, failure);
+  } else {
+    assert.equal(cost.length, 1, `exactly one cost line for ${failure}`);
+    assert.equal(report.cost.passes, 3);
+    // The reported total is every charge the run's own passes recorded, not a
+    // count of reviewers and not a figure this assertion supplies. A failed or
+    // cancelled reviewer still spent whatever the runtime charged before it
+    // stopped, and one that failed before its first charge spent nothing.
+    const recorded = report.reviewers.flatMap((reviewer) => reviewer.billing ?? []);
+    // A reviewer whose turn started and that reported no usage event at all ran
+    // and was billed for something the runtime never named. It is the one case
+    // that cannot be summed, and `missing-usage` is exactly it.
+    const ran = report.reviewers.filter((reviewer) =>
+      Number.isFinite(reviewer.startedAt) && !(reviewer.billing ?? []).length).length;
+    assert.equal(report.cost.requests, recorded.length, failure);
+    assert.equal(report.cost.uncharged, ran, failure);
+    // Three scenarios leave a pass that ran and was never charged, and all three
+    // are honest unknowns rather than zeros: the reviewer that errored after its
+    // output and before its usage event, the one whose usage event never came,
+    // and the cancelled run whose three reviewers were all stopped mid-turn.
+    assert.equal(ran > 0, ["reviewer", "missing-usage", "cancel"].includes(failure), failure);
+    if (failure === "cancel") assert.equal(ran, 3, "a cancelled run spent what it spent");
+    const tail = `${(report.cost.modelMs / 1000).toFixed(1)} s of model work in ` +
+      `${report.cost.timedPasses} pass(es); ${(report.cost.elapsedMs / 1000).toFixed(1)} s elapsed.`;
+    if (ran) {
+      assert.equal(report.cost.credits, undefined, failure);
+      assert.equal(cost[0], "Review cost: unavailable, the runtime reported no charge at all for " +
+        `${ran} pass(es) that ran, and an unreported charge is unknown rather than zero; ${tail}`, failure);
+    } else {
+      assert.equal(report.cost.credits,
+        recorded.reduce((sum, { totalNanoAiu }) => sum + totalNanoAiu, 0) / 1e9, failure);
+      assert.equal(cost[0],
+        `Review cost: ${report.cost.credits} AI credits over ${recorded.length} request(s); ${tail}`, failure);
+    }
+  }
+}
+
+// T1: the runtime reporting no charge leaves the total unavailable, never a
+// partial sum and never a zero. The timings are still its own and still stand.
+{
+  const h = harness({ charges: null });
+  const report = await executeReviewRun(h.parent, h.client, options, structuredClone(assignments), {
+    controller: h.controller, gh: fakeGh(), git: checkoutGit, onStopped() {},
+  });
+  assert.equal(report.cost.requests, 3);
+  assert.equal(report.cost.reportedRequests, 0);
+  assert.equal(report.cost.credits, undefined);
+  const [line] = h.messages.filter((m) => m.startsWith("Review cost:"));
+  assert.match(line, /^Review cost: unavailable, the runtime reported a charge for 0 of 3 request\(s\)/);
+  assert.match(line, /unknown rather than zero/);
+  assert.match(line, /s of model work in 3 pass\(es\); .* s elapsed\.$/);
+}
+
+// T1: --quiet drops the evidence JSON and the raw model envelopes and drops
+// nothing about what the run cost. O1 settled that a quiet run still reports
+// everything a person needs in order to judge it, and a bill is one of those.
+{
+  const loud = harness();
+  await executeReviewRun(loud.parent, loud.client, options, structuredClone(assignments), {
+    controller: loud.controller, gh: fakeGh(), git: checkoutGit, onStopped() {},
+  });
+  const quiet = harness();
+  await executeReviewRun(quiet.parent, quiet.client, { ...options, quiet: true },
+    structuredClone(assignments), {
+      controller: quiet.controller, gh: fakeGh(), git: checkoutGit, onStopped() {},
+    });
+  const costOf = (h) => h.messages.filter((m) => m.startsWith("Review cost:"));
+  assert.equal(costOf(quiet).length, 1, "--quiet must not suppress the cost line");
+  assert.equal(costOf(quiet)[0].replace(/[\d.]+ s/g, "N s"), costOf(loud)[0].replace(/[\d.]+ s/g, "N s"));
+  assert(!quiet.messages.some((m) => m.startsWith("Q3 evidence: ")), "the evidence line is still suppressed");
 }
 
 // A configured fallback is one extra attempt for the one reviewer that failed.
@@ -780,7 +871,31 @@ const withFallbackAssignments = () => assignments.map((assignment) => ({
   const stored = retainedRecord(report).outcome.reviewers[0];
   assert.equal(stored.model, "other");
   assert.deepEqual(Object.keys(stored.fallbackFrom).sort(),
-    ["completedAt", "error", "model", "reasoningEffort", "sessionId", "startedAt", "status", "usage"]);
+    ["completedAt", "error", "model", "reasoningEffort", "sessionId", "startedAt", "status", "usage"],
+    "the retained record deliberately drops billing; the cost line is computed live");
+}
+{
+  // T1: the failed attempt a fallback replaced was billed, and `failedAttempt`
+  // has to copy that charge or a recovered reviewer under-reports the run. This
+  // primary fails on a usage mismatch, which happens after the runtime has
+  // charged it, so it is the case where the charge exists and can be lost.
+  // Raised as a follow-up by GitHub's own reviewer on #37.
+  const h = harness({ failure: "usage" });
+  const report = await executeReviewRun(h.parent, h.client, options, withFallbackAssignments(), {
+    controller: h.controller, gh: fakeGh(), git: checkoutGit,
+  });
+  const recovered = report.reviewers[0];
+  assert.equal(recovered.status, "completed");
+  assert.match(recovered.fallbackFrom.error, /usage did not match the assignment/);
+  assert.deepEqual(recovered.fallbackFrom.billing, [{ totalNanoAiu: 1_000_000_000 }],
+    "the charge travels with the attempt that failed");
+  // Four attempts and four charges: three reviewers, plus the primary the
+  // fallback replaced. A total taken from the reviewers alone would say three.
+  assert.equal(report.cost.passes, 4);
+  assert.equal(report.cost.requests, 4);
+  assert.equal(report.cost.credits, 4);
+  assert(h.messages.some((m) => m.startsWith("Review cost: 4 AI credits over 4 request(s);")),
+    "the recovered reviewer's failed attempt is in the reported total");
 }
 {
   // The one attempt is the only attempt: a fallback that fails too leaves the
@@ -1290,6 +1405,21 @@ const withInstructions = async (files, body) => {
       structuredClone(assignments), { controller: h.controller, gh: fakeGh(), git: checkoutGit }));
   assert.equal(report.verify, true);
   assert.equal(h.discoveries.length, 1, "Discovery is one pass, not one per reviewer");
+  // T1: discovery is a model pass this run paid for and it is not one of the
+  // reviewers, so a total read off the outcome alone leaves it out and
+  // under-reports every --verify run. The charges are collected where the
+  // passes are started rather than where they are retained, so it is counted.
+  {
+    const reviewerCharges = report.reviewers.flatMap((reviewer) => reviewer.billing ?? []);
+    assert.equal(report.cost.passes, report.reviewers.length + 1);
+    assert.equal(report.cost.requests, reviewerCharges.length + 1);
+    assert.equal(report.cost.credits,
+      (reviewerCharges.reduce((sum, { totalNanoAiu }) => sum + totalNanoAiu, 0) + 2_000_000_000) / 1e9);
+    assert(h.messages.some((message) => message === `Review cost: ${report.cost.credits} AI credits over ` +
+      `${report.cost.requests} request(s); ${(report.cost.modelMs / 1000).toFixed(1)} s of model work in ` +
+      `${report.cost.timedPasses} pass(es); ${(report.cost.elapsedMs / 1000).toFixed(1)} s elapsed.`),
+    "the discovery pass's charge is in the run's reported total");
+  }
   assert.equal(report.discovery.status, "found");
   assert.deepEqual(report.discovery.commands, declared);
   const presented = h.messages.find((message) => message.startsWith("V1b safeguard discovery"));
@@ -1976,6 +2106,20 @@ console.log("PASS final retention-log cancellation revokes an unsubmitted propos
   assert.equal(report.preview.status, "suppressed");
   assert.equal(report.preview.submitted, false);
   assert.match(report.preview.request.payload.body, /^Balanced review: 3 selected validated finding\(s\)/);
+  // T1: what a review cost is the runner's business and nobody else's. The
+  // published body carries the coverage report, so a cost sentence written into
+  // formatCoverage would post this figure to a public pull request. It is a
+  // separate line on the run's own timeline, and these three assertions are what
+  // keep it there.
+  assert(!/Review cost|AI credits|elapsed/.test(report.preview.request.payload.body),
+    "the published review body must not carry what the review cost");
+  assert(!/Review cost|AI credits|elapsed/.test(formatFindings(report)),
+    "the findings report a reader may copy must not carry it either");
+  // Adjudication ran here, so its own charge is in the total: five reviewers and
+  // one adjudicator, at the harness's distinct per-kind charges.
+  assert.equal(report.cost.passes, 6);
+  assert.equal(report.cost.credits, (5 * 1_000_000_000 + 3_000_000_000) / 1e9);
+  assert(h.messages.some((message) => message.startsWith("Review cost: 8 AI credits over 6 request(s);")));
   assert.equal(report.publication.attempted, false);
   const record = retainedRecord(report);
   validateRecord(record, h.parent.sessionId);

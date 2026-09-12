@@ -119,6 +119,11 @@ try {
     ["status", "--incremental asks for fresh hunting to be confined to the commits added since an earlier review"],
     ["help", "--revalidate  Judge what became of the findings an earlier review of this pull request published"],
     ["status", "--revalidate buys one model pass over the earlier review's findings that this tool cannot settle"],
+    // T1 adds no flag, so the help and the status describe a report every run
+    // now prints. A behaviour nothing dispatches and reads is a behaviour that
+    // can go false silently, which is what these pairs exist to stop.
+    ["help", "A finished review reports what it cost on one line beside its coverage"],
+    ["status", "A finished review reports what it cost beside its coverage"],
     ["cancel", "No review is running."],
   ]) {
     const before = (await session.getEvents()).length;

@@ -17,7 +17,8 @@ landed on top of it.** `I1` was sliced into three with the user before anything 
 and `G1` was the last increment scheduled before the backlog was agreed; **every
 increment scheduled up to `G1` is complete.** On 2026-09-12 the user triaged
 `G1`'s twelve proposals one at a time and scheduled six of them: `T1`, `B1`,
-`W1`, `N1`, `H1` and `K1`, in that order, which are the `Pending` rows below.
+`W1`, `N1`, `H1` and `K1`, in that order. **`T1` is complete and its entry is
+the only live one below**; the other five are the `Pending` rows.
 The closing section records what was decided, and what stays open as a
 limitation rather than as work.
 
@@ -78,7 +79,7 @@ posting them.
 | I1b | Completed | `--incremental` confines fresh hunting to the commits added since an earlier review of the same pull request, so a re-review stops reporting hunks that review already covered. A range diff that cannot be shown complete refuses rather than confines, and the reviewers are told both the confined head-side ranges and every path those commits touched, because a deleted file's only possible anchor is base-side. Opt-in, at the user's decision, and a request rather than a parse-time contract: any relationship but `incremental`, an unreadable range, or added commits that change no file each narrow nothing and say which it was. The captured binding, its context windows, the provenance checks and every citation rule are unchanged; the reviewers are given the confined head-side ranges and code sets aside any candidate anchored outside them, before adjudication, reported with its location and never refuted. One informational caveat carries the confinement into the published body, because a confined review does not cover the whole pull request. Pull request #31, reviewed once with this plugin at the user's authorization: deep, 68.53836 credits, 91.5 s of model work, 16 approved tool calls and no denial, 0 candidates and 0 validated findings, and one coverage gap that is exact and unfixable here, namely that the confinement path has fixture coverage only and no live run has ever reported the incremental relationship. | I1a; [Targets](SCOPE.md#targets-and-local-behavior), [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | I1c | Completed | Revalidating the findings an earlier review of the same pull request published, as resolved, still open or obsolete. The parser `I1a` deferred reads this tool's own emitted comment prose back into a structured finding, and is held to the emitter's own template: a parse counts only when rebuilding it reproduces the body byte for byte. Every review then reports the verdicts code can prove and spends nothing on them: lines the newer commits never touched are still open, an anchor GitHub can no longer place or a file those commits deleted is obsolete, and nothing is ever proved resolved without reading the code. `--revalidate` buys one model pass over exactly what is left; a proved verdict is never put to it and never overturned by it, and a pass that fails settles nothing. A settled verdict is answered on the earlier review's own thread, under the review's own posting authority and never any other, which makes this the first write set in this tool that is more than one request: each reply is journalled before it is sent, a definite rejection does not stop the others, and one unknown outcome stops the set with every thread after it left unattempted. The retained record carries the verdicts and the reply dispositions, which is the schema change `I1a` and `I1b` each deferred to the increment that would consume it. Pull request #32, reviewed twice with this plugin, each time at the user's explicit authorization: deep on `gpt-5.6-terra` at high effort both times, 144.23376 then 115.0322 credits. The first found 0 validated findings on INCOMPLETE coverage and three discarded or uncertain candidates that all described real defects and are all fixed here, one of them a crash that would have thrown whenever a review settled less than every earlier finding. The second covered those fixes, reported 0 candidates on INCOMPLETE coverage, and produced the live absent-path refusal `Q7` had never seen. | I1a, I1b; [Modes/findings](SCOPE.md#review-modes-and-findings), [Publication controls](SCOPE.md#selection-publication-and-cached-results) |
 | G1 | Completed | Gap analysis against the field, then a proposal, recorded in `docs/gap-analysis.md`. Ten sources read at the user's choice of the widest sweep: upstream at the pinned baseline and again at its current head, the four skills the roadmap named, the closest peer plugin, GitHub's own reviewer, the hosted field, and the one independent benchmark in it. Nothing was copied and `L1`'s rule held. Upstream has since converged on `I1a`-`I1c`, shipping the same four head relationships and the same three prior-finding verdicts independently. The field's dominant complaint is false positives at 40-70 per cent, which is the axis this tool is built on and has never measured; upstream publishes recall against a seeded corpus and this project has nothing equivalent. Upstream's own committed numbers have deep matching the best recall with no false positive and no clean-control noise at a median no slower than the five-reviewer default, which makes this project's inherited default a question rather than a setting. Four tools steer reviews with the project's own written standards and this one hands its collected instruction files to no reviewer. One concrete publication defect was found: no redaction exists anywhere, so a reviewer that writes a credential into its own prose publishes it. Twelve adoptions are ranked with a proposed five-stage sequence; every one was a scope decision for the user and **none was scheduled by `G1` itself**. The user triaged all twelve one at a time on 2026-09-12 and scheduled six of them, which are the `Pending` rows below; `G1`'s ranking and its sequence did not survive that triage and the document stands as the record of what was argued, not as a plan. Documentation-only pull request #33. | I1c; [Upstream baseline](SCOPE.md#upstream-baseline) |
-| T1 | Pending | A finished review reports what it cost and how long it took: the credit total the runtime reports and the elapsed model time, on one line, alongside coverage rather than buried in the evidence lines. `--quiet` suppresses evidence JSON and raw envelopes and must not suppress this. Needs a one-line `SCOPE.md` change, because the scope defers detailed timing and usage reports as a nice-to-have and one summary line is not a detailed report. `E1` established that billing is collected per request and retained and then never printed, so a person cannot tell what they spent without reading Copilot's session state off disk, and `scripts/dogfood-review.mjs` already prints a credit total, which is evidence the number is reachable. `G1`'s menu item 2. | G1; [Release boundary](SCOPE.md#priority-and-release-boundary) |
+| T1 | Completed | A finished review reports what it cost and how long it took, on one line beside its coverage: the credit total the runtime reported, the model time its passes spent and the time the run took. Both elapsed figures, at the user's choice, because in a parallel mode summed model time far exceeds the clock and neither answers the other's question. Every pass the run paid for is counted, also at the user's choice: four stages start one and only two put their reviewers on the outcome, so the safeguard discovery pass, the revalidation pass and the failed attempt a fallback replaced were each dropping their charge, and a total read off the outcome alone under-reported every `--verify` and every `--revalidate` run. An unreported charge leaves the total unavailable rather than a partial sum. Not part of `formatCoverage`, which `preview.mjs` embeds in the published body, so a spend is never posted to a pull request; not suppressed by `--quiet`; and a report about a finished run rather than a budget, so nothing reads it and no timeout exists. The one-line `SCOPE.md` change was put to the user as exact wording and approved before the file was edited. Pull request #37, reviewed once with this plugin at the user's authorization: deep on `gpt-5.6-terra` at high effort, 64.24808 credits over 5 requests, 72.9 s of model work in 2 passes against 91.0 s elapsed, 12 approved tool calls and no denial, completed coverage, one informational caveat, and 1 validated finding that was real, exact, and is fixed here. | G1; [Release boundary](SCOPE.md#priority-and-release-boundary) |
 | B1 | Pending | A review that could not look closely at the whole pull request says which parts it skimmed, as a coverage gap rather than as silence. **The honesty half only**: no size-triggered transport, so the diff stays embedded, reviewer count is unchanged and citations stay bound to the captured diff and context windows. Fits `SCOPE.md` as written, because the absence of a large-diff path is an absence rather than a decision. `E1`'s review of 1427 changed lines over 16 files worked, and nothing has established where this stops working. `G1`'s menu item 11. | T1; [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | W1 | Pending | Every validated finding carries one remediation sentence saying what to do about it, in the presented and the published forms. **The sentence only**: a committable suggestion block is explicitly not part of this and stays unscheduled, because code this tool proposes to write sits badly with a tool whose defining promise is that it never writes source. Needs a scope decision, because `SCOPE.md` defers the finding editor and the candidate schema excludes rewrite suggestions. `G1`'s menu item 9. | B1; [Selection/publication](SCOPE.md#selection-publication-and-cached-results) |
 | N1 | Pending | A seeded corpus and a deterministic scorer, so that recall and precision can be measured at all. **The free half only**: small synthetic diffs pinned by content hash, each seeded defect carrying a stable identity, a target severity, the severities that count, acceptable locations and the concepts a matching report must contain, plus clean controls that must draw nothing; and a scorer needing no model and no network, running in the controlled suite and in CI, which rejects an explicit non-finding before matching so that a reviewer calling a thing safe cannot score as having found it. **The collection runs that spend credits are not scheduled, and neither is a baseline gate.** Fits `SCOPE.md` as written: it changes no product behaviour. `G1`'s menu item 5. | W1; [Modes/findings](SCOPE.md#review-modes-and-findings) |
@@ -164,6 +165,114 @@ backlog triage archived `G1`'s** on the same rule, having written the six
 entry has ever been written in less than that, so `T1`'s session would have had
 to do this move first.
 
+## `T1`: a finished review reports what it cost and how long it took
+
+`E1` established that billing is collected per request and retained and then
+never printed, so a person could not tell what a review spent without reading
+Copilot's session state off disk. The run now says it, beside its coverage:
+
+```text
+Review coverage: completed.
+Review cost: 64.24808 AI credits over 5 request(s); 72.9 s of model work in 2 pass(es); 91.0 s elapsed.
+```
+
+That is the live line from this increment's own review, and the first time this
+tool has ever reported its own cost.
+
+### The four decisions, each put to the user on its own
+
+**The `SCOPE.md` change was the user's, and the exact wording was approved
+before the file was edited.** One sentence was added to "Models, configuration,
+and execution" stating the behaviour positively. The deferral row in the release
+boundary is unchanged and stays true, because one summary line is not a detailed
+report. **The `Pending` row was not treated as the authorization.**
+
+**Both elapsed figures**, because model time is summed per pass and elapsed time
+is the clock: five reviewers working a minute each is five minutes of model work
+in one minute of waiting. Wall time runs from the run starting to it settling,
+before finding selection, so no wait for a person is counted except a `--verify`
+approval answer.
+
+**Every paid pass counts.** Four stages start a model pass and only two put
+their reviewers on the outcome. Three sources of charge were being dropped
+before the outcome was assembled: the safeguard discovery pass, the revalidation
+pass, and the failed attempt a configured fallback replaced, whose record kept
+its `usage` and not its `billing`. A total read off the outcome would have
+under-reported exactly the runs this project makes on its own pull requests.
+The charges are collected where the passes are started instead.
+
+**`README.md`'s headroom was solved first, in its own pull request**, #36, which
+moved the four re-review sections to `docs/re-review.md` verbatim and took the
+file from 63865 to 55675 bytes. Documentation-only, merged without a plugin
+review at the user's decision, exactly as #30 was.
+
+### What it deliberately is not
+
+**Not part of `formatCoverage`.** That text is embedded in the body `preview.mjs`
+publishes, so a cost sentence written there would post the spend to a public
+pull request. `scripts/smoke-cost.mjs` and `scripts/smoke-review.mjs` each assert
+the separation, in the formatter and in a real published payload.
+
+**Not suppressed by `--quiet`.** `O1` settled that the flag drops evidence JSON
+and raw model envelopes and nothing a person needs in order to judge a result.
+
+**Not a deadline.** Both figures are reports about a finished run. Nothing reads
+either, and `SCOPE.md`'s refusal of review timeouts is untouched.
+
+### The review, and the finding it caught
+
+Pull request #37, reviewed once with this plugin at the user's explicit
+authorization: deep on `gpt-5.6-terra` at high effort, **64.24808 credits over 5
+requests**, 12 approved tool calls and no denial, **completed** coverage, one
+informational caveat, 0 withheld and 0 rejected candidates, and **1 validated
+finding that was real and exact**.
+
+It found that `runCost` counted requests from the billing entries alone, so a
+pass whose model turn started and for which the runtime emitted no usage event
+at all contributed no request and no gap. The empty charge list then counted as
+fully reported and the run announced **0 AI credits**, which is precisely the
+plausible number this increment exists to refuse. It looks identical in the
+billing entries to a pass that never reached inference and really did cost
+nothing; the two are told apart by whether a turn ever started. **A cancelled
+run is the common case**, its reviewers stopped mid-turn and billed for work the
+runtime never reported, and it now says its total is unavailable rather than
+claiming the run was free. Fixed on the branch with its own failing test first,
+and `scripts/smoke-review.mjs` now names all three scripted scenarios that leave
+such a pass.
+
+The caveat is fair and stands: no live transcript establishes how often a
+completed request omits its usage event, only that the state is reachable.
+
+GitHub's own Copilot reviewer was also requested on #37, at the user's
+authorization, and its findings are not in this entry.
+
+### Verified, and not
+
+**Seventeen controlled suites pass**, `smoke-cost` being the new one, and it is
+in the CI list. `git diff --check` is clean, no tracked text carries a control
+byte, and discovery reads all six root files and skips none.
+
+- **The revalidation pass has no end-to-end run in any suite**, and had none
+  before this. Its charge collection is wired identically to the other three;
+  what covers it is a source-shape assertion that every `reviewAssignments` call
+  in `review.mjs` goes through the collector, which guards a future fifth stage
+  too. That is a source check, not a run.
+- **The parallel case was not exercised live.** The review was deep, so two
+  passes ran in sequence and elapsed time exceeded model time. Model time
+  exceeding elapsed time, which is the figure a balanced run makes interesting,
+  rests on the suites.
+- `scripts/smoke-runtime.mjs --targets` **still has not been run**. It gained a
+  help and a status probe pair here, on top of the four `I1c` added without
+  running them.
+- **`scripts/runtime-quick.mjs` still computes a narrower total of its own**,
+  the way `dogfood-review.mjs` did before this. It is a live probe that spends
+  inference, so it was left rather than changed unverified. Follow-up.
+- **A retained result does not carry what its run cost.** The figures are
+  printed when the review settles and are not written into the record, so
+  `/pr-review inspect` and `/pr-review publish` say nothing about the spend of
+  the run they replay. Keeping them out avoided a schema version; recorded as a
+  limitation rather than as work.
+
 ## v1 is complete, and six increments are scheduled on top of it
 
 **`D1` delivered v1, and `O1`, `E1`, `U1`, `I1a`, `I1b`, `I1c` and `G1` have
@@ -180,8 +289,8 @@ was built, and `I1a`, `I1b` and `I1c` are all done.
 `G1` ended with twelve proposals and none of them scheduled. The user was put
 through all twelve one at a time, cheapest first, and **scheduled six**: `T1`,
 `B1`, `W1`, `N1`, `H1`, `K1`, in that order, which is the order of the `Pending`
-rows above and the order the next session works in. **`T1` is the next
-increment.** The user chose that order over starting with the measurement and
+rows above and the order the next session works in. **`T1` is done and `B1`
+is the next increment.** The user chose that order over starting with the measurement and
 over starting with the largest capability gap, and chose the mnemonic IDs over
 one series off `G1`.
 
@@ -201,8 +310,7 @@ that list. **The triage itself was not a numbered increment.**
 
 **Four of the six need a scope decision, and that decision is the user's every
 time, taken in the session that builds the increment and never assumed from this
-row.** `T1` needs the one-line change that lets a review report its own cost,
-against a scope that defers detailed timing and usage reports. `W1` needs one
+row.** `T1` took its, as one approved sentence. `W1` needs one
 because the finding editor is deferred and the candidate schema excludes rewrite
 suggestions, `H1` because the scope says nothing about convention review, and
 `K1` because it says nothing about a feedback channel. **`B1` and `N1` fit
@@ -210,10 +318,9 @@ suggestions, `H1` because the scope says nothing about convention review, and
 
 ### What is settled and must not be redone
 
-**`E1`, `U1`, `I1a`, `I1b`, `I1c` and `G1` are done: do not redo any of them.**
-**`E1` raised three items and `T1` now schedules the first of them**, which is
-that a run never reports its own cost. The other two stay recorded and stay
-unscheduled: the evidence lines are still truncated by the interactive UI, and
+**`E1`, `U1`, `I1a`, `I1b`, `I1c`, `G1` and `T1` are done: do not redo any.**
+**`E1` raised three items and `T1` closed the first**, a run that never reported
+its own cost. The other two stay recorded and stay unscheduled: the evidence lines are still truncated by the interactive UI, and
 per-reviewer progress still says nothing while a reviewer works. `U1` is settled as one preflight flag that refuses. **`I1a`'s slicing is
 settled and is not to be re-cut.** **`I1b` is settled as one opt-in flag that
 confines**, and **`I1c` is settled as one opt-in flag that judges**, with its six
@@ -343,7 +450,8 @@ It is not an increment, has no roadmap row, and was not part of what the plugin
 reviewed. **It went green on #31 before that pull request was merged**, running
 all fifteen suites, reading all six instruction files and skipping none.
 
-It runs the fifteen controlled suites and two invariants this repository has
+It runs every controlled suite, seventeen of them since `T1`, and two
+invariants this repository has
 broken before: that safeguard discovery still reads every instruction file at
 the checkout root, which fails the job if one crosses 65536 bytes, and that no
 tracked text carries a control byte, which is what refused #17's review. There
@@ -396,13 +504,9 @@ except where a bullet says so:
   nothing**: the corpus and the deterministic scorer. **The collection runs that
   would actually produce a recall number are not scheduled**, so recall stays
   unmeasured until the user authorizes them.
-- ~~**A run that reports what it cost.**~~ **This is now `T1`, the next
-  increment.** `E1` found that billing is collected per request and retained,
-  and never printed, so a person cannot tell what they spent without reading
-  Copilot's session state from disk. `SCOPE.md` defers detailed timing and usage
-  reports, so the cost line needed a scope decision rather than a bug fix, and
-  the user took it on 2026-09-12. The dogfood runner already prints a credit
-  total, so the number is reachable.
+- ~~**A run that reports what it cost.**~~ **Closed by `T1`**, whose entry is
+  above. The scope decision it needed was taken on 2026-09-12 and the sentence
+  was approved before the file was edited.
 - **Evidence lines a person can actually read.** Each is one very long line of
   JSON, and the interactive UI truncates it at the window edge, so `E1`'s own
   evidence had to be recovered from `~/.copilot/session-state/<id>/events.jsonl`,

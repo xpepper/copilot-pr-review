@@ -11,6 +11,7 @@ import { realpathSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { runGit } from "../extensions/pr-review/checkout.mjs";
+import { formatCost } from "../extensions/pr-review/cost.mjs";
 import { reviewModes } from "../extensions/pr-review/modes.mjs";
 import { runGh } from "../extensions/pr-review/target.mjs";
 
@@ -99,13 +100,16 @@ try {
     // No deadline is imposed here either; cancellation stays the manual control.
     const report = await review.promise;
     await settled.promise;
-    const billed = [...report.reviewers, ...(report.adjudicator ? [report.adjudicator] : [])];
-    const charges = billed.flatMap((reviewer) => reviewer.billing ?? []);
-    console.log(`Credit cost: ${charges.length &&
-      billed.every((reviewer) => reviewer.billing?.length === reviewer.usage?.length) &&
-      charges.every(({ totalNanoAiu }) => Number.isFinite(totalNanoAiu) && totalNanoAiu >= 0)
-      ? `${charges.reduce((sum, charge) => sum + charge.totalNanoAiu, 0) / 1e9} AI credits (reported nano-AIU / 1e9)`
-      : "unavailable: the runtime did not report every request charge"}`);
+    // T1: the run reports this itself now, on its own timeline, and counts the
+    // safeguard discovery and revalidation passes this runner never could: they
+    // are not on the outcome. Read the run's own figure rather than recomputing
+    // a narrower one here, so the evidence this records is the evidence a user
+    // sees. `--quiet` is refused above, but the line is not one of the lines it
+    // would have suppressed anyway.
+    // The line already names itself, so this repeats it rather than labelling it.
+    console.log(report.cost
+      ? formatCost(report.cost)
+      : "Review cost: no model pass started, so there is nothing to report.");
     assert.equal(report.publication?.attempted ?? false, false, "This runner must not publish");
     console.log(`Outcome: mode=${report.mode} coverage=${report.coverage} ` +
       `findings=${report.validation?.findings.length ?? 0} withheld=${report.validation?.capped?.length ?? 0} ` +
