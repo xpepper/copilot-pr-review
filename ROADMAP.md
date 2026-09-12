@@ -229,8 +229,11 @@ rejected**: `retainedRecord` drops the structured events, but inspecting a
 retained result renders the gap with every figure, and the gap had to travel
 through diagnostics without a schema change, as `T1` did for `billing`.
 
-GitHub's own Copilot reviewer was also requested on #39, at the user's
-authorization.
+GitHub's own Copilot reviewer, requested on #39 at the user's authorization,
+left two comments in its review body and no thread. One restates the candidate
+above and is rejected for the same reason. The other says the start event's
+`currentTokens` and the complete event's `preCompactionTokens` measure different
+things; in all seven compactions on disk they are equal, so it is rejected too.
 
 ### Verified, and not
 
