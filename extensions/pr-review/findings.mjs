@@ -9,7 +9,7 @@ export const minimumConfidence = 0.8;
 export const reviewKey = (binding) => createHash("sha256").update(JSON.stringify(binding)).digest("hex");
 
 const citationFormat = 'CITATION is {"path":"exact source path","side":"head|base","startLine":1,"endLine":1,"quote":"exact full lines, joined with \\n, no final newline"}.';
-const limitationFormat = [
+export const limitationFormat = [
   'Each limitations entry is {"kind":"coverage-gap|caveat","reason":"specific limitation","impact":null}.',
   'For coverage-gap, impact MUST instead be nonempty text naming the consequential assessment blocked and why it matters to this diff.',
   "Use coverage-gap for relevant missing changed content or evidence needed to settle a specific consequential assessment.",
@@ -158,7 +158,7 @@ function unfenced(raw) {
 // which is the one way the marker rule could quietly widen.
 export const unwrapEnvelope = (raw) => typeof raw === "string" ? unfenced(delimited(raw)) : raw;
 
-function envelope(raw, key, field) {
+export function envelope(raw, key, field) {
   // Every check below is applied to the unwrapped payload exactly as it was to
   // a bare response.
   const parsed = JSON.parse(unwrapEnvelope(raw));

@@ -174,10 +174,166 @@ function validation(value, target, policy) {
   requireValue([...candidates].every((id) => ids.has(id) || excluded.has(id)), "unaccounted duplicate alias");
 }
 
+// I1c: the first thing this record has ever held about an earlier review of the
+// same pull request. I1a retained none of its discovery and I1b none of its
+// confinement, on the rule that the increment which consumes something is the
+// one that puts it in the schema; this is that increment, because a reply posted
+// to a thread has to be journalled against the verdict it carries.
+//
+// It is an optional key rather than a new rung of `schemaVersion`. That ladder
+// means one thing, the publication capability a record was written with, and
+// each rung implies the one below it: 4 implies publication implies preview. A
+// revalidation is orthogonal to all of it, so hanging it off that ladder would
+// either break the nesting or overwrite what rung 4 already says.
+// Every proof `codeVerdict` can reach, including the two that leave a finding
+// unsettled. Omitting "touched" made any review that revalidated and settled
+// less than everything throw when it journalled itself, which the deep review
+// of #32 caught and every test here had missed by judging its unsettled
+// entries away before retaining them.
+const codeProofs = ["unchanged-head", "untouched", "anchor-unplaceable", "file-deleted",
+  "path-moved", "touched", "no-range"];
+const verdicts = ["resolved", "still-open", "obsolete", "unsettled"];
+
+function revalidationEntry(value, judged) {
+  object(value, ["commentId", "url", "path", "side", "outdated",
+    "finding", "verdict", "proof", "decidedBy"], ["startLine", "endLine", "reason"]);
+  requireValue(Number.isSafeInteger(value.commentId) && value.commentId > 0, "invalid revalidated comment ID");
+  text(value.url); text(value.path);
+  // The line pair is present together or not at all: a comment GitHub can no
+  // longer place keeps the line it was written at, and one nothing can place
+  // carries no anchor rather than half of one.
+  requireValue(["head", "base"].includes(value.side) && typeof value.outdated === "boolean" &&
+    (value.startLine === undefined) === (value.endLine === undefined) &&
+    (value.endLine === undefined || (Number.isSafeInteger(value.startLine) && value.startLine > 0 &&
+      Number.isSafeInteger(value.endLine) && value.endLine >= value.startLine)), "invalid revalidated anchor");
+  object(value.finding, ["severity", "title", "trigger", "expected", "actual", "introduction",
+    "confidence", "reportedBy"]);
+  for (const key of ["severity", "title", "trigger", "expected", "actual", "introduction"]) text(value.finding[key]);
+  requireValue(Number.isFinite(value.finding.confidence) &&
+    value.finding.confidence >= minimumConfidence && value.finding.confidence <= 1,
+  "invalid revalidated confidence");
+  strings(value.finding.reportedBy);
+  requireValue(value.finding.reportedBy.length, "revalidated finding without attribution");
+  requireValue(verdicts.includes(value.verdict) && ["code", "model"].includes(value.decidedBy),
+    "invalid revalidation verdict");
+  // The two halves are kept apart in the record, because which of them decided a
+  // verdict is the whole reason one of them can be trusted without a model.
+  // Code proves that something still stands and never that it has gone away, so
+  // "resolved" is the model's alone, and anything still unsettled is code's.
+  if (value.decidedBy === "code") {
+    requireValue(codeProofs.includes(value.proof) && value.reason === undefined,
+      "invalid code-proved verdict");
+    requireValue(value.verdict !== "resolved", "code claims to have proved a finding resolved");
+  } else {
+    requireValue(value.proof === "judged" && value.verdict !== "unsettled", "invalid judged verdict");
+    text(value.reason);
+    requireValue(judged?.status === "completed", "a judged verdict without a completed revalidation pass");
+  }
+}
+
+function revalidation(value, target) {
+  object(value, ["reviewedBefore", "head", "relationship", "basis", "review", "entries", "unreadable"],
+    ["rangeError", "judged"]);
+  requireValue(sha.test(value.reviewedBefore) && sha.test(value.head) && value.head === target.head,
+    "revalidation is not bound to the reviewed head");
+  requireValue(["same-head", "incremental", "diverged", "unknown"].includes(value.relationship) &&
+    ["same-head", "range", "no-range"].includes(value.basis) &&
+    (value.basis === "same-head") === (value.relationship === "same-head"), "invalid revalidation basis");
+  if (value.rangeError !== undefined) text(value.rangeError);
+  object(value.review, ["id", "url", "submittedAt", "head", "mode", "label", "declaredFindings"]);
+  requireValue(Number.isSafeInteger(value.review.id) && value.review.id > 0 &&
+    sha.test(value.review.head) && value.review.head === value.reviewedBefore &&
+    modeIds.includes(value.review.mode) &&
+    Number.isSafeInteger(value.review.declaredFindings) && value.review.declaredFindings >= 0,
+  "invalid revalidated review");
+  for (const key of ["url", "submittedAt", "label"]) text(value.review[key]);
+  if (value.judged !== undefined) {
+    object(value.judged, ["status"], ["reviewer", "asked", "decided", "ignored", "reason"]);
+    requireValue(["completed", "failed"].includes(value.judged.status), "invalid revalidation pass state");
+    if (value.judged.status === "failed") {
+      text(value.judged.reason);
+      requireValue(value.judged.decided === undefined, "a failed revalidation pass decided something");
+    } else {
+      requireValue([value.judged.asked, value.judged.decided, value.judged.ignored]
+        .every((count) => Number.isSafeInteger(count) && count >= 0) &&
+        value.judged.decided <= value.judged.asked, "invalid revalidation pass counts");
+    }
+    if (value.judged.reviewer !== undefined) text(value.judged.reviewer);
+  }
+  requireValue(Array.isArray(value.entries) && Array.isArray(value.unreadable), "invalid revalidation lists");
+  const seen = new Set();
+  for (const entry of value.entries) {
+    revalidationEntry(entry, value.judged);
+    requireValue(!seen.has(entry.commentId), "duplicate revalidated comment");
+    seen.add(entry.commentId);
+  }
+  for (const entry of value.unreadable) {
+    object(entry, ["commentId", "url", "path"]);
+    requireValue(Number.isSafeInteger(entry.commentId) && entry.commentId > 0 && !seen.has(entry.commentId),
+      "invalid unreadable prior comment");
+    text(entry.url); text(entry.path);
+    seen.add(entry.commentId);
+  }
+  requireValue(value.judged?.status !== "completed" ||
+    value.judged.decided === value.entries.filter((entry) => entry.decidedBy === "model").length,
+  "the revalidation pass count disagrees with the judged verdicts");
+}
+
+// The reply write set. It is the first thing in this record that journals more
+// than one remote write, so partial completion is an ordinary state here rather
+// than an error: some threads answered, at most one unknown, the rest never
+// attempted. Every thread carries its own disposition, because "we wrote some of
+// them" is not something a person can act on.
+const dispositions = ["not-attempted", "in-flight", "written", "skipped", "failed", "uncertain"];
+
+function replies(value, revalidation) {
+  object(value, ["status", "attempted", "entries"], ["reason"]);
+  requireValue(["not-attempted", "in-flight", "completed", "partial", "uncertain"].includes(value.status) &&
+    typeof value.attempted === "boolean" && value.attempted === (value.status !== "not-attempted") &&
+    Array.isArray(value.entries), "invalid reply write state");
+  if (value.reason !== undefined) {
+    text(value.reason);
+    requireValue(!value.attempted, "an attempted reply set explains itself by its entries");
+  }
+  if (!value.attempted) {
+    requireValue(value.entries.length === 0, "an unattempted reply set wrote to a thread");
+    return;
+  }
+  requireValue(revalidation, "a reply set without the revalidation it answers");
+  const answerable = new Map(revalidation.entries
+    .filter((entry) => entry.verdict !== "unsettled").map((entry) => [entry.commentId, entry]));
+  const seen = new Set();
+  let unknown = 0;
+  for (const entry of value.entries) {
+    object(entry, ["commentId", "verdict", "disposition"], ["replyId", "url", "error", "reason"]);
+    const answered = answerable.get(entry.commentId);
+    requireValue(answered && answered.verdict === entry.verdict && !seen.has(entry.commentId),
+      "a reply to a thread this run settled no verdict for");
+    seen.add(entry.commentId);
+    requireValue(dispositions.includes(entry.disposition), "unknown reply disposition");
+    if (entry.disposition === "written") {
+      requireValue(Number.isSafeInteger(entry.replyId) && entry.replyId > 0 && !entry.error, "invalid written reply");
+      text(entry.url);
+    } else {
+      requireValue(entry.replyId === undefined && entry.url === undefined, "an unwritten reply carries a reply ID");
+    }
+    if (["failed", "uncertain"].includes(entry.disposition)) text(entry.error);
+    if (entry.reason !== undefined) text(entry.reason);
+    if (entry.disposition === "uncertain") unknown += 1;
+  }
+  // At most one unknown, because an unknown stops the set. Anything after it
+  // stays unattempted rather than becoming a second unknown.
+  requireValue(unknown <= 1, "more than one reply outcome is unknown");
+  requireValue((value.status === "uncertain") === (unknown === 1), "reply status disagrees with its entries");
+  const settled = value.entries.every((entry) => ["written", "skipped"].includes(entry.disposition));
+  requireValue((value.status === "completed") === settled, "reply status disagrees with its entries");
+}
+
 const attemptKeys = ["model", "reasoningEffort", "sessionId", "status", "error", "usage", "startedAt", "completedAt"];
 const reviewerKeys = ["label", ...attemptKeys, "fallbackFrom"];
 const outcomeKeys = ["invocation", "binding", "mode", "noComment", "complete", "reviewComplete",
-  "executionComplete", "coverage", "cancelled", "error", "cleanupErrors", "disposition", "reason", "selection", "preview", "publication"];
+  "executionComplete", "coverage", "cancelled", "error", "cleanupErrors", "disposition", "reason", "selection",
+  "preview", "publication", "revalidation", "replies"];
 
 // Version 4 marks a record whose write came from the explicit publish-later
 // command. Optional validation diagnostics do not change publication authority.
@@ -222,7 +378,7 @@ export function validateRecord(record, sessionId) {
   const value = record.outcome;
   object(value, ["invocation", "mode", "noComment", "complete", "reviewComplete", "executionComplete",
     "coverage", "cancelled", "cleanupErrors", "selection", "reviewers"],
-  ["binding", "validation", "adjudicator", "error", "disposition", "reason",
+  ["binding", "validation", "adjudicator", "error", "disposition", "reason", "revalidation", "replies",
     ...(record.schemaVersion >= 2 ? ["preview"] : []), ...(record.schemaVersion >= 3 ? ["publication"] : [])]);
   requireValue(record.digest === reviewKey(value) && isDeepStrictEqual(value.invocation, record.invocation),
     "record digest or invocation mismatch");
@@ -237,6 +393,11 @@ export function validateRecord(record, sessionId) {
   requireValue(["completed", "incomplete", "not-started"].includes(value.coverage) &&
     value.complete === (value.coverage === "completed"), "inconsistent coverage");
   if (value.binding) binding(value.binding);
+  if (value.revalidation) {
+    requireValue(value.binding, "revalidation without a review binding");
+    revalidation(value.revalidation, value.binding);
+  }
+  if (value.replies) replies(value.replies, value.revalidation);
   if (value.validation) {
     requireValue(value.binding, "validated result without review binding");
     validation(value.validation, value.binding, mode.policy);

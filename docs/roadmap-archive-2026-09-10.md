@@ -4,8 +4,9 @@ These are the completed increment entries moved out of
 [../ROADMAP.md](../ROADMAP.md) on and after 2026-09-10, by increment `A1` for
 everything through `V1c`, by increment `L1` for `V2a` and `V2b`, by increment
 `D1` for `A1`'s own entry and then `L1`'s, by increment `O1` for `D1`'s, by
-increment `U1` for `O1`'s, by increment `I1a` for `E1`'s, and by increment `I1b`
-for `U1`'s and then `I1a`'s, which is the last in this file. They are the
+increment `U1` for `O1`'s, by increment `I1a` for `E1`'s, by increment `I1b`
+for `U1`'s and then `I1a`'s, and by increment `I1c` for `I1b`'s, which is the
+last in this file. They are the
 project's
 evidence of record and are reproduced verbatim: nothing here was rewritten,
 condensed or corrected in any of those moves, so a claim below still reads
@@ -8846,3 +8847,253 @@ about its own control flow and a body signature loose enough to admit anything
 between its ends. GitHub's reviewer found two more documents disagreeing with
 each other and with the code. **Neither found a defect in what discovery
 actually does**, which is the honest limit on what #29 establishes.
+
+## Completed increment: I1b
+
+**`I1b` is the second of `I1`'s three slices, and the first one that changes
+what a reviewer may report.** `I1a` discovered that this tool had already
+reviewed a pull request and how the head being reviewed relates to the head that
+review evaluated. `I1b` acts on exactly one of those relationships: when the
+reviewed head descends from the reviewed-before head, `--incremental` confines
+fresh hunting to the commits added since, so a re-review stops reporting hunks
+that earlier review already covered.
+
+### Opt-in, and why, decided by the user before anything was built
+
+**The roadmap and the handoff both recorded this as unsettled and as the user's
+call**, so nothing was built until it was taken. Three options were put, with
+worked examples of where they differ, and **opt-in was chosen**.
+
+- **A re-review in a heavier mode than the earlier one.** A first review runs
+  `--quick`, three specialists on P0-P2 only; the re-review runs `--deep`. A
+  default narrowing would mean the integrated reviewer never reaches the hunks
+  the quick review only skimmed, and nothing in the run would say that mattered.
+- **An earlier review whose coverage this code cannot read.** `toolReviewBody`
+  requires a coverage sentence and deliberately never reads what it says,
+  because that prose is the half most likely to change between versions of this
+  tool. So a run narrowing by default could rest on a degraded earlier review
+  and have no way to know it did.
+- **The asymmetry settles it.** A forgotten `--incremental` costs credits, which
+  a person can see. A wrong narrowing loses a finding that is never reported and
+  never mentioned. Opt-in is also the reversible direction: a later increment
+  can flip the default once `incremental` has live evidence, and today it has
+  none.
+
+An opt-out flag over a default narrowing was the other serious option and is
+recorded here as declined rather than forgotten.
+
+### A request, not a parse-time contract
+
+**`--incremental` is the only one of the four review flags that cannot be
+settled at parse time.** `--verify`, `--quiet` and `--unattended` are each a
+fact about the invocation; whether a forward commit range exists at all is a
+fact about the pull request, and nothing knows it until capture has run. So the
+flag is recorded at parse time and honoured after capture, and every outcome
+that is not a confinement says which one it was.
+
+| Outcome | When | What the run does |
+| --- | --- | --- |
+| `confined` | Relationship `incremental`, range read, at least one file changed | Confines fresh hunting to those head-side line ranges |
+| `not-applicable` | Relationship `none`, `same-head`, `diverged` or `unknown`, or discovery failed | Narrows nothing; costs no request at all |
+| `failed` | The comparison could not be read | Narrows nothing; the reason is reported and the review proceeds |
+| `empty` | A forward range whose commits change no file | Narrows nothing; it is not a failure and is not called one |
+
+Its only refusal is `--capture-only`, which takes no review flag of any kind. It
+combines with `--unattended`, because a confined run asks nobody anything.
+
+### Narrowing is a filter over the captured binding
+
+**Nothing about the binding, the context windows, the provenance checks or the
+citation rules changed, and that is what kept this increment off head binding
+and off the evidence boundary.** Publication requires every finding to anchor
+inside a hunk of the captured base-to-head diff, so a range diff swapped in for
+that one would produce anchors GitHub refuses. The reviewers receive the same
+captured diff and the same context they would receive without the flag; what
+they are additionally given is `confinedTo`, the head-side line ranges those
+newer commits changed, and an instruction to anchor a candidate only there.
+
+**Code then decides what the instruction only asks for.** `collectCandidates`
+sets aside any candidate anchored outside the range, after the evidence boundary
+has bound its citation and **before adjudication**, which is where the saving
+is: a candidate an earlier turn already covered is not paid to be judged again.
+
+- **A set-aside candidate is reported, never dropped**, with its id, severity,
+  title and location, and the report says plainly that none of them was
+  adjudicated, so none is a validated finding and none is refuted.
+- **It is not a refusal and not an execution failure**, so it never blocks
+  coverage. The candidate passed every check an unconfined run makes.
+- **The comparison is read with the diff media type** and parsed by the same
+  `parseDiffFiles` the captured diff goes through, so the head-side line numbers
+  are already in the coordinate system a reviewer cites in. Nothing is
+  translated.
+- **A base-side anchor cannot be placed in the range at all**, because it names
+  the captured base revision the comparison never saw. The one thing
+  establishable about one is that its file was never touched, so a base-side
+  candidate in a file those commits did touch stays in scope. **The filter
+  removes only what it can prove an earlier turn covered**, which is the safe
+  direction for an increment whose whole job is to cover less.
+
+### A confined review does not cover the whole pull request, and says so
+
+One informational caveat carries that sentence into the run's coverage report
+and therefore into the published review body, naming the range, the count of
+set-aside candidates, and the fact that the earlier review's own coverage was
+not read and is not vouched for.
+
+**It is a caveat and deliberately not a coverage gap.** A coverage gap makes the
+run INCOMPLETE, and INCOMPLETE has to keep meaning that something failed. A
+confined review is complete over what it was asked to review, and a person asked
+for it; making the same word carry both would leave this project unable to say
+which had happened.
+
+**`describePrior` no longer promises that the run acts on none of the prior
+review.** That sentence was true when `I1a` wrote it and this increment makes it
+false, so it is now conditional on what the run actually did, and the
+confinement is settled before the prior review is reported so that the two lines
+agree. Revalidating the earlier findings is still nobody's work and is denied in
+both branches. **This is the defect seven reviews in a row have caught here**,
+and it was found by the standing check rather than by a reviewer.
+
+### Validation
+
+**Fifteen controlled suites now**, the new one being
+`scripts/smoke-incremental.mjs`. They need no inference and no network.
+
+```sh
+for s in findings review selection retention preview publication publish-later \
+  checkout config context fixture target safeguards prior incremental; do node scripts/smoke-$s.mjs; done
+```
+
+`scripts/smoke-incremental.mjs` covers the range parse and its head-side line
+grouping, four shapes of incomplete range diff and the parser's silence on one
+of them, a range that deletes a file and the base-side anchor that is then the
+only one such a defect can have, all five cases the filter decides including
+both base-side ones, every outcome in the table above with its prose, the `gh`
+call shape and media type, the four relationships that cost no request at all, a
+cancellation re-thrown rather than reported, the set-aside candidate at a real
+evidence boundary with its caveat and its untouched coverage, what
+`formatFindings` and the published body then say, the reviewer instruction and
+prompt with and without a confinement, the two branches of the prior-review
+sentence, and the wiring into capture verbosely, quietly and not at all. `scripts/smoke-review.mjs` gained the
+parse cases and the two refusals. `scripts/smoke-reviewer-tools.mjs` was not
+run: nothing here touches `read-only.mjs`.
+
+`node scripts/smoke-runtime.mjs --targets` **passes with 75 assertions and no
+inference**, up from `U1`'s 71, against the plugin reinstalled from this
+checkout with `copilot plugin install "$(pwd)"` and `diff -rq`'d against it with
+no output. The four new ones are one sentence of `help` and one of `status`
+naming the flag, and its two refusals through the runtime's own command RPC.
+None of them reaches a capture, so the coverage is free. CLI 1.0.83.
+
+**`U1`'s entry moved verbatim to the archive** before this one was written, under
+the rule earlier moves established, and `README.md`'s `--verify` guide moved to
+`docs/safeguards.md` in its own documentation-only pull request beforehand for
+the same reason: neither file had room for an increment's worth of writing.
+
+### Pull request #31 and its review
+
+Reviewed once with this plugin at the user's authorization, dispatched with
+`node scripts/dogfood-review.mjs 31 --deep --all --no-comment --unattended`. The
+plugin was reinstalled from the branch head and `diff -rq`'d against the
+checkout with no output first, so the review exercised this increment's own
+`incremental.mjs` and not a stale copy.
+
+| Measure | Value |
+| --- | --- |
+| Diff | 1391 additions, 496 deletions, 13 files |
+| Bound input | 146859 byte diff, 443594 bytes of context over 24 sources |
+| Reviewer `integrated`, heavy, `gpt-5.6-terra` high | 91.5 s, 4 requests, 68.53836 credits |
+| Adjudicator | never started; 0 candidates reached the evidence gate |
+| Total | 68.53836 credits, 91.5 s of model work |
+| Tool calls | 16, all approved, zero denials: `view` x8, GPT's `rg` alias x7, `glob` x1 |
+| Result | 0 candidates, 0 validated findings, 0 rejected, 0 capped, 0 discarded |
+| Coverage | INCOMPLETE: 0 execution failures, 1 coverage gap, 0 informational caveats |
+
+**It reported one coverage gap and no candidate at all**, which makes this the
+first review of this repository in eight to find nothing wrong with its
+paperwork. The gap is exact and is the thing this entry already records as open:
+the confinement path has fixture coverage only, and the real GitHub compare-diff
+response and its head-side line coordinates have not been established, so live
+range parsing and confinement behaviour could not be assessed. **Nothing was
+changed in response, because nothing can be**: closing it needs live evidence
+that does not exist yet, and the run was right to call that incomplete coverage
+rather than to pass over it.
+
+**The adjudicator cost nothing**, because it starts only when a candidate
+survives the evidence boundary and none did. The whole 68.53836 credits are the
+one reviewer's four requests.
+
+**The reviewer's last search is worth recording**: it went looking for
+`rename from`, `rename to` and `headerPaths`, which is a rename in the commit
+range, and reported nothing. `newRangeFrom` collects both sides' paths into
+`touched` and keys the changed lines by the head path, so a rename inside the
+new commits is handled, but **that this was checked and passed is the reviewer's
+reading, not a test**, and no suite pins it.
+
+**Confinement never engaged in this run and could not have.** #31 has no prior
+review by this tool, so discovery reported `none`, the evidence line recorded
+`"incremental":false`, and the prior-review sentence printed its unconfined
+branch. That is the correct behaviour and it is not evidence about a confined
+run.
+
+**No live evidence of a confinement exists**, and none can be had cheaply. A
+confined run needs a pull request this tool has published a review on and that
+has since moved, and the only two published reviews are on playground pull
+requests #1 and #2, both still at the head they evaluated. Arranging one means
+publishing a real review or pushing a commit to a playground branch, and both
+are the user's call. **Playground #1 and #2 must never be merged.**
+
+### GitHub's own Copilot reviewer, on the same pull request
+
+**#31 was also reviewed by GitHub's built-in Copilot code reviewer**, which is
+not this tool and costs this project nothing. It arrived later than the plugin
+review, after this entry had already recorded its silence, and it raised three
+inline comments. **All three were real and all three are fixed.** All are
+replied to and resolved.
+
+| Comment | Disposition |
+| --- | --- |
+| A truncated commit range diff is confined to anyway, creating false negatives | **Fixed**, cause rejected |
+| The reviewer contract forbids the base-side anchor the code filter keeps | **Fixed** |
+| The archive boundary says `U1` where the same file says `I1a` | **Fixed** |
+
+**The first was right about the harm and wrong about the cause.** It said
+compare responses are bounded to 300 changed files; that cap is on the compare
+JSON `files` array, and this code fetches the diff media type, which is not
+bounded the same way. `cli/cli` `v2.40.0...v2.60.0` returns 541 file sections in
+one diff response, which settles it. **The harm is real by another route**, and
+it reproduces: `parseDiffFiles` is a parser and not a completeness check, so a
+diff cut mid-hunk parses without error and reports zero changed head lines for
+the file it truncated, and every candidate in that file would then be set aside
+as already covered. That is the one direction this filter promised never to go.
+The structural half of `validateDiff` is now shared as `assertCompleteDiff` and
+`newRangeFrom` asserts it, so a range that cannot be shown complete reports
+`failed` and the run proceeds unconfined. **The new check immediately caught an
+arithmetic error in this increment's own test fixture**, whose hunk header
+declared five new lines for six. The authoritative file-set cross-check the
+comment asked for was not added, because the only candidate for it is the
+`files` array that is itself capped.
+
+**The second is the one worth keeping.** The reviewer instruction said to report
+a location only when it anchors on a head-side line in the confined ranges,
+while `withinNewRange` keeps a base-side anchor in any touched file and
+`README.md` promised exactly that. **A file the new commits deleted has no
+head-side line at all**, never enters `changed`, and was therefore absent from
+the confined input, so a reviewer was told not to emit the only anchor such a
+defect can have. `confinedTo` now carries `basePaths`, the touched set the
+filter actually tests against, and the instruction permits a base-side location
+there and says why the two lists differ. `scripts/smoke-incremental.mjs` builds
+a range that deletes a file and pins the whole shape.
+
+**The third was this branch's own.** `U1`'s entry was archived first and
+`I1a`'s afterwards; line 79 and the handoff were updated for the second move and
+line 10 was not.
+
+**Two reviewers, and this time the free one found everything.** The plugin's
+deep review produced no candidate and one honest coverage gap; GitHub's reviewer
+found two real defects in the shipped behaviour and one in the paperwork.
+**Neither of the behaviour defects was reachable by any of the fifteen suites**,
+which is the honest limit on what controlled coverage establishes here. **The
+three fixes changed `extensions/` and have not themselves been reviewed by this
+plugin**, because the standing workflow authorizes one review per pull request
+and #31 has spent it.

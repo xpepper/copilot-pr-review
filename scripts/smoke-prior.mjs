@@ -254,8 +254,9 @@ await assert.rejects(collectPriorReview(repository, target, {
   gh: async () => { throw new Error("killed"); }, cwd, signal: controller.signal,
 }), /killed/, "A cancellation belongs to the run, never to the discovery report");
 
-// The one sentence that must survive every path where a prior review exists.
-const acts = /reports the prior review and acts on none of it/;
+// The two clauses that must survive every path where a prior review exists, each
+// derived from the stage that settled it rather than asserted ahead of one.
+const acts = /Fresh hunting is not confined to any commit range\./;
 for (const outcome of [none, incremental, same, unmeasured]) {
   assert.match(describePrior(outcome, currentHead), acts);
 }
@@ -299,4 +300,4 @@ const quietSession = { ...session, log: async (message) => quietLogs.push(messag
 await executeTargetCapture(quietSession, "1", { gh: capturing, quiet: true });
 assert(!quietLogs.some((line) => line.startsWith("I1 prior: ")), "Quiet drops the evidence dump");
 assert(quietLogs.some((line) => acts.test(line)), "Quiet never drops what the run did about it");
-console.log("PASS I1a capture reports the prior review, verbosely and quietly, and acts on none of it");
+console.log("PASS I1a capture reports the prior review, verbosely and quietly, and confines nothing");

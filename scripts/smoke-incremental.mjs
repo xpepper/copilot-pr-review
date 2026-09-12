@@ -326,11 +326,14 @@ console.log("PASS I1b confinement narrows what may be reported and changes no re
 // The prior-review report says what this run actually did with it.
 
 const priorOutcome = { ...found("incremental"), identity, considered: 1, comments: [] };
-assert.match(describePrior(priorOutcome, head, false), /acts on none of it/);
-assert.match(describePrior(priorOutcome, head, true), /confines fresh hunting to the commit range reported below/);
+assert.match(describePrior(priorOutcome, head, false), /Fresh hunting is not confined to any commit range\./);
+assert.match(describePrior(priorOutcome, head, true), /Fresh hunting is confined to the commit range reported below\./);
+// I1c made the second clause conditional too. This review published no comment
+// this tool can read back, so both branches say there is none to revalidate,
+// and neither promises a revalidation that did not happen.
 for (const confinedFlag of [false, true]) {
-  assert.match(describePrior(priorOutcome, head, confinedFlag), /earlier findings are not revalidated/,
-    "Revalidating them is still nobody's work, in both branches");
+  assert.match(describePrior(priorOutcome, head, confinedFlag), /none is revalidated/,
+    "The report never promises a revalidation the run did not make");
 }
 console.log("PASS I1b the prior-review report never promises a confinement the run did not make");
 
@@ -370,7 +373,7 @@ const evidence = asked.find((line) => line.startsWith("I1b confinement: "));
 assert(evidence, "A verbose run dumps the confinement evidence like every other stage");
 assert.match(evidence, /"status":"confined"/);
 assert.match(evidence, /does not cover the whole pull request/);
-assert(asked.some((line) => /confines fresh hunting to the commit range reported below/.test(line)),
+assert(asked.some((line) => /Fresh hunting is confined to the commit range reported below\./.test(line)),
   "The prior-review line agrees with the confinement that followed it");
 
 const quiet = [];
@@ -383,5 +386,5 @@ const unasked = [];
 const ordinary = await executeTargetCapture(session(unasked), "13", { gh: capturing });
 assert.equal(ordinary.confinement, undefined);
 assert(!unasked.some((line) => line.includes("I1b confinement")), "A run that did not ask reports no confinement");
-assert(unasked.some((line) => /acts on none of it/.test(line)));
+assert(unasked.some((line) => /Fresh hunting is not confined to any commit range\./.test(line)));
 console.log("PASS I1b capture confines only when asked, and reports it verbosely and quietly");

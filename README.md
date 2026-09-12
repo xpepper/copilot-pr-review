@@ -30,6 +30,7 @@ and how to reproduce each behaviour yourself.
 | --- | --- |
 | [Install](#install) | Getting the plugin into your CLI |
 | [Your first review](#your-first-review) | One worked run, start to finish |
+| [Revalidating findings](#revalidating-the-earlier-reviews-findings) | `--revalidate`: what became of the last review's findings |
 | [Review modes](#review-modes) | Quick, balanced, full, deep, and what each costs |
 | [Models and configuration](#models-and-configuration) | Tiers, precedence, fallbacks, project trust |
 | [Reading the result](#reading-the-result) | Findings, the evidence boundary, coverage |
@@ -103,7 +104,8 @@ credits. What you see, in order:
 3. **The bound source context**, a `Q2 context:` line naming each changed file,
    the side fetched, blob identities and window ranges.
 4. **Any earlier review of ours**, an `I1 prior:` line naming the head it
-   evaluated and how the reviewed head relates to it. Nothing acts on it yet.
+   evaluated and how the reviewed head relates to it, then an `I1c revalidation:`
+   line saying what became of the findings it published.
 5. **The revision gate**, which refuses the review unless this checkout is the
    reviewed head.
 6. **Per-reviewer progress**: starting, active, completed or failed.
@@ -189,10 +191,11 @@ and its anchor normalised to a fixed shape: path, side, the current line, and th
 line it was written at, which GitHub keeps after an anchor falls out of the
 current diff. Every other field GitHub returns is dropped.
 
-One flag acts on this, and only when you ask for it: `--incremental`, in the
-section below. Without it hunting is not confined, and the earlier findings are
-not revalidated either way, so a re-review costs and reports what a first review
-does. Discovery failure is reported as itself and never refuses a review.
+Two things act on this. **Revalidating that review's findings happens in every
+review**, for the verdicts that cost nothing, and is the section after next;
+`--revalidate` buys the rest. **Confining fresh hunting happens only when you ask
+for it**, with `--incremental`, in the section below. Discovery failure is
+reported as itself and never refuses a review.
 
 ### Confining a re-review to the new commits
 
@@ -253,6 +256,86 @@ silently never reach the hunks that lighter mode only skimmed. And the earlier
 review's own coverage cannot be read: the body signature requires a coverage
 sentence and deliberately never reads what it says, because that prose is the
 part most likely to change between versions of this tool.
+
+### Revalidating the earlier review's findings
+
+Every review that finds an earlier review of the same pull request reports what
+became of the findings that review published. It reads the comments discovery
+already retained, spends nothing, and settles only what it can prove:
+
+| Verdict | Proved by |
+| --- | --- |
+| still open | The commits added since that review do not touch the lines the comment anchors on |
+| still open | The reviewed head is exactly the head that review evaluated, so nothing has changed |
+| obsolete | GitHub can no longer place the comment in the current diff |
+| obsolete | Those commits deleted the file the comment anchors in |
+| not settled | Anything else, including a file those commits renamed |
+
+The asymmetry is deliberate: code proves that a finding still stands and never
+that it has gone away. **Nothing is ever proved resolved without reading the
+code**, because absence of evidence that a defect remains is not evidence that
+somebody fixed it, and a wrongly resolved finding is one nobody looks at again.
+
+Pass `--revalidate` to buy one model pass over exactly what is left:
+
+```text
+/pr-review 123 --deep --no-comment --revalidate
+```
+
+That pass reads the checkout the revision gate has already proved is the
+reviewed head, and returns resolved, still open or obsolete for each finding it
+was asked about. It is never asked about a verdict the code proved and can never
+overturn one. A verdict for a finding it was not asked about, a word that is not
+one of the three, and silence about a finding are each ignored rather than
+trusted, and a pass that fails settles nothing and loses nothing.
+
+Like discovery and confinement, **revalidation grounds nothing a finding depends
+on**, so a failed pass is reported as itself and never becomes the review's
+coverage. It reports no new finding. A comment this tool cannot read back into a
+finding is named and counted rather than guessed at.
+
+### Answering the threads that review left
+
+A settled verdict is posted as a reply on the thread the earlier review's
+comment started:
+
+```text
+Revalidated at head 4f2c9b1...: STILL OPEN.
+
+The commits added since that review do not touch the lines this comment anchors on.
+
+Decided by this tool, from the commit range.
+
+This is a revalidation of a finding an earlier review by this tool published. It is not a
+re-review of this pull request.
+```
+
+Replies carry **the review's own posting authority and no other**. `--no-comment`
+suppresses them exactly as it suppresses the review, `--comment` and
+`autoPostReviews` authorize them, a confirmed review proposal covers them, and a
+declined one refuses them and is never re-asked. What they do not need is a
+review: a re-review that selects no finding and has three earlier findings to
+answer is the case this exists for. **When there was no review proposal to
+confirm, the replies ask for themselves**, because nothing else had the chance
+to. An unsettled verdict is never posted, because replying that this tool could
+not tell is noise.
+
+A thread already carrying this run's answer **at this head** is skipped rather
+than answered twice. A thread answered at an older head is answered again,
+because that answer was about a different revision.
+
+**This is the only write in this tool that is more than one request**, and the
+one place where partial completion is an ordinary result rather than an error.
+Each reply is journalled before it is sent. A reply GitHub definitely refuses
+does not stop the others, because it is known not to have been written. **An
+unknown outcome stops the set**: every thread after it is deliberately left
+unattempted rather than becoming a second unknown, the run says so, and the
+retained record says which thread it was. Do not retry it; inspect the pull
+request and reconcile the record first.
+
+`/pr-review publish` deliberately answers no thread. A verdict about the current
+code was grounded in a read of the checkout at the reviewed head, and that
+command never reads a checkout.
 
 ## Review modes
 
@@ -930,6 +1013,7 @@ Review flags:
 | `--include-closed`, `--review-closed` | Review a closed or merged pull request |
 | `--unattended` | Declare that nothing is left for a person to answer. Refuses at parse time without `--all` and one of `--comment`/`--no-comment`, and refuses `--verify`. Authorizes nothing |
 | `--incremental` | Confine fresh hunting to the commits added since an earlier review of this pull request by this tool. A request, not a parse-time contract: a run with no forward commit range narrows nothing and says so. Authorizes nothing |
+| `--revalidate` | Buy one model pass over the earlier review's findings this tool cannot settle for free. Every review already reports the verdicts it can prove. A settled verdict is answered on the earlier review's thread under the review's own posting authority. Authorizes nothing |
 | `--capture-only` | Stop after capture. Takes no mode, posting or model argument |
 | `heavyModel=ID`, `heavyEffort=LEVEL` | Override the heavy tier for this invocation only |
 
@@ -1087,10 +1171,11 @@ the point of this project:
   1427 changed lines over 16 files, and its single finding was real. That is
   precision. What a review misses needs a defect corpus with agreed ground
   truth, which this project does not have.
-- **A re-review revalidates nothing.** The earlier review, the head it evaluated
-  and its inline comments are discovered and reported, and `--incremental`
-  confines fresh hunting to the commits added since. Deciding whether each
-  earlier finding is now resolved, still open or obsolete is not built.
+- **No revalidation has run live.** Every verdict this tool reports about an
+  earlier finding, and every reply it would post to a thread, rests on fixture
+  coverage alone. Closing this needs a pull request this tool has published a
+  review on and that has since moved, the same live evidence `--incremental`
+  is still waiting for.
 - **No confined run has been watched end to end.** `--incremental` narrows only
   where capture reports `incremental`, and no live run has ever reported that
   relationship: the only two reviews this tool has published are on playground

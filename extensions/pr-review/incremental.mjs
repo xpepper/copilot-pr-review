@@ -36,14 +36,22 @@ export function newRangeFrom(diff, { priorHead, head, commits } = {}) {
   const parsed = parseDiffFiles(diff);
   const touched = new Set();
   const changed = new Map();
+  // I1c reads this one: a path these commits removed outright, which is the only
+  // way a head-side anchor can be proved to have nothing left to point at. A
+  // rename is deliberately not one, because both of its sides carry a path and
+  // the code moved rather than went away.
+  const removed = new Set();
   for (const file of parsed) {
     for (const path of [file.oldPath, file.newPath]) if (path) touched.add(path);
-    if (!file.newPath) continue;
+    if (!file.newPath) {
+      if (file.oldPath) removed.add(file.oldPath);
+      continue;
+    }
     const lines = changed.get(file.newPath) ?? new Set();
     for (const line of file.changed.head) lines.add(line);
     changed.set(file.newPath, lines);
   }
-  return { priorHead, head, commits, touched, changed, files: parsed.length };
+  return { priorHead, head, commits, touched, changed, removed, files: parsed.length };
 }
 
 // Consecutive head-side lines read as one range, which is what a reviewer is
@@ -83,21 +91,39 @@ export async function readNewRange(repository, priorHead, head, { gh = runGh, cw
   return diff;
 }
 
+// I1c also needs this range, and for free in every re-review rather than only
+// behind `--incremental`, because it is what proves an earlier finding's lines
+// untouched. So the read is made once and its outcome handed to both consumers;
+// a relationship with no forward range still costs no request at all.
+export async function readRangeOnce(prior, pull, repository, { gh = runGh, cwd, signal } = {}) {
+  if (prior?.relationship !== "incremental") return undefined;
+  try {
+    const diff = await readNewRange(repository, prior.review.head, pull.head.sha, { gh, cwd, signal });
+    return { range: newRangeFrom(diff, {
+      priorHead: prior.review.head, head: pull.head.sha, commits: prior.comparison?.totalCommits,
+    }) };
+  } catch (error) {
+    if (signal?.aborted) throw error;
+    return { error: String(error.message ?? error) };
+  }
+}
+
 // Confinement is decided here, once, from a discovery this run already made.
 // Every outcome but `confined` narrows nothing, and each says which it is: a
 // run that asked to be confined and was not must never read as one that was.
 export async function confineToNewCommits(prior, pull, repository, {
-  requested = false, gh = runGh, cwd, signal,
+  requested = false, read, gh = runGh, cwd, signal,
 } = {}) {
   if (!requested) return undefined;
   if (prior?.relationship !== "incremental") {
     return { status: "not-applicable", relationship: prior?.relationship ?? "none", requested };
   }
+  // A range the caller already read is used as read. Nothing else changes: an
+  // unread range still fails, and a failed read still narrows nothing.
+  const outcome = read ?? await readRangeOnce(prior, pull, repository, { gh, cwd, signal });
   try {
-    const diff = await readNewRange(repository, prior.review.head, pull.head.sha, { gh, cwd, signal });
-    const range = newRangeFrom(diff, {
-      priorHead: prior.review.head, head: pull.head.sha, commits: prior.comparison?.totalCommits,
-    });
+    if (outcome?.error) throw new Error(outcome.error);
+    const { range } = outcome;
     // A forward range that changed no file leaves nothing to confine hunting
     // to. Confining to it would set every candidate aside, and calling it a
     // failure would name something that did not happen, so it is its own

@@ -194,20 +194,24 @@ export function priorSummary(prior, limit = 20) {
   };
 }
 
-// The one sentence that must survive every path, and it has to say what this
-// run actually did. I1b made confining fresh hunting possible, so the sentence
-// that used to promise it never happens is now conditional on the confinement
-// this run reached: a run that says it acts on none of the prior review while
-// confining its hunting to that review's successor commits is exactly the
-// paperwork defect this project keeps catching in itself. Revalidating the
-// earlier findings is still nobody's work, and stays denied in both branches.
-const actsOnNone = "This run reports the prior review and acts on none of it: fresh hunting is not confined " +
-  "to any commit range, and the earlier findings are not revalidated.";
-const actsOnRange = "This run confines fresh hunting to the commit range reported below, which is the only " +
-  "thing it takes from the prior review: the earlier findings are not revalidated.";
+// The lines that must survive every path, and they have to say what this run
+// actually did. I1b made confining fresh hunting possible and I1c made
+// revalidating the earlier findings possible, so both halves of what used to be
+// one flat denial are now conditional on what this run reached. A run that says
+// it acts on none of the prior review while confining its hunting to that
+// review's successor commits, or while reporting verdicts on that review's own
+// findings, is exactly the paperwork defect this project keeps catching in
+// itself. Each clause is therefore derived from the stage that settled it,
+// never asserted ahead of one.
+const confinesNothing = "Fresh hunting is not confined to any commit range.";
+const confinesRange = "Fresh hunting is confined to the commit range reported below.";
+const revalidatesFindings = "What became of that review's own findings is revalidated and reported below.";
+const revalidatesNothing = "That review published no finding this tool could read back, so none is revalidated.";
 
-export function describePrior(prior, head, confined = false) {
-  const acts = confined ? actsOnRange : actsOnNone;
+export function describePrior(prior, head, confined = false, revalidating = false) {
+  const acts = `${confined ? confinesRange : confinesNothing} ` +
+    (prior.status === "found" ? revalidating ? revalidatesFindings : revalidatesNothing
+      : "There is no earlier finding of ours to revalidate.");
   if (prior.status === "failed") {
     return `Prior review discovery failed: ${prior.reason}\n` +
       "The review is unaffected and proceeds as an ordinary one. No earlier review was read, " +

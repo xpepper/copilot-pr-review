@@ -117,6 +117,8 @@ try {
     ["status", "--unattended declares that a run leaves nothing for a person to answer"],
     ["help", "--incremental  Ask for fresh hunting to be confined to the commits added since an earlier review"],
     ["status", "--incremental asks for fresh hunting to be confined to the commits added since an earlier review"],
+    ["help", "--revalidate  Judge what became of the findings an earlier review of this pull request published"],
+    ["status", "--revalidate buys one model pass over the earlier review's findings that this tool cannot settle"],
     ["cancel", "No review is running."],
   ]) {
     const before = (await session.getEvents()).length;
@@ -190,6 +192,10 @@ try {
     ["123 --deep --all --unattended", /--unattended needs --comment or --no-comment/],
     ["123 --quick --all --no-comment --verify --unattended", /--unattended cannot be combined with --verify/],
     ["123 --capture-only --unattended", /cannot be combined/],
+    // I1c: the flag reaches the real dispatch path too, and a capture that
+    // reviews nothing takes no review flag.
+    ["123 --capture-only --revalidate", /cannot be combined/],
+    ["123 --deep --all --no-comment --revalidate --revalidate", /Duplicate review argument/],
     ["123 --deep --all --no-comment --unattended --unattended", /Duplicate review argument/],
     // I1b: the flag's only refusals. Everything else it could disagree with is a
     // fact about the pull request, which parse time cannot know, so neither of
