@@ -5,8 +5,9 @@ These are the completed increment entries moved out of
 everything through `V1c`, by increment `L1` for `V2a` and `V2b`, by increment
 `D1` for `A1`'s own entry and then `L1`'s, by increment `O1` for `D1`'s, by
 increment `U1` for `O1`'s, by increment `I1a` for `E1`'s, by increment `I1b`
-for `U1`'s and then `I1a`'s, by increment `I1c` for `I1b`'s, and by increment
-`G1` for `I1c`'s, which is the
+for `U1`'s and then `I1a`'s, by increment `I1c` for `I1b`'s, by increment
+`G1` for `I1c`'s, and by the backlog triage of 2026-09-12 for `G1`'s own, which
+is the
 last in this file. They are the
 project's
 evidence of record and are reproduced verbatim: nothing here was rewritten,
@@ -9316,3 +9317,150 @@ evidence records the refusal as `policy.permissionDenials: ["read-absent"]`, so
 the plugin reported it without anyone reading Copilot's session state.
 `enforcement` stayed empty and correctly so: it carries deliberate
 forbidden-tool probes, not refusals that happened.
+
+## Completed increment: G1
+
+`G1` compares this tool behaviourally with upstream `pi-pr-review` and with the
+code-review agents and skills now in the open, on capability and on user
+experience, and proposes what is worth adopting. The output is
+[docs/gap-analysis.md](docs/gap-analysis.md), 35275 bytes, and it is analysis
+and a proposal rather than code. **No product behaviour changed in this
+increment**, and nothing it proposes has started.
+
+### The user chose the widest sweep, and the proposal shape, before anything was written
+
+Two decisions were put to the user separately, as every increment since `U1` has
+done, and both were taken before a word of the document existed.
+
+- **Breadth.** The offered options were the five named references alone, those
+  plus the neighbours this project already meets, or those plus a full open-field
+  sweep. **The user chose the widest.** So the document covers ten sources rather
+  than five, and the extra five are the closest peer plugin, GitHub's own
+  reviewer, the hosted products, the open-source tooling around them and the one
+  independent benchmark in the field.
+- **The shape of the proposal.** The offered options were a ranked menu with
+  nothing chosen, one recommendation argued in depth, or a ranked menu plus a
+  proposed sequence. **The user chose the menu plus a sequence.** The sequence is
+  therefore in the document, marked as a proposal and not a plan, with every
+  entry naming whether it fits `SCOPE.md` as written or needs a scope decision.
+
+### `L1`'s rule held, and holding it is the reportable part
+
+No upstream or third-party source, prompt text, configuration or documentation
+was copied into this repository. Everything read was read into a scratchpad
+outside the working tree and described in this project's own words.
+[docs/upstream-licensing.md](docs/upstream-licensing.md) remains the record of
+why, and the document repeats the rule in its own opening so a later reader
+cannot mistake a described behaviour for a borrowed one.
+
+### Upstream has converged on `I1a`, `I1b` and `I1c`
+
+`SCOPE.md` pins upstream at 1.17.10. Upstream is now at 1.18.1, and the drift
+that matters is one section: it has shipped incremental re-review. It classifies
+the prior head against the current one into the same four relationships this
+project named, counts only a review carrying its own marker from the
+authenticated identity, and revalidates prior findings into the same three
+verdicts of resolved, still open and obsolete.
+
+**Two implementations reaching the same vocabulary independently is the best
+evidence either has that the vocabulary is right**, and until now `I1a`-`I1c`
+rested on this project's own reasoning alone. The differences are choices, and
+this project's are the more conservative: an answer goes on the thread that
+asked rather than into the review body, a still-open finding is answered rather
+than resurfaced as a fresh one, and code is never allowed to prove a finding
+resolved. **None of that is reopened by this increment.**
+
+Upstream also short-circuits a `same-head` re-review into a revalidation-only
+run that spends nothing on reviewer passes. This tool has every piece for that
+and does not do it, which is item 3 of the menu.
+
+### What the sweep established about this tool's position
+
+- **The field's dominant complaint is false positives**, reported between 40 and
+  70 per cent among leading agents, with one study finding developers rejecting
+  56.3 per cent of one tool's comments. **That is the axis this tool is built
+  on**, and nothing else read here refuses a real observation because a model
+  paraphrased its own quotation.
+- **And this tool has never measured itself on it.** Upstream publishes recall,
+  precision, per-lens and cross-file numbers over a seeded corpus with ground
+  truth, a plan that cannot be cherry-picked, a collector that refuses reruns,
+  and gates that stay `baseline_required` until a person writes one. This
+  project has none of that, and its README is right to say recall is unmeasured.
+- **Upstream's own committed numbers point at this project's default.** Over 72
+  runs, deep matched the best recall in every band, produced no false positive,
+  left every clean control alone, completed the most reliably, and was no slower
+  at the median than the five-reviewer default; full was worst on precision, with
+  every clean control drawing a finding. Upstream labels these diagnostic and no
+  baseline gate has been accepted, so **this is a question raised, not a default
+  refuted.** `SCOPE.md` fixes balanced as the default and this increment changes
+  nothing.
+- **Four independent tools steer their reviews with the project's own written
+  standards.** This tool collects its checkout's instruction files for safeguard
+  discovery and the code says in as many words that it hands them to no reviewer.
+  That is the largest capability gap found, and it is a scope question rather
+  than a defect, because a convention finding's evidence is a sentence in a
+  document and this tool's validation is built for provable effects in code.
+- **The field's lenses are not this tool's four specialists.** The closest peer
+  spends three of its five reviewers on git history, on comments left on earlier
+  pull requests touching the same files, and on the code comments in the changed
+  files. One reference makes the reviewer set a property of the repository, so
+  adding a lens is adding a file. Another fires its gates on what the diff
+  touched, so a documentation-only change draws no security reviewer and a
+  workflow change draws one that knows what a dangerous trigger looks like.
+- **What this tool has and the field does not** is recorded too, because a gap
+  analysis that lists only gaps misleads: the evidence boundary, the isolated
+  toolless adjudication, coverage as a result that outranks the findings,
+  publication that is code-controlled end to end, and honest refusal.
+
+### One concrete defect, found by reading and not by running
+
+**There is no redaction anywhere in this tool.** The published inline comment
+carries the reviewer's own prose in five fields and nothing constrains what that
+prose contains. The citation quotes are not published, which narrows the
+exposure without closing it: a security reviewer that finds a hardcoded
+credential on a changed line and writes it into its own sentence will have that
+sentence posted verbatim on a public pull request under the user's identity. The
+security specialist is the reviewer explicitly pointed at secrets, which makes it
+the one most likely to quote one.
+
+**It is not fixed here.** `G1`'s authorization is analysis, and a change to
+`extensions/` would make this pull request a behaviour change needing an
+installed-plugin review it was not authorized to spend. It is item 1 of the menu
+and the first thing in the proposed sequence.
+
+### The menu and the sequence, in one line each
+
+Twelve adoptions are ranked in the document with their evidence and the
+`SCOPE.md` clause each touches: redact credential-shaped text before
+publication; report what a run cost and how long it took; skip the reviewers when
+nothing has moved; let the project's own standards steer the review; measure
+recall and precision against a seeded corpus; decide the default mode on
+evidence; add the history lenses; fire reviewers on what the diff touched; give
+findings somewhere to go next; anchor findings that land outside the diff; handle
+a large diff as a large diff; ask what the review found useful.
+
+The proposed sequence runs in five stages: the two small ones first, then the
+`same-head` short-circuit, then the measurement work sliced the way `I1` was
+sliced, then the default-mode decision that measurement unblocks, then the three
+scope questions that are really one question wearing three hats. **Every item is
+a scope decision for the user and none is scheduled.**
+
+### Validation
+
+This increment changed no code. The sixteen controlled suites were run at the
+start of the session and again before the checkpoint and all sixteen pass;
+`git diff --check` is clean; no tracked text carries a control byte; and the
+real discovery collector reads all six root files and skips none.
+
+`ROADMAP.md` had 7916 bytes spare, which is less than any increment entry ever
+written here, so **`I1c`'s 13014-byte entry was archived verbatim first**, under
+the rule every earlier move followed. `docs/gap-analysis.md` lives in `docs/`,
+which safeguard discovery does not recurse into, so its 35275 bytes cost the cap
+nothing. `README.md` is unchanged: this increment ships no user-visible
+behaviour, and its 2665 bytes of headroom are untouched.
+
+### Pull request #33 and its review
+
+Documentation-only. `AGENTS.md` requires the pull request and leaves its plugin
+review to the user, because reviewing costs real credits, and this increment
+asked rather than spending by default.
