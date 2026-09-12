@@ -2,7 +2,7 @@
 
 Read `AGENTS.md`, `SCOPE.md` and `ROADMAP.md`, then inspect git state and open
 pull requests before editing anything. Scope is authoritative; the roadmap
-records demonstrated evidence and what stays open. Do not rely on this
+records demonstrated evidence and what stays open. Do not rely on any previous
 conversation or reopen settled decisions. Distinguish what has been demonstrated
 from what has only been assumed, in your own reporting as well as in the code.
 
@@ -12,14 +12,14 @@ for an older increment's evidence. The README material that used to carry them
 is in `docs/readme-archive-2026-09-10.md`, and the `--verify` guide now lives in
 `docs/safeguards.md`.
 
-## Headroom first, and this time `README.md` is the problem
+## Headroom first, and `README.md` is still the problem
 
 At 65536 bytes this project's own safeguard discovery stops reading a file,
 silently, and the tool can no longer read its own project. **`README.md` has 2665
-bytes spare and `ROADMAP.md` has 11151.** That is not one increment's writing in
-the README, and the next increment that touches it will have to solve that first.
-**CI fails the build if either crosses the cap**, so this is a thing you cannot
-miss rather than a thing you have to remember.
+bytes spare and `ROADMAP.md` has 7916.** Neither is one increment's writing, and
+the next increment that touches either has to solve that first. **CI fails the
+build if any root file crosses the cap**, so this is a thing you cannot miss
+rather than a thing you have to remember.
 
 - **`README.md`'s escape is `docs/`, which discovery does not recurse into.**
   `D1` moved the old README there, and `I1b` moved the 12922-byte `--verify`
@@ -27,18 +27,19 @@ miss rather than a thing you have to remember.
   #30, which the user merged without a plugin review. That is the pattern:
   **housekeeping is worth its own pull request, and it is worth agreeing with the
   user first.** Do not start it unasked.
-- **`ROADMAP.md`'s escape is archiving**, and `I1c` used it once: `I1b`'s
-  15018-byte entry moved before a word of `I1c`'s could be written. **One live
-  completed entry rather than two is where that rule lands.** If your entry does
-  not fit, archive `I1c`'s the same way: verbatim, with the same kind of pointer,
-  not rewritten or condensed on the way.
+- **`ROADMAP.md`'s escape is archiving.** `I1c`'s live entry is **13015 bytes**
+  and is the only completed entry left in the file. If your own entry does not
+  fit in the 7916 spare, archive `I1c`'s the same way every earlier move was
+  done: verbatim, with the same kind of pointer, not rewritten or condensed on
+  the way. **One live completed entry rather than two is where that rule lands.**
 - Measure with `wc -c`, and run the collector check below before opening a pull
   request. A file that starts appearing in the skipped list has crossed 65536.
 
 ## Take `G1`, and nothing else
 
-**`I1` is complete. `G1` is the only increment the user scheduled that is left**,
-and `ROADMAP.md`'s section "The next increment is `G1`" is authoritative.
+**`I1` is complete and merged. `G1` is the only increment the user scheduled that
+is left**, and `ROADMAP.md`'s section "The next increment is `G1`" is
+authoritative.
 
 `G1` is gap analysis against the field, then a proposal: compare this tool
 behaviourally with upstream `pi-pr-review` and with other code-review agents and
@@ -53,14 +54,17 @@ not a boundary.
 - **Anything it proposes is a scope decision for the user**, not work to start.
 - Its written output is long, and `README.md` has no room for it. **`docs/` is
   where it belongs**, and agreeing that with the user first is the pattern.
+- A documentation-only pull request still needs the pull request, but its plugin
+  review is the user's call rather than a requirement, because reviewing costs
+  real credits. **Ask; do not spend by default.**
 - **Ask the user before building anything unsettled**, as `U1`, `I1a`, `I1b` and
   `I1c` each did. Do not start anything after `G1` without the user saying so.
 
-## What `I1c` did, and the seven things worth carrying forward
+## What `I1c` did, and the eight things worth carrying forward
 
 `I1c` revalidates the findings an earlier review of the same pull request
 published, and answers each settled one on its own thread. Pull request #32
-carries all of it.
+carried all of it and is merged.
 
 - **Six decisions were taken with the user before anything was built**, each put
   as a separate question, and the roadmap entry records all six with the
@@ -69,26 +73,33 @@ carries all of it.
   `--revalidate`; replies go on the earlier review's own threads and *not* as a
   line in the published review body; replies carry the review's own posting
   authority and never a separate one.
-- **This session recorded a sizing concern and the user reaffirmed anyway.**
-  Per-comment replies are a new GitHub mutation class `SCOPE.md` does not cover,
-  and they made this the first write set in the tool that is more than one
-  request. That was the user's call, it is recorded in the roadmap entry, and it
-  is not to be relitigated.
+- **A sizing concern was recorded and the user reaffirmed anyway.** Per-comment
+  replies are a new GitHub mutation class `SCOPE.md` does not cover, and they
+  made this the first write set in the tool that is more than one request. That
+  was the user's call, it is in the roadmap entry, and it is not to be
+  relitigated.
 - **Code proves that a finding still stands and never that it has gone away.**
   Nothing is ever proved resolved without reading the code, because absence of
   evidence that a defect remains is not evidence that somebody fixed it. The
   retained record enforces it: a `decidedBy: "code"` entry claiming `resolved` is
   refused. **Keep that asymmetry**; it is the same one `withinNewRange` keeps.
 - **A round-trip check on an anchored pattern proves nothing about which split
-  it chose.** This increment argued itself into believing otherwise and #32's
-  reviewer caught it. The parser now refuses a body that admits more than one
-  split. **Do not reintroduce the idea that rebuilding the same bytes proves the
-  fields were right.**
+  it chose.** That increment argued itself into believing otherwise and #32's
+  first reviewer caught it. The parser now refuses a body that admits more than
+  one split. **Do not reintroduce the idea that rebuilding the same bytes proves
+  the fields were right.**
 - **An unknown write outcome stops the reply set**, and every thread after it
   stays unattempted rather than becoming a second unknown. A definite rejection
   does not stop it, because it is known not to have been written. The retained
   record admits at most one unknown and the validator enforces that. **Do not
   add a retry.**
+- **The retained journal is a record, never a resume point.** #32's second
+  reviewer asked whether a later run preserves or overwrites it. It overwrites,
+  and that is harmless: whether a thread already carries our answer is read fresh
+  from GitHub's paginated comment listing each run, not from the record, and
+  neither `retained-run.mjs` nor `publication.mjs` holds any reply path at all.
+  So an uncertain reply is never blindly retried. **Keep the fresh read**; it is
+  what makes that true.
 - **A reply must never come back as a finding or as a review this tool wrote.**
   Discovery keeps only the comments of the review it recognised, and recognising
   a review reads the body this tool builds, so a reply is excluded twice over.
@@ -96,17 +107,16 @@ carries all of it.
   either changing would make a re-review revalidate its own answers.
 - **Before you finish, grep the live roadmap and the README for claims your own
   change has made false**, and for claims that were already false. `I1b` asked
-  for this check and `I1c`'s run of it found four: three README sentences and one
-  shipped string, each saying the earlier findings are never revalidated. Each
-  was true when written.
+  for this check, `I1c`'s run of it found four, and #32's second review made
+  three more false in a session that changed no behaviour at all.
 
 ## Validation and runtime caveats
 
 The **sixteen** controlled suites (`node scripts/smoke-<name>.mjs`) are findings,
 review, selection, retention, preview, publication, publish-later, checkout,
 config, context, fixture, target, safeguards, prior, incremental and
-**revalidation**. They need no inference and no network, and all sixteen pass at
-this handoff. `git diff --check` is clean and the branch diff carries no control
+revalidation. They need no inference and no network, and all sixteen pass at
+this handoff. `git diff --check` is clean and no tracked text carries a control
 byte.
 
 ```sh
@@ -148,14 +158,21 @@ its journal, one unknown outcome stopping it, a definite rejection not stopping
 it, the posting authority in all seven of its states, and the capture wiring
 verbosely, quietly and with each flag. **Keep every one.**
 
-**Check `copilot plugin list` immediately before dispatching any review**, and
-**reinstall whenever the checkout changes**, checking out before installing and
-never the other way round. During `D1` an install that had reported success was
-gone minutes later, most likely clobbered by a concurrent `copilot` process.
-`I1c` reinstalled with `copilot plugin install "$(pwd)"` and then ran `diff -rq`
-of `~/.copilot/installed-plugins/_direct/pr-review/extensions/pr-review` against
-the checkout, expecting no output; do the same. CLI 1.0.83 warns that direct
-local installs are deprecated for a future release.
+**Reinstall the plugin before every review, and verify it.** #32's second review
+found the installed copy stale by exactly the four files its own fixes had
+touched, which means the first review had reviewed code that was no longer there.
+**Check out first, then install, never the other way round**, and prove it:
+
+```sh
+copilot plugin install "$(pwd)"
+diff -rq ~/.copilot/installed-plugins/_direct/pr-review/extensions/pr-review \
+  extensions/pr-review   # expect no output
+```
+
+Run `copilot plugin list` immediately before dispatching as well. During `D1` an
+install that had reported success was gone minutes later, most likely clobbered
+by a concurrent `copilot` process. CLI 1.0.83 warns that direct local installs
+are deprecated for a future release.
 
 **If you cannot type a Copilot slash command, dispatch it through the SDK** with
 `node scripts/dogfood-review.mjs NUMBER --deep --all --no-comment --unattended`,
@@ -178,19 +195,22 @@ It passes every other flag straight through, so `--incremental` and
 `--revalidate` both reach it.
 
 **A review takes minutes of wall time and prints almost nothing while it runs.**
-#32's reviewer printed two `active` lines and nothing else for most of it. If you
-poll for completion, block on the process itself rather than timing your own
-waits; an agent that mistakes its own elapsed sleeps for the review's can report
-a hang that is not there. **Never add a timeout**, and a quiet timeline is not a
-hang. The evidence lines are also very long, so grep them narrowly or you will
-pull half a megabyte of JSON into your own context.
+#32's second reviewer printed eleven `active` lines over 137 seconds and nothing
+else. If you poll for completion, block on the process itself rather than timing
+your own waits; an agent that mistakes its own elapsed sleeps for the review's
+can report a hang that is not there. **Never add a timeout**, and a quiet
+timeline is not a hang. The evidence lines are also very long, so grep them
+narrowly or you will pull half a megabyte of JSON into your own context. A
+reviewer's own tool calls and denials are in the run's `M2 evidence` line under
+`reviewers[].policy`, which is the plugin's own record and is easier to read than
+Copilot's session state.
 
-`node scripts/smoke-runtime.mjs --targets` **was not run during `I1c`.** It
-passed with 75 assertions during `I1b`; `I1c` added four more without running
-them, two `help`/`status` sentences for `--revalidate` and two parse refusals, so
-**the expected count is now 79 and that is unverified.** It spends no credits but
-needs a live runtime connection. If you change a `help` or `status` string,
-change the probe with it.
+`node scripts/smoke-runtime.mjs --targets` **has not been run since `I1b`**,
+where it passed with 75 assertions. `I1c` added four without running them, two
+`help`/`status` sentences for `--revalidate` and two parse refusals, so **the
+expected count is now 79 and that is unverified.** It spends no credits but needs
+a live runtime connection. If you change a `help` or `status` string, change the
+probe with it.
 
 `scripts/smoke-reviewer-tools.mjs`, the confinement probe outside the sixteen,
 must be run and reported for any increment touching `read-only.mjs`. `V2a`,
@@ -200,12 +220,13 @@ it.
 The personal config probe fails its first assertion if personal
 `pr-review/config.json` exists. Move it aside only if running that probe, restore
 it afterwards, and verify with `shasum -a 256`. That file was not moved or edited
-during `I1c`, and #32's review ran on `heavyModel=gpt-5.6-terra` at high effort.
+during `I1c`, and both of #32's reviews ran on `heavyModel=gpt-5.6-terra` at high
+effort.
 
 **Press Space on the command before pressing Enter** in any `--verify` run, in
-finding selection, and now in the reply confirmation. The host's multi-select
-toggles only on Space; Enter on a merely highlighted option submits the empty
-default. The question says so.
+finding selection, and in the reply confirmation. The host's multi-select toggles
+only on Space; Enter on a merely highlighted option submits the empty default.
+The question says so.
 
 **Keep the source of every fixture plain text**: a raw control byte in a test is
 what refused #17's review. Check a branch's diff for control bytes before
@@ -220,7 +241,8 @@ test` gets a refusal, and the answer is for that project to declare two lines.
 
 **Do not revert to `fs.realpathSync` anywhere in `read-only.mjs`**, and do not
 replace the `lstat` check in `absentInsideRoot` with a `stat` or a plain resolve:
-both exist to stop a refusal from saying where a symlink points.
+both exist to stop a refusal from saying where a symlink points. That absent-path
+refusal now has live evidence and it works: see the roadmap's `Q7` entry.
 
 **Do not widen `F6`'s marker unwrap or reintroduce substring matching.**
 `safeguards.mjs` shares it as `unwrapEnvelope` from `findings.mjs` so the one
@@ -233,7 +255,9 @@ Factories without a new CLI version**; three separate blockers were demonstrated
 on 1.0.83 and all three would have to change.
 
 Cold resume of command-only records remains unsupported. Citations remain limited
-to captured diff and context windows.
+to captured diff and context windows, which is what produced #32's second
+coverage gap: the reviewer could read an unchanged file from the checkout and
+still could not cite it.
 
 ## Settled decisions, none of which is to be reopened
 
@@ -275,26 +299,23 @@ to captured diff and context windows.
 
 ## State at this handoff
 
-`I1c` landed through pull request **#32**, nine commits on branch
-`i1c-prior-finding-revalidation`, and was reviewed once with this plugin at the
-user's standing authorization: **deep, 144.23376 credits, 0 validated findings on
-INCOMPLETE coverage** from two execution failures and three coverage gaps.
+**`I1c` is complete and pull request #32 is merged into `main`**, twelve commits
+on branch `i1c-prior-finding-revalidation`. Confirm that from git rather than
+from this sentence, and reconcile anything that disagrees. **Start `G1` from a
+fresh branch off `main`.**
 
-**Zero validated findings and three real defects.** Two candidates were discarded
-at the evidence boundary on citations that did not exactly match a supplied
-context window, and one was adjudicated `uncertain` because the captured context
-did not include `finishPreview`. **All three described real defects and all three
-are fixed on the branch**, each with a test written to reproduce it first. One
-was a crash: the retained record refused the proof an ordinary unsettled verdict
-carries, so any review that revalidated and settled less than everything would
-have thrown when it journalled itself. **Read the discarded candidates of a
-review, not only its validated findings.**
+**#32 was reviewed twice with this plugin, each time at the user's explicit
+authorization**, both deep on `gpt-5.6-terra` at high effort.
 
-**The coverage gap is exact and nothing was changed in response, because nothing
-can be.** The reviewer and the adjudicator independently reported that the reply
-flow has fixture coverage only and that no live run has exercised the real
-replies endpoint, the paginated comment response shape or the acknowledgment
-payload. **That is the honest limit on what #32 demonstrates.**
+- The **first** cost 144.23376 credits and reported 0 validated findings on
+  INCOMPLETE coverage. Its three discarded or uncertain candidates all described
+  real defects, all three are fixed, one of them a crash. **Read the discarded
+  candidates of a review, not only its validated findings.**
+- The **second** was authorized because those three fixes changed `extensions/`
+  and nothing had reviewed them. It cost 115.0322 credits, reported 0 candidates
+  on INCOMPLETE coverage, and changed nothing. It still bought two things: the
+  stale-install lesson above, and the live `Q7` absent-path refusal the roadmap
+  had recorded as impossible to arrange.
 
 **Neither `I1b` nor `I1c` has live evidence, and both are blocked on the same
 thing**: a pull request this tool has published a review on and that has since
@@ -303,21 +324,12 @@ the head they evaluated. Arranging one means publishing a real review or pushing
 a commit to a playground branch. **Both are the user's call, and playground #1
 and #2 must never be merged.**
 
-**The three fixes changed `extensions/` and have not themselves been reviewed by
-this plugin**, because the standing workflow authorizes one review per pull
-request and #32 has spent it. A further review needs the user's explicit
-authorization.
-
-**GitHub's own Copilot reviewer is slower than the plugin review**, and on #31 it
-arrived after the plugin review had finished and found three things the plugin
-review and all fifteen suites had missed, for no cost. **Check #32 again before
-you finish**, and treat what it leaves like any other reviewer: **check the
-premise of a finding before implementing it.**
-
-**#32 was open and unmerged at this handoff.** Merging is always the user's
-decision, and `main` refuses direct pushes for everyone, including admins and
-agents using their token. Confirm the state from git rather than from this
-sentence, and reconcile anything that disagrees.
+**GitHub's own Copilot reviewer is slower than the plugin review but free**, and
+on #31 it found three things the plugin review and every suite had missed. **It
+reviews only when it is requested.** It was never requested on #32 and therefore
+left nothing there. Consider requesting it on your own pull request, and treat
+what it leaves like any other reviewer: **check the premise of a finding before
+implementing it.**
 
 If you land anything at all: follow `AGENTS.md`, with meaningful validated
 checkpoint commits, a named branch and pull request, no direct `main` push, and
