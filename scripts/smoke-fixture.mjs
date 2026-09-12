@@ -253,6 +253,66 @@ assert.deepEqual(billed.usage, [
   { model: "model-a", reasoningEffort: undefined, isByok: undefined },
 ], "Billing evidence does not change retained usage attribution");
 
+// B1: the runtime's own context-loss events are recorded on the pass's
+// evidence, with the figures the runtime supplied and how far the pass had got
+// when each began. The summary a compaction writes is not kept: code cannot
+// know what it kept, and the figures are what the runtime reports about it.
+const contextEvents = [
+  { type: "assistant.turn_start" },
+  { type: "tool.execution_start", data: { toolName: "view", arguments: { path: "a.js" } } },
+  { type: "assistant.turn_start" },
+  { type: "tool.execution_start", data: { toolName: "grep", arguments: { pattern: "b" } } },
+  { type: "session.compaction_start", data: {
+    trigger: "threshold", currentTokens: 265318, conversationTokens: 256126, tokenLimit: 272000,
+  } },
+  { type: "tool.execution_start", data: { toolName: "view", arguments: { path: "c.js" } } },
+  { type: "session.compaction_complete", data: {
+    success: true, trigger: "threshold", preCompactionTokens: 265318, postCompactionTokens: 26129,
+    messagesRemoved: 0, tokensRemoved: 239192, tokenLimit: 272000, summaryContent: "A summary of the diff.",
+  } },
+  { type: "assistant.turn_start" },
+  { type: "session.truncation", data: {
+    performedBy: "BasicTruncator", tokenLimit: 272000, preTruncationTokensInMessages: 270000,
+    postTruncationTokensInMessages: 200000, preTruncationMessagesLength: 12, postTruncationMessagesLength: 8,
+    messagesRemovedDuringTruncation: 4, tokensRemovedDuringTruncation: 70000,
+  } },
+  { type: "session.compaction_start", data: { trigger: "context_limit_retry", currentTokens: 271000, tokenLimit: 272000 } },
+  { type: "assistant.message", data: { content: "candidate output" } },
+  { type: "session.idle" },
+];
+const lost = await runReviewer(fakeSession(contextEvents), "quick", { toolCalls: [] });
+assert.equal(lost.status, "completed", "A context-loss event is a report about a pass, never a failure of it");
+assert.deepEqual(lost.contextLoss, [
+  { kind: "compaction", turns: 2, toolCalls: 2, trigger: "threshold", tokenLimit: 272000, tokensBefore: 265318,
+    completed: true, success: true, tokensAfter: 26129, messagesRemoved: 0, tokensRemoved: 239192 },
+  { kind: "truncation", turns: 3, toolCalls: 3, performedBy: "BasicTruncator", tokenLimit: 272000,
+    tokensBefore: 270000, tokensAfter: 200000, messagesRemoved: 4, tokensRemoved: 70000 },
+  { kind: "compaction", turns: 3, toolCalls: 3, trigger: "context_limit_retry", tokenLimit: 272000,
+    tokensBefore: 271000, completed: false },
+], "Each event keeps its figures and its moment; a compaction still open at settlement says so");
+const failedCompaction = await runReviewer(fakeSession([
+  { type: "assistant.turn_start" },
+  { type: "session.compaction_start", data: { trigger: "threshold", currentTokens: 230000, tokenLimit: 272000 } },
+  { type: "session.compaction_complete", data: {
+    success: false, error: "Compaction response was empty", trigger: "threshold", tokenLimit: 272000,
+  } },
+  { type: "session.error", data: { message: "context overflow" } },
+]));
+assert.equal(failedCompaction.status, "incomplete");
+assert.deepEqual(failedCompaction.contextLoss, [
+  { kind: "compaction", turns: 1, toolCalls: 0, trigger: "threshold", tokenLimit: 272000, tokensBefore: 230000,
+    completed: true, success: false, error: "Compaction response was empty" },
+], "A failed compaction is recorded as what it was, and a failed pass keeps it");
+assert.deepEqual(billed.contextLoss, [], "A pass the runtime never compacted or truncated records nothing");
+// Only a host that asks clears a conversation, and this tool never asks.
+const cleared = await runReviewer(fakeSession([
+  { type: "session.context_cleared", data: { messagesCleared: 3 } },
+  { type: "assistant.message", data: { content: "candidate output" } },
+  { type: "session.idle" },
+]));
+assert.deepEqual(cleared.contextLoss, []);
+console.log("PASS B1 compaction and truncation events are recorded on the pass with their figures and moment");
+
 for (const [events, sendError, expected] of [
   [[{ type: "assistant.message", data: { content: "retained output" } }, { type: "session.idle" }], undefined, "completed"],
   [[{ type: "session.error", data: { message: "explicit runtime error" } }], undefined, "incomplete"],
