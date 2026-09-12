@@ -117,6 +117,9 @@ are intentionally not ported.
 Cancellation must stop owned review work and prevent unintended publication.
 Provide basic per-reviewer progress, explicit failure reporting, and completion
 state. A live scrolling view of reviewer output is not required.
+A finished review reports, on one line beside its coverage, the credit total the
+runtime reported and the elapsed time it spent; that summary is not the detailed
+timing and usage reports deferred below.
 
 Provide text-based configuration inspection and updates, following the
 `/pr-review-config show` and `key=value` workflow. Persist personal configuration
