@@ -20,6 +20,9 @@ and how to reproduce each behaviour yourself.
 - [AGENTS.md](AGENTS.md) is the workflow this repository is developed under.
 - [docs/safeguards.md](docs/safeguards.md) is the full `--verify` guide, which
   this one summarises.
+- [docs/gap-analysis.md](docs/gap-analysis.md) compares this tool with upstream
+  and with the rest of the field, and proposes what is worth adopting. Nothing
+  it proposes is scheduled.
 - [docs/readme-archive-2026-09-10.md](docs/readme-archive-2026-09-10.md) is the
   previous README, kept verbatim. Look there for a harness probe invocation this
   guide no longer prints, or for how a capability read when its increment landed.
@@ -1189,6 +1192,16 @@ the point of this project:
 - **Cold resume of command-only sessions is unsupported** by CLI 1.0.83.
 - **A run never reports what it cost.** Billing is collected per request and
   retained in the evidence, and nothing prints it.
+- **A finding's text is published unredacted.** Nothing in this tool redacts
+  anything. A reviewer's own prose is posted verbatim, so a reviewer that finds
+  a credential on a changed line and writes it into its explanation publishes it
+  to the pull request. The quoted source citations are not published, which
+  narrows this without closing it. Weigh it before authorizing posting on a
+  repository whose diffs can carry secrets.
+- **No reviewer is told your project's conventions.** `--verify` reads your
+  instruction files to discover safeguard commands and hands them to no reviewer,
+  so a review judges your change against the code around it and never against
+  what you wrote down.
 - **Copilot CLI only.** Plugin-format support elsewhere does not establish
   equivalent execution, and no other client is demonstrated.
 
