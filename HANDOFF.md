@@ -6,137 +6,92 @@ records demonstrated evidence and what stays open. Do not rely on any previous
 conversation or reopen settled decisions. Distinguish what has been demonstrated
 from what has only been assumed.
 
-Completed entries through `I1c` are in `docs/roadmap-archive-2026-09-10.md`,
-which you need only for an older increment's evidence. The `--verify` guide is
-in `docs/safeguards.md`, the previous README in
-`docs/readme-archive-2026-09-10.md`.
+Every completed entry, `F1` through `G1`, is now in
+`docs/roadmap-archive-2026-09-10.md`, which you need only for an older
+increment's evidence. The `--verify` guide is in `docs/safeguards.md`, the
+previous README in `docs/readme-archive-2026-09-10.md`, and the comparison
+against the field in `docs/gap-analysis.md`.
 
-## Your job this session is to agree a backlog, not to build one
+## Your job this session is `T1`, and only `T1`
 
-**`G1` is merged and every increment the user scheduled is complete.** The queue
-is empty on purpose. `G1`'s output, `docs/gap-analysis.md`, proposes twelve
-adoptions ranked against the field, with a five-stage sequence, and says in its
-own opening that every one is a scope decision for the user.
+**The backlog is no longer empty.** On 2026-09-12 the user triaged `G1`'s twelve
+proposals one at a time and scheduled six, which are the `Pending` rows in
+`ROADMAP.md`: `T1`, `B1`, `W1`, `N1`, `H1`, `K1`, in that order. **`T1` is the
+next increment. Take it and nothing else.**
 
-**The user has asked to review that plan and pick what is worth building.** That
-is this session's work:
+**`T1`: a finished review reports what it cost and how long it took.** One line,
+alongside coverage rather than buried in the evidence lines.
 
-1. **Read `docs/gap-analysis.md` in full first.** It is 35 KB and it is the whole
-   basis of the conversation you are about to have. Do not triage from the
-   summary below; it exists so you know what is coming, not so you can skip the
-   evidence.
-2. **Put the items to the user one at a time**, with a recommendation and the
-   alternatives, smallest viable step first. Do not present a combined wall of
-   twelve. Batching them is how this goes wrong.
-3. **Record what the user decides** in `ROADMAP.md`'s increments table as
-   `Pending` rows, with IDs agreed with the user, and rewrite the closing
-   section, which currently says there is no next increment. **That is the
-   deliverable.**
-4. **Then ask whether to start the first agreed increment in this same session.**
-   Do not assume either answer. `U1`, `I1a`, `I1b` and `I1c` each decided with
-   the user and then built in one session, so building is the pattern; an empty
-   queue being refilled is not, so ask.
+- `E1` established that billing is collected per request and retained, and then
+  never printed, so a person cannot tell what they spent without reading
+  Copilot's session state off disk. `scripts/dogfood-review.mjs` already prints a
+  credit total, **so start by reading how it gets one**; that is evidence the
+  number is reachable, not a design to copy blindly.
+- **`--quiet` must not suppress it.** `O1` settled that `--quiet` suppresses the
+  evidence JSON lines and the raw untrusted model envelopes, and suppresses
+  nothing about coverage, refusals, failures, safeguards or publication. A cost
+  line belongs with the second group. `scripts/dogfood-review.mjs` refuses
+  `--quiet` anyway.
+- **The number must be the runtime's, reported honestly.** If the runtime
+  reports no total for a run, say so rather than computing a plausible one, and
+  a run that fails or is cancelled still spent what it spent.
+- Decide with the user whether the elapsed figure is wall time, model time, or
+  both. `E1`'s evidence used model time and `I1c`'s entries record both.
 
-**Triage itself is not a numbered increment.** It is a substantive planning
-outcome, which `AGENTS.md` authorizes committing, the way the CI pipeline landed
-without a roadmap row. It still lands on a branch and a pull request, because the
-`main` ruleset admits no exception.
+**`T1` needs a one-line `SCOPE.md` change and that is the user's decision, not
+yours.** `SCOPE.md` defers detailed timing and usage reports as a nice-to-have.
+The argument the user already accepted is that one summary line is not a
+detailed report. **Put the exact wording to them and get a yes before you edit
+the file.** Do not treat the `Pending` row as the authorization.
 
-### The user's steers so far, which are decisions and not suggestions
+It changes user-visible behaviour, so it needs `README.md` updated, its own
+branch and pull request, and **one plugin review, which is its verification of
+record**. That review spends real credits and needs the user's explicit
+authorization. Ask; do not spend by default.
 
-- **Item 1, redacting a credential before publication, is a nice-to-have and
-  moves later in the backlog.** The user said so explicitly when merging #33.
-  `G1` ranked it first; **the user has overruled that ranking and it is not to be
-  argued back to the top.** It stays recorded as open in `ROADMAP.md` under
-  "Recorded, not scheduled" and in `README.md` under limits, which is where a
-  deferred item belongs. Offer it in its new place; do not lead with it.
-- **The proposal is a menu, not a plan.** `G1`'s five-stage sequence is one
-  agent's ordering and carries no authority. If the user's ordering differs,
-  the user's ordering wins and the document's stays as the record of what was
-  argued at the time.
+### What is scheduled after `T1`, so you can recognise scope creep
 
-### The twelve, in `G1`'s order, so you know the shape
+Do not start any of these. They are listed so you know what is already someone
+else's increment: `B1` large-diff honesty, `W1` a remediation sentence on every
+finding, `N1` a seeded corpus and deterministic scorer, `H1` opt-in project
+standards steering the review, `K1` a feedback channel on a published review.
+`ROADMAP.md` carries the acceptance criteria for each.
 
-Read the document for the evidence behind each. `Scope` says whether it fits
-`SCOPE.md` as written or needs a scope decision from the user.
+**Three of the six carry a named half and an explicitly unscheduled other
+half.** `B1` takes no size-triggered transport. `W1` takes no committable
+suggestion block. `N1` takes neither the collection runs that spend credits nor
+a baseline gate. **Do not widen any of them on your own judgement**, and do not
+read `docs/gap-analysis.md` as authorization: **`G1`'s ranking and its five-stage
+sequence did not survive the triage**, and the document stands as the record of
+what was argued at the time.
 
-| # | Item | Scope |
-|---|---|---|
-| 1 | Redact credential-shaped text before publication. **User has deferred this.** | Fits |
-| 2 | Report what a run cost and how long it took | Small decision |
-| 3 | Skip the reviewers when nothing has moved, on a `same-head` re-review | Fits |
-| 4 | Let the project's own standards steer the review | Decision |
-| 5 | Measure recall and precision against a seeded corpus | Fits |
-| 6 | Decide the default mode on evidence. **Blocked on 5** | Decision |
-| 7 | Add the history lenses: git blame, comments on earlier pull requests | Decision |
-| 8 | Fire reviewers on what the diff actually touched | Decision |
-| 9 | Give findings somewhere to go next: a remediation sentence | Decision |
-| 10 | Anchor findings that land outside the diff | Decision |
-| 11 | Handle a large diff as a large diff | Fits |
-| 12 | Ask what the review found useful | Decision |
+**Six of the twelve were declined**, each put to the user on its own: credential
+redaction, the `same-head` short-circuit, the default-mode decision, the two
+history lenses, path-conditioned reviewer firing, and anchoring findings outside
+the diff. They are in `ROADMAP.md` under "Recorded, not scheduled" with the
+reason. **Declined is not deferred-until-you-feel-like-it.** The default-mode one
+is additionally blocked: nothing can settle it until `N1`'s collection runs
+exist, and those are not scheduled.
 
-**Two would change `SCOPE.md`'s settled text**: item 6, because `SCOPE.md` fixes
-balanced as the default, and item 2, because `SCOPE.md` defers timing and usage
-reports. A `SCOPE.md` edit is the user's decision and nobody else's.
-
-**Items 4, 7 and 8 are one question wearing three hats.** All three widen what a
-reviewer may consider beyond the diff and its bound source, and all three raise
-the same problem: what evidence a claim not grounded in provable code effect must
-carry. Answering it once is much cheaper than answering it three times. Put them
-to the user together for that reason, as one decision with three parts, rather
-than as three separate ones.
-
-**Item 5 is the long pole and unblocks item 6.** Its collection runs cost real
-credits, so each would be an explicit authorization exactly like a pull-request
-review. Its corpus and scorer cost nothing and belong in the existing suite.
-
-## What `G1` established, and what stays settled
-
-`G1` read ten sources at the user's choice of the widest sweep, and copied
-nothing. **`L1`'s rule bound it and binds you: read them, copy nothing**;
-anything adopted is adopted as behaviour and re-implemented here.
-
-- **Upstream has converged on `I1a` through `I1c`**, shipping incremental
-  re-review with the same four head relationships and the same three
-  prior-finding verdicts this project reached independently. **That is
-  corroboration, not an instruction to change anything.** `I1c`'s six decisions
-  stay settled, including where upstream chose differently.
-- **The field's dominant complaint is false positives**, at 40 to 70 per cent
-  among leading agents. That is the axis this tool is built on and it has never
-  measured itself on it. Item 5 is the answer and it is unscheduled.
-- **Upstream's own numbers put this project's default in question.** Over 72
-  runs, deep matched the best recall in every band, produced no false positive,
-  left every clean control alone and was no slower at the median than the
-  five-reviewer default. Upstream labels these diagnostic and accepted no gate,
-  so **this is a question raised, not a default refuted.** `SCOPE.md` fixes
-  balanced and nothing has changed it.
-- **No reviewer is told this project's conventions.** `--verify` collects the
-  checkout's instruction files for safeguard discovery and `review.mjs` hands
-  them to no reviewer. Four independent tools in the field steer reviews with the
-  project's own written standards. That is item 4.
-- **A reviewer can publish a credential it found.** No redaction exists anywhere.
-  Deferred by the user, recorded in both files, and still true.
-
-## Headroom first: `README.md` is the tight one now
+## Headroom: `README.md` is still the tight one, `ROADMAP.md` is not
 
 At 65536 bytes this project's own safeguard discovery stops reading a file,
-silently, and the tool can no longer read its own project. **`README.md` has
-1785 bytes spare and `ROADMAP.md` has 7872.** **CI fails the build if any root
-file crosses the cap.**
+silently, and the tool can no longer read its own project. **CI fails the build
+if any root file crosses the cap.**
 
-- **`README.md` is the binding constraint.** 1785 bytes is less than one
-  paragraph. **The next increment that changes user-visible behaviour has to
-  solve that before it can document it.** Its escape is `docs/`, which discovery
-  does not recurse into: `D1` moved the old README there and `I1b` moved the
-  12922-byte `--verify` section to `docs/safeguards.md` in its own
-  documentation-only pull request, #30, which the user merged without a plugin
-  review. **Housekeeping is worth its own pull request, and it is worth agreeing
-  with the user first.** Do not start it unasked.
-- **`ROADMAP.md`'s escape is archiving.** `G1`'s live entry is **8864 bytes** and
-  is the only completed entry left. Adding `Pending` rows is cheap, a completed
-  entry is not. If a later entry does not fit the spare, archive `G1`'s verbatim,
-  with the same kind of pointer, not rewritten or condensed. **One live completed
-  entry rather than two is where that rule lands.**
+- **`README.md` has 1671 bytes spare and `T1` has to document itself there.**
+  That is less than one paragraph. Solve it before you write the documentation,
+  not after. Its escape is `docs/`, which discovery does not recurse into: `D1`
+  moved the old README there and `I1b` moved the 12922-byte `--verify` section
+  to `docs/safeguards.md` in its own documentation-only pull request, #30, which
+  the user merged without a plugin review. **Housekeeping is worth its own pull
+  request and worth agreeing with the user first. Do not start it unasked.**
+- **`ROADMAP.md` has 7718 bytes spare and no live completed entry at all**,
+  which is new. The backlog triage archived `G1`'s 8863 bytes after the six
+  `Pending` rows and the rewritten closing section left 181 bytes spare. So
+  **`T1`'s entry is written into an empty space and will be the only live one**,
+  and you should not need to archive anything. If you somehow do, move an entry
+  verbatim with the same kind of pointer, never rewritten or condensed.
 - Measure with `wc -c` and run the collector check below before opening a pull
   request. A file that appears in the skipped list has crossed 65536.
 
@@ -157,11 +112,10 @@ for s in findings review selection retention preview publication publish-later \
 **GitHub Actions runs that same loop on every pull request and every push to
 `main`**, in `.github/workflows/ci.yml`, with the two invariants this repository
 has broken before: that the tool can still read its own instruction files, and
-that no tracked text carries a control byte. **It went green on #33.** It needs
-no secret and no dependency install, **it is not a substitute for running the
-suites locally before a checkpoint commit**, and it deliberately runs nothing
-that spends Copilot credits. A red run is a real failure; do not rerun it hoping
-for green.
+that no tracked text carries a control byte. It needs no secret and no
+dependency install, **it is not a substitute for running the suites locally
+before a checkpoint commit**, and it deliberately runs nothing that spends
+Copilot credits. A red run is a real failure; do not rerun it hoping for green.
 
 This cheap check runs the real discovery collector against this checkout and
 tells you which of your own files the tool can read:
@@ -218,11 +172,11 @@ export COPILOT_SDK_PATH="$(ls -d "$HOME"/.copilot/pkg/*/"$(copilot --version \
 
 It requires `--all` and `--unattended`, because its session has no elicitation
 UI, and it refuses `--comment` and `--quiet`. It asserts a clean tree at the
-pull request head and prints the credit total the interactive run does not.
-`PR_REVIEW_DOGFOOD_REPOSITORY` retargets it. `copilot -p "/pr-review N"` is not
-a substitute: prompt mode starts an ambient model turn instead of dispatching.
-It passes every other flag straight through, so `--incremental` and
-`--revalidate` both reach it.
+pull request head and **prints the credit total the interactive run does not**,
+which is exactly the number `T1` is about. `PR_REVIEW_DOGFOOD_REPOSITORY`
+retargets it. `copilot -p "/pr-review N"` is not a substitute: prompt mode
+starts an ambient model turn instead of dispatching. It passes every other flag
+straight through, so `--incremental` and `--revalidate` both reach it.
 
 **A review takes minutes of wall time and prints almost nothing while it runs.**
 #32's second reviewer printed eleven `active` lines over 137 seconds and nothing
@@ -236,9 +190,10 @@ tool calls and denials are in the run's `M2 evidence` line under
 
 `node scripts/smoke-runtime.mjs --targets` **has not been run since `I1b`**,
 where it passed with 75 assertions. `I1c` added four without running them, so
-**the expected count is 79 and that is still unverified.** `G1` changed no string
-and added none. It spends no credits but needs a live runtime connection. If you
-change a `help` or `status` string, change the probe with it.
+**the expected count is 79 and that is still unverified.** Neither `G1` nor the
+backlog triage changed a string or added one. It spends no credits but needs a
+live runtime connection. **`T1` adds a line to a shipped output, so if it touches
+a `help` or `status` string, change the probe with it.**
 
 `scripts/smoke-reviewer-tools.mjs`, the confinement probe outside the sixteen,
 must be run and reported for any increment touching `read-only.mjs`. Nothing
@@ -246,8 +201,8 @@ since `V2a` has touched it.
 
 The personal config probe fails its first assertion if personal
 `pr-review/config.json` exists. Move it aside only if running that probe, restore
-it afterwards, and verify with `shasum -a 256`. It was not moved or edited during
-`G1`, which ran no review at all.
+it afterwards, and verify with `shasum -a 256`. It was not moved or edited by
+`G1` or by the triage, neither of which ran a review at all.
 
 **Press Space on the command before pressing Enter** in any `--verify` run, in
 finding selection, and in the reply confirmation. The host's multi-select toggles
@@ -262,7 +217,8 @@ the watch exclusion and `V2a`'s cancellation all depend on their absence. **`G1`
 read upstream's deadline machinery in full and it is an argument for this refusal,
 not against it**: several hundred lines of interacting budgets, reserves, grace
 periods and truncation rules, with its own validation ranges and failure
-taxonomy, to answer a question this tool answers by waiting.
+taxonomy, to answer a question this tool answers by waiting. **An elapsed-time
+line is a report, never a deadline**, and `T1` must not become one.
 
 **Do not weaken the shell gate.** A project that declares `npm run lint && npm
 test` gets a refusal, and the answer is for that project to declare two lines.
@@ -282,10 +238,15 @@ Factories without a new CLI version**; three blockers were demonstrated on
 
 Cold resume of command-only records remains unsupported. Citations remain limited
 to captured diff and context windows, which produced #32's second coverage gap.
-**Upstream answers this with a size-triggered transport**, which is item 11.
+**Upstream answers this with a size-triggered transport, and the user explicitly
+did not schedule one**: `B1` takes the honesty half only.
 
 ## Settled decisions, none of which is to be reopened
 
+- **The triage of 2026-09-12 is settled.** Six scheduled, six declined, in the
+  order and under the IDs the user chose. **Do not re-triage, re-rank or
+  re-argue it**, and do not promote a declined item because the document ranks
+  it highly.
 - **`I1c`'s six decisions stand**, as recorded in its archived entry: the hybrid
   verdict, the free half in every review with the model pass behind
   `--revalidate`, replies on threads rather than a line in the review body, both
@@ -309,25 +270,30 @@ to captured diff and context windows, which produced #32's second coverage gap.
 - **`U1` is closed and its shape is not to be widened.** Posting authority still
   never authorizes safeguard execution.
 - **`L1` is closed**, and it bound `G1` absolutely. Nothing may be copied and a
-  line-level audit shows none has been.
+  line-level audit shows none has been. **It binds every adopted item in the
+  backlog too**: `H1`, `N1` and the rest are re-implemented from behaviour, never
+  copied.
 - **This project is MIT licensed**, `Copyright (c) 2026 Pietro Di Bello`.
 - **`V2` is closed.** No reviewer receives safeguard output, the retained record
   says nothing about what ran, the citation gate still accepts a prefix, the
   shell gate refuses a chained command, and no timeout bounds a safeguard.
 - **`O1` is one flag, not a configuration key**, and verbose stays the default.
-- **`E1`'s three unfixed items are recorded limitations.** `G1` ranked two of
-  them in its menu and neither became scheduled by that.
+- **`E1`'s two remaining items are recorded limitations**: truncated evidence
+  lines and silent per-reviewer progress. Its third, a run that reports its own
+  cost, is `T1`.
 
 ## State at this handoff
 
-**`G1` is complete and pull request #33 is merged into `main`** as `eb06078`,
-two commits on branch `g1-gap-analysis`. Confirm that from git rather than from
-this sentence, and reconcile anything that disagrees. **Start from a fresh branch
-off `main`.**
+**The backlog triage is on branch `backlog-triage` and pull request #35**, with
+the roadmap commit `1ce8a70` and this handoff commit on top of it. Confirm that
+from git rather than from this sentence, and reconcile anything that disagrees.
+**#35 is not merged at this handoff**; if it still is not, say so and ask,
+because `T1` should start from a `main` that carries its `Pending` row. **Start
+`T1` from a fresh branch off `main`.**
 
-**#33 was never reviewed with this plugin.** It was documentation-only, so
-`AGENTS.md` left that review to the user, and the user merged without one. **No
-credits were spent during `G1` at all.** CI went green on both its commits.
+**#35 is documentation-only and no credits were spent during the triage at
+all.** `AGENTS.md` leaves a documentation-only pull request's plugin review to
+the user, and the user was asked rather than charged.
 
 **Neither `I1b` nor `I1c` has live evidence, and both are blocked on the same
 thing**: a pull request this tool has published a review on and that has since
@@ -338,7 +304,7 @@ and #2 must never be merged.**
 
 **GitHub's own Copilot reviewer is slower than the plugin review but free**, and
 on #31 it found three things the plugin review and every suite had missed. **It
-reviews only when it is requested**, and it was not requested on #32 or #33.
+reviews only when it is requested**, and it was not requested on #32, #33 or #35.
 Consider requesting it on your own pull request, and treat what it leaves like
 any other reviewer: **check the premise of a finding before implementing it.**
 
@@ -348,7 +314,7 @@ force-push or amended published history. **The standing workflow authorizes
 exactly one plugin review per pull request and nothing else**; any rerun or extra
 probe that spends credits needs a fresh explicit instruction. Keep findings
 local: no `--comment` and no publish without one. Update `README.md` for
-user-visible behaviour, and solve its 1785 bytes of headroom before you do.
+user-visible behaviour, and solve its 1671 bytes of headroom before you do.
 
 Rewrite this file as the final repository file edit before your session-ending
 commit, include it in that commit, and push it to the pull request the work lives
