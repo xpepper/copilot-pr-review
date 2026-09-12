@@ -260,7 +260,32 @@ whole bound context, so judging a single candidate cost 29.6565 of those
 survives the evidence boundary, however few survive. A review where none
 survives starts no adjudicator and pays nothing for one.
 
-Missing charges mean unknown cost, not zero.
+**Every finished review now tells you this itself**, on one line beside its
+coverage:
+
+```text
+Review coverage: completed.
+Review cost: 68.53836 AI credits over 4 request(s); 91.5 s of model work in 3 pass(es); 74.2 s elapsed.
+```
+
+Model time is summed per pass and elapsed time is the clock, so in a parallel
+mode the first is much larger than the second: five reviewers working for a
+minute each is five minutes of model work in one minute of waiting. Neither
+answers the other's question, so both are reported.
+
+Everything the run paid for is counted, including the two passes that are not
+reviewers: the safeguard discovery pass a `--verify` run starts, the
+`--revalidate` pass, and the failed attempt a configured fallback replaced. A
+run that failed or was cancelled still reports what it spent before it stopped,
+and `--quiet` does not suppress the line.
+
+Missing charges mean unknown cost, not zero. If the runtime reports no charge
+for even one request, the line says the total is unavailable and names how many
+of the requests it did report. It never prints the partial sum, because a
+partial beside a coverage line reads as the bill.
+
+The figure is a report about a run that has already finished. Nothing reads it,
+nothing is bounded by it, and reviews still have no timeout.
 
 ## Models and configuration
 
@@ -915,13 +940,14 @@ command approval.
 
 ## Verify it yourself
 
-Fifteen controlled suites cover the shipped logic with test doubles. They need
+Seventeen controlled suites cover the shipped logic with test doubles. They need
 no network, no inference and no runtime connection, and each finishes in well
 under a second:
 
 ```sh
 for s in findings review selection retention preview publication publish-later \
-  checkout config context fixture target safeguards prior incremental; do node scripts/smoke-$s.mjs; done
+  checkout config context fixture target safeguards prior incremental revalidation \
+  cost; do node scripts/smoke-$s.mjs; done
 ```
 
 They cover PR capture and its gates, revision-bound context assembly, all four
@@ -929,8 +955,9 @@ reviewer topologies, tier and fallback resolution, the evidence boundary and
 citation refusals, deduplication, degraded coverage, selection, retention and
 its schemas, the publication payload and its journal, publish-later, the
 configuration and trust rules, prior-review discovery and its head
-classification, the confinement of a re-review to the new commits, and the
-safeguard path end to end.
+classification, the confinement of a re-review to the new commits, the
+revalidation of an earlier review's findings, what a run reports about its own
+cost, and the safeguard path end to end.
 
 Their limits matter as much as their coverage. Their semantic accept and reject
 decisions are explicit test doubles, not live-model evidence, and their `gh` is
@@ -1035,8 +1062,10 @@ the point of this project:
   its line, prose after a fence, two fenced blocks or a truncated object each
   discard the whole output.
 - **Cold resume of command-only sessions is unsupported** by CLI 1.0.83.
-- **A run never reports what it cost.** Billing is collected per request and
-  retained in the evidence, and nothing prints it.
+- **A retained result does not carry what its run cost.** The line is printed
+  when the review settles and the figures are not written into the retained
+  record, so `/pr-review inspect` and a later `/pr-review publish` say nothing
+  about the spend of the run they are replaying.
 - **A finding's text is published unredacted.** Nothing in this tool redacts
   anything. A reviewer's own prose is posted verbatim, so a reviewer that finds
   a credential on a changed line and writes it into its explanation publishes it

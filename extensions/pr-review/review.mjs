@@ -4,6 +4,7 @@ import {
   ambientAssignment, describeFallback, describeTier, requireUsableProject, resolveFallback, resolveTier,
   resolvedAssignment,
 } from "./config.mjs";
+import { formatCost, runCost } from "./cost.mjs";
 import { reviewAssignments, validateModelAssignment } from "./fixture.mjs";
 import { confinementInput, confinementSummary, incrementalFlag, isConfined } from "./incremental.mjs";
 import { publishReplies, describeReplies } from "./replies.mjs";
@@ -323,7 +324,7 @@ export function reviewPrompt(mode, assignment, snapshot, context, binding, acces
 // the supplied file text alone. It is deliberately not a reviewer, so it takes
 // no configured fallback. A fallback answers a gap in review coverage, and
 // discovery is not part of that coverage.
-async function discoverSafeguards(parent, client, assignments, access, binding, signal, quiet) {
+async function discoverSafeguards(parent, client, assignments, access, binding, signal, quiet, payFor) {
   const collected = collectInstructionFiles(access.root);
   const sources = {
     files: collected.files.map(({ name, bytes }) => ({ name, bytes })), skipped: collected.skipped,
@@ -337,7 +338,7 @@ async function discoverSafeguards(parent, client, assignments, access, binding, 
   const supplied = collected.files.map(({ name }) => name);
   let report;
   try {
-    report = await reviewAssignments(parent, client, [{ ...assignment, label: "safeguard-discovery" }], {
+    report = payFor(await reviewAssignments(parent, client, [{ ...assignment, label: "safeguard-discovery" }], {
       // O1: the discovery pass is a model pass, so its raw output is an untrusted
       // envelope like a reviewer's and goes quiet with the rest. What it found
       // never does: the commands and their sources are what a person is asked to
@@ -348,7 +349,7 @@ async function discoverSafeguards(parent, client, assignments, access, binding, 
         "reviewer, and nothing it reports is approved or executed by this run.",
       outputLabel: "Untrusted safeguard discovery output",
       prompt: () => discoveryPrompt(key, collected.files),
-    });
+    }));
   } catch (error) {
     // A pass that cannot even start is a failed discovery, not a failed review:
     // it grounds nothing a finding depends on, so the reviewers still run. A
@@ -390,6 +391,23 @@ export async function executeReviewRun(parent, client, options, assignments, {
   // handed to every stage that prints an evidence dump; nothing else consults it,
   // and no stage may use it to withhold a refusal, a failure or a coverage state.
   const quiet = options.quiet === true;
+  // T1: every model pass this run pays for, collected in one place because four
+  // stages start one and two of them used to drop the charge before the outcome
+  // was assembled. The reviewers and the adjudicator are on the outcome already;
+  // the safeguard discovery pass and the revalidation pass are not, and a total
+  // that quietly leaves them out under-reports exactly the runs this project
+  // uses on its own pull requests.
+  const paid = [];
+  const payFor = (report) => {
+    paid.push(...report.reviewers);
+    return report;
+  };
+  // Wall time for the run, not for the session: it starts here and is read where
+  // the review settles, before finding selection, so no wait for a person is
+  // counted except the safeguard approval a --verify run asks for. It is a
+  // report about a finished run and nothing reads it; no deadline is imposed
+  // anywhere, and none may be added.
+  const startedAt = Date.now();
   const outcome = await executeOwnedRun(parent, client, {
     controller, onStopped, subject: mode.label, evidencePrefix: prefix, quiet,
     details: () => ({
@@ -405,6 +423,9 @@ export async function executeReviewRun(parent, client, options, assignments, {
       // request. It is retained because the replies are journalled against it.
       revalidate: options.revalidate === true, revalidation: retainedRevalidation(revalidation),
       invocation, binding, validation, adjudicator, discovery, approval, safeguards,
+      // Settled at the moment the run settles, so a cancelled or failed run
+      // still reports what it spent before it stopped.
+      cost: runCost(paid, Date.now() - startedAt),
       executionComplete: execution?.complete ?? false,
       reviewers: assignments.map((assignment) => ({
         ...assignment, status: "incomplete", error: "Review did not reach specialist execution.",
@@ -476,7 +497,7 @@ export async function executeReviewRun(parent, client, options, assignments, {
       // and no coverage state; a failed pass is reported as itself, because it
       // grounds nothing that a finding depends on.
       if (verify) {
-        discovery = await discoverSafeguards(parent, client, assignments, access, binding, signal, quiet);
+        discovery = await discoverSafeguards(parent, client, assignments, access, binding, signal, quiet, payFor);
         await parent.log(describeDiscovery(discovery));
         // V1c: the run asks which of the discovered commands may run, records
         // that answer, and still executes nothing. The question sits here, and
@@ -503,7 +524,7 @@ export async function executeReviewRun(parent, client, options, assignments, {
           { level: ["failed", "cancelled"].includes(safeguards.status) ? "error" : "info" });
         signal.throwIfAborted();
       }
-      const report = await reviewAssignments(parent, client, assignments, {
+      const report = payFor(await reviewAssignments(parent, client, assignments, {
         signal, quiet, access,
         systemMessage: { mode: "append", content: reviewInstructions(mode, confinement) },
         verifyResult: envelopeVerifier(reviewKey(binding), "candidates"),
@@ -512,7 +533,7 @@ export async function executeReviewRun(parent, client, options, assignments, {
         outputLabel: `Unvalidated candidate output for ${binding.repository.nameWithOwner}#${binding.number} at ${binding.head}`,
         prompt: (assignment) =>
           reviewPrompt(mode, assignment, target.snapshot, target.context, binding, access, confinement),
-      });
+      }));
       execution = {
         ...report, reviewers: report.reviewers.map((reviewer) => ({ ...reviewer, binding })),
       };
@@ -532,7 +553,7 @@ export async function executeReviewRun(parent, client, options, assignments, {
         // reviewer's assignment and never a substituted one.
         const heavy = assignments.find(({ tier }) => tier === "heavy");
         if (!heavy) throw new Error("Evidence adjudication requires a heavy-tier assignment.");
-        const assessment = await reviewAssignments(parent, client, [{
+        const assessment = payFor(await reviewAssignments(parent, client, [{
           ...heavy, label: "evidence-validator",
         }], {
           signal, quiet, systemMessage: { mode: "append", content: validationInstructions(mode.policy) },
@@ -548,7 +569,7 @@ export async function executeReviewRun(parent, client, options, assignments, {
               untrustedDiff: target.snapshot.diff, untrustedContext: target.context.text,
             }),
           ].join("\n"),
-        });
+        }));
         adjudicator = assessment.reviewers[0];
         validation = adjudicateCandidates(collected, adjudicator, boundary, mode.policy);
       }
@@ -561,7 +582,7 @@ export async function executeReviewRun(parent, client, options, assignments, {
       if (options.revalidate && unsettledEntries(revalidation).length && !signal.aborted) {
         const heavy = assignments.find(({ tier }) => tier === "heavy");
         if (!heavy) throw new Error("Revalidating an earlier finding requires a heavy-tier assignment.");
-        const pass = await reviewAssignments(parent, client, [{ ...heavy, label: "revalidator" }], {
+        const pass = payFor(await reviewAssignments(parent, client, [{ ...heavy, label: "revalidator" }], {
           signal, quiet, access,
           systemMessage: { mode: "append", content: revalidationInstructions() },
           verifyResult: envelopeVerifier(boundary.key, "verdicts"),
@@ -569,7 +590,7 @@ export async function executeReviewRun(parent, client, options, assignments, {
             "finding(s) the code could not settle. It reports no new finding and judges nothing else.",
           outputLabel: "Untrusted revalidation output",
           prompt: () => revalidationPrompt(revalidation, boundary.key),
-        });
+        }));
         revalidation = applyJudgedVerdicts(revalidation, pass.reviewers[0], boundary.key);
         await parent.log(describeRevalidation(revalidation, true),
           { level: revalidation.judged.status === "failed" ? "error" : "info" });
@@ -584,6 +605,12 @@ export async function executeReviewRun(parent, client, options, assignments, {
   if (outcome.coverage !== "not-started") {
     await parent.log(formatFindings(outcome), { level: outcome.complete ? "info" : "error" });
   }
+  // T1: what the run cost, beside its coverage rather than buried in the
+  // evidence line a quiet run does not print. `--quiet` suppresses evidence JSON
+  // and raw model envelopes; a cost belongs with coverage, refusals and
+  // publication, so nothing gates this on the flag. A run that started no model
+  // pass has nothing to report and says nothing.
+  if (outcome.cost) await parent.log(formatCost(outcome.cost));
   const selected = await finishSelection(parent, outcome, options, controller);
   const proposal = await finishPreview(parent, selected, options, controller, boundary, effectiveConfig);
   const published = await publishCurrent(parent, proposal, boundary, { controller, cwd, gh, persist });

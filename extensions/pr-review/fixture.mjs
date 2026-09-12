@@ -153,9 +153,12 @@ async function prepareReviewer(client, assignment, { systemMessage, access, sign
 // What a failed primary attempt leaves behind on the reviewer that fell back.
 // The record's own model and status describe the attempt that produced its
 // result, so the attempt that did not is kept here rather than overwritten.
+// T1: the charge travels with it. An attempt that reached inference and then
+// failed spent what it spent, and a recovery does not refund it; dropping the
+// billing here made a recovered reviewer silently under-report the run's cost.
 const failedAttempt = (record) => ({
   model: record.model, reasoningEffort: record.reasoningEffort, sessionId: record.sessionId,
-  status: record.status, error: record.error, usage: record.usage,
+  status: record.status, error: record.error, usage: record.usage, billing: record.billing,
   startedAt: record.startedAt, completedAt: record.completedAt, policy: record.policy,
 });
 
