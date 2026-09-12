@@ -327,6 +327,15 @@ scheduled work.** A proposal in that document is not an authorization to start
 it, and neither is the sequence it sits in. Do not start anything without the
 user saying so in your own session.
 
+**The user has asked to review that menu and pick from it**, which is what
+`HANDOFF.md` now sets up: put the twelve to them one at a time, record what they
+choose as `Pending` rows in the table above, and rewrite this section to match.
+**Two of the user's steers are already decisions.** The credential-publication
+item is a nice-to-have and moves later in the backlog, so `G1`'s ranking of it
+first no longer holds. And **`G1`'s five-stage sequence is one agent's ordering
+and carries no authority**: where the user's ordering differs, the user's wins
+and the document stays as the record of what was argued at the time.
+
 **The two that would change `SCOPE.md`'s settled text**, if the user ever wants
 them, are the default mode, which `SCOPE.md` fixes as balanced, and the timing
 and cost line, which `SCOPE.md` defers as a nice-to-have. Both are argued in the
@@ -542,10 +551,12 @@ not a backlog. Do not start one without the user saying so.
   published, which narrows the exposure without closing it. The security
   specialist is the reviewer explicitly pointed at secrets and therefore the one
   most likely to quote one into its own sentence, which would then be posted
-  verbatim on a public pull request under the user's identity. It is ranked first
-  of `G1`'s twelve and first in the proposed sequence. **It stays unscheduled
-  until the user says otherwise**, and it is the one item here a reader should
-  weigh before authorizing a publishing run on a repository that holds secrets.
+  verbatim on a public pull request under the user's identity. `G1` ranked it
+  first of its twelve and first in the proposed sequence; **the user has since
+  overruled that ranking, calling it a nice-to-have to be taken later**, so it
+  stays here as open and deferred rather than as the next thing to build. It is
+  still the one item here a reader should weigh before authorizing a publishing
+  run on a repository that holds secrets.
 - **Upstream's own licence position could change.** `L1` settled the inspected
   revision, not upstream in perpetuity. A later revision could add a `LICENSE`
   file or change the declaration. Recheck before relying on the answer for any
