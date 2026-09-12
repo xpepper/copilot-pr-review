@@ -91,7 +91,7 @@ Read from the installed SDK and from a model listing that ran no inference, on
   through `payFor`; `scripts/smoke-cost.mjs` asserts it in source.
 - `README.md` documents the setting and its cost. It has 5763 bytes spare.
 - `ROADMAP.md`: **archive `B1`'s entry verbatim first**, then write `X1`'s, then
-  update the closing section. The file has 1339 bytes spare.
+  update the closing section. The file has 1032 bytes spare.
 - **One plugin review of `X1`'s pull request, after the user authorizes it.**
   That review will not exercise the long-context tier unless the configuration
   used for it selects one, and whether to pay for that is the user's call.
@@ -182,7 +182,7 @@ not scheduled" with the reason. Declined is not deferred, and
 At 65536 bytes this project's own safeguard discovery stops reading a file,
 silently, and **CI fails the build if any root file crosses the cap.**
 
-- **`ROADMAP.md` has 1339 bytes spare.** Archive `B1`'s entry verbatim into
+- **`ROADMAP.md` has 1032 bytes spare.** Archive `B1`'s entry verbatim into
   `docs/roadmap-archive-2026-09-10.md` before you write a word of `X1`'s, with the
   same pointers the earlier moves left in both files. An archived entry keeps its
   own heading; nothing is rewritten or condensed.
@@ -275,6 +275,13 @@ gh api graphql -f query='mutation($pr: ID!, $bot: ID!) { requestReviews(input: {
 ```
 
 Check the premise of anything it leaves before implementing it.
+
+**Claude is also installed on this repository**, since 2026-09-13. A
+`claude-review` check appeared on #39's pushes after that, and mentioning
+`@claude[agent]` in a pull request comment asks it for another point of view on
+a review; the user offered it for exactly that. A mention is a public comment,
+so say you are about to use it, and check the premise of anything it leaves as
+you would GitHub's reviewer.
 
 `node scripts/smoke-runtime.mjs --targets` **has not been run since `I1b`**, where
 it passed with 75 assertions; 81 is expected and unverified. It spends no
