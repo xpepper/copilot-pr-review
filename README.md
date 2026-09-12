@@ -273,9 +273,11 @@ mode the first is much larger than the second: five reviewers working for a
 minute each is five minutes of model work in one minute of waiting. Neither
 answers the other's question, so both are reported.
 
-Everything the run paid for is counted, including the two passes that are not
-reviewers: the safeguard discovery pass a `--verify` run starts, the
-`--revalidate` pass, and the failed attempt a configured fallback replaced. A
+Everything the run paid for is counted. That includes the two passes that are
+not reviewers at all, the safeguard discovery pass a `--verify` run starts and
+the `--revalidate` pass. It also includes the failed attempt a configured
+fallback replaced, which is a reviewer attempt rather than a third kind of pass:
+it ran and was billed before it failed, and the recovery does not refund it. A
 run that failed or was cancelled still reports what it spent before it stopped,
 and `--quiet` does not suppress the line.
 

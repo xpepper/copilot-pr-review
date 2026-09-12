@@ -450,7 +450,8 @@ It is not an increment, has no roadmap row, and was not part of what the plugin
 reviewed. **It went green on #31 before that pull request was merged**, running
 all fifteen suites, reading all six instruction files and skipping none.
 
-It runs the fifteen controlled suites and two invariants this repository has
+It runs every controlled suite, seventeen of them since `T1`, and two
+invariants this repository has
 broken before: that safeguard discovery still reads every instruction file at
 the checkout root, which fails the job if one crosses 65536 bytes, and that no
 tracked text carries a control byte, which is what refused #17's review. There

@@ -871,7 +871,31 @@ const withFallbackAssignments = () => assignments.map((assignment) => ({
   const stored = retainedRecord(report).outcome.reviewers[0];
   assert.equal(stored.model, "other");
   assert.deepEqual(Object.keys(stored.fallbackFrom).sort(),
-    ["completedAt", "error", "model", "reasoningEffort", "sessionId", "startedAt", "status", "usage"]);
+    ["completedAt", "error", "model", "reasoningEffort", "sessionId", "startedAt", "status", "usage"],
+    "the retained record deliberately drops billing; the cost line is computed live");
+}
+{
+  // T1: the failed attempt a fallback replaced was billed, and `failedAttempt`
+  // has to copy that charge or a recovered reviewer under-reports the run. This
+  // primary fails on a usage mismatch, which happens after the runtime has
+  // charged it, so it is the case where the charge exists and can be lost.
+  // Raised as a follow-up by GitHub's own reviewer on #37.
+  const h = harness({ failure: "usage" });
+  const report = await executeReviewRun(h.parent, h.client, options, withFallbackAssignments(), {
+    controller: h.controller, gh: fakeGh(), git: checkoutGit,
+  });
+  const recovered = report.reviewers[0];
+  assert.equal(recovered.status, "completed");
+  assert.match(recovered.fallbackFrom.error, /usage did not match the assignment/);
+  assert.deepEqual(recovered.fallbackFrom.billing, [{ totalNanoAiu: 1_000_000_000 }],
+    "the charge travels with the attempt that failed");
+  // Four attempts and four charges: three reviewers, plus the primary the
+  // fallback replaced. A total taken from the reviewers alone would say three.
+  assert.equal(report.cost.passes, 4);
+  assert.equal(report.cost.requests, 4);
+  assert.equal(report.cost.credits, 4);
+  assert(h.messages.some((m) => m.startsWith("Review cost: 4 AI credits over 4 request(s);")),
+    "the recovered reviewer's failed attempt is in the reported total");
 }
 {
   // The one attempt is the only attempt: a fallback that fails too leaves the
