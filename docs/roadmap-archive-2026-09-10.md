@@ -6,8 +6,8 @@ everything through `V1c`, by increment `L1` for `V2a` and `V2b`, by increment
 `D1` for `A1`'s own entry and then `L1`'s, by increment `O1` for `D1`'s, by
 increment `U1` for `O1`'s, by increment `I1a` for `E1`'s, by increment `I1b`
 for `U1`'s and then `I1a`'s, by increment `I1c` for `I1b`'s, by increment
-`G1` for `I1c`'s, and by the backlog triage of 2026-09-12 for `G1`'s own, which
-is the
+`G1` for `I1c`'s, by the backlog triage of 2026-09-12 for `G1`'s own, and by
+increment `B1` for `T1`'s, which is the
 last in this file. They are the
 project's
 evidence of record and are reproduced verbatim: nothing here was rewritten,
@@ -9464,3 +9464,111 @@ behaviour, and its 2665 bytes of headroom are untouched.
 Documentation-only. `AGENTS.md` requires the pull request and leaves its plugin
 review to the user, because reviewing costs real credits, and this increment
 asked rather than spending by default.
+
+## `T1`: a finished review reports what it cost and how long it took
+
+`E1` established that billing is collected per request and retained and then
+never printed, so a person could not tell what a review spent without reading
+Copilot's session state off disk. The run now says it, beside its coverage:
+
+```text
+Review coverage: completed.
+Review cost: 64.24808 AI credits over 5 request(s); 72.9 s of model work in 2 pass(es); 91.0 s elapsed.
+```
+
+That is the live line from this increment's own review, and the first time this
+tool has ever reported its own cost.
+
+### The four decisions, each put to the user on its own
+
+**The `SCOPE.md` change was the user's, and the exact wording was approved
+before the file was edited.** One sentence was added to "Models, configuration,
+and execution" stating the behaviour positively. The deferral row in the release
+boundary is unchanged and stays true, because one summary line is not a detailed
+report. **The `Pending` row was not treated as the authorization.**
+
+**Both elapsed figures**, because model time is summed per pass and elapsed time
+is the clock: five reviewers working a minute each is five minutes of model work
+in one minute of waiting. Wall time runs from the run starting to it settling,
+before finding selection, so no wait for a person is counted except a `--verify`
+approval answer.
+
+**Every paid pass counts.** Four stages start a model pass and only two put
+their reviewers on the outcome. Three sources of charge were being dropped
+before the outcome was assembled: the safeguard discovery pass, the revalidation
+pass, and the failed attempt a configured fallback replaced, whose record kept
+its `usage` and not its `billing`. A total read off the outcome would have
+under-reported exactly the runs this project makes on its own pull requests.
+The charges are collected where the passes are started instead.
+
+**`README.md`'s headroom was solved first, in its own pull request**, #36, which
+moved the four re-review sections to `docs/re-review.md` verbatim and took the
+file from 63865 to 55675 bytes. Documentation-only, merged without a plugin
+review at the user's decision, exactly as #30 was.
+
+### What it deliberately is not
+
+**Not part of `formatCoverage`.** That text is embedded in the body `preview.mjs`
+publishes, so a cost sentence written there would post the spend to a public
+pull request. `scripts/smoke-cost.mjs` and `scripts/smoke-review.mjs` each assert
+the separation, in the formatter and in a real published payload.
+
+**Not suppressed by `--quiet`.** `O1` settled that the flag drops evidence JSON
+and raw model envelopes and nothing a person needs in order to judge a result.
+
+**Not a deadline.** Both figures are reports about a finished run. Nothing reads
+either, and `SCOPE.md`'s refusal of review timeouts is untouched.
+
+### The review, and the finding it caught
+
+Pull request #37, reviewed once with this plugin at the user's explicit
+authorization: deep on `gpt-5.6-terra` at high effort, **64.24808 credits over 5
+requests**, 12 approved tool calls and no denial, **completed** coverage, one
+informational caveat, 0 withheld and 0 rejected candidates, and **1 validated
+finding that was real and exact**.
+
+It found that `runCost` counted requests from the billing entries alone, so a
+pass whose model turn started and for which the runtime emitted no usage event
+at all contributed no request and no gap. The empty charge list then counted as
+fully reported and the run announced **0 AI credits**, which is precisely the
+plausible number this increment exists to refuse. It looks identical in the
+billing entries to a pass that never reached inference and really did cost
+nothing; the two are told apart by whether a turn ever started. **A cancelled
+run is the common case**, its reviewers stopped mid-turn and billed for work the
+runtime never reported, and it now says its total is unavailable rather than
+claiming the run was free. Fixed on the branch with its own failing test first,
+and `scripts/smoke-review.mjs` now names all three scripted scenarios that leave
+such a pass.
+
+The caveat is fair and stands: no live transcript establishes how often a
+completed request omits its usage event, only that the state is reachable.
+
+GitHub's own Copilot reviewer was also requested on #37, at the user's
+authorization, and its findings are not in this entry.
+
+### Verified, and not
+
+**Seventeen controlled suites pass**, `smoke-cost` being the new one, and it is
+in the CI list. `git diff --check` is clean, no tracked text carries a control
+byte, and discovery reads all six root files and skips none.
+
+- **The revalidation pass has no end-to-end run in any suite**, and had none
+  before this. Its charge collection is wired identically to the other three;
+  what covers it is a source-shape assertion that every `reviewAssignments` call
+  in `review.mjs` goes through the collector, which guards a future fifth stage
+  too. That is a source check, not a run.
+- **The parallel case was not exercised live.** The review was deep, so two
+  passes ran in sequence and elapsed time exceeded model time. Model time
+  exceeding elapsed time, which is the figure a balanced run makes interesting,
+  rests on the suites.
+- `scripts/smoke-runtime.mjs --targets` **still has not been run**. It gained a
+  help and a status probe pair here, on top of the four `I1c` added without
+  running them.
+- **`scripts/runtime-quick.mjs` still computes a narrower total of its own**,
+  the way `dogfood-review.mjs` did before this. It is a live probe that spends
+  inference, so it was left rather than changed unverified. Follow-up.
+- **A retained result does not carry what its run cost.** The figures are
+  printed when the review settles and are not written into the record, so
+  `/pr-review inspect` and `/pr-review publish` say nothing about the spend of
+  the run they replay. Keeping them out avoided a schema version; recorded as a
+  limitation rather than as work.
