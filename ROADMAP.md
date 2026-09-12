@@ -17,8 +17,9 @@ landed on top of it.** `I1` was sliced into three with the user before anything 
 and `G1` was the last increment scheduled before the backlog was agreed; **every
 increment scheduled up to `G1` is complete.** On 2026-09-12 the user triaged
 `G1`'s twelve proposals one at a time and scheduled six of them: `T1`, `B1`,
-`W1`, `N1`, `H1` and `K1`, in that order. **`T1` is complete and its entry is
-the only live one below**; the other five are the `Pending` rows.
+`W1`, `N1`, `H1` and `K1`, in that order, and the same day scheduled `X1`
+immediately after `B1`. **`T1` and `B1` are complete and `B1`'s entry is the only
+live one below**; the other five are the `Pending` rows.
 The closing section records what was decided, and what stays open as a
 limitation rather than as work.
 
@@ -80,15 +81,16 @@ posting them.
 | I1c | Completed | Revalidating the findings an earlier review of the same pull request published, as resolved, still open or obsolete. The parser `I1a` deferred reads this tool's own emitted comment prose back into a structured finding, and is held to the emitter's own template: a parse counts only when rebuilding it reproduces the body byte for byte. Every review then reports the verdicts code can prove and spends nothing on them: lines the newer commits never touched are still open, an anchor GitHub can no longer place or a file those commits deleted is obsolete, and nothing is ever proved resolved without reading the code. `--revalidate` buys one model pass over exactly what is left; a proved verdict is never put to it and never overturned by it, and a pass that fails settles nothing. A settled verdict is answered on the earlier review's own thread, under the review's own posting authority and never any other, which makes this the first write set in this tool that is more than one request: each reply is journalled before it is sent, a definite rejection does not stop the others, and one unknown outcome stops the set with every thread after it left unattempted. The retained record carries the verdicts and the reply dispositions, which is the schema change `I1a` and `I1b` each deferred to the increment that would consume it. Pull request #32, reviewed twice with this plugin, each time at the user's explicit authorization: deep on `gpt-5.6-terra` at high effort both times, 144.23376 then 115.0322 credits. The first found 0 validated findings on INCOMPLETE coverage and three discarded or uncertain candidates that all described real defects and are all fixed here, one of them a crash that would have thrown whenever a review settled less than every earlier finding. The second covered those fixes, reported 0 candidates on INCOMPLETE coverage, and produced the live absent-path refusal `Q7` had never seen. | I1a, I1b; [Modes/findings](SCOPE.md#review-modes-and-findings), [Publication controls](SCOPE.md#selection-publication-and-cached-results) |
 | G1 | Completed | Gap analysis against the field, then a proposal, recorded in `docs/gap-analysis.md`. Ten sources read at the user's choice of the widest sweep: upstream at the pinned baseline and again at its current head, the four skills the roadmap named, the closest peer plugin, GitHub's own reviewer, the hosted field, and the one independent benchmark in it. Nothing was copied and `L1`'s rule held. Upstream has since converged on `I1a`-`I1c`, shipping the same four head relationships and the same three prior-finding verdicts independently. The field's dominant complaint is false positives at 40-70 per cent, which is the axis this tool is built on and has never measured; upstream publishes recall against a seeded corpus and this project has nothing equivalent. Upstream's own committed numbers have deep matching the best recall with no false positive and no clean-control noise at a median no slower than the five-reviewer default, which makes this project's inherited default a question rather than a setting. Four tools steer reviews with the project's own written standards and this one hands its collected instruction files to no reviewer. One concrete publication defect was found: no redaction exists anywhere, so a reviewer that writes a credential into its own prose publishes it. Twelve adoptions are ranked with a proposed five-stage sequence; every one was a scope decision for the user and **none was scheduled by `G1` itself**. The user triaged all twelve one at a time on 2026-09-12 and scheduled six of them, which are the `Pending` rows below; `G1`'s ranking and its sequence did not survive that triage and the document stands as the record of what was argued, not as a plan. Documentation-only pull request #33. | I1c; [Upstream baseline](SCOPE.md#upstream-baseline) |
 | T1 | Completed | A finished review reports what it cost and how long it took, on one line beside its coverage: the credit total the runtime reported, the model time its passes spent and the time the run took. Both elapsed figures, at the user's choice, because in a parallel mode summed model time far exceeds the clock and neither answers the other's question. Every pass the run paid for is counted, also at the user's choice: four stages start one and only two put their reviewers on the outcome, so the safeguard discovery pass, the revalidation pass and the failed attempt a fallback replaced were each dropping their charge, and a total read off the outcome alone under-reported every `--verify` and every `--revalidate` run. An unreported charge leaves the total unavailable rather than a partial sum. Not part of `formatCoverage`, which `preview.mjs` embeds in the published body, so a spend is never posted to a pull request; not suppressed by `--quiet`; and a report about a finished run rather than a budget, so nothing reads it and no timeout exists. The one-line `SCOPE.md` change was put to the user as exact wording and approved before the file was edited. Pull request #37, reviewed once with this plugin at the user's authorization: deep on `gpt-5.6-terra` at high effort, 64.24808 credits over 5 requests, 72.9 s of model work in 2 passes against 91.0 s elapsed, 12 approved tool calls and no denial, completed coverage, one informational caveat, and 1 validated finding that was real, exact, and is fixed here. | G1; [Release boundary](SCOPE.md#priority-and-release-boundary) |
-| B1 | Pending | A review that could not look closely at the whole pull request says which parts it skimmed, as a coverage gap rather than as silence. **The honesty half only**: no size-triggered transport, so the diff stays embedded, reviewer count is unchanged and citations stay bound to the captured diff and context windows. Fits `SCOPE.md` as written, because the absence of a large-diff path is an absence rather than a decision. `E1`'s review of 1427 changed lines over 16 files worked, and nothing has established where this stops working. `G1`'s menu item 11. | T1; [Modes/findings](SCOPE.md#review-modes-and-findings) |
-| W1 | Pending | Every validated finding carries one remediation sentence saying what to do about it, in the presented and the published forms. **The sentence only**: a committable suggestion block is explicitly not part of this and stays unscheduled, because code this tool proposes to write sits badly with a tool whose defining promise is that it never writes source. Needs a scope decision, because `SCOPE.md` defers the finding editor and the candidate schema excludes rewrite suggestions. `G1`'s menu item 9. | B1; [Selection/publication](SCOPE.md#selection-publication-and-cached-results) |
+| B1 | Completed | A pass whose context the runtime compacted or truncated is a coverage gap rather than silence: `runReviewer` records the runtime's own events, and a reviewer or adjudicator with any adds one gap naming the pass, never a file. Findings survive, the review is INCOMPLETE, and nothing stops, retries or falls back. **The honesty half only.** This project's own logs held seven compacted reviewer sessions in four reviews that no run reported. Pull request #39, reviewed once with this plugin at the user's authorization: deep, 31.73861 credits, INCOMPLETE on one exact gap and one refused candidate, rejected, and no false gap. No live compaction has run through this code. `G1`'s menu item 11. | T1; [Modes/findings](SCOPE.md#review-modes-and-findings) |
+| X1 | Pending | The long-context tier: a reviewer can run on a model's long-context window, so a large pull request is reviewed without compaction. `createSession` and `setModel` accept `contextTier: "long_context"`; on 2026-09-12 the runtime listed 872k-936k-token long-context budgets against 200k-272k defaults, at up to twice the input price (`git show 6ddd11d:HANDOFF.md`). **Needs a `SCOPE.md` decision** whose wording the user approves, being a new setting that can double input cost. The user's call: always on, per tier, or only for large input. Not demonstrated: that the runtime keeps the tier, how it is billed, and how well models reason over 900k tokens. `B1`'s gap stays as the backstop. Scheduled on 2026-09-12 after `B1`; ID chosen on 2026-09-13. | B1; [Models/execution](SCOPE.md#models-configuration-and-execution) |
+| W1 | Pending | Every validated finding carries one remediation sentence saying what to do about it, in the presented and the published forms. **The sentence only**: a committable suggestion block is explicitly not part of this and stays unscheduled, because code this tool proposes to write sits badly with a tool whose defining promise is that it never writes source. Needs a scope decision, because `SCOPE.md` defers the finding editor and the candidate schema excludes rewrite suggestions. `G1`'s menu item 9. | X1; [Selection/publication](SCOPE.md#selection-publication-and-cached-results) |
 | N1 | Pending | A seeded corpus and a deterministic scorer, so that recall and precision can be measured at all. **The free half only**: small synthetic diffs pinned by content hash, each seeded defect carrying a stable identity, a target severity, the severities that count, acceptable locations and the concepts a matching report must contain, plus clean controls that must draw nothing; and a scorer needing no model and no network, running in the controlled suite and in CI, which rejects an explicit non-finding before matching so that a reviewer calling a thing safe cannot score as having found it. **The collection runs that spend credits are not scheduled, and neither is a baseline gate.** Fits `SCOPE.md` as written: it changes no product behaviour. `G1`'s menu item 5. | W1; [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | H1 | Pending | Opt-in, the project's own written standards steer the review. The checkout's instruction files, which `--verify` discovery already collects and hands to no reviewer, reach one, and a finding raised on that basis must quote the instruction it relies on; that quote is checked against the collected file the way a source citation is checked against bound source, and a finding whose quoted rule cannot be found is refused. **This increment settles what evidence a claim not grounded in a provable code effect must carry**, which is the rule the history lenses and path-conditioned lenses would inherit if they are ever taken. Needs a scope decision, because `SCOPE.md` says nothing about convention review. Opt-in, consistent with `I1b` and `I1c`. `G1`'s menu item 4. | N1; [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | K1 | Pending | A published review asks what it found useful, and a later run reads the reactions and the resolution state of its own threads. `I1c` already reads an earlier review's threads fresh from GitHub on every run, so the read path exists. It is the only scheduled item that would produce evidence about real pull requests rather than a synthetic corpus, and it is last because it needs a review actually published to a pull request before there is anything to read back, and findings stay local unless the user authorizes posting. Needs a scope decision. `G1`'s menu item 12. | H1, I1c; [Publication controls](SCOPE.md#selection-publication-and-cached-results) |
 
-## Every completed increment, `F1` through `G1`, is archived
+## Every completed increment, `F1` through `T1`, is archived
 
-Fifty-one sections were here and nine increments plus the backlog triage moved
+Fifty-two sections were here and ten increments plus the backlog triage moved
 every one of them
 verbatim to
 [docs/roadmap-archive-2026-09-10.md](docs/roadmap-archive-2026-09-10.md): `A1`
@@ -96,13 +98,13 @@ moved the thirty-nine through `V1c`, `L1` moved `V2a` and `V2b` because this
 file had 4272 bytes of headroom left and the smaller of the two is 7547, `D1`
 moved `A1`'s entry and then `L1`'s, `O1` moved `D1`'s, `U1` moved `O1`'s, `I1a`
 moved `E1`'s, `I1b` moved `U1`'s and then `I1a`'s, `I1c` moved `I1b`'s
-15018 bytes, `G1` moved `I1c`'s 13014 bytes, and **the backlog triage moved
-`G1`'s own 8863 bytes**, the last in that
-file. Forty-three are completed-increment entries,
-covering the forty-one increments `F1`, `F2`, `F3`, `Q1`, `Q2`, `Q3`, `Q4`,
+15018 bytes, `G1` moved `I1c`'s 13014 bytes, **the backlog triage moved
+`G1`'s own 8863 bytes**, and **`B1` moved `T1`'s 5951**, the last in that
+file. Forty-four are completed-increment entries,
+covering the forty-two increments `F1`, `F2`, `F3`, `Q1`, `Q2`, `Q3`, `Q4`,
 `P1`, `P2`, `P3`, `P4`, `P5`, `C1`, `C2`, `F4`, `R1`, `M1`, `F5`, `F6`, `M2`,
 `C3`, `C4`, `Q5`, `Q6`, `C5`, `Q7`, `V1a`, `V1b`, `V1c`, `V2a`, `V2b`, `A1`,
-`L1`, `D1`, `O1`, `E1`, `U1`, `I1a`, `I1b`, `I1c` and `G1`, with `R1` and `M1` each recorded in two halves. The remaining eight are the
+`L1`, `D1`, `O1`, `E1`, `U1`, `I1a`, `I1b`, `I1c`, `G1` and `T1`, with `R1` and `M1` each recorded in two halves. The remaining eight are the
 working record kept between them:
 
 - the `Q4` acceptance criteria recorded at the `Q3` checkpoint;
@@ -114,7 +116,7 @@ working record kept between them:
 - the `R1` second-half harness checkpoint;
 - the documentation checkpoint for pull request #4 and its review.
 
-Nothing was rewritten, condensed or corrected in any of the nine moves, so each
+Nothing was rewritten, condensed or corrected in any of the ten moves, so each
 section still reads exactly as the session that wrote it left it, and the
 archive is the evidence of record for every increment it holds: reproduction
 commands, the models and efforts actually used, credit costs, findings and
@@ -131,12 +133,9 @@ than from this file.
 [docs/upstream-licensing.md](docs/upstream-licensing.md) is still the record of
 that licence work and did not move.
 
-**No completed entry is live at all now**, which is new: this file is the
-increments table above and the closing section at the end, and nothing else.
-The backlog triage added no entry of its own, because agreeing a backlog is not
-a numbered increment, so archiving `G1` left none behind rather than leaving the
-usual one. **The next completed increment's entry is written into an empty
-space**, and `T1`'s will be the only live one when it lands. The rule these
+**`B1`'s entry is the only live one.** The backlog triage added no entry of its
+own, because agreeing a backlog is not a numbered increment, so archiving `G1`
+left none behind and `T1`'s was written into that empty space. The rule these
 moves established is to keep
 the most recent entries and archive the rest, measuring this file with `wc -c`
 against the 65536-byte cap before opening a pull request. `O1` archived `D1`
@@ -163,117 +162,93 @@ that has to record a comparison against ten sources does not fit in that. **The
 backlog triage archived `G1`'s** on the same rule, having written the six
 `Pending` rows and the closing section down to 181 bytes of spare: no increment
 entry has ever been written in less than that, so `T1`'s session would have had
-to do this move first.
+to do this move first. **`B1` archived `T1`'s 5951 bytes** on that rule before
+writing a word of its own, because 1313 bytes were spare.
 
-## `T1`: a finished review reports what it cost and how long it took
+## `B1`: a pass the runtime compacted is a coverage gap, not silence
 
-`E1` established that billing is collected per request and retained and then
-never printed, so a person could not tell what a review spent without reading
-Copilot's session state off disk. The run now says it, beside its coverage:
+The Copilot runtime compacts a session once its conversation nears the model's
+prompt budget. `prepareReviewer` never sets `infiniteSessions`, so the SDK
+default applies and background compaction starts at 80%: a model writes a
+summary, and the pass carries on from it while its citations must still quote
+the captured diff and context exactly. **It happened on this project's own
+reviews and no run said so.** A census of 36 review invocations in
+`~/.copilot/session-state`, which spent nothing, found seven compacted reviewer
+sessions in four reviews: #3's four specialists at 912k characters of prompt,
+#24's deep reviewer at 835k, and #32's twice, at 834k and 942k. Nothing at 616k
+or below compacted. Each came after two turns, and #32's second review made 40
+of its 50 tool calls after it. #24 and #32 each discarded candidates that were
+real; compaction may explain that, as a hypothesis. The census command is in
+`git show 6ddd11d:HANDOFF.md`.
 
-```text
-Review coverage: completed.
-Review cost: 64.24808 AI credits over 5 request(s); 72.9 s of model work in 2 pass(es); 91.0 s elapsed.
-```
+### The decisions, taken with the user before anything was built
 
-That is the live line from this increment's own review, and the first time this
-tool has ever reported its own cost.
+- **The runtime's own events, measured by code**: not a reviewer's self-report,
+  since a compacted reviewer cannot know what its summary lost, and not a size
+  threshold, which would be a guess.
+- **A coverage gap, not an execution failure.** Findings survive and are still
+  adjudicated, and no fallback becomes eligible. Upstream's self-review child
+  fails closed; the user kept "coverage gap".
+- **The honesty half only**: what is embedded, `infiniteSessions`, the reviewer
+  count and the citation binding are unchanged.
+- **Declined**: reviewers fetching the diff with `gh` or `git`, since a shell is
+  not read-only and a read lands in the same memory; a DuckDB store, for the same
+  memory and a first dependency; and turning compaction off, since overflow is
+  then native code's decision and might drop the diff. That stays unscheduled
+  until a live run shows it, which is a credit decision.
+- **The long-context tier is next, as `X1`**, the ID the user chose on 2026-09-13.
 
-### The four decisions, each put to the user on its own
+### What it does
 
-**The `SCOPE.md` change was the user's, and the exact wording was approved
-before the file was edited.** One sentence was added to "Models, configuration,
-and execution" stating the behaviour positively. The deferral row in the release
-boundary is unchanged and stays true, because one summary line is not a detailed
-report. **The `Pending` row was not treated as the authorization.**
+`runReviewer` records `session.compaction_start`, `session.compaction_complete`
+and `session.truncation` as `contextLoss`, with the runtime's figures and the
+turns and tool calls made when each began; the summary is not kept. A reviewer
+or adjudicator with any adds one `coverage-gap` to `validation.diagnostics`,
+which decides `outcome.complete`, naming the pass and the moment and never a
+file. An unfinished or failed compaction says so. A fallback's replaced primary
+keeps its `contextLoss` in `fallbackFrom` and adds no gap. The gap has no
+"Blocked assessment" clause, so two passes are never merged. It is printed,
+retained and published without a schema version, and `--quiet` suppresses none
+of it. `session.context_cleared` is left out: only a host calling `clearContext`
+emits it, this tool never does, and no local log holds one.
 
-**Both elapsed figures**, because model time is summed per pass and elapsed time
-is the clock: five reviewers working a minute each is five minutes of model work
-in one minute of waiting. Wall time runs from the run starting to it settling,
-before finding selection, so no wait for a person is counted except a `--verify`
-approval answer.
+### The review
 
-**Every paid pass counts.** Four stages start a model pass and only two put
-their reviewers on the outcome. Three sources of charge were being dropped
-before the outcome was assembled: the safeguard discovery pass, the revalidation
-pass, and the failed attempt a configured fallback replaced, whose record kept
-its `usage` and not its `billing`. A total read off the outcome would have
-under-reported exactly the runs this project makes on its own pull requests.
-The charges are collected where the passes are started instead.
+Pull request #39, reviewed once with this plugin at the user's authorization:
+deep on `gpt-5.6-terra` at high effort for all five requests, **31.73861
+credits**, 37.5 s of model work against 50.8 s elapsed, 15 approved tool calls
+and no denial, **INCOMPLETE** and 0 validated findings. **Its `contextLoss` was
+empty, so an ordinary run gained no false gap**, which is all a pull request
+this small can show. No adjudicator ran.
 
-**`README.md`'s headroom was solved first, in its own pull request**, #36, which
-moved the four re-review sections to `docs/re-review.md` verbatim and took the
-file from 63865 to 55675 bytes. Documentation-only, merged without a plugin
-review at the user's decision, exactly as #30 was.
+Its coverage gap, that no live run has exercised the event handling, is exact
+and unfixable here. Its one candidate, P2 "Retain context-loss evidence with
+each reviewer record", was refused because its `breaks` citation quoted
+`retention.mjs`, which the diff does not change. **Its premise is true and it is
+rejected**: `retainedRecord` drops the structured events, but inspecting a
+retained result renders the gap with every figure, and the gap had to travel
+through diagnostics without a schema change, as `T1` did for `billing`.
 
-### What it deliberately is not
-
-**Not part of `formatCoverage`.** That text is embedded in the body `preview.mjs`
-publishes, so a cost sentence written there would post the spend to a public
-pull request. `scripts/smoke-cost.mjs` and `scripts/smoke-review.mjs` each assert
-the separation, in the formatter and in a real published payload.
-
-**Not suppressed by `--quiet`.** `O1` settled that the flag drops evidence JSON
-and raw model envelopes and nothing a person needs in order to judge a result.
-
-**Not a deadline.** Both figures are reports about a finished run. Nothing reads
-either, and `SCOPE.md`'s refusal of review timeouts is untouched.
-
-### The review, and the finding it caught
-
-Pull request #37, reviewed once with this plugin at the user's explicit
-authorization: deep on `gpt-5.6-terra` at high effort, **64.24808 credits over 5
-requests**, 12 approved tool calls and no denial, **completed** coverage, one
-informational caveat, 0 withheld and 0 rejected candidates, and **1 validated
-finding that was real and exact**.
-
-It found that `runCost` counted requests from the billing entries alone, so a
-pass whose model turn started and for which the runtime emitted no usage event
-at all contributed no request and no gap. The empty charge list then counted as
-fully reported and the run announced **0 AI credits**, which is precisely the
-plausible number this increment exists to refuse. It looks identical in the
-billing entries to a pass that never reached inference and really did cost
-nothing; the two are told apart by whether a turn ever started. **A cancelled
-run is the common case**, its reviewers stopped mid-turn and billed for work the
-runtime never reported, and it now says its total is unavailable rather than
-claiming the run was free. Fixed on the branch with its own failing test first,
-and `scripts/smoke-review.mjs` now names all three scripted scenarios that leave
-such a pass.
-
-The caveat is fair and stands: no live transcript establishes how often a
-completed request omits its usage event, only that the state is reachable.
-
-GitHub's own Copilot reviewer was also requested on #37, at the user's
-authorization, and its findings are not in this entry.
+GitHub's own Copilot reviewer was also requested on #39, at the user's
+authorization.
 
 ### Verified, and not
 
-**Seventeen controlled suites pass**, `smoke-cost` being the new one, and it is
-in the CI list. `git diff --check` is clean, no tracked text carries a control
-byte, and discovery reads all six root files and skips none.
+**Test first**: three suites gained the cases and failed for the right reason
+before the change. All seventeen pass, `git diff --check` is clean, discovery
+reads all six root files, and CI passed on #39.
 
-- **The revalidation pass has no end-to-end run in any suite**, and had none
-  before this. Its charge collection is wired identically to the other three;
-  what covers it is a source-shape assertion that every `reviewAssignments` call
-  in `review.mjs` goes through the collector, which guards a future fifth stage
-  too. That is a source check, not a run.
-- **The parallel case was not exercised live.** The review was deep, so two
-  passes ran in sequence and elapsed time exceeded model time. Model time
-  exceeding elapsed time, which is the figure a balanced run makes interesting,
-  rests on the suites.
-- `scripts/smoke-runtime.mjs --targets` **still has not been run**. It gained a
-  help and a status probe pair here, on top of the four `I1c` added without
-  running them.
-- **`scripts/runtime-quick.mjs` still computes a narrower total of its own**,
-  the way `dogfood-review.mjs` did before this. It is a live probe that spends
-  inference, so it was left rather than changed unverified. Follow-up.
-- **A retained result does not carry what its run cost.** The figures are
-  printed when the review settles and are not written into the record, so
-  `/pr-review inspect` and `/pr-review publish` say nothing about the spend of
-  the run they replay. Keeping them out avoided a schema version; recorded as a
-  limitation rather than as work.
+- **No live compaction has run through this code**, and that the events reach
+  `session.on` here is inferred. Reviewing a pull request large enough to
+  compact is a separate credit decision.
+- **A compaction's own charge may be missing from `T1`'s cost line.** The
+  complete event carries one, 9.2 and 11.6 credits on two real events, and usage
+  events are not persisted, so whether it is counted is unknown.
+- **The discovery and revalidation passes add no gap**, not being review
+  coverage. Follow-up.
+- `scripts/smoke-runtime.mjs --targets` still has not run; 81 is unverified.
 
-## v1 is complete, and six increments are scheduled on top of it
+## v1 is complete, and seven increments are scheduled on top of it
 
 **`D1` delivered v1, and `O1`, `E1`, `U1`, `I1a`, `I1b`, `I1c` and `G1` have
 landed on top of it.**
@@ -289,8 +264,8 @@ was built, and `I1a`, `I1b` and `I1c` are all done.
 `G1` ended with twelve proposals and none of them scheduled. The user was put
 through all twelve one at a time, cheapest first, and **scheduled six**: `T1`,
 `B1`, `W1`, `N1`, `H1`, `K1`, in that order, which is the order of the `Pending`
-rows above and the order the next session works in. **`T1` is done and `B1`
-is the next increment.** The user chose that order over starting with the measurement and
+rows above and the order the next session works in, with `X1` inserted after
+`B1` the same day. **`T1` and `B1` are done and `X1` is the next increment.** The user chose that order over starting with the measurement and
 over starting with the largest capability gap, and chose the mnemonic IDs over
 one series off `G1`.
 
@@ -308,17 +283,18 @@ reviewer firing, and anchoring findings outside the diff. **A proposal in
 `docs/gap-analysis.md` is still not an authorization**, and neither is a row in
 that list. **The triage itself was not a numbered increment.**
 
-**Four of the six need a scope decision, and that decision is the user's every
+**Five of the seven need a scope decision, and that decision is the user's every
 time, taken in the session that builds the increment and never assumed from this
 row.** `T1` took its, as one approved sentence. `W1` needs one
 because the finding editor is deferred and the candidate schema excludes rewrite
 suggestions, `H1` because the scope says nothing about convention review, and
-`K1` because it says nothing about a feedback channel. **`B1` and `N1` fit
+`K1` because it says nothing about a feedback channel, and `X1` because it adds
+a context-tier setting that can double input cost. **`B1` and `N1` fit
 `SCOPE.md` as written** and need no decision at all.
 
 ### What is settled and must not be redone
 
-**`E1`, `U1`, `I1a`, `I1b`, `I1c`, `G1` and `T1` are done: do not redo any.**
+**`E1`, `U1`, `I1a`, `I1b`, `I1c`, `G1`, `T1` and `B1` are done: do not redo any.**
 **`E1` raised three items and `T1` closed the first**, a run that never reported
 its own cost. The other two stay recorded and stay unscheduled: the evidence lines are still truncated by the interactive UI, and
 per-reviewer progress still says nothing while a reviewer works. `U1` is settled as one preflight flag that refuses. **`I1a`'s slicing is
@@ -505,7 +481,7 @@ except where a bullet says so:
   would actually produce a recall number are not scheduled**, so recall stays
   unmeasured until the user authorizes them.
 - ~~**A run that reports what it cost.**~~ **Closed by `T1`**, whose entry is
-  above. The scope decision it needed was taken on 2026-09-12 and the sentence
+  archived. The scope decision it needed was taken on 2026-09-12 and the sentence
   was approved before the file was edited.
 - **Evidence lines a person can actually read.** Each is one very long line of
   JSON, and the interactive UI truncates it at the window edge, so `E1`'s own
