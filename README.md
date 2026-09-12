@@ -21,8 +21,9 @@ and how to reproduce each behaviour yourself.
 - [docs/safeguards.md](docs/safeguards.md) is the full `--verify` guide, which
   this one summarises.
 - [docs/gap-analysis.md](docs/gap-analysis.md) compares this tool with upstream
-  and with the rest of the field, and proposes what is worth adopting. Nothing
-  it proposes is scheduled.
+  and with the rest of the field, and proposes what is worth adopting. Six of
+  its twelve proposals are scheduled in [ROADMAP.md](ROADMAP.md), six are not,
+  and its own ranking and sequence did not survive that triage.
 - [docs/readme-archive-2026-09-10.md](docs/readme-archive-2026-09-10.md) is the
   previous README, kept verbatim. Look there for a harness probe invocation this
   guide no longer prints, or for how a capability read when its increment landed.
