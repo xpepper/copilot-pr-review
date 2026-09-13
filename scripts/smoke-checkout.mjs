@@ -9,7 +9,7 @@ import {
   assertReviewableCheckout, refuseCheckout, runGit, verificationNotice,
 } from "../extensions/pr-review/checkout.mjs";
 import { reviewModes } from "../extensions/pr-review/modes.mjs";
-import { collectStandards } from "../extensions/pr-review/standards.mjs";
+import { collectStandards, standardsBudgetBytes, standardsInput } from "../extensions/pr-review/standards.mjs";
 
 const temporary = [];
 function repositoryFixture({ commit = true, ignore } = {}) {
@@ -452,7 +452,47 @@ try {
     assert.equal(sha256.files[0].blobSha.length, 64);
     assert.deepEqual(sha256.skipped, []);
   }
+  // H1: what reaches the reviewer is bounded, because pull request #44's own diff
+  // already came close to filling the light model's window. The budget counts the
+  // numbered form a prompt carries rather than source bytes; files are taken in
+  // reading order while they fit, one that does not is named, a smaller file after
+  // it still fits, and a file refused for not being committed spends nothing.
+  {
+    assert.equal(standardsBudgetBytes, 48 * 1024);
+    const budgeted = realpathSync(mkdtempSync(join(tmpdir(), "pr-review-standards-budget-")));
+    temporary.push(budgeted);
+    const budgetGit = (...args) => execFileSync("git", ["-C", budgeted, ...args], { encoding: "utf8" });
+    execFileSync("git", ["init", "--quiet", "-b", "pr-branch", budgeted]);
+    writeFileSync(join(budgeted, "AGENTS.md"), "Keep the rules short.\n");
+    writeFileSync(join(budgeted, "README.md"), "A long guide.\n".repeat(4000));
+    writeFileSync(join(budgeted, "SCOPE.md"), "Scope.\n");
+    budgetGit("add", "AGENTS.md", "README.md", "SCOPE.md");
+    budgetGit("-c", "user.email=fixture@example.invalid", "-c", "user.name=Fixture", "commit", "--quiet", "-m", "head");
+    writeFileSync(join(budgeted, "NOTES.md"), "n".repeat(49000));
+    const budgetHead = budgetGit("rev-parse", "HEAD").trim();
+
+    const bounded = await collectStandards(budgeted, budgetHead);
+    assert.deepEqual(bounded.files.map(({ name }) => name), ["AGENTS.md", "SCOPE.md"]);
+    assert.deepEqual(bounded.skipped, [
+      { name: "README.md", bytes: 56000, reason: `does not fit the ${48 * 1024} byte standards budget` },
+      { name: "NOTES.md", bytes: 49000, reason: "is not committed at the reviewed head" },
+    ]);
+
+    const numbered = Buffer.byteLength(standardsInput([bounded.files[0]]));
+    assert(numbered > bounded.files[0].bytes, "a numbered file is larger than its source");
+    const short = await collectStandards(budgeted, budgetHead, { budgetBytes: numbered - 1 });
+    assert.deepEqual(short.files.map(({ name }) => name), ["SCOPE.md"],
+      "a file whose source fits but whose numbered form does not is left out");
+    assert.deepEqual(short.skipped.map(({ name, reason }) => [name, reason]), [
+      ["AGENTS.md", `does not fit the ${numbered - 1} byte standards budget`],
+      ["README.md", `does not fit the ${numbered - 1} byte standards budget`],
+      ["NOTES.md", "is not committed at the reviewed head"],
+    ]);
+    const exact = await collectStandards(budgeted, budgetHead, { budgetBytes: numbered });
+    assert.deepEqual(exact.files.map(({ name }) => name), ["AGENTS.md"], "a file that fits exactly fits");
+  }
   console.log("PASS H1 standards are the root markdown files proven to be the reviewed head's committed text");
+  console.log("PASS H1 the standards a reviewer is handed are bounded by a numbered-byte budget, in reading order");
 } finally {
   for (const directory of temporary) rmSync(directory, { recursive: true, force: true });
 }

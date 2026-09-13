@@ -13,6 +13,13 @@ import { collectInstructionFiles } from "./safeguards.mjs";
 // handed, and it grants nothing, opens no gate and selects no mode.
 export const noStandardsFlag = "--no-standards";
 
+// What the standards reviewer may be handed, counted as the numbered text its
+// prompt carries. Pull request #44's own diff already came close to filling the
+// light overview model's 200,000-token window, and this project's six root files
+// added about 44,000 more, so the user chose a bound: 48 KiB keeps AGENTS.md,
+// CLAUDE.md, HANDOFF.md and SCOPE.md here and names README.md and ROADMAP.md.
+export const standardsBudgetBytes = 48 * 1024;
+
 // Built rather than typed, so no editor can turn an escape into a raw byte.
 const nul = String.fromCharCode(0);
 const tab = String.fromCharCode(9);
@@ -41,7 +48,7 @@ function rootEntries(listing) {
 // handed on only when the reviewed head commits a regular file of that name
 // whose blob is exactly the text that was read. One Git call covers the root.
 // Anything else is named with its reason and never reaches a reviewer.
-export async function collectStandards(root, head, { git = runGit, signal } = {}) {
+export async function collectStandards(root, head, { git = runGit, signal, budgetBytes = standardsBudgetBytes } = {}) {
   const collected = collectInstructionFiles(root);
   if (!collected.files.length) return { files: [], skipped: collected.skipped };
   let entries;
@@ -58,6 +65,7 @@ export async function collectStandards(root, head, { git = runGit, signal } = {}
   }
   const files = [];
   const skipped = [...collected.skipped];
+  let spent = 0;
   for (const { name, bytes, text } of collected.files) {
     const entry = entries.get(name);
     if (!entry) {
@@ -69,7 +77,16 @@ export async function collectStandards(root, head, { git = runGit, signal } = {}
     } else if (blobId(Buffer.from(text, "utf8"), entry.object) !== entry.object) {
       skipped.push({ name, bytes, reason: "is not the reviewed head's committed text" });
     } else {
-      files.push({ name, bytes, blobSha: entry.object, text });
+      // Bounded as numbered in the prompt, in reading order. A file that does not
+      // fit is named, and a smaller file after it may still fit.
+      const file = { name, bytes, blobSha: entry.object, text };
+      const size = Buffer.byteLength(standardsInput([file]));
+      if (spent + size > budgetBytes) {
+        skipped.push({ name, bytes, reason: `does not fit the ${budgetBytes} byte standards budget` });
+      } else {
+        files.push(file);
+        spent += size;
+      }
     }
   }
   return { files, skipped };
