@@ -15,6 +15,9 @@ export const reviewKey = (binding) => createHash("sha256").update(JSON.stringify
 // publication, so the boundary and the payload can never disagree about it.
 export const publishedProse = ["title", "trigger", "expected", "actual", "introduction", "remediation"];
 export const opensCodeBlock = (text) => /^ {0,3}(?:`{3}|~{3})/m.test(text);
+const sentenceSegmenter = new Intl.Segmenter("en", { granularity: "sentence" });
+export const isOneLineSentence = (text) => typeof text === "string" && !/[\r\n]/.test(text) &&
+  [...sentenceSegmenter.segment(text)].filter(({ segment }) => segment.trim()).length === 1;
 
 const citationFormat = 'CITATION is {"path":"exact source path","side":"head|base","startLine":1,"endLine":1,"quote":"exact full lines, joined with \\n, no final newline"}.';
 export const limitationFormat = [
@@ -289,9 +292,8 @@ function candidate(value, boundary, policy, diagnostics, id) {
   object(value, ["title", "severity", "confidence", "location", "trigger", "expected", "actual",
     "introduction", "remediation", "before", "after", "evidence"], "Candidate", ["breaks"]);
   for (const key of ["title", "trigger", "expected", "actual", "introduction", "remediation"]) text(value[key], key);
-  // W1: the sentence is published after its label on a line of its own, so it
-  // stays one line and never becomes a paragraph, a list or a block.
-  if (/[\r\n]/.test(value.remediation)) throw new Error("Remediation must be one sentence on one line.");
+  // W1: the sentence is published after its label on a line of its own.
+  if (!isOneLineSentence(value.remediation)) throw new Error("Remediation must be one sentence on one line.");
   const block = publishedProse.find((key) => opensCodeBlock(value[key]));
   if (block) throw new Error(`${block} opens a code block; a published finding carries no code block.`);
   if (!policy.severities.includes(value.severity) ||

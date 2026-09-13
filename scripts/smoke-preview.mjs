@@ -319,6 +319,9 @@ console.log("PASS strict version-2 retained previews, altered payload/authority 
   // Nor does a sentence that is not one line get posted, whatever a record holds.
   for (const finding of current.validation.findings) finding.remediation = "Multiply instead.\nThen retest.";
   assert.throws(() => buildReviewPreview(current, earlier.boundary), /remediation sentence/);
+  // Nor do two sentences become one merely because they share a physical line.
+  for (const finding of current.validation.findings) finding.remediation = "Multiply instead. Then retest.";
+  assert.throws(() => buildReviewPreview(current, earlier.boundary), /remediation sentence/);
   // And a code block in any published field is refused at publication as well,
   // because a retained record never passed back through the evidence boundary.
   for (const finding of current.validation.findings) {

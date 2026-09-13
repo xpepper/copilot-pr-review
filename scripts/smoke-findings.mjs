@@ -79,6 +79,7 @@ for (const mutate of [
   (c) => { c.confidence = "0.95"; }, (c) => { c.confidence = 1.1; },
   (c) => { c.actual = " "; }, (c) => { c.extra = true; },
   (c) => { delete c.remediation; }, (c) => { c.remediation = " "; },
+  (c) => { c.remediation = "Multiply instead. Then retest."; },
   (c) => { c.remediation = "Multiply instead.\nThen retest."; }, (c) => { c.remediation = "Multiply instead.\r"; },
   (c) => { c.location.path = "../total.js"; }, (c) => { c.location.side = "RIGHT"; },
   (c) => { c.location.startLine = 0; }, (c) => { c.location.endLine = 3.5; },
@@ -112,9 +113,10 @@ for (const field of ["title", "trigger", "expected", "actual", "introduction", "
 {
   const prose = structuredClone(candidate);
   prose.actual += "\n\nSeen with `total(100, 3)` in the fixture.\n    ``` four spaces in is text, not a fence";
-  prose.remediation = "Use `*` rather than `+` between the unit price and the quantity.";
+  prose.remediation = "Use Node.js multiplication, e.g. `*`, between the unit price and quantity.";
   const kept = collectCandidates([reviewer([prose])], boundary, policy);
-  assert.equal(kept.candidates.length, 1, "Inline code, a blank line and a four-space indent are prose");
+  assert.equal(kept.candidates.length, 1,
+    "Inline code, abbreviations, a blank line and a four-space indent are prose");
   assert.deepEqual(kept.issues, []);
 }
 assert.match(candidateFormat(policy), /code block/i);
