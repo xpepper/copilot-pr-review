@@ -235,6 +235,13 @@ through `extension.mjs`, true of every flag since no suite reaches that file;
 this review dispatched it live, and a harness is a follow-up. **Already in
 hand**: `ROADMAP.md` and `HANDOFF.md` were not yet updated at that head.
 
+`@claude[agent]`, asked at the user's authorization, reviewed `3742416` with six
+observations, no blocking concern and no commit. Three confirm the design and
+one repeats the `extension.mjs` item. **Rejected**: that no test displays a
+fallback whose window differs, since `smoke-review` asserts and runs exactly
+that; and a comment on the tier assignment, which fixture assignments without a
+window need and a comment above it already explains.
+
 ### Verified, and not
 
 **Test first**: `smoke-review` failed on the missing option before the change,
