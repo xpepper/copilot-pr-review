@@ -185,3 +185,179 @@ export function loadCorpus(directory = corpusDirectory) {
   });
   return { hash: sha256(manifestBytes), nonFindingPhrases: manifest.nonFindingPhrases, cases };
 }
+
+// The prose a validated finding carries. Concepts may appear in any of it.
+const proseFields = ["title", "trigger", "expected", "actual", "introduction", "remediation"];
+const denialFields = ["title", "actual"];
+const wordEdge = /[a-z0-9]/;
+
+// A term is found literally in normalised text. A term that starts or ends with
+// a letter or digit must meet a non-word character there, so "ms" is not found
+// inside "items"; a punctuation edge such as "<=" matches wherever it appears.
+function containsTerm(text, term) {
+  for (let index = text.indexOf(term); index !== -1; index = text.indexOf(term, index + 1)) {
+    const before = text[index - 1];
+    const after = text[index + term.length];
+    if ((!wordEdge.test(term[0]) || before === undefined || !wordEdge.test(before)) &&
+        (!wordEdge.test(term.at(-1)) || after === undefined || !wordEdge.test(after))) return true;
+  }
+  return false;
+}
+
+const reference = (finding) => `${finding.location.path}:${finding.location.startLine}-${finding.location.endLine} ` +
+  `(${finding.location.side}) [${finding.severity}] ${finding.title}`;
+
+function checkFinding(label, finding, index) {
+  const where = `${label}: finding ${index + 1}`;
+  const location = finding?.location;
+  if (!finding || typeof finding !== "object" || typeof finding.title !== "string" || typeof finding.severity !== "string" ||
+      !location || typeof location.path !== "string" || !["head", "base"].includes(location.side) ||
+      !Number.isSafeInteger(location.startLine) || !Number.isSafeInteger(location.endLine)) {
+    throw new Error(`${where} needs a title, a severity and a location with a path, a head or base side and a line range.`);
+  }
+  if (!severities.includes(finding.severity)) {
+    throw new Error(`${where} has severity ${JSON.stringify(finding.severity)}, which this tool does not report.`);
+  }
+  for (const key of proseFields) {
+    if (finding[key] !== undefined && typeof finding[key] !== "string") throw new Error(`${where}: ${key} must be text.`);
+  }
+}
+
+const overlaps = (location, accepted) => location.path === accepted.path && location.side === accepted.side &&
+  location.startLine <= accepted.endLine && accepted.startLine <= location.endLine;
+
+function scoreCase(entry, findings, phrases) {
+  // Findings are put in one canonical order before anything is decided, so the
+  // order a report happened to list them in cannot change a pairing.
+  const ordered = findings
+    .map((finding) => ({ finding, key: JSON.stringify([finding.location.path, finding.location.side,
+      finding.location.startLine, finding.location.endLine, finding.severity, ...proseFields.map((key) => finding[key] ?? "")]) }))
+    .sort((left, right) => (left.key < right.key ? -1 : left.key > right.key ? 1 : 0))
+    .map(({ finding }) => finding);
+  // An explicit non-finding is set aside before matching, so a report calling
+  // the code safe can never detect the defect it names. Only the headline and
+  // the observed behaviour are read: the expected field describes correct
+  // behaviour by design, so "is correct" there denies nothing.
+  const nonFindings = [];
+  const considered = [];
+  for (const finding of ordered) {
+    const denial = denialFields
+      .map((field) => ({ field, phrase: phrases.find((phrase) => containsTerm(normalize(finding[field] ?? ""), phrase)) }))
+      .find((entry) => entry.phrase);
+    if (denial) nonFindings.push({ finding: reference(finding), ...denial });
+    else considered.push(finding);
+  }
+  const checks = considered.map((finding) => {
+    const text = normalize(proseFields.map((key) => finding[key] ?? "").join(" "));
+    return entry.defects.map((defect) => {
+      const location = defect.locations.some((accepted) => overlaps(finding.location, accepted));
+      const severity = defect.allowedSeverities.includes(finding.severity);
+      const missingConcepts = defect.concepts.filter((group) => !group.some((term) => containsTerm(text, term)));
+      return { defect: defect.id, location, severity, missingConcepts };
+    });
+  });
+  const eligible = (f, d) => checks[f][d].location && checks[f][d].severity && !checks[f][d].missingConcepts.length;
+  // A maximum one-to-one matching, by augmenting paths. Taking the first
+  // eligible pairing instead can spend a finding on one defect that only it
+  // could not have detected, and lose the other.
+  const owner = entry.defects.map(() => -1);
+  const augment = (f, seen) => entry.defects.some((_, d) => {
+    if (!eligible(f, d) || seen.has(d)) return false;
+    seen.add(d);
+    if (owner[d] !== -1 && !augment(owner[d], seen)) return false;
+    owner[d] = f;
+    return true;
+  });
+  considered.forEach((_, f) => augment(f, new Set()));
+  const matched = new Set(owner);
+  return {
+    id: entry.id,
+    kind: entry.kind,
+    detected: entry.defects.flatMap((defect, d) => (owner[d] === -1 ? [] :
+      [{ defect: defect.id, severity: defect.severity, finding: reference(considered[owner[d]]) }])),
+    missed: entry.defects.flatMap((defect, d) => (owner[d] === -1 ? [{ defect: defect.id, severity: defect.severity }] : [])),
+    nonFindings,
+    // Unmatched but eligible means every defect it could detect was already
+    // detected by another finding: a second report, not a false one.
+    duplicates: considered.flatMap((finding, f) => {
+      const d = entry.defects.findIndex((_, index) => eligible(f, index));
+      return matched.has(f) || d === -1 ? [] : [{ finding: reference(finding), defect: entry.defects[d].id }];
+    }),
+    falsePositives: considered.flatMap((finding, f) => (matched.has(f) || entry.defects.some((_, d) => eligible(f, d)) ? [] :
+      [{ finding: reference(finding), checks: checks[f] }])),
+  };
+}
+
+// Scores reports of review findings against the corpus they were produced for.
+// It spends nothing and decides nothing: it counts, per case and per target
+// severity, and every count can be traced to the finding and check behind it.
+export function scoreReports(corpus, submission) {
+  if (!submission || typeof submission !== "object" || !Array.isArray(submission.reports)) {
+    throw new Error("Reports must be an object carrying a corpus hash and a reports list.");
+  }
+  if (submission.corpus !== corpus.hash) {
+    throw new Error(`Reports were produced against corpus ${submission.corpus}, not ${corpus.hash}.`);
+  }
+  const reported = new Map();
+  for (const report of submission.reports) {
+    const entry = corpus.cases.find((candidate) => candidate.id === report?.case);
+    if (!entry) throw new Error(`Report names unknown corpus case ${JSON.stringify(report?.case)}.`);
+    if (reported.has(entry.id)) throw new Error(`Duplicate report for corpus case ${JSON.stringify(entry.id)}.`);
+    if (!Array.isArray(report.findings)) throw new Error(`Report for ${entry.id}: findings must be a list.`);
+    report.findings.forEach((finding, index) => checkFinding(`Report for ${entry.id}`, finding, index));
+    reported.set(entry.id, report.findings);
+  }
+  const cases = corpus.cases.filter((entry) => reported.has(entry.id))
+    .map((entry) => scoreCase(entry, reported.get(entry.id), corpus.nonFindingPhrases));
+  const bands = Object.fromEntries(severities.map((severity) => [severity, { opportunities: 0, detected: 0 }]));
+  for (const scored of cases) {
+    for (const { severity } of scored.detected) bands[severity].detected++;
+    for (const { severity } of [...scored.detected, ...scored.missed]) bands[severity].opportunities++;
+  }
+  const total = (key) => cases.reduce((sum, scored) => sum + scored[key].length, 0);
+  return {
+    corpus: corpus.hash,
+    cases,
+    unscored: corpus.cases.filter((entry) => !reported.has(entry.id)).map((entry) => entry.id),
+    bands,
+    falsePositives: total("falsePositives"),
+    duplicates: total("duplicates"),
+    nonFindings: total("nonFindings"),
+    controlsWithFindings: cases.filter((scored) => scored.kind === "control" && scored.falsePositives.length)
+      .map((scored) => scored.id),
+  };
+}
+
+export function formatScore(score) {
+  const lines = [
+    `Benchmark score against corpus ${score.corpus}.`,
+    `Scored ${score.cases.length} of ${score.cases.length + score.unscored.length} case(s); ` +
+      `unscored: ${score.unscored.join(", ") || "none"}.`,
+    ...severities.map((severity) =>
+      `${severity}: ${score.bands[severity].detected} of ${score.bands[severity].opportunities} seeded defect(s) detected`),
+    `False positives: ${score.falsePositives}; duplicates: ${score.duplicates}; non-findings rejected: ${score.nonFindings}; ` +
+      `controls that drew a finding: ${score.controlsWithFindings.join(", ") || "none"}.`,
+    "Counts only, banded by each defect's target severity; no rate, baseline or threshold is applied.",
+  ];
+  for (const scored of score.cases) {
+    lines.push(`${scored.id} (${scored.kind})`);
+    for (const entry of scored.detected) lines.push(`  detected ${entry.defect} [target ${entry.severity}] by ${entry.finding}`);
+    for (const entry of scored.missed) lines.push(`  missed ${entry.defect} [target ${entry.severity}]`);
+    for (const entry of scored.nonFindings) {
+      lines.push(`  non-finding rejected before matching: ${entry.finding}; its ${entry.field} says "${entry.phrase}"`);
+    }
+    for (const entry of scored.duplicates) lines.push(`  duplicate of ${entry.defect}: ${entry.finding}`);
+    for (const entry of scored.falsePositives) {
+      lines.push(`  false positive: ${entry.finding}`);
+      if (!entry.checks.length) lines.push("    no seeded defect to match: this is a clean control");
+      for (const check of entry.checks) {
+        const concepts = check.missingConcepts.length
+          ? check.missingConcepts.map((group) => `missing a concept (one of: ${group.join(", ")})`).join("; ")
+          : "every concept present";
+        lines.push(`    against ${check.defect}: location ${check.location ? "matches" : "does not match"}; ` +
+          `severity ${check.severity ? "allowed" : "not allowed"}; ${concepts}`);
+      }
+    }
+  }
+  return lines.join("\n");
+}
