@@ -7,167 +7,171 @@ Do not rely on another conversation, reopen settled product decisions or infer
 behavior from an API declaration. Keep what you demonstrate apart from what you
 assume, in the roadmap and in your final report.
 
-## Your job: finish pull request #43, hand off `H1`, then merge
+## First confirm that pull request #43 is merged
 
-`N1` is on branch `n1-seeded-corpus-scorer`, pull request #43. The user
-scheduled this session for exactly these steps, in this order, all on that
-branch:
+`N1` lives on branch `n1-seeded-corpus-scorer`, pull request #43. The session
+that wrote this file was authorized to squash-merge #43 once every check on its
+final head had passed, which could only happen after this file was pushed, so
+this file cannot tell you whether it did. Confirm with `gh pr view 43` that #43
+is merged, switch to `main`, pull with `--ff-only`, and check that `main` carries
+the corpus, the scorer and this file. **If #43 is not merged, ask the user**
+rather than stacking `H1` on it or merging it yourself.
 
-1. Address GitHub Copilot's inline review comment on #43, test first.
-2. Record the response in `ROADMAP.md`, then replace this file with the prompt
-   for the `H1` session as the last repository edit, and push.
-3. Merge #43 once every check on that final head has passed.
+What #43 carries, after `7e9ce50` archived `W1`: the corpus (`a4fa88c`), the
+scorer (`baad911`), the CI loop (`33625b6`), the roadmap entry (`c205f03`, the
+head the installed plugin reviewed), `bccdd06` fixing the reversed range that
+review raised, two handoff commits, `230f982` fixing GitHub Copilot's comment,
+and the commit containing this file.
 
-The user chose to write the roadmap and handoff **before** merging, so they land
-on `main` with #43 and no separate documentation pull request is needed; `main`
-refuses direct pushes. The user authorized merging #43 in this session, and
-addressing that one comment, which includes one short reply on its thread and
-resolving it. Nothing else: do not start `H1` or `K1`, and do not widen `N1`.
+The one authorized plugin review for this increment was spent on `c205f03`.
+**Do not rerun it without fresh explicit authorization.** It ran **balanced**,
+without `--long-context`, with findings kept local:
 
-## State when this was written
+- four heavy specialists on `gpt-5.6-terra` and the overview on `gpt-5.6-luna`,
+  all at high effort on `contextTier: default`, with no context loss;
+- 14 reported requests over 5 paid passes, 127.050688 credits, 232.9 s of model
+  time against 114.0 s elapsed;
+- 32 approved permission requests for 31 confined reads, and no denial;
+- INCOMPLETE coverage, 0 validated findings, and one real candidate raised by
+  two reviewers, refused on its citation and fixed anyway in `bccdd06`.
 
-Commits on the branch, oldest first: `7e9ce50` archives `W1`, `a4fa88c` adds the
-corpus, `baad911` the scorer, `33625b6` the CI loop, `c205f03` the roadmap entry
-and is the head the installed plugin reviewed, `bccdd06` fixes the reversed
-range that review raised, `e92f9a2` records it and hands off `H1`, and then the
-commit containing this file. On `e92f9a2` both checks passed:
-`Controlled suites and self-readability` and `claude-review`.
+What else was said on #43:
 
-What has been said on #43:
+- GitHub Copilot's review of `e92f9a2` left one inline comment: the scorer
+  accepted a finding location the tool refuses, so `src/paginate.js:1-999`
+  detected the seeded defect at `3-4`. `230f982` fixes it test first. One reply
+  naming the commit was posted on that thread, and the thread is resolved.
+- `@codex[agent]` found no actionable issue at `e92f9a2`, and the
+  `claude-review` action reported none.
+- The user asked `@claude[agent]+claude-sonnet-5` for a review at 16:39:10Z on
+  2026-09-13, and it had not replied when this was written. If it has since
+  replied with something actionable, report it to the user and ask before acting
+  on it. The same applies to any other new comment.
 
-- the `claude-review` action commented "No issues found";
-- `@codex[agent]` reviewed `e92f9a2` and found no actionable issue;
-- GitHub Copilot's review `5191377384`, state COMMENTED, left one inline
-  comment, `4000178733`, which is this session's job;
-- the user asked `@claude[agent]+claude-sonnet-5` for a review at 16:39:10Z on
-  2026-09-13, and it had not replied when this was written. If it has replied
-  with something actionable, report it to the user and ask before acting on it.
-  The same applies to any other new comment.
+No plugin review covers `bccdd06` or `230f982`, and `ROADMAP.md` says so.
 
-**The one authorized plugin review of #43 is spent. Do not rerun it**, and ask
-before any other review or live probe that spends credits. The fix below
-changes `scripts/`, so no plugin review covers it; record that plainly.
+## What `N1` is, so you do not redo or widen it
 
-## The comment
+`scripts/benchmark/corpus/` holds five plain-text diffs pinned by sha256 (three
+seeded cases with four defects, two clean controls) and `corpus.json`, whose own
+hash `scripts/smoke-benchmark.mjs` pins. `scripts/benchmark/score.mjs` loads and
+checks the corpus and scores findings: a submitted location must be one the tool
+could anchor (at most ten lines, inside one hunk, covering a changed line, in a
+file of the diff), explicit non-findings are rejected before matching, matching
+is maximum one-to-one and independent of order, recall is banded by target
+severity, and unscored cases are kept apart from missed ones. **No model output
+has ever been scored.** Collection runs, a mode matrix, published recall or
+precision and any baseline gate are **not scheduled**; do not add them.
 
-GitHub Copilot, on `scripts/benchmark/score.mjs` line 309 at `e92f9a2`, verbatim:
+## Your job after #43 merges is `H1`, and only `H1`
 
-> `checkFinding` only validates that the range is positive; it does not enforce
-> the actual validated-finding location contract. For example, a report at
-> `src/paginate.js:1-999` passes this gate, overlaps the seeded `3-4` location,
-> and is counted as a detection even though product validation rejects
-> locations over ten lines or outside one hunk
-> (`extensions/pr-review/findings.mjs:310-314`). Validate each submitted
-> location against `entry.files` with the same anchor rule and add a regression
-> for an over-broad range.
+Create a fresh named branch from the updated `main`.
 
-**Demonstrated** against `e92f9a2`: a pagination finding at `src/paginate.js`
-lines `1-999`, and one at `3-13`, each score as detecting
-`pagination-inclusive-bound`. The product refuses both: `findings.mjs:310`
-refuses a location spanning more than ten lines, and `:314` one that is not on
-changed lines inside one hunk, using `includesChangedLine` at `:266` and
-`withinHunk` at `:268`. The scorer's `checkFinding`, at `score.mjs:210`, checks
-only shape and `1 <= startLine <= endLine`. The loader's `checkLocation`, at
-`:117`, already applies a hunk and changed-line rule, but only to acceptable
-locations.
+`H1`, from the roadmap row: opt-in, the project's own written standards steer
+the review. The checkout's instruction files, which `--verify` discovery already
+collects and hands to no reviewer, reach one; a finding raised on that basis
+must quote the instruction it relies on; that quote is checked against the
+collected file the way a source citation is checked against bound source; and a
+finding whose quoted rule cannot be found is refused. It settles what evidence a
+claim not grounded in a provable code effect must carry. Pull request #42's
+handoff contradicted `AGENTS.md` twice, which is its concrete acceptance case.
 
-**Not yet checked**: whether the loader's hunk rule agrees exactly with the
-product's `withinHunk`. Read `findings.mjs:260-320` before reusing either.
+**`H1` needs a scope decision before any code**, because `SCOPE.md` says nothing
+about convention review. That decision is the user's: put the exact `SCOPE.md`
+wording to them and get it approved before editing the file, as `T1`, `X1` and
+`W1` did. Settle with them, one question at a time, how it is opted into, which
+reviewer receives the files, and how a quoted rule is bound.
 
-Acceptance criteria:
+Do **not** start `K1`, restore `docs/gap-analysis.md`'s staged plan, or revisit
+the six `G1` proposals the user declined. Do not widen `N1`.
 
-- Refuse, before matching, a submitted finding whose location the product would
-  refuse: more than ten lines, a path naming no file in that case's diff on its
-  side, not inside one hunk, or covering no changed line. The message names the
-  case, the finding number and which rule failed. This follows `bccdd06`: a
-  report is meant to hold validated findings, so a malformed one is refused
-  rather than scored. If you conclude a false positive is the better outcome,
-  ask the user before choosing.
-- One shared anchor check for both uses, not a second copy. Acceptable locations
-  in the corpus keep no ten-line cap; only submitted findings take it.
-- Test first: regressions for `1-999`, `3-13` and a location inside the hunk
-  that covers no changed line, such as head `5-6`, each seen failing for the
-  intended reason before the fix.
-- **Expect existing scripted findings to break.** By the diff parse recorded in
-  `N1`'s session, `src/client.js` changes only head lines 2 and 4 and
-  `src/paginate.js` only 3 and 4, so the suite's timeout findings at
-  `client.js:5-5` and its location-mismatch finding at `paginate.js:7-7` are
-  not valid anchors. Move them onto changed lines. A location-mismatch test then
-  needs a valid anchor outside every acceptable range, and the pinned
-  `formatScore` text may move with it.
-- Disable each new rule in turn and confirm the suite fails, as `N1` did for
-  every earlier guard.
-- `README.md`, the corpus and its pinned hash should not need to change. If one
-  does, say why.
+## Headroom and validation
 
-Commit the fix on its own, for example
-`fix(benchmark): refuse a finding location no validated finding could have`.
-Push, then reply once on thread `4000178733` with one plain sentence naming the
-commit, with no em-dash because it posts under the user's name, and resolve it:
+At handoff, `ROADMAP.md` is 64881 bytes, only 655 below the 65536 bytes at which
+root files stop being discovered, and `README.md` is 63643 bytes. Archive
+`N1`'s entry verbatim into `docs/roadmap-archive-2026-09-10.md` before writing a
+word of `H1`'s, updating the archive pointers and counts exactly as earlier
+moves do. A scripted move must dry-run and refuse unless each old string matches
+exactly once.
+
+The controlled set is eighteen suites:
 
 ```sh
-gh api repos/xpepper/copilot-pr-review/pulls/43/comments/4000178733/replies \
-  -f body='Fixed in COMMIT: ...'
-gh api graphql -f query='query { repository(owner: "xpepper", name: "copilot-pr-review") {
-  pullRequest(number: 43) { reviewThreads(first: 20) { nodes { id isResolved
-  comments(first: 1) { nodes { databaseId } } } } } } }'
-gh api graphql -f query='mutation($id: ID!) { resolveReviewThread(input: {threadId: $id}) {
-  thread { isResolved } } }' -f id=THREAD_NODE_ID
+for s in findings review selection retention preview publication publish-later \
+  checkout config context fixture target safeguards prior incremental revalidation \
+  cost benchmark; do node scripts/smoke-$s.mjs; done
 ```
 
-## Record, hand off, merge
+Before every checkpoint, run the affected targeted suite plus
+`smoke-safeguards.mjs` and `smoke-review.mjs`; run the whole set before opening
+the pull request. Also run `git diff --check`, the tracked-control-byte check
+(CI includes `*.diff`) and the real safeguard collector, which must read all six
+root instruction files and skip none. Test first means watching the new test
+fail for the intended reason before implementing, and disabling each new guard
+in turn should fail the suite.
 
-`ROADMAP.md` is 64116 bytes at `e92f9a2`, **only 1420 below** the 65536 bytes at
-which this tool's own discovery stops reading it. Add to `N1`'s entry one short
-paragraph: the comment, the reproduction, the fix commit, that no plugin review
-covers it, and the Codex and `@claude[agent]` outcomes. Keep the file under the
-cap with room to spare, and **do not archive `N1` here**: the `H1` session does
-that before writing its own entry.
+**Check new, untracked files for control bytes with plain `grep -rnP`**, not
+`git grep`, which does not see them. In the `N1` session the file writer twice
+turned a typed Unicode escape for code point 7 into a raw BEL byte, once inside
+a `.mjs` test; both were caught and replaced before any commit. Build such
+characters with `String.fromCharCode` instead of typing an escape.
 
-Then replace this file with the `H1` prompt, as the last repository edit. Build
-it from the `H1` handoff this file replaced, `git show e92f9a2:HANDOFF.md`: keep
-its `H1` job, its scope-decision rule, and its headroom, validation, workflow and
-runtime sections, and update whatever this session changed. It must tell the
-next agent to confirm #43 is merged rather than embed the merge commit, which
-does not exist yet.
+## Pull-request workflow
 
-Before each commit, run `smoke-safeguards.mjs`, `smoke-review.mjs` and the
-affected suite; before the final push, the whole eighteen-suite set listed in
-`README.md` and CI. Also run `git diff --check`, the tracked-control-byte check
-including `*.diff`, plain `grep -rnP '[\x00-\x08\x0B\x0C\x0E-\x1F]'` over any
-new or untracked file, and the safeguard collector, which must read all six root
-instruction files and skip none. In `N1`'s session a typed unicode escape for
-code point 7 twice landed on disk as a raw BEL byte; build such characters with
-`String.fromCharCode`.
+Follow `AGENTS.md`: meaningful validated local checkpoint commits are
+authorized. Push the `H1` branch and open its own pull request; never push
+directly to `main`, amend published history or force-push.
 
-Commit `ROADMAP.md` and `HANDOFF.md` together as the final branch commit and
-push. Before merging, confirm:
+`H1` changes `extensions/`, so its pull request needs exactly one
+installed-plugin review as verification of record; the standing workflow
+authorizes that first review. Ask before any additional review, rerun or other
+live probe that spends credits. Keep findings local with `--no-comment`. Ask
+separately before any public GitHub Copilot reviewer request, `@claude[agent]`
+mention, or reply on a review thread.
 
-- the checkout is clean and exactly the pushed head;
-- every check on that head has passed. Take snapshots with `gh pr checks 43`
-  rather than a long `--watch`: `claude-review` took almost seven minutes on
-  `e92f9a2`. If a check fails, do not merge; record it and report to the user;
-- no new comment asks for a change. If one does, stop and ask.
-
-Merge the way every earlier increment was merged: a squash whose subject is the
-pull-request title followed by its number. The repository deletes the branch on
-merge.
+Before reviewing, the local checkout must exactly equal the pushed PR head and
+be clean. Reinstall and verify the plugin:
 
 ```sh
-gh pr merge 43 --squash --subject "N1: a seeded review corpus and a deterministic scorer (#43)"
+copilot plugin install "$(pwd)"
+diff -rq ~/.copilot/installed-plugins/_direct/pr-review/extensions/pr-review \
+  extensions/pr-review
+copilot plugin list
 ```
 
-Then switch to `main`, pull with `--ff-only`, and confirm that `main`'s tree
-equals the merged head's tree and that CI passes on `main`. Make no further
-repository edit, because `main` refuses direct pushes. Report the fix commit, the
-thread reply and resolution, the merge commit and the checks, and point to
-`HANDOFF.md` rather than repeating it.
+CLI 1.0.83 warns that direct local installs are deprecated. Dispatch through
+the SDK, not prompt mode, and never add a timeout:
 
-## Settled constraints
+```sh
+export COPILOT_CLI_PATH="$(command -v copilot)"
+export COPILOT_SDK_PATH="$(ls -d "$HOME"/.copilot/pkg/*/"$(copilot --version \
+  | sed -n 's/.*CLI \([0-9][0-9.]*[0-9]\).*/\1/p')"/copilot-sdk)"
+node scripts/dogfood-review.mjs NUMBER --all --no-comment --unattended > LOG 2>&1
+```
 
-Follow `AGENTS.md` throughout: validated checkpoint commits on the branch; never
-push to `main`, amend published history or force-push; keep review findings
-local; and ask before any GitHub write this prompt does not name. No runtime API
-changed; CLI 1.0.83 remains the recorded runtime. Do not add review timeouts,
-weaken the shell gate, use `fs.realpathSync` in `read-only.mjs`, change `F6`'s
-marker unwrap, or treat a compaction event as a retry or stop condition.
+Balanced is the default unless the user chooses another mode. Run the command in
+the background with no timeout, edit nothing while it reads the checkout, and
+parse the mode-prefixed evidence JSON from the log. The evidence line carries no
+tool-call count: read each reviewer's `sessionId` events under
+`~/.copilot/session-state/` for `tool.execution_start` and `permission.completed`,
+which is an implementation detail rather than a contract. Record actual model,
+effort, context tier, reviewer coverage, tool calls and denials, findings,
+withheld findings, context loss and reported credit cost. A refusal or
+incomplete review is evidence, not a reason to weaken a gate or rerun.
+
+## Runtime and settled constraints
+
+No runtime API changed in `N1`; CLI 1.0.83 remains the recorded runtime.
+`scripts/smoke-runtime.mjs --targets` has not run since `I1b`. Do not spend
+credits or run live probes merely to close that gap.
+
+Do not add review timeouts, weaken the shell gate, use `fs.realpathSync` in
+`read-only.mjs`, change `F6`'s marker unwrap, or treat a compaction event as a
+retry or stop condition. Code proves that a finding still stands and never that
+it disappeared. An unknown write outcome stops the reply set. Cold resume of
+command-only records remains unsupported.
+
+Before ending the next session, update `ROADMAP.md` with evidence and the exact
+next increment, then replace this file as the final repository edit. Include it
+in the final branch commit and push it to the pull request. Report the commit
+and pull-request outcome and point here rather than duplicating the prompt.

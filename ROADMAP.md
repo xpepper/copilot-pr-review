@@ -221,6 +221,17 @@ either half fails the suite. Overview's envelope failed to parse at character
 coverage gap and security a caveat, all the same observation: no collection
 runner or other caller exists to assess, which is this increment's boundary.
 
+GitHub Copilot's later review of `e92f9a2` left one inline comment: the scorer
+checked only that a range was positive, so `src/paginate.js:1-999` or `3-13`
+detected `pagination-inclusive-bound`, though the tool refuses a location over
+ten lines or off the changed lines of one hunk. **`230f982` fixes it**, test
+first: a submitted finding now takes the loader's anchor check, which reads the
+same as `findings.mjs:266-272`, plus the ten-line cap. `1-999`, `3-13`, `3-9`,
+`5-6`, a missing path and `10-20` each scored before it, and disabling each of
+seven rules fails the suite. Two scripted findings off changed lines moved; the
+corpus and its hash did not. No plugin review covers the fix. Codex found
+nothing at `e92f9a2`, and `@claude[agent]` had not replied.
+
 ### Verified, and not
 
 **Test first**: the suite failed on the missing module, then on the missing
