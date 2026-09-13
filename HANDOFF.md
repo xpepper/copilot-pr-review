@@ -123,9 +123,11 @@ history or force-push.
 
 Because `N1` changes `scripts/`, its pull request still needs exactly one
 installed-plugin review as verification of record under this repository's
-workflow, even though the benchmark itself spends nothing. **Ask before that
-review spends credits.** Keep findings local with `--no-comment`. Ask separately
-before any public GitHub Copilot reviewer request or `@claude[agent]` mention.
+workflow, even though the benchmark itself spends nothing. The standing
+workflow authorizes that first review; ask before any additional review, rerun
+or other live probe that spends credits. Keep findings local with
+`--no-comment`. Ask separately before any public GitHub Copilot reviewer request
+or `@claude[agent]` mention.
 
 Before reviewing, the local checkout must exactly equal the pushed PR head and
 be clean. Reinstall and verify the plugin:
