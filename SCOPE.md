@@ -142,6 +142,12 @@ Present findings for selection before publication. Editing findings is optional
 and deferred. The exact selection UI is an implementation choice; recreating
 pi's terminal UI is not required.
 
+Every validated finding carries one sentence saying what to do about it, shown
+when findings are presented and included in its published inline comment. The
+sentence is part of the finding as the review produced it, so editing findings
+stays deferred. It is prose, never code: this tool proposes no change to commit,
+so no committable suggestion block is offered.
+
 Publish primarily resolvable inline comments in a GitHub review, retaining the
 original concise-summary behavior for applicable non-inline findings. The only
 GitHub review event emitted by the port is `COMMENT`: never `APPROVE` or
