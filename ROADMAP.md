@@ -221,8 +221,10 @@ The boundary and publication tests first failed on
 `"Multiply instead. Then retest."`; disabling either new guard makes its own
 suite fail. All seventeen controlled suites pass, `git diff --check` is clean,
 no tracked text carries a control byte, and discovery reads all six root files
-and skips none. CI passed on the five-commit PR head the plugin reviewed; it has
-not yet run on the review-response commit.
+and skips none. The controlled CI passed on review-response head `9e1ebca`.
+The separate `claude-review` workflow failed before inference: its action
+initialized, then returned `is_error:true` in 494 ms with zero cost, empty model
+usage and no buffered comments. It was recorded rather than rerun.
 
 - The live reviewer produced both remediation sentences in the required shape,
   demonstrating real model output, but no candidate survived to presentation or

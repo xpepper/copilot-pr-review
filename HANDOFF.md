@@ -41,8 +41,11 @@ its own suite fail. Ordinary abbreviations and inline code remain accepted.
 reproduction evidence. Before this handoff was written, all seventeen
 controlled suites passed, `git diff --check` was clean, no tracked text carried
 a control byte, and safeguard discovery read all six root files and skipped
-none. The old five-commit PR head passed both GitHub checks; inspect checks on
-the review-response commit rather than assuming they followed.
+none. The controlled CI also passed on review-response head `9e1ebca`. The
+separate `claude-review` action initialized and then failed before inference
+with `is_error:true`, zero cost, empty model usage and no buffered comments. It
+was recorded rather than rerun. Inspect checks on the evidence commit containing
+this handoff rather than assuming they followed.
 
 No finding was posted. No GitHub Copilot reviewer or `@claude[agent]` review was
 requested. The review log is a session artifact, not repository state.
