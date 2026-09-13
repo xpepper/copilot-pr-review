@@ -48,7 +48,22 @@ was recorded rather than rerun. Inspect checks on the evidence commit containing
 this handoff rather than assuming they followed.
 
 No finding was posted. No GitHub Copilot reviewer or `@claude[agent]` review was
-requested. The review log is a session artifact, not repository state.
+requested during the plugin run. The review log is a session artifact, not
+repository state.
+
+The user later requested GitHub Copilot and Codex reviews. Copilot reviewed all
+15 files and found two workflow contradictions introduced in the post-review
+handoff: the first-review authorization and an unsupported trailer attribution.
+Commits `9e4682b` and `3ee3c7e` fix them; both threads are answered and resolved.
+Codex reviewed `3c5ffd4`, found no actionable change, and reported a
+firewall-blocked GitHub query that did not prevent its assessment. It was
+acknowledged.
+
+These exact lines were not in the head our plugin reviewed, so they are a
+finalization gap rather than missed findings against `9896b23`. Their underlying
+class is now recorded on `H1`: changed agent instructions must be checked
+against authoritative collected rules. Do not implement that inside `N1`, and
+do not spend a second review of #42 without fresh authorization.
 
 ## Your job after #42 merges is `N1`, and only `N1`
 
