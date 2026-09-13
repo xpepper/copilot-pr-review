@@ -86,7 +86,7 @@ posting them.
 | X1 | Completed | `--long-context`, one flag chosen per run and saved nowhere, asks every model pass for its model's long-context window when its session catalog lists one. A model that lists none keeps its own window and says so; a window the runtime does not keep is refused before any send. Every pass names its window in the display and on the evidence line. A probe spending nothing found `getCurrent()` echoes any tier, so the catalog decides. `SCOPE.md` gained one paragraph the user approved. Pull request #41, reviewed once at the user's authorization: deep with `--long-context` on `gpt-5.6-terra` at high effort, 45.55611 credits, the first live long-context pass, INCOMPLETE on two test-coverage gaps and 0 findings. | B1; [Models/execution](SCOPE.md#models-configuration-and-execution) |
 | W1 | Completed | Every validated finding carries one adjudicated remediation sentence in its presented and published forms. Missing, multi-line, multi-sentence and code-block-bearing prose is refused at ingestion and again before publication; older retained results still load but cannot publish without a new review. No committable suggestion block. Pull request #42, reviewed once with this plugin at the user's authorization: deep on `gpt-5.6-terra` at high effort and its default window, 81.62026 credits, INCOMPLETE on two invalid citation paths, 0 validated findings and two useful candidate signals, one fixed and one retained as an explicit parser limitation. | X1; [Selection/publication](SCOPE.md#selection-publication-and-cached-results) |
 | N1 | Completed | A seeded corpus and a deterministic scorer, **the free half only**: five plain-text diffs pinned by content hash, three seeded cases carrying four defects with stable ids, target and allowed severities, acceptable locations and concept groups, and two clean controls; a scorer needing no model or network that rejects explicit non-findings before matching and pairs findings with defects one-to-one, run by an eighteenth controlled suite and CI. No collection run, recall number or gate. Pull request #43, reviewed once with this plugin at the standing authorization: balanced, 127.050688 credits, INCOMPLETE, 0 validated findings, and one real candidate raised by two reviewers and refused on its citation, fixed anyway. | W1; [Modes/findings](SCOPE.md#review-modes-and-findings) |
-| H1 | Pending | Opt-in, the project's own written standards steer the review. The checkout's instruction files, which `--verify` discovery already collects and hands to no reviewer, reach one, and a finding raised on that basis must quote the instruction it relies on; that quote is checked against the collected file the way a source citation is checked against bound source, and a finding whose quoted rule cannot be found is refused. **This increment settles what evidence a claim not grounded in a provable code effect must carry**, which is the rule the history lenses and path-conditioned lenses would inherit if they are ever taken. Pull request #42 supplies a concrete acceptance case: changed handoff instructions contradicted or over-attributed the authoritative `AGENTS.md` workflow. Needs a scope decision, because `SCOPE.md` says nothing about convention review. Opt-in, consistent with `I1b` and `I1c`. `G1`'s menu item 4. | N1; [Modes/findings](SCOPE.md#review-modes-and-findings) |
+| H1 | Pending | By default the project's own written rules steer the review: the root instruction files the reviewed head commits reach the one reviewer that weighs the whole change, a finding relying on one must quote the rule as exact lines of its file, code binds that quote the way it binds a source citation, and `--no-standards` turns it off for one run. The user reversed the opt-in this row first proposed and approved the `SCOPE.md` paragraph word for word. **It settles what a claim not grounded in a provable code effect must carry: a quotable rule**, which the history and path-conditioned lenses would inherit. Pull request #42's handoff contradicting `AGENTS.md` was the acceptance case. Pull request #44. `G1`'s menu item 4. | N1; [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | K1 | Pending | A published review asks what it found useful, and a later run reads the reactions and the resolution state of its own threads. `I1c` already reads an earlier review's threads fresh from GitHub on every run, so the read path exists. It is the only scheduled item that would produce evidence about real pull requests rather than a synthetic corpus, and it is last because it needs a review actually published to a pull request before there is anything to read back, and findings stay local unless the user authorizes posting. Needs a scope decision. `G1`'s menu item 12. | H1, I1c; [Publication controls](SCOPE.md#selection-publication-and-cached-results) |
 
 ## Every completed increment, `F1` through `N1`, is archived
@@ -134,7 +134,7 @@ than from this file.
 [docs/upstream-licensing.md](docs/upstream-licensing.md) is still the record of
 that licence work and did not move.
 
-**No entry is live until `H1` writes one.** The backlog triage added no entry of its
+**`H1` is the only live entry.** The backlog triage added no entry of its
 own, because agreeing a backlog is not a numbered increment, so archiving `G1`
 left none behind and `T1`'s was written into that empty space. The rule these
 moves established is to keep
@@ -169,6 +169,50 @@ writing a word of its own, because 1313 bytes were spare. **`X1` archived `B1`'s
 `X1`'s 5123 bytes** on the same rule, because 956 bytes were spare. **`N1`
 archived `W1`'s 4684 bytes** on the same rule, because 1003 bytes were spare. **`H1`
 archived `N1`'s 4982 bytes** on the same rule, because 655 bytes were spare.
+
+## `H1`: the project's written rules steer the review
+
+`SCOPE.md` gained one paragraph, approved word for word before the file was
+edited, after three decisions the user took one at a time: **on by default**,
+with `--no-standards` for one run and no setting; **the whole-change reviewer
+receives the files**, being overview in balanced and full, integrated in deep
+and contracts in quick; and **a rule is bound as exact lines**, like a source
+citation. The user added the hint naming `AGENTS.md` and `CLAUDE.md` as the
+likeliest files to hold rules.
+
+`collectStandards` keeps a root markdown file only when one `git ls-tree` of
+the reviewed head commits a regular file whose blob is exactly the text read,
+and names any other with its reason. The standards reviewer's prompt alone
+carries the numbered files and how to quote one; every other prompt is byte for
+byte unchanged. A candidate's `rule` is refused unless that reviewer sent it and
+its lines are exact, clipped ends repaired and reported. The adjudicator is
+handed each cited file in full and nothing otherwise. A finding shows `Rule:
+FILE:LINES`; its published comment does not. The run names what reached which
+reviewer and what was left out at every verbosity, and the evidence line
+records names, sizes and blobs, never text. Under `--verify` the standards
+reviewer is handed the committed files, which may name commands, and nothing
+discovery produced reaches any reviewer.
+
+### Verified, and not
+
+**Test first**: each new test failed for its intended reason before its code
+existed. **62 guards** were disabled one at a time and the suite failed for
+every one, three as a crash. All eighteen suites pass, `git diff --check` is
+clean, no new or changed file carries a control byte, and discovery reads all
+six root files and skips none.
+
+- **No real model has quoted a rule** before the review below.
+- **An absent rule is refused, not reported.** #42's handoff attributing a
+  trailer rule to `AGENTS.md` has nothing to quote.
+- **The cost is estimated**: this repository's six root files are about 160 KB
+  added to one pass of every review.
+- **Not handled**: a rule citation has no span cap, a CRLF file's multi-line
+  quote cannot match, and nothing below the root is read.
+
+### The review
+
+The one authorized installed-plugin review of pull request #44 has not run yet;
+its evidence replaces this paragraph.
 
 ## v1 is complete, and seven increments are scheduled on top of it
 
