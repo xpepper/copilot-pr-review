@@ -224,9 +224,16 @@ the first live long-context pass**: the installed plugin displayed
 answer, which also shows `extension.mjs` passes the flag through.
 
 Its two coverage gaps are both about tests. No captured test runs a real session
-with the flag, which this review is and could not see. No test combines the flag
-with discovery or revalidation, which is true and recorded below. Nothing
-changed in response.
+with the flag, which this review is and could not see. No test combined the flag
+with discovery or revalidation, which was true: a `--verify --long-context` run
+is now in `smoke-review`.
+
+GitHub's Copilot reviewer, requested at the user's authorization, commented on
+`72892c9` with three items, each checked. **Accepted**: the same discovery and
+revalidation gap. **Rejected for `X1`**: a controlled test dispatching the flag
+through `extension.mjs`, true of every flag since no suite reaches that file;
+this review dispatched it live, and a harness is a follow-up. **Already in
+hand**: `ROADMAP.md` and `HANDOFF.md` were not yet updated at that head.
 
 ### Verified, and not
 
@@ -240,8 +247,10 @@ none, and CI passed on #41.
 - **Whether inference used the larger window is not shown.** `getCurrent()`
   echoes and usage events carry no tier; only a compaction reporting a 922000
   limit would, and none has run.
-- **Discovery and revalidation carry the window by spread only**; no suite runs
-  either with the flag. Follow-up.
+- **Revalidation carries the window by spread only**: no suite runs that pass
+  end to end, with or without the flag, as `T1` recorded. Discovery has a run.
+- **No controlled test dispatches `--long-context` through `extension.mjs`.**
+  Follow-up.
 - How well a model reasons over 900k tokens is unmeasured.
 
 ## v1 is complete, and seven increments are scheduled on top of it
