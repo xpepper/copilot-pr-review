@@ -38,7 +38,7 @@ and how to reproduce each behaviour yourself.
 | [Your first review](#your-first-review) | One worked run, start to finish |
 | [Re-reviewing a pull request](docs/re-review.md) | `--incremental`, `--revalidate`, and answering the last review's threads |
 | [Review modes](#review-modes) | Quick, balanced, full, deep, and what each costs |
-| [Models and configuration](#models-and-configuration) | Tiers, precedence, fallbacks, project trust |
+| [Models and configuration](#models-and-configuration) | Tiers, precedence, fallbacks, `--long-context`, project trust |
 | [Reading the result](#reading-the-result) | Findings, the evidence boundary, coverage |
 | [Selecting findings](#selecting-findings) | The selection step and `--all` |
 | [Publishing](#publishing) | Posting authority, gates, uncertain writes |
@@ -102,9 +102,10 @@ That is a balanced review, the default, with posting suppressed. It spends
 credits. What you see, in order:
 
 1. **The effective configuration**, then the per-reviewer assignments: every
-   reviewer, its tier, its model, its reasoning effort, and where each value
-   came from. This prints before any reviewer starts, so an unusable assignment
-   refuses the review instead of quietly substituting something else.
+   reviewer, its tier, its model, its reasoning effort, the context window it
+   asks for, and where each value came from. This prints before any reviewer
+   starts, so an unusable assignment refuses the review instead of quietly
+   substituting something else.
 2. **The target capture**, a `Q1 target:` line naming repository, pull request,
    lifecycle, base and head SHAs, diff size and a SHA-256 of the diff.
 3. **The bound source context**, a `Q2 context:` line naming each changed file,
@@ -437,6 +438,55 @@ instead.
 
 This is what makes the cheapest models usable for the light tier, which is the
 tier balanced and full run their overview reviewer on.
+
+### A larger window with `--long-context`
+
+Everything a reviewer works with has to fit its model's context window: the
+diff, the context around it, and every file it reads. Near the limit the runtime
+compacts the conversation into a summary and the pass carries on from that. In
+this project's review of #3, each of four heavy reviewers on `gpt-5.6-terra`
+went from about 257k tokens to under 30k, and still had to quote the diff
+exactly.
+
+Some models also offer a long-context window. `--long-context` asks every model
+pass of that one run for it: every reviewer, the adjudicator, a fallback
+attempt, and the discovery and revalidation passes.
+
+```text
+/pr-review 3 --long-context
+```
+
+**It can double what the run's input costs.** As the runtime listed them in
+September 2026, in AI credits per billing batch of input tokens:
+
+| Model | Input window, default then long | Input price, default then long |
+| --- | --- | --- |
+| `gpt-5.6-terra` | 272k then 922k | 200 then 400 |
+| `gpt-5.6-luna` | 200k then 922k | 20 then 40 |
+| `claude-sonnet-5` | 200k then 936k | 200 then 200 |
+| `kimi-k3` | 917k, no long-context window | 300 |
+| `claude-haiku-4.5` | 136k, no long-context window | not listed |
+
+It is a flag and never a setting, so nothing saved turns it on. The assignments
+printed before any reviewer starts say which window each pass will ask for:
+
+```text
+  correctness [heavy]: model=gpt-5.6-terra [configured:heavy] reasoning=high [configured:heavy] context=long_context [flag]
+  overview [light]: model=claude-haiku-4.5 [configured:light] reasoning=(not configurable) [model] context=default (no long-context window) [model]
+```
+
+A model that lists no long-context window runs on its own window rather than
+refusing the review, and `[model]` says the model decided it. A model that lists
+one and does not keep it is refused before anything is sent. Without the flag
+every pass asks for `context=default [unset]`, so a window kept from elsewhere
+never runs unasked.
+
+**What this does not prove.** The runtime confirms it recorded the request, but
+it reports `long_context` back even for a model that lists none, so the check is
+on the request and not on the window inference used. How a long-context pass is
+billed, and how well a model reasons over 900k tokens, have not been seen on a
+real run. A pass can still compact on the larger window, and is then reported
+as a coverage gap like any other.
 
 ### Trusting a project's settings
 
@@ -918,6 +968,7 @@ Review flags:
 | `--unattended` | Declare that nothing is left for a person to answer. Refuses at parse time without `--all` and one of `--comment`/`--no-comment`, and refuses `--verify`. Authorizes nothing |
 | `--incremental` | Confine fresh hunting to the commits added since an earlier review of this pull request by this tool. A request, not a parse-time contract: a run with no forward commit range narrows nothing and says so. Authorizes nothing |
 | `--revalidate` | Buy one model pass over the earlier review's findings this tool cannot settle for free. Every review already reports the verdicts it can prove. A settled verdict is answered on the earlier review's thread under the review's own posting authority. Authorizes nothing |
+| `--long-context` | Ask every model pass for its model's long-context window, at that window's own and possibly higher price. A model with none keeps its own window and says so; one that lists a window and does not keep it is refused. Saved nowhere. Authorizes nothing |
 | `--capture-only` | Stop after capture. Takes no mode, posting or model argument |
 | `heavyModel=ID`, `heavyEffort=LEVEL` | Override the heavy tier for this invocation only |
 
@@ -1077,6 +1128,10 @@ the point of this project:
   the runtime reports that charge on the compaction event, and nothing has shown
   whether its usage events include it too. A compacted safeguard discovery pass
   or revalidation pass adds no gap, because neither is review coverage.
+- **No review has run with `--long-context`.** The window is requested,
+  displayed and checked in the controlled suites, and the runtime's catalog and
+  its answers were read live with no inference. What a long-context pass is
+  billed, and whether inference really used the larger window, are not shown.
 - **No exclusion rule has ever refused a real discovered command.** The
   exclusion table is demonstrated only against the controlled suites, because
   what a discovery pass reports is not something a run can arrange.
