@@ -143,7 +143,7 @@ const finding = (path, startLine, endLine, severity, title, actual = "") => ({
 });
 const pagination = finding("src/paginate.js", 4, 4, "P2", "Page loop reads one past the end",
   "The inclusive <= bound pushes undefined once the page reaches the end of items.");
-const timeout = finding("src/client.js", 5, 5, "P1", "Default timeout is multiplied as seconds after becoming milliseconds",
+const timeout = finding("src/client.js", 4, 5, "P1", "Default timeout is multiplied as seconds after becoming milliseconds",
   "30000 * 1000 aborts after about eight hours.");
 const owner = finding("src/routes/attachments.js", 13, 15, "P1", "replaceAttachment skips the owner check",
   "Any authenticated user can overwrite another user's attachment.");
@@ -191,9 +191,11 @@ console.log("PASS N1 a report finding every seeded defect and nothing else detec
       missingConcepts: [corpus.cases[0].defects[0].concepts[0]],
     }] }],
   });
-  const elsewhere = { ...pagination, location: { ...pagination.location, startLine: 7, endLine: 7 } };
-  assert.deepEqual(only([elsewhere]).falsePositives[0].checks,
-    [{ defect: "pagination-inclusive-bound", location: false, severity: true, missingConcepts: [] }]);
+  // Every changed head line in pagination-bounds is acceptable, so a valid
+  // anchor outside every acceptable range comes from timeout-units instead.
+  const elsewhere = { ...timeout, location: { ...timeout.location, startLine: 2, endLine: 2 } };
+  assert.deepEqual(scoreReports(corpus, every({ "timeout-units": [elsewhere] })).cases[1].falsePositives[0].checks,
+    [{ defect: "timeout-seconds-multiplied", location: false, severity: true, missingConcepts: [] }]);
   const baseSide = { ...pagination, location: { ...pagination.location, side: "base" } };
   assert.equal(only([baseSide]).falsePositives[0].checks[0].location, false, "the side is part of the location");
   const minor = { ...pagination, severity: "P3" };
@@ -303,12 +305,38 @@ assert.throws(() => scoreReports(corpus, submit([{ case: "pagination-bounds", fi
   /Report for pagination-bounds: finding 1 has severity "P9", which this tool does not report/);
 console.log("PASS N1 reports bound to another corpus, naming an unknown or repeated case, or malformed are refused");
 
+// The tool also refuses a location it could not anchor: more than ten lines,
+// outside one hunk, covering no changed line, or in no file of the diff. So the
+// scorer does, naming the rule: 1-999, 3-13 and 3-9 would otherwise overlap the
+// accepted 3-4 and count as detections. Pull request #43's Copilot review raised it.
+for (const [location, rule] of [
+  [{ startLine: 1, endLine: 999 }, "src/paginate.js:1-999 (head) spans more than 10 lines"],
+  [{ startLine: 3, endLine: 13 }, "src/paginate.js:3-13 (head) spans more than 10 lines"],
+  [{ startLine: 3, endLine: 9 }, "src/paginate.js:3-9 (head) is not inside one hunk"],
+  [{ startLine: 5, endLine: 6 }, "src/paginate.js:5-6 (head) covers no changed line"],
+  [{ path: "src/missing.js" }, "src/missing.js:4-4 (head) names no file in the diff"],
+]) {
+  assert.throws(() => scoreReports(corpus, submit([{ case: "pagination-bounds",
+    findings: [pagination, { ...pagination, location: { ...pagination.location, ...location } }] }])),
+  { message: `Report for pagination-bounds: finding 2: location ${rule}.` });
+}
+// Ten lines is the cap, not eleven: 11-20 is accepted, and 10-20, inside the same
+// hunk and covering the same changed lines, is refused for its span alone.
+{
+  const spanning = (startLine) => scoreReports(corpus, submit([{ case: "attachment-replace",
+    findings: [{ ...owner, location: { ...owner.location, startLine, endLine: 20 } }] }]));
+  assert.deepEqual(spanning(11).cases[0].detected.map((entry) => entry.defect), ["attachment-replace-owner-check"]);
+  assert.throws(() => spanning(10),
+    { message: "Report for attachment-replace: finding 1: location src/routes/attachments.js:10-20 (head) spans more than 10 lines." });
+}
+console.log("PASS N1 a finding location the tool could not anchor is refused, naming the case, the finding and the rule");
+
 // Terms are literal. A word term matches whole words only, so "ms" is not found
 // inside "items"; case and runs of whitespace are normalised; a punctuation term
 // such as "<=" matches wherever it appears.
 {
   const timed = (title, actual) => scoreReports(corpus, every({
-    "timeout-units": [finding("src/client.js", 5, 5, "P1", title, actual)],
+    "timeout-units": [finding("src/client.js", 4, 5, "P1", title, actual)],
   })).cases[1].detected.length;
   assert.equal(timed("Timeout items abort late", "30000 * 1000"), 0);
   assert.equal(timed("Timeout is 30000 MS   times 1000", ""), 1);

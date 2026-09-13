@@ -113,9 +113,11 @@ function checkHunks(label, diff) {
 }
 
 // An acceptable location obeys the anchor rule a validated finding obeys: it
-// lies inside one hunk and covers a changed line on its own side.
-function checkLocation(label, location, files) {
+// lies inside one hunk and covers a changed line on its own side. A submitted
+// finding also takes the tool's ten-line cap; an acceptable location takes none.
+function checkLocation(label, location, files, maxLines = Infinity) {
   const where = `location ${location.path}:${location.startLine}-${location.endLine} (${location.side})`;
+  if (location.endLine - location.startLine >= maxLines) throw new Error(`${label}: ${where} spans more than ${maxLines} lines.`);
   const file = files.find((entry) => (location.side === "head" ? entry.newPath : entry.oldPath) === location.path);
   if (!file) throw new Error(`${label}: ${where} names no file in the diff.`);
   const [start, count] = location.side === "head" ? ["newStart", "newLines"] : ["oldStart", "oldLines"];
@@ -207,7 +209,7 @@ function containsTerm(text, term) {
 const reference = (finding) => `${finding.location.path}:${finding.location.startLine}-${finding.location.endLine} ` +
   `(${finding.location.side}) [${finding.severity}] ${finding.title}`;
 
-function checkFinding(label, finding, index) {
+function checkFinding(label, finding, index, files) {
   const where = `${label}: finding ${index + 1}`;
   const location = finding?.location;
   if (!finding || typeof finding !== "object" || typeof finding.title !== "string" || typeof finding.severity !== "string" ||
@@ -223,6 +225,9 @@ function checkFinding(label, finding, index) {
   for (const key of proseFields) {
     if (finding[key] !== undefined && typeof finding[key] !== "string") throw new Error(`${where}: ${key} must be text.`);
   }
+  // A report holds validated findings, and the tool refuses a location it could
+  // not anchor, so the scorer does too: 1-999 would otherwise overlap 3-4.
+  checkLocation(where, location, files, 10);
 }
 
 const overlaps = (location, accepted) => location.path === accepted.path && location.side === accepted.side &&
@@ -306,7 +311,7 @@ export function scoreReports(corpus, submission) {
     if (!entry) throw new Error(`Report names unknown corpus case ${JSON.stringify(report?.case)}.`);
     if (reported.has(entry.id)) throw new Error(`Duplicate report for corpus case ${JSON.stringify(entry.id)}.`);
     if (!Array.isArray(report.findings)) throw new Error(`Report for ${entry.id}: findings must be a list.`);
-    report.findings.forEach((finding, index) => checkFinding(`Report for ${entry.id}`, finding, index));
+    report.findings.forEach((finding, index) => checkFinding(`Report for ${entry.id}`, finding, index, entry.files));
     reported.set(entry.id, report.findings);
   }
   const cases = corpus.cases.filter((entry) => reported.has(entry.id))
