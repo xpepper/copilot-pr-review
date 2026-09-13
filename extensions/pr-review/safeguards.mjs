@@ -78,7 +78,16 @@ export function collectInstructionFiles(root,
       skipped.push({ name, bytes: stat.size, reason: `the ${budgetBytes} byte discovery budget is already spent` });
       continue;
     }
-    files.push({ name, bytes: stat.size, text: readFileSync(path, "utf8") });
+    let text;
+    try {
+      text = readFileSync(path, "utf8");
+    } catch (error) {
+      // H1: every review collects these files now, so a file that cannot be read
+      // is named with its reason rather than failing the whole collection.
+      skipped.push({ name, bytes: stat.size, reason: `cannot be read (${error.code ?? error.message})` });
+      continue;
+    }
+    files.push({ name, bytes: stat.size, text });
     spent += stat.size;
   }
   return { files, skipped };

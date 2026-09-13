@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -100,6 +100,21 @@ assert(instructionBudgetBytes >= instructionFileMaxBytes);
   assert.deepEqual(names(collected), ["AGENTS.md"]);
   assert.deepEqual(skippedNames(collected), ["b-notes.md", "c-notes.md"]);
   assert.match(collected.skipped[0].reason, /budget/);
+}
+if (process.getuid?.() !== 0) {
+  // H1: every review collects these files now, not only a --verify run, so a
+  // regular file that cannot be read is named with its reason and the rest are
+  // still collected; one unreadable note must never stop a review from starting.
+  // Skipped as root, whom a file mode does not stop.
+  const root = project({ "AGENTS.md": "agents", "LOCKED.md": "locked" });
+  chmodSync(join(root, "LOCKED.md"), 0o000);
+  try {
+    const collected = collectInstructionFiles(root);
+    assert.deepEqual(names(collected), ["AGENTS.md"]);
+    assert.deepEqual(collected.skipped, [{ name: "LOCKED.md", bytes: 6, reason: "cannot be read (EACCES)" }]);
+  } finally {
+    chmodSync(join(root, "LOCKED.md"), 0o600);
+  }
 }
 {
   // Markdown is recognised by extension regardless of case.
