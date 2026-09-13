@@ -291,6 +291,14 @@ assert.throws(() => scoreReports(corpus, submit([
 ])), /Duplicate report for corpus case "pagination-bounds"/);
 assert.throws(() => scoreReports(corpus, submit([{ case: "pagination-bounds", findings: [{ ...pagination, location: undefined }] }])),
   /Report for pagination-bounds: finding 1 needs a title, a severity and a location/);
+// The tool refuses a reversed or non-positive range before it becomes a finding,
+// so the scorer does too: 4-3 would otherwise overlap the accepted 3-4 and count
+// as a detection. Pull request #43's own review raised this.
+for (const [startLine, endLine] of [[4, 3], [0, 3]]) {
+  assert.throws(() => scoreReports(corpus, submit([{ case: "pagination-bounds",
+    findings: [{ ...pagination, location: { ...pagination.location, startLine, endLine } }] }])),
+  /Report for pagination-bounds: finding 1 needs .*1 <= startLine <= endLine/);
+}
 assert.throws(() => scoreReports(corpus, submit([{ case: "pagination-bounds", findings: [{ ...pagination, severity: "P9" }] }])),
   /Report for pagination-bounds: finding 1 has severity "P9", which this tool does not report/);
 console.log("PASS N1 reports bound to another corpus, naming an unknown or repeated case, or malformed are refused");

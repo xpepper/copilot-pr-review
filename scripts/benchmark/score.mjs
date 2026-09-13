@@ -212,8 +212,10 @@ function checkFinding(label, finding, index) {
   const location = finding?.location;
   if (!finding || typeof finding !== "object" || typeof finding.title !== "string" || typeof finding.severity !== "string" ||
       !location || typeof location.path !== "string" || !["head", "base"].includes(location.side) ||
-      !Number.isSafeInteger(location.startLine) || !Number.isSafeInteger(location.endLine)) {
-    throw new Error(`${where} needs a title, a severity and a location with a path, a head or base side and a line range.`);
+      !Number.isSafeInteger(location.startLine) || !Number.isSafeInteger(location.endLine) ||
+      location.startLine < 1 || location.endLine < location.startLine) {
+    throw new Error(`${where} needs a title, a severity and a location with a path, a head or base side, ` +
+      "and 1 <= startLine <= endLine.");
   }
   if (!severities.includes(finding.severity)) {
     throw new Error(`${where} has severity ${JSON.stringify(finding.severity)}, which this tool does not report.`);
