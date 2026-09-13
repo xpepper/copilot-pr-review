@@ -21,6 +21,7 @@ const help = [
   "Usage: /pr-review [status|help|models|fixture model1=ID effort1=LEVEL model2=ID effort2=LEVEL]",
   "       /pr-review NUMBER [--balanced|--full|--deep|--quick|--major-only] [--comment|--no-comment] [--all]",
   "                         [--verify] [--quiet] [--unattended] [--incremental] [--revalidate]",
+  "                         [--long-context]",
   "                         [--include-drafts] [--include-closed|--review-closed]",
   "                         [heavyModel=ID] [heavyEffort=LEVEL]",
   "       /pr-review NUMBER --capture-only [--include-drafts] [--include-closed|--review-closed]",
@@ -123,6 +124,14 @@ const help = [
   "          coverage this run does not read and does not vouch for. That is why it is opt-in rather than the",
   "          default. It authorizes nothing, opens no gate, and is not a configuration key, so no saved or",
   "          trusted-project setting can confine a run. It cannot be combined with --capture-only.",
+  "--long-context  Ask every model pass this review starts for its model's long-context window, so a large",
+  "          pull request is less likely to be compacted. That window is billed at its own price, which the",
+  "          runtime has listed at up to twice the default input price. A model that lists no long-context",
+  "          window runs on its own window instead of refusing the review, and the assignments say so before",
+  "          any reviewer starts. A model that lists one and does not keep it is refused; nothing is",
+  "          substituted. Each pass says which window it asked for. The runtime confirms that the request was",
+  "          kept, not that inference used the larger window. It authorizes nothing, is not a configuration",
+  "          key, so nothing saved can turn it on, and it cannot be combined with --capture-only.",
   "--capture-only  Capture and bind the target, then stop: no reviewers, no inference, no publication.",
   "Reviewers additionally read this checkout, so it must be the reviewed revision:",
   "local HEAD must equal the captured PR head, the PR head must not have moved, and no tracked",
@@ -207,6 +216,9 @@ const status = [
   "range narrows nothing and says so. A confined run does not cover the whole pull request, and says that in",
   "the run and in the published body; the captured binding, the context windows and every citation rule are",
   "unchanged, and a candidate outside the range is set aside and reported rather than dropped.",
+  "--long-context asks every model pass for its model's long-context window, at that window's own and possibly",
+  "higher price. A model that lists none runs on its own window and says so; a model that lists one and does",
+  "not keep it is refused. It is chosen for one run and saved nowhere.",
   "--verify additionally requires the PR's head branch and no untracked path before any reviewer starts,",
   "then presents the safeguard commands this project's own instruction files declare, with their source,",
   "and asks which of them may run. An approved command runs in this checkout, as you, before any reviewer",
@@ -288,7 +300,8 @@ const session = await joinSession({
               await session.log(describeConfiguration(configuration, {
                 flags: options.settings, heading: "Effective PR review configuration for this invocation.",
               }));
-              const assignments = await reviewerAssignments(session, mode, options.settings, configuration);
+              const assignments = await reviewerAssignments(session, mode, options.settings, configuration,
+                { longContext: options.longContext });
               await session.log(describeAssignments(mode, assignments));
               // A verification-enabled run states its own boundary before it
               // starts. An ordinary run's output is unchanged.

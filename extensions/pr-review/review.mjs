@@ -5,7 +5,7 @@ import {
   resolvedAssignment,
 } from "./config.mjs";
 import { formatCost, runCost } from "./cost.mjs";
-import { reviewAssignments, validateModelAssignment } from "./fixture.mjs";
+import { contextWindow, describeWindow, reviewAssignments, validateModelAssignment } from "./fixture.mjs";
 import { confinementInput, confinementSummary, incrementalFlag, isConfined } from "./incremental.mjs";
 import { publishReplies, describeReplies } from "./replies.mjs";
 import {
@@ -44,6 +44,12 @@ export const quietFlag = "--quiet";
 // before a single credit is spent rather than after the reviewers have been
 // paid for.
 export const unattendedFlag = "--unattended";
+// X1: the one request for a larger window. Like the flags above it is a flag and
+// deliberately not a configuration key: it can double what a review's input
+// costs, so the person running this one review chooses it and nothing saves it.
+// It asks every model pass the run starts for its model's long-context window,
+// and a model that lists none keeps its own window rather than refusing the run.
+export const longContextFlag = "--long-context";
 
 export function parseReviewArgs(args) {
   const [number, ...tokens] = args.trim().split(/\s+/);
@@ -54,7 +60,7 @@ export function parseReviewArgs(args) {
     if (seen.has(token)) throw new Error(`Duplicate review argument: ${token}`);
     seen.add(token);
     if ([...modeFlags, captureOnlyFlag, verifyFlag, quietFlag, unattendedFlag, incrementalFlag,
-      revalidateFlag, "--comment", "--no-comment", "--all"].includes(token)) continue;
+      revalidateFlag, longContextFlag, "--comment", "--no-comment", "--all"].includes(token)) continue;
     if (token.includes("=")) {
       const [key, value, extra] = token.split("=");
       if (!settingKeys.includes(key) || !value || extra !== undefined || key in settings) {
@@ -76,7 +82,7 @@ export function parseReviewArgs(args) {
   if (seen.has(captureOnlyFlag)) {
     const conflicting = [...chosen,
       ...["--comment", "--no-comment", "--all", verifyFlag, quietFlag, unattendedFlag, incrementalFlag,
-        revalidateFlag].filter((flag) => seen.has(flag)),
+        revalidateFlag, longContextFlag].filter((flag) => seen.has(flag)),
       ...Object.keys(settings)];
     if (conflicting.length) {
       throw new Error(`${captureOnlyFlag} captures the target without reviewing it, ` +
@@ -84,7 +90,7 @@ export function parseReviewArgs(args) {
     }
     return { mode: undefined, captureOnly: true, captureArgs, settings, all: false, comment: false,
       noComment: false, verify: false, quiet: false, unattended: false, incremental: false,
-      revalidate: false };
+      revalidate: false, longContext: false };
   }
   const mode = chosen.length ? modeForFlag(chosen[0]) : reviewMode(defaultModeId);
   const { policy } = postingAuthority({ comment: seen.has("--comment"), noComment: seen.has("--no-comment") });
@@ -139,13 +145,17 @@ export function parseReviewArgs(args) {
     // and answered on the threads whatever this flag says, because proving them
     // costs nothing and withholding them would be withholding a free answer.
     revalidate: seen.has(revalidateFlag),
+    // X1: a window, which grants nothing and constrains no other option. Whether
+    // each pass can hold it is a fact about its model, resolved with the
+    // assignments and displayed before any reviewer starts.
+    longContext: seen.has(longContextFlag),
   };
 }
 
 // Each reviewer resolves the tier its mode assigns it. Invocation flags win over
 // a trusted project's settings, which win over personal settings, which win over
 // the ambient session model and reasoning effort.
-export async function reviewerAssignments(parent, mode, flags, configuration) {
+export async function reviewerAssignments(parent, mode, flags, configuration, { longContext = false } = {}) {
   const context = configuration ?? {
     effective: { settings: {}, origins: {} },
     ambient: await ambientAssignment(parent), models: (await parent.rpc.model.list()).list,
@@ -159,6 +169,10 @@ export async function reviewerAssignments(parent, mode, flags, configuration) {
       { settings, origins, ambient: context.ambient, flags, models: context.models });
     const assignment = resolvedAssignment(resolution);
     validateModelAssignment(assignment, context.models);
+    // X1: resolved per model, because the flag asks each pass for its own model's
+    // long-context window and a model may list none.
+    const resolvedWindow = contextWindow(assignment.model, context.models, longContext);
+    assignment.contextTier = resolvedWindow.value;
     // A configured fallback is an explicit assignment too, so it is resolved and
     // validated here, before any reviewer starts, rather than at the moment one
     // has already failed. An unusable one refuses the review like any other
@@ -169,18 +183,24 @@ export async function reviewerAssignments(parent, mode, flags, configuration) {
     if (fallbackResolution && !fallbackResolution.identical) {
       fallback = resolvedAssignment(fallbackResolution);
       validateModelAssignment(fallback, context.models);
+      // A fallback's window is its own model's, so a long-context primary may
+      // fall back to a model that lists no such window.
+      const fallbackWindow = contextWindow(fallback.model, context.models, longContext);
+      fallback.contextTier = fallbackWindow.value;
       fallback.origin = {
         model: fallbackResolution.model.source,
         reasoningEffort: fallbackResolution.reasoningEffort.source,
+        contextTier: fallbackWindow.source,
       };
     }
-    tiers.set(tier, { resolution, assignment, fallback });
+    tiers.set(tier, { resolution, assignment, fallback, resolvedWindow });
   }
   return mode.reviewers.map(({ label, tier }) => ({
     label, tier, ...tiers.get(tier).assignment,
     origin: {
       model: tiers.get(tier).resolution.model.source,
       reasoningEffort: tiers.get(tier).resolution.reasoningEffort.source,
+      contextTier: tiers.get(tier).resolvedWindow.source,
       tier: describeTier(tiers.get(tier).resolution),
     },
     ...(tiers.get(tier).fallback ? { fallback: structuredClone(tiers.get(tier).fallback) } : {}),
@@ -195,13 +215,14 @@ export function describeAssignments(mode, assignments) {
     ...assignments.flatMap((assignment) => [
       `  ${assignment.label} [${assignment.tier}]: model=${assignment.model ?? "(unset)"} ` +
       `[${assignment.origin.model}] reasoning=${assignment.reasoningEffort ?? "(not configurable)"} ` +
-      `[${assignment.origin.reasoningEffort}]`,
+      `[${assignment.origin.reasoningEffort}] ` +
+      `context=${describeWindow(assignment)} [${assignment.origin.contextTier ?? "unset"}]`,
       ...(assignment.fallback ? [`    ${describeFallback({
         model: { value: assignment.fallback.model, source: assignment.fallback.origin.model },
         reasoningEffort: {
           value: assignment.fallback.reasoningEffort, source: assignment.fallback.origin.reasoningEffort,
         },
-      })}`] : []),
+      })} context=${describeWindow(assignment.fallback)} [${assignment.fallback.origin.contextTier ?? "unset"}]`] : []),
     ]),
     withFallback.length
       ? `Configured fallbacks: ${withFallback.length} of ${assignments.length} reviewer(s) have one; each gets ` +
@@ -422,6 +443,9 @@ export async function executeReviewRun(parent, client, options, assignments, {
       // I1c: the record's first word about an earlier review of this pull
       // request. It is retained because the replies are journalled against it.
       revalidate: options.revalidate === true, revalidation: retainedRevalidation(revalidation),
+      // X1: what this run asked for. Each pass's own record says which window it
+      // held, and like billing neither is retained.
+      longContext: options.longContext === true,
       invocation, binding, validation, adjudicator, discovery, approval, safeguards,
       // Settled at the moment the run settles, so a cancelled or failed run
       // still reports what it spent before it stopped.
