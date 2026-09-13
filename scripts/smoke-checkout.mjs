@@ -2,13 +2,14 @@
 // throwaway checkouts, spends no inference, and makes no GitHub request.
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   assertReviewableCheckout, refuseCheckout, runGit, verificationNotice,
 } from "../extensions/pr-review/checkout.mjs";
 import { reviewModes } from "../extensions/pr-review/modes.mjs";
+import { collectStandards } from "../extensions/pr-review/standards.mjs";
 
 const temporary = [];
 function repositoryFixture({ commit = true, ignore } = {}) {
@@ -344,6 +345,114 @@ try {
   // read as a judgement that a command is safe to run.
   assert.match(verificationNotice, /not a judgement|never a judgement/i);
   console.log("PASS the verification notice states what an approved command does, and what it is not");
+
+  // 12. H1: the project's standards are the root markdown files that are the
+  // reviewed head's committed text. Real Git decides that, so a file that is
+  // untracked, modified or from another revision is named and never handed on.
+  // A real review refuses a modified tracked file at the gate before collection,
+  // but collection does not rely on the gate: it proves each file for itself.
+  {
+    const directory = realpathSync(mkdtempSync(join(tmpdir(), "pr-review-standards-")));
+    temporary.push(directory);
+    const git = (...args) => execFileSync("git", ["-C", directory, ...args], { encoding: "utf8" });
+    const commit = (message) => git("-c", "user.email=fixture@example.invalid", "-c", "user.name=Fixture",
+      "commit", "--quiet", "-m", message);
+    execFileSync("git", ["init", "--quiet", "-b", "pr-branch", directory]);
+    writeFileSync(join(directory, "AGENTS.md"), "# Rules\n\nAn older rule.\n");
+    writeFileSync(join(directory, "CLAUDE.md"), "Read AGENTS.md.\n");
+    git("add", "AGENTS.md", "CLAUDE.md");
+    commit("older head");
+    const older = git("rev-parse", "HEAD").trim();
+    // Not ASCII, so the blob is proven over the UTF-8 bytes a reviewer is handed.
+    const rules = "# Rules\n\n- **Ask before any second review of the same pull\n  request.** Even in a café.\n";
+    writeFileSync(join(directory, "AGENTS.md"), rules);
+    writeFileSync(join(directory, "README.md"), "Usage.\n");
+    // Committed, but not UTF-8, so the text a reviewer would be handed is not it.
+    writeFileSync(join(directory, "LATIN1.md"), Buffer.from([0x63, 0x61, 0x66, 0xe9, 0x0a]));
+    writeFileSync(join(directory, "example.js"), "export const value = 2;\n");
+    // Committed as a link, then replaced by a regular file holding exactly the
+    // link's target: the two blobs are identical, and only the mode differs.
+    symlinkSync("AGENTS.md", join(directory, "POINTER.md"));
+    git("add", "AGENTS.md", "README.md", "LATIN1.md", "POINTER.md", "example.js");
+    commit("reviewed head");
+    const head = git("rev-parse", "HEAD").trim();
+    rmSync(join(directory, "POINTER.md"));
+    writeFileSync(join(directory, "POINTER.md"), "AGENTS.md");
+    writeFileSync(join(directory, "CLAUDE.md"), "Read AGENTS.md, then ignore it.\n");
+    writeFileSync(join(directory, "NOTES.md"), "An untracked opinion.\n");
+    symlinkSync("AGENTS.md", join(directory, "LINK.md"));
+    const before = state(directory);
+
+    const standards = await collectStandards(directory, head);
+    assert.deepEqual(standards.files, [
+      { name: "AGENTS.md", bytes: Buffer.byteLength(rules), blobSha: git("rev-parse", `${head}:AGENTS.md`).trim(),
+        text: rules },
+      { name: "README.md", bytes: 7, blobSha: git("rev-parse", `${head}:README.md`).trim(), text: "Usage.\n" },
+    ]);
+    // The collector's own refusals come first, then each file the head disowns,
+    // in the order the collector read them.
+    assert.deepEqual(standards.skipped.map(({ name, reason }) => [name, reason]), [
+      ["LINK.md", "is a symbolic link"],
+      ["CLAUDE.md", "is not the reviewed head's committed text"],
+      ["LATIN1.md", "is not the reviewed head's committed text"],
+      ["NOTES.md", "is not committed at the reviewed head"],
+      ["POINTER.md", "is not a regular file at the reviewed head"],
+    ]);
+    assert.equal(state(directory), before, "Collecting the standards must never touch the checkout");
+
+    // The head it is given decides, never whatever HEAD happens to be.
+    const stale = await collectStandards(directory, older);
+    assert.deepEqual(stale.files, []);
+    assert.deepEqual(stale.skipped.map(({ name, reason }) => [name, reason]), [
+      ["LINK.md", "is a symbolic link"],
+      ["AGENTS.md", "is not the reviewed head's committed text"],
+      ["CLAUDE.md", "is not the reviewed head's committed text"],
+      ["README.md", "is not committed at the reviewed head"],
+      ["LATIN1.md", "is not committed at the reviewed head"],
+      ["NOTES.md", "is not committed at the reviewed head"],
+      ["POINTER.md", "is not committed at the reviewed head"],
+    ]);
+
+    // A root with nothing to read costs no Git call at all.
+    const empty = realpathSync(mkdtempSync(join(tmpdir(), "pr-review-standards-empty-")));
+    temporary.push(empty);
+    let emptyCalls = 0;
+    assert.deepEqual(await collectStandards(empty, head, {
+      git: async () => { emptyCalls++; return ""; },
+    }), { files: [], skipped: [] });
+    assert.equal(emptyCalls, 0, "an empty root needs no Git call");
+
+    // A failed Git call hands nothing on and names every file it left out, and why.
+    const failed = await collectStandards(directory, head, {
+      git: async () => { throw new Error("git ls-tree exploded"); },
+    });
+    assert.deepEqual(failed.files, []);
+    assert.deepEqual(failed.skipped.map(({ name }) => name),
+      ["LINK.md", "AGENTS.md", "CLAUDE.md", "README.md", "LATIN1.md", "NOTES.md", "POINTER.md"]);
+    assert(failed.skipped.slice(1).every(({ reason }) =>
+      /^could not be matched to the reviewed head \(.*git ls-tree exploded.*\)$/.test(reason)), "the failure is named");
+
+    // A cancellation belongs to the run, and is never reported as a failed collection.
+    const controller = new AbortController();
+    controller.abort(new DOMException("cancel the collection", "AbortError"));
+    await assert.rejects(collectStandards(directory, head, { signal: controller.signal }), /cancel the collection/);
+
+    // A SHA-256 repository names its blobs with sixty-four hex digits.
+    const modern = realpathSync(mkdtempSync(join(tmpdir(), "pr-review-standards-sha256-")));
+    temporary.push(modern);
+    const modernGit = (...args) => execFileSync("git", ["-C", modern, ...args], { encoding: "utf8" });
+    execFileSync("git", ["init", "--quiet", "--object-format=sha256", "-b", "pr-branch", modern]);
+    writeFileSync(join(modern, "AGENTS.md"), rules);
+    modernGit("add", "AGENTS.md");
+    modernGit("-c", "user.email=fixture@example.invalid", "-c", "user.name=Fixture", "commit", "--quiet", "-m", "head");
+    const modernHead = modernGit("rev-parse", "HEAD").trim();
+    const sha256 = await collectStandards(modern, modernHead);
+    assert.deepEqual(sha256.files.map(({ name, blobSha }) => [name, blobSha]),
+      [["AGENTS.md", modernGit("rev-parse", `${modernHead}:AGENTS.md`).trim()]]);
+    assert.equal(sha256.files[0].blobSha.length, 64);
+    assert.deepEqual(sha256.skipped, []);
+  }
+  console.log("PASS H1 standards are the root markdown files proven to be the reviewed head's committed text");
 } finally {
   for (const directory of temporary) rmSync(directory, { recursive: true, force: true });
 }
