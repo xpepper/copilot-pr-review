@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import {
-  buildReviewPreview, cancelPreview, finishPreview, postingAuthority, validatePreview,
+  buildReviewPreview, cancelPreview, commentBody, finishPreview, postingAuthority, validatePreview,
 } from "../extensions/pr-review/preview.mjs";
 import { reviewKey } from "../extensions/pr-review/findings.mjs";
 import { retainedRecord, validateRecord } from "../extensions/pr-review/retention.mjs";
@@ -92,6 +92,15 @@ assert.deepEqual(request, {
   },
 });
 assert.equal(request.payload.comments.length, 1, "Rejected/raw/duplicate bodies never become comments");
+// H1: a finding that relies on a project rule names it when presented, and never
+// in its published comment, which carries no citation of any kind.
+{
+  const [finding] = exact.outcome.validation.findings;
+  const ruled = { ...finding,
+    rule: { file: "AGENTS.md", startLine: 3, endLine: 4, quote: "- **Totals multiply.**\n  Always.", blobSha: "e".repeat(40) } };
+  assert.equal(commentBody(ruled), commentBody(finding));
+  assert.doesNotMatch(commentBody(ruled), /Rule|AGENTS\.md/);
+}
 for (const kind of ["caveat", "coverage-gap", "execution-failure", "mixed", "legacy"]) {
   const h = await harness({ options: { comment: true } });
   const diagnostics = [
