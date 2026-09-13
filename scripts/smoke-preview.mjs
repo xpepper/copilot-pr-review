@@ -86,6 +86,7 @@ assert.deepEqual(request, {
       path: "total.js", line: 3, side: "RIGHT",
       body: "[P2] Multiply cents by quantity\n\nWhen: total(100, 3)\n\nExpected: 300 cents\n\nActual: 103 cents\n\n" +
         "Introduced by this diff: The changed operator adds quantity instead of multiplying.\n\n" +
+        "Fix: Multiply the unit price by quantity.\n\n" +
         "Confidence: 0.95. Reported by: correctness, contracts.",
     }],
   },
@@ -302,3 +303,21 @@ assert.equal(legacy.schemaVersion, 1);
 validateRecord(legacy, h.parent.sessionId);
 assert.equal(legacy.outcome.preview, undefined, "Legacy records gain neither preview nor authority");
 console.log("PASS strict version-2 retained previews, altered payload/authority rejection, and read-only legacy compatibility");
+
+// W1: a result retained before remediation sentences existed still loads and
+// inspects, but publishing it is refused: every published finding carries its
+// sentence, and code refuses one that has none rather than posting without it.
+{
+  const earlier = await harness({ options: { comment: true } });
+  const current = await earlier.run();
+  for (const finding of current.validation.findings) delete finding.remediation;
+  const [comment] = current.preview.request.payload.comments;
+  comment.body = comment.body.replace("\n\nFix: Multiply the unit price by quantity.", "");
+  assert(!comment.body.includes("Fix:"), "The body an earlier run stored had no Fix paragraph");
+  validateRecord(retainedRecord(current), earlier.parent.sessionId);
+  assert.throws(() => buildReviewPreview(current, earlier.boundary), /remediation sentence/);
+  // Nor does a sentence that is not one line get posted, whatever a record holds.
+  for (const finding of current.validation.findings) finding.remediation = "Multiply instead.\nThen retest.";
+  assert.throws(() => buildReviewPreview(current, earlier.boundary), /remediation sentence/);
+  console.log("PASS W1 a result retained before remediation sentences still loads, and publishing it is refused");
+}

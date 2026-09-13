@@ -52,6 +52,9 @@ export function commentBody(finding) {
     `Expected: ${finding.expected}`,
     `Actual: ${finding.actual}`,
     `Introduced by this diff: ${finding.introduction}`,
+    // W1: a finding carries its remediation sentence. A body published before
+    // W1 has none, and I1c still has to rebuild that body byte for byte.
+    ...(finding.remediation === undefined ? [] : [`Fix: ${finding.remediation}`]),
     `Confidence: ${finding.confidence}. Reported by: ${[...new Set(finding.reportedBy)].join(", ")}.`,
   ].join("\n\n");
 }
@@ -106,6 +109,11 @@ export function buildReviewPreview(outcome, boundary) {
   requirePreview(boundary?.key === reviewKey(outcome.binding), "captured evidence binding mismatch");
   const request = reviewRequest(outcome);
   for (const [index, finding] of selectedFindings(outcome).entries()) {
+    // W1: every published finding carries its one-line remediation sentence. A
+    // result retained before W1 still reloads, because reload rebuilds its request
+    // through `reviewRequest`, but it is refused here rather than posted without.
+    requirePreview(typeof finding.remediation === "string" && finding.remediation.trim() &&
+      !/[\r\n]/.test(finding.remediation), "finding carries no one-line remediation sentence");
     const { ref, blobSha, ...citation } = finding.location;
     requirePreview(isDeepStrictEqual(boundary.cite(citation), finding.location), "changed source citation");
     const file = boundary.files.find((entry) =>

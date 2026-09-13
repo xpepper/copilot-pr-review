@@ -239,6 +239,7 @@ const candidateFor = (path, title) => ({
   trigger: `a call into ${path}`, expected: "the documented behaviour",
   actual: "the changed expression returns something else",
   introduction: "The changed operator is what makes this fail.",
+  remediation: "Restore the operator the documented behaviour needs.",
   before: cite(path, "base"), after: cite(path, "head"), evidence: [cite(path, "head", 1)],
 });
 const reviewer = (candidates) => ({ label: "correctness", status: "completed",

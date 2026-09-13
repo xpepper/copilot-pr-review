@@ -700,7 +700,7 @@ function harness({
               // Unchanged code outside the only hunk: the shape Q5 exists for.
               breaks: unchanged,
               trigger: "Read value", expected: "1", actual: "2",
-              introduction: "The constant changed", evidence: [cite("base")],
+              introduction: "The constant changed", remediation: "Restore value to 1.", evidence: [cite("base")],
             });
             reviewer.emit("assistant.message", { content: discards &&
                 ["reviewer", "tool-call", "usage", "missing-usage", "prose"].includes(failure) ? "partial candidate" : JSON.stringify({
