@@ -19,8 +19,7 @@ increment scheduled up to `G1` is complete.** On 2026-09-12 the user triaged
 `G1`'s twelve proposals one at a time and scheduled six of them: `T1`, `B1`,
 `W1`, `N1`, `H1` and `K1`, in that order, and the same day scheduled `X1`
 immediately after `B1`. **`T1`, `B1`, `X1` and `W1` are complete and archived, and
-`N1`'s entry below awaits its pull-request review**; the three `Pending` rows are
-what is left.
+`N1` is complete below**; the two `Pending` rows are what is left.
 The closing section records what was decided, and what stays open as a
 limitation rather than as work.
 
@@ -85,7 +84,7 @@ posting them.
 | B1 | Completed | A pass whose context the runtime compacted or truncated is a coverage gap rather than silence: `runReviewer` records the runtime's own events, and a reviewer or adjudicator with any adds one gap naming the pass, never a file. Findings survive, the review is INCOMPLETE, and nothing stops, retries or falls back. **The honesty half only.** This project's own logs held seven compacted reviewer sessions in four reviews that no run reported. Pull request #39, reviewed once with this plugin at the user's authorization: deep, 31.73861 credits, INCOMPLETE on one exact gap and one refused candidate, rejected, and no false gap. No live compaction has run through this code. `G1`'s menu item 11. | T1; [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | X1 | Completed | `--long-context`, one flag chosen per run and saved nowhere, asks every model pass for its model's long-context window when its session catalog lists one. A model that lists none keeps its own window and says so; a window the runtime does not keep is refused before any send. Every pass names its window in the display and on the evidence line. A probe spending nothing found `getCurrent()` echoes any tier, so the catalog decides. `SCOPE.md` gained one paragraph the user approved. Pull request #41, reviewed once at the user's authorization: deep with `--long-context` on `gpt-5.6-terra` at high effort, 45.55611 credits, the first live long-context pass, INCOMPLETE on two test-coverage gaps and 0 findings. | B1; [Models/execution](SCOPE.md#models-configuration-and-execution) |
 | W1 | Completed | Every validated finding carries one adjudicated remediation sentence in its presented and published forms. Missing, multi-line, multi-sentence and code-block-bearing prose is refused at ingestion and again before publication; older retained results still load but cannot publish without a new review. No committable suggestion block. Pull request #42, reviewed once with this plugin at the user's authorization: deep on `gpt-5.6-terra` at high effort and its default window, 81.62026 credits, INCOMPLETE on two invalid citation paths, 0 validated findings and two useful candidate signals, one fixed and one retained as an explicit parser limitation. | X1; [Selection/publication](SCOPE.md#selection-publication-and-cached-results) |
-| N1 | Pending | A seeded corpus and a deterministic scorer, so that recall and precision can be measured at all. **The free half only**: small synthetic diffs pinned by content hash, each seeded defect carrying a stable identity, a target severity, the severities that count, acceptable locations and the concepts a matching report must contain, plus clean controls that must draw nothing; and a scorer needing no model and no network, running in the controlled suite and in CI, which rejects an explicit non-finding before matching so that a reviewer calling a thing safe cannot score as having found it. **The collection runs that spend credits are not scheduled, and neither is a baseline gate.** Fits `SCOPE.md` as written: it changes no product behaviour. `G1`'s menu item 5. | W1; [Modes/findings](SCOPE.md#review-modes-and-findings) |
+| N1 | Completed | A seeded corpus and a deterministic scorer, **the free half only**: five plain-text diffs pinned by content hash, three seeded cases carrying four defects with stable ids, target and allowed severities, acceptable locations and concept groups, and two clean controls; a scorer needing no model or network that rejects explicit non-findings before matching and pairs findings with defects one-to-one, run by an eighteenth controlled suite and CI. No collection run, recall number or gate. Pull request #43, reviewed once with this plugin at the standing authorization: balanced, 127.050688 credits, INCOMPLETE, 0 validated findings, and one real candidate raised by two reviewers and refused on its citation, fixed anyway. | W1; [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | H1 | Pending | Opt-in, the project's own written standards steer the review. The checkout's instruction files, which `--verify` discovery already collects and hands to no reviewer, reach one, and a finding raised on that basis must quote the instruction it relies on; that quote is checked against the collected file the way a source citation is checked against bound source, and a finding whose quoted rule cannot be found is refused. **This increment settles what evidence a claim not grounded in a provable code effect must carry**, which is the rule the history lenses and path-conditioned lenses would inherit if they are ever taken. Pull request #42 supplies a concrete acceptance case: changed handoff instructions contradicted or over-attributed the authoritative `AGENTS.md` workflow. Needs a scope decision, because `SCOPE.md` says nothing about convention review. Opt-in, consistent with `I1b` and `I1c`. `G1`'s menu item 4. | N1; [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | K1 | Pending | A published review asks what it found useful, and a later run reads the reactions and the resolution state of its own threads. `I1c` already reads an earlier review's threads fresh from GitHub on every run, so the read path exists. It is the only scheduled item that would produce evidence about real pull requests rather than a synthetic corpus, and it is last because it needs a review actually published to a pull request before there is anything to read back, and findings stay local unless the user authorizes posting. Needs a scope decision. `G1`'s menu item 12. | H1, I1c; [Publication controls](SCOPE.md#selection-publication-and-cached-results) |
 
@@ -202,6 +201,26 @@ covering no changed line on its side, and an unnormalised term. It reuses
 `formatScore` prints counts only and, for every false positive, which check
 failed against which defect.
 
+### The review
+
+Pull request #43 was reviewed once with the installed plugin, **balanced**, at
+head `c205f03`: four heavy specialists on `gpt-5.6-terra` and the overview on
+`gpt-5.6-luna`, all at high effort on the default window, 14 requests,
+**127.050688 credits**, 232.9 s of model work against 114.0 s elapsed. All 32
+permission requests were approved for 31 confined reads; nothing was denied, no
+pass lost context, and no finding was posted.
+
+Coverage is **INCOMPLETE** with 0 validated findings. Correctness and contracts
+each raised one P2 candidate, the same defect: `checkFinding` accepted a
+reversed or non-positive range, so `4-3` overlapped `3-4` and detected the
+defect. Both were refused at the evidence boundary for citing
+`score.mjs:213-216` with a five-line quote. **Fixed anyway**: the new test
+failed on `4-3`, a finding now needs `1 <= startLine <= endLine`, and disabling
+either half fails the suite. Overview's envelope failed to parse at character
+2789, an execution failure. Contracts and performance-resources each named a
+coverage gap and security a caveat, all the same observation: no collection
+runner or other caller exists to assess, which is this increment's boundary.
+
 ### Verified, and not
 
 **Test first**: the suite failed on the missing module, then on the missing
@@ -238,7 +257,7 @@ was built, and `I1a`, `I1b` and `I1c` are all done.
 through all twelve one at a time, cheapest first, and **scheduled six**: `T1`,
 `B1`, `W1`, `N1`, `H1`, `K1`, in that order, which is the order of the remaining
 rows above and the order the next session works in, with `X1` inserted after
-`B1` the same day. **`T1`, `B1`, `X1` and `W1` are done and `N1` is the next increment.** The user chose that order over starting with the measurement and
+`B1` the same day. **`T1`, `B1`, `X1`, `W1` and `N1` are done and `H1` is the next increment.** The user chose that order over starting with the measurement and
 over starting with the largest capability gap, and chose the mnemonic IDs over
 one series off `G1`.
 
@@ -265,7 +284,7 @@ approved paragraph. `H1` needs one because the scope says nothing about conventi
 
 ### What is settled and must not be redone
 
-**`E1`, `U1`, `I1a`, `I1b`, `I1c`, `G1`, `T1`, `B1`, `X1` and `W1` are done: do not redo any.**
+**`E1`, `U1`, `I1a`, `I1b`, `I1c`, `G1`, `T1`, `B1`, `X1`, `W1` and `N1` are done: do not redo any.**
 **`E1` raised three items and `T1` closed the first**, a run that never reported
 its own cost. The other two stay recorded and stay unscheduled: the evidence lines are still truncated by the interactive UI, and
 per-reviewer progress still says nothing while a reviewer works. `U1` is settled as one preflight flag that refuses. **`I1a`'s slicing is
@@ -447,7 +466,7 @@ except where a bullet says so:
   stays open after it is recall: nobody has measured what a review misses, and
   doing so needs a defect corpus with agreed ground truth that this project does
   not have. **`G1` established that upstream has exactly that** and publishes
-  numbers from it, and **`N1` now schedules the half of that which costs
+  numbers from it, and **`N1` has delivered the half of that which costs
   nothing**: the corpus and the deterministic scorer. **The collection runs that
   would actually produce a recall number are not scheduled**, so recall stays
   unmeasured until the user authorizes them.
