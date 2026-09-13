@@ -37,6 +37,50 @@ export function coverageDiagnostics(outcome) {
   return diagnostics;
 }
 
+// B1: one coverage gap for a pass whose context the runtime compacted or
+// truncated. From that moment the pass held less than the captured diff and
+// context it was sent, while its citations still had to quote them exactly. Code
+// cannot know what a summary kept, so the gap names the pass and the moment and
+// never a file. It deliberately carries no "Blocked assessment" clause:
+// consolidation groups one assessment several specialists reported, and two
+// passes compacted alike are two gaps.
+const figure = (value) => (Number.isFinite(value) ? value : "unreported");
+const moment = ({ turns, toolCalls }) =>
+  `${turns ? `during turn ${turns}` : "before its first turn"}, after ${figure(toolCalls)} tool call(s)`;
+const tokens = ({ tokensBefore, tokenLimit, tokensAfter }) =>
+  `${figure(tokensBefore)} of ${figure(tokenLimit)} tokens` +
+  (tokensAfter === undefined ? "" : ` reduced to ${figure(tokensAfter)}`);
+
+function describeContextLoss(loss) {
+  const trigger = loss.trigger ? `, trigger ${loss.trigger}` : "";
+  if (loss.kind === "truncation") {
+    return `The runtime truncated this pass's context ${moment(loss)}: ${tokens(loss)}, ` +
+      `${figure(loss.messagesRemoved)} message(s) removed${loss.performedBy ? ` by ${loss.performedBy}` : ""}. ` +
+      "From then on the pass worked without part of the captured diff and context it was sent.";
+  }
+  if (!loss.completed) {
+    return `The runtime began compacting this pass's context ${moment(loss)} (${tokens(loss)}${trigger}), and ` +
+      "the compaction had not completed when the pass settled, so whether the pass went on from a summary of " +
+      "the captured diff and context rather than their text cannot be told.";
+  }
+  if (loss.success === false) {
+    return `The runtime tried to compact this pass's context ${moment(loss)} (${tokens(loss)}${trigger}), and the ` +
+      `compaction failed: ${loss.error ?? "no reason was reported"}. What the pass held after that was not reported.`;
+  }
+  return `The runtime compacted this pass's context ${moment(loss)} (${tokens(loss)}${trigger}, ` +
+    `${figure(loss.messagesRemoved)} message(s) removed). From then on the pass worked from a model-written ` +
+    "summary of the captured diff and context, not their text.";
+}
+
+export function contextLossGap(label, contextLoss) {
+  if (!contextLoss?.length) return undefined;
+  return {
+    kind: "coverage-gap",
+    message: `${label}: ${contextLoss.map(describeContextLoss).join(" ")} ` +
+      "Code cannot know what the pass lost, so no file is named.",
+  };
+}
+
 const gapPattern = /^([^:]+): (.+) Blocked assessment: (.+)$/;
 const stopWords = new Set([
   "after", "also", "and", "any", "are", "because", "been", "before", "being", "cannot", "could",

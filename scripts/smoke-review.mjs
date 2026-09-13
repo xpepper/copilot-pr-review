@@ -426,6 +426,9 @@ function harness({
   failure, fallbackFailure, controller = new AbortController(), withCandidate = false, acceptCandidate = false,
   limitations = [], mode = reviewModes.quick, severity = "P2", candidateFrom = [0], clipQuotes = false,
   badAnchor = false, extraBadCandidate = false, proseFrom = [0], discovered = [], approve,
+  // B1: context-loss events a session emits as soon as its turn starts, keyed by
+  // role: a specialist's session id, "adjudicator", or "fallback".
+  contextLoss = {},
   // T1: what the runtime reports it charged for each request. The three kinds
   // differ so that a sum can be told apart from a count, and `charges: null`
   // is the runtime reporting no charge at all, which must leave the run's total
@@ -548,6 +551,10 @@ function harness({
           }
           sends++;
           this.emit("assistant.turn_start");
+          for (const [type, data] of
+            contextLoss[validating ? "adjudicator" : fallbackAttempt ? "fallback" : this.sessionId] ?? []) {
+            this.emit(type, data);
+          }
           if (validating) {
             const input = JSON.parse(prompt.split("\n").at(-1));
             if (failure === "validator-error" && !fallbackAttempt) {
@@ -1231,6 +1238,90 @@ assert(binaryReport.validation.diagnostics.some((entry) =>
   entry.kind === "coverage-gap" && entry.message.includes("image.png: binary change")));
 assert(binaryReport.validation.diagnostics.some((entry) => entry.kind === "caveat"));
 console.log("PASS settled caveat-only, substantive gap and failure-with-caveat results without inference or publication");
+
+// B1: the runtime's own context-loss events reach coverage end to end. A pass it
+// compacted is a coverage gap in validation.diagnostics, so it decides whether
+// the review is complete, is printed with the coverage, is retained without a
+// new schema version and is carried in the proposed review body. It is never an
+// execution failure, never starts a fallback, and --quiet does not suppress it.
+const compactionEvents = [
+  ["session.compaction_start", { trigger: "threshold", currentTokens: 265318, tokenLimit: 272000 }],
+  ["session.compaction_complete", {
+    success: true, trigger: "threshold", preCompactionTokens: 265318, postCompactionTokens: 26129,
+    messagesRemoved: 0, tokensRemoved: 239192, tokenLimit: 272000,
+  }],
+];
+const lossGaps = (outcome) => outcome.validation.diagnostics.filter((entry) =>
+  entry.kind === "coverage-gap" && /compacted/.test(entry.message));
+{
+  const h = harness();
+  const baseline = await executeReviewRun(h.parent, h.client, options, withFallbackAssignments(), {
+    controller: h.controller, gh: fakeGh(), git: checkoutGit,
+  });
+  assert.equal(baseline.coverage, "completed", "A run with no context loss keeps its coverage");
+  assert.deepEqual(baseline.reviewers.map((r) => r.contextLoss), [[], [], []]);
+  assert.equal(lossGaps(baseline).length, 0);
+  for (const quiet of [false, true]) {
+    const h = harness({ contextLoss: { "reviewer-0": compactionEvents } });
+    const report = await executeReviewRun(h.parent, h.client, { ...options, quiet }, withFallbackAssignments(), {
+      controller: h.controller, gh: fakeGh(), git: checkoutGit,
+    });
+    const record = retainedRecord(report);
+    validateRecord(record, h.parent.sessionId);
+    assert.equal(record.schemaVersion, retainedRecord(baseline).schemaVersion, "No schema version for a gap");
+    assert.equal(report.executionComplete, true, "A compacted reviewer still completed its execution");
+    assert.equal(report.reviewers[0].status, "completed");
+    assert.equal(report.coverage, "incomplete", "A compacted reviewer makes the review incomplete");
+    assert.equal(report.reviewers[0].contextLoss.length, 1);
+    assert.deepEqual(report.reviewers.slice(1).map((r) => r.contextLoss), [[], []]);
+    assert.equal(lossGaps(report).length, 1);
+    assert.match(lossGaps(report)[0].message, /^correctness: /);
+    assert.deepEqual(lossGaps(record.outcome), lossGaps(report), "The retained record carries the gap");
+    assert.equal(h.sessions.length, 3, "A compaction starts no fallback");
+    assert(!h.messages.some((m) => /falling back once/.test(m)));
+    assert(!report.validation.diagnostics.some((entry) => entry.kind === "execution-failure"));
+    assert(h.messages.some((m) => /\nCoverage gap: correctness: .*compacted/.test(m)), `printed, quiet=${quiet}`);
+    assert.equal(h.messages.some((m) => m.startsWith("Q3 evidence: ")), !quiet);
+  }
+}
+{
+  const h = harness({ withCandidate: true, acceptCandidate: true, contextLoss: { adjudicator: compactionEvents } });
+  const report = await executeReviewRun(h.parent, h.client, { ...options, all: true }, structuredClone(assignments), {
+    controller: h.controller, gh: fakeGh(), git: checkoutGit,
+  });
+  validateRecord(retainedRecord(report), h.parent.sessionId);
+  assert.equal(report.validation.findings.length, 1, "A compacted adjudicator's accepted finding survives");
+  assert.equal(report.coverage, "incomplete");
+  assert.equal(lossGaps(report).length, 1);
+  assert.match(lossGaps(report)[0].message, /^evidence-validator: /);
+  assert.match(report.preview.request.payload.body, /\nCoverage gap: evidence-validator: .*compacted/,
+    "The proposed review body carries the gap");
+}
+for (const compacted of ["reviewer-0", "fallback"]) {
+  // The gap follows the attempt whose output the review rests on. A primary a
+  // fallback replaced keeps what happened to its context as evidence, and its
+  // output is not what the review used, so it is not a gap in that review.
+  const h = harness({ failure: "reviewer", contextLoss: { [compacted]: compactionEvents } });
+  const report = await executeReviewRun(h.parent, h.client, options, withFallbackAssignments(), {
+    controller: h.controller, gh: fakeGh(), git: checkoutGit,
+  });
+  validateRecord(retainedRecord(report), h.parent.sessionId);
+  const recovered = report.reviewers[0];
+  assert.equal(recovered.status, "completed", compacted);
+  assert.equal(recovered.fallbackFrom.contextLoss.length, compacted === "fallback" ? 0 : 1, compacted);
+  assert.equal(recovered.contextLoss.length, compacted === "fallback" ? 1 : 0, compacted);
+  assert.equal(lossGaps(report).length, compacted === "fallback" ? 1 : 0, compacted);
+  assert.equal(report.coverage, compacted === "fallback" ? "incomplete" : "completed", compacted);
+}
+{
+  const h = harness({ contextLoss: { "reviewer-0": compactionEvents, "reviewer-1": compactionEvents } });
+  const report = await executeReviewRun(h.parent, h.client, options, structuredClone(assignments), {
+    controller: h.controller, gh: fakeGh(), git: checkoutGit,
+  });
+  assert.equal(lossGaps(report).length, 2);
+  assert(h.messages.some((m) => /coverage gaps: 2;/.test(m)), "Two compacted passes are two gaps, never consolidated");
+}
+console.log("PASS B1 a compacted pass is a coverage gap end to end: printed, retained, published, never a failure or fallback");
 
 // The revision gate stops the whole run before any reviewer session exists.
 for (const [scenario, state, expected] of [

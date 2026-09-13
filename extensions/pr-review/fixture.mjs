@@ -156,11 +156,18 @@ async function prepareReviewer(client, assignment, { systemMessage, access, sign
 // T1: the charge travels with it. An attempt that reached inference and then
 // failed spent what it spent, and a recovery does not refund it; dropping the
 // billing here made a recovered reviewer silently under-report the run's cost.
+// B1: and so does what the runtime did to its context, which is evidence about
+// that attempt even though the review no longer rests on its output.
 const failedAttempt = (record) => ({
   model: record.model, reasoningEffort: record.reasoningEffort, sessionId: record.sessionId,
   status: record.status, error: record.error, usage: record.usage, billing: record.billing,
+  contextLoss: record.contextLoss,
   startedAt: record.startedAt, completedAt: record.completedAt, policy: record.policy,
 });
+
+// Only the figures the runtime actually supplied, so an absent one stays absent
+// rather than becoming a recorded undefined.
+const defined = (entry) => Object.fromEntries(Object.entries(entry).filter(([, value]) => value !== undefined));
 
 export async function reviewAssignments(parent, client, assignments, {
   signal, prompt, intro, outputLabel, systemMessage, access, verifyResult,
@@ -283,7 +290,12 @@ export async function runReviewer(session, prompt, {
   toolCalls,
   onActive = async () => {},
 } = {}) {
-  const evidence = { sessionId: session.sessionId, usage: [], billing: [], result: "", startedAt: null, completedAt: null };
+  const evidence = {
+    sessionId: session.sessionId, usage: [], billing: [], contextLoss: [], result: "", startedAt: null, completedAt: null,
+  };
+  // B1: how far the pass had got, so a context-loss event can say when it began.
+  let turns = 0;
+  let calls = 0;
   const { promise, resolve, reject } = Promise.withResolvers();
   // Cancellation can reject before send, while cleanup is still awaiting an RPC.
   promise.catch(() => {});
@@ -293,6 +305,7 @@ export async function runReviewer(session, prompt, {
   const unsubscribe = session.on((event) => {
     switch (event.type) {
       case "assistant.turn_start":
+        turns++;
         evidence.startedAt ??= Date.parse(event.timestamp);
         // Log delivery failures must settle the reviewer too, rather than leave a rejected callback.
         onActive().catch(reject);
@@ -312,6 +325,7 @@ export async function runReviewer(session, prompt, {
         evidence.result = event.data.content;
         break;
       case "tool.execution_start":
+        calls++;
         // A tool call is a hard failure unless this reviewer was granted the
         // confined read-only set; then the runtime, not the model, bounds it.
         if (!toolCalls) {
@@ -319,6 +333,38 @@ export async function runReviewer(session, prompt, {
           break;
         }
         toolCalls.push({ tool: event.data.toolName, arguments: event.data.arguments });
+        break;
+      // B1: the runtime's own report that this pass stopped holding everything it
+      // was sent. Each is recorded with the figures the runtime supplied and is
+      // never a reason to stop, retry or replace the pass. `session.context_cleared`
+      // is deliberately absent: only a host that asks clears a conversation, and
+      // this tool never asks. A compaction's summary is not kept, because code
+      // cannot know what it kept.
+      case "session.compaction_start":
+        evidence.contextLoss.push(defined({
+          kind: "compaction", turns, toolCalls: calls, trigger: event.data.trigger,
+          tokenLimit: event.data.tokenLimit, tokensBefore: event.data.currentTokens, completed: false,
+        }));
+        break;
+      case "session.compaction_complete": {
+        let entry = evidence.contextLoss.findLast((loss) => loss.kind === "compaction" && !loss.completed);
+        if (!entry) evidence.contextLoss.push(entry = { kind: "compaction", turns, toolCalls: calls });
+        Object.assign(entry, defined({
+          trigger: event.data.trigger, tokenLimit: event.data.tokenLimit,
+          tokensBefore: event.data.preCompactionTokens, completed: true, success: event.data.success,
+          error: event.data.error, tokensAfter: event.data.postCompactionTokens,
+          messagesRemoved: event.data.messagesRemoved, tokensRemoved: event.data.tokensRemoved,
+        }));
+        break;
+      }
+      case "session.truncation":
+        evidence.contextLoss.push(defined({
+          kind: "truncation", turns, toolCalls: calls, performedBy: event.data.performedBy,
+          tokenLimit: event.data.tokenLimit, tokensBefore: event.data.preTruncationTokensInMessages,
+          tokensAfter: event.data.postTruncationTokensInMessages,
+          messagesRemoved: event.data.messagesRemovedDuringTruncation,
+          tokensRemoved: event.data.tokensRemovedDuringTruncation,
+        }));
         break;
       case "session.error":
         reject(new Error(event.data.message));

@@ -246,6 +246,90 @@ assert.equal(uncertain.diagnostics[0].kind, "coverage-gap");
 assert.equal(retained.diagnostics[0].kind, "execution-failure");
 console.log("PASS explicit reviewer/adjudicator caveats, consequential gaps, failures, mixed results and conservative legacy output");
 
+// B1: a pass whose context the runtime compacted or truncated worked, from that
+// moment, on less than the captured diff and context it was given. That is a
+// coverage gap: its findings survive and are still adjudicated, and the review
+// is incomplete. Code cannot know what a summary kept, so the gap names the pass
+// and the moment, never a file.
+{
+  const compaction = {
+    kind: "compaction", turns: 2, toolCalls: 5, trigger: "threshold", tokenLimit: 272000, tokensBefore: 265318,
+    completed: true, success: true, tokensAfter: 26129, messagesRemoved: 0, tokensRemoved: 239192,
+  };
+  const unfinished = {
+    kind: "compaction", turns: 1, toolCalls: 0, trigger: "threshold", tokenLimit: 272000, tokensBefore: 230000,
+    completed: false,
+  };
+  const failedCompaction = { ...unfinished, completed: true, success: false, error: "Compaction response was empty" };
+  const truncation = {
+    kind: "truncation", turns: 3, toolCalls: 7, performedBy: "BasicTruncator", tokenLimit: 272000,
+    tokensBefore: 270000, tokensAfter: 200000, messagesRemoved: 4, tokensRemoved: 70000,
+  };
+  const gapsOf = (assessment) => assessment.diagnostics.filter((entry) => entry.kind === "coverage-gap");
+
+  const compacted = collectCandidates([reviewer(undefined, { contextLoss: [compaction] })], boundary, policy);
+  assert.equal(compacted.candidates.length, 1, "A compacted reviewer's candidates still reach adjudication");
+  const reviewed = adjudicateCandidates(compacted, validator(), boundary, policy);
+  assert.equal(reviewed.findings.length, 1, "and are still adjudicated against bound source");
+  assert.equal(reviewed.complete, false, "A compacted reviewer makes the review incomplete");
+  assert.equal(reviewed.diagnostics.filter((entry) => entry.kind === "execution-failure").length, 0,
+    "A compaction is not an execution failure");
+  const [reviewerGap] = gapsOf(reviewed);
+  assert.equal(gapsOf(reviewed).length, 1);
+  assert.match(reviewerGap.message, /^correctness: /);
+  assert.match(reviewerGap.message, /compacted .*during turn 2, after 5 tool call\(s\)/);
+  assert.match(reviewerGap.message, /265318 of 272000 tokens/);
+  assert.match(reviewerGap.message, /26129/);
+  assert.match(reviewerGap.message, /threshold/);
+  assert.match(reviewerGap.message, /summary of the captured diff and context/);
+  assert.match(reviewerGap.message, /not their text/);
+  assert.doesNotMatch(reviewerGap.message, /total\.js/, "The gap names the pass and never a file");
+  assert.match(formatCoverage({ validation: reviewed, complete: false }), /\nCoverage gap: correctness: /);
+
+  const adjudicated = adjudicateCandidates(collected, validator(undefined, { contextLoss: [compaction] }), boundary, policy);
+  assert.equal(adjudicated.findings.length, 1, "A compacted adjudicator's decisions still stand");
+  assert.equal(adjudicated.complete, false);
+  assert.equal(gapsOf(adjudicated).length, 1);
+  assert.match(gapsOf(adjudicated)[0].message, /^evidence-validator: .*compacted/);
+
+  for (const [loss, wording] of [
+    [unfinished, /had not completed when the pass settled/],
+    [failedCompaction, /compaction failed: Compaction response was empty/],
+    [truncation, /truncated .*during turn 3, after 7 tool call\(s\).*270000 of 272000 tokens.*200000.*4 message\(s\) removed/],
+  ]) {
+    const assessment = adjudicateCandidates(
+      collectCandidates([reviewer([], { contextLoss: [loss] })], boundary, policy), undefined, boundary, policy);
+    assert.equal(assessment.complete, false, String(wording));
+    assert.equal(gapsOf(assessment).length, 1, String(wording));
+    assert.match(gapsOf(assessment)[0].message, wording);
+  }
+
+  const twice = collectCandidates([reviewer([], { contextLoss: [compaction, truncation] })], boundary, policy);
+  assert.equal(gapsOf(twice).length, 1, "One gap per pass, however many events it had");
+  assert.match(gapsOf(twice)[0].message, /compacted.*truncated/);
+
+  const crashed = collectCandidates([
+    reviewer([], { status: "incomplete", error: "Synthetic crash", contextLoss: [compaction] }),
+  ], boundary, policy);
+  assert.deepEqual(crashed.diagnostics.map((entry) => entry.kind).sort(), ["coverage-gap", "execution-failure"],
+    "A failed reviewer that was compacted reports both");
+
+  // Two passes compacted alike are two gaps. Consolidation is for one blocked
+  // assessment reported by several specialists, and these are different passes.
+  const both = adjudicateCandidates(collectCandidates([
+    reviewer([], { contextLoss: [compaction] }), reviewer([], { label: "contracts", contextLoss: [compaction] }),
+  ], boundary, policy), undefined, boundary, policy);
+  assert.equal(presentationDiagnostics(both.diagnostics).filter((entry) => entry.kind === "coverage-gap").length, 2);
+  const bothCoverage = formatCoverage({ validation: both, complete: false });
+  assert.match(bothCoverage, /coverage gaps: 2;/);
+  assert.doesNotMatch(bothCoverage, /consolidated/);
+
+  const untouched = collectCandidates([reviewer(undefined, { contextLoss: [] })], boundary, policy);
+  assert.deepEqual(untouched.diagnostics, collected.diagnostics, "A pass with no context loss changes nothing");
+  assert.equal(adjudicateCandidates(untouched, validator(undefined, { contextLoss: [] }), boundary, policy).complete, true);
+}
+console.log("PASS B1 a compacted or truncated reviewer or adjudicator is one coverage gap per pass, naming no file");
+
 const repeatedDependencyGaps = [
   {
     kind: "coverage-gap",

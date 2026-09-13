@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
 import { formatContext, parseDiffFiles } from "./context.mjs";
-import { blockingIssues, formatCoverage } from "./coverage.mjs";
+import { blockingIssues, contextLossGap, formatCoverage } from "./coverage.mjs";
 import { confinementCaveat, isConfined, withinNewRange } from "./incremental.mjs";
 import { admitsMinor, capsMinor, isMinor, reviewModes, severityRank } from "./modes.mjs";
 
@@ -335,6 +335,11 @@ export function collectCandidates(reviewers, boundary, policy, confinement) {
   const diagnostics = [];
   const outside = [];
   for (const reviewer of reviewers) {
+    // B1: here rather than beside the printed coverage, because only what
+    // reaches validation's diagnostics decides whether the review is complete.
+    // A compacted pass is a gap whether or not it went on to complete.
+    const lost = contextLossGap(reviewer.label, reviewer.contextLoss);
+    if (lost) diagnostics.push(lost);
     if (reviewer.status !== "completed") {
       diagnostics.push({ kind: "execution-failure", message:
         `${reviewer.label}: incomplete specialist execution; output not eligible for acceptance.${reviewer.error ? ` ${reviewer.error}` : ""}` });
@@ -390,6 +395,8 @@ export function adjudicateCandidates(collected, reviewer, boundary, policy) {
     return { complete: issues.length === 0, findings, rejected, duplicates, capped, outside, issues, diagnostics };
   };
   if (!collected.candidates.length) return result();
+  const lost = contextLossGap("evidence-validator", reviewer?.contextLoss);
+  if (lost) diagnostics.push(lost);
   if (reviewer?.status !== "completed") {
     diagnostics.push({ kind: "execution-failure", message:
       `evidence-validator: Evidence adjudication did not complete; no candidates accepted.${reviewer?.error ? ` ${reviewer.error}` : ""}` });
