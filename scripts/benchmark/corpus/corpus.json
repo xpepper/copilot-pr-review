@@ -1,0 +1,97 @@
+{
+  "nonFindingPhrases": [
+    "no defect", "no defects", "no issue", "no issues", "no bug", "no bugs", "no problem", "no problems",
+    "not a defect", "not a bug", "not an issue", "not a problem", "false positive",
+    "is safe", "are safe", "is correct", "are correct", "is fine",
+    "works as intended", "works correctly", "handled correctly", "correctly handles"
+  ],
+  "cases": [
+    {
+      "id": "pagination-bounds",
+      "kind": "seeded",
+      "sha256": "0a2b8cfe4e442fbb4cb408a63897f165101e2f36b2ca3322b9abe5580f2e0570",
+      "defects": [
+        {
+          "id": "pagination-inclusive-bound",
+          "summary": "The loop now runs up to an exclusive limit inclusively, so every page reads one element past its end and the last page appends undefined.",
+          "severity": "P2",
+          "allowedSeverities": ["P2", "P1"],
+          "locations": [
+            { "path": "src/paginate.js", "side": "head", "startLine": 3, "endLine": 4 }
+          ],
+          "concepts": [
+            ["off-by-one", "off by one", "one past", "past the end", "out of bounds", "out-of-bounds", "one extra", "extra element", "extra item", "undefined"],
+            ["<=", "inclusive", "last", "length", "bound"]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "timeout-units",
+      "kind": "seeded",
+      "sha256": "b9d822525f6bb0aa6a7202b3503cd32e58e6103e5711bc497021942a0be76c9d",
+      "defects": [
+        {
+          "id": "timeout-seconds-multiplied",
+          "summary": "The default timeout is now in milliseconds but the client still treats it as seconds and multiplies by 1000, so a default request waits about eight hours instead of thirty seconds.",
+          "severity": "P1",
+          "allowedSeverities": ["P1", "P2"],
+          "locations": [
+            { "path": "src/config.js", "side": "head", "startLine": 3, "endLine": 4 },
+            { "path": "src/client.js", "side": "head", "startLine": 4, "endLine": 5 }
+          ],
+          "concepts": [
+            ["millisecond", "milliseconds", "ms", "seconds", "unit", "units"],
+            ["1000", "timeout", "abort", "aborts"]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "attachment-replace",
+      "kind": "seeded",
+      "sha256": "d9a07ce9c679a57f7545a7fed678eb198e8070af3944850db7d7eb37a71546fa",
+      "defects": [
+        {
+          "id": "attachment-replace-owner-check",
+          "summary": "replaceAttachment never checks that the caller owns the attachment, as readAttachment does, so any authenticated user can overwrite anyone's attachment.",
+          "severity": "P1",
+          "allowedSeverities": ["P1", "P0"],
+          "locations": [
+            { "path": "src/routes/attachments.js", "side": "head", "startLine": 12, "endLine": 15 }
+          ],
+          "concepts": [
+            ["owner", "ownerid", "ownership", "authorization", "authorisation", "authorize", "authorise", "unauthorized", "unauthorised", "permission", "permissions", "access control", "403", "forbidden"],
+            ["replace", "replaces", "overwrite", "overwrites", "save", "saves", "modify", "modifies", "any user", "another user", "other users", "someone else"]
+          ]
+        },
+        {
+          "id": "attachment-replace-lock-release",
+          "summary": "The lock is taken before the size check, so an oversized body returns 413 without releasing it and every later replace of that attachment waits; a failed save leaks it the same way.",
+          "severity": "P2",
+          "allowedSeverities": ["P2", "P1"],
+          "locations": [
+            { "path": "src/routes/attachments.js", "side": "head", "startLine": 15, "endLine": 16 },
+            { "path": "src/routes/attachments.js", "side": "head", "startLine": 17, "endLine": 18 }
+          ],
+          "concepts": [
+            ["release", "released", "releases", "unreleased", "leak", "leaks", "leaked", "held", "deadlock", "deadlocks"],
+            ["lock", "locks", "locked", "413", "early return", "size check", "throws", "rejects"]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "clean-extract-constant",
+      "kind": "control",
+      "sha256": "3b4c469c8e156599b9794525ac99ad5b74e9eb11157b787653e064d38ac7d8bd",
+      "defects": []
+    },
+    {
+      "id": "clean-empty-name-parts",
+      "kind": "control",
+      "sha256": "b62168f6443a1f5f226a58e09f90553b5779a807ff8765dbcf99ff8ec278fac1",
+      "defects": []
+    }
+  ]
+}

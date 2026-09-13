@@ -1,0 +1,10 @@
+diff --git a/src/retry.js b/src/retry.js
+--- a/src/retry.js
++++ b/src/retry.js
+@@ -1,3 +1,5 @@
++const baseDelayMs = 250;
++const maxDelayMs = 8000;
+ export function delayFor(attempt) {
+-  return Math.min(250 * 2 ** attempt, 8000);
++  return Math.min(baseDelayMs * 2 ** attempt, maxDelayMs);
+ }

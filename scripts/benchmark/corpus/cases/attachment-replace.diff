@@ -1,0 +1,24 @@
+diff --git a/src/routes/attachments.js b/src/routes/attachments.js
+--- a/src/routes/attachments.js
++++ b/src/routes/attachments.js
+@@ -1,11 +1,20 @@
+ export async function readAttachment(req, res, store) {
+   const attachment = await store.find(req.params.id);
+   if (!attachment) return res.status(404).end();
+   if (attachment.ownerId !== req.user.id) return res.status(403).end();
+   const handle = await store.open(attachment.path, "r");
+   try {
+     res.status(200).send(await handle.read());
+   } finally {
+     await handle.close();
+   }
+ }
++export async function replaceAttachment(req, res, store) {
++  const attachment = await store.find(req.params.id);
++  if (!attachment) return res.status(404).end();
++  const lock = await store.lock(attachment.id);
++  if (req.body.length > 1048576) return res.status(413).end();
++  await store.save(attachment.id, req.body);
++  await lock.release();
++  res.status(204).end();
++}

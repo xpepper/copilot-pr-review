@@ -1,0 +1,11 @@
+diff --git a/src/names.js b/src/names.js
+--- a/src/names.js
++++ b/src/names.js
+@@ -1,6 +1,7 @@
+ export function initials(name) {
+   return name
+     .split(" ")
++    .filter((part) => part.length > 0)
+     .map((part) => part[0].toUpperCase())
+     .join("");
+ }
