@@ -1,0 +1,28 @@
+diff --git a/src/client.js b/src/client.js
+--- a/src/client.js
++++ b/src/client.js
+@@ -1,11 +1,11 @@
+ import { defaults } from "./config.js";
+-export async function fetchWithTimeout(url) {
++export async function fetchWithTimeout(url, options = {}) {
+   const controller = new AbortController();
+-  const seconds = defaults.requestTimeout;
++  const seconds = options.timeout ?? defaults.requestTimeout;
+   const timer = setTimeout(() => controller.abort(), seconds * 1000);
+   try {
+     return await fetch(url, { signal: controller.signal });
+   } finally {
+     clearTimeout(timer);
+   }
+ }
+diff --git a/src/config.js b/src/config.js
+--- a/src/config.js
++++ b/src/config.js
+@@ -1,5 +1,5 @@
+ export const defaults = {
+   retries: 3,
+-  // Seconds to wait for a response before aborting.
+-  requestTimeout: 30,
++  // Milliseconds to wait for a response before aborting.
++  requestTimeout: 30000,
+ };

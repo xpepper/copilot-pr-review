@@ -1033,14 +1033,14 @@ command approval.
 
 ## Verify it yourself
 
-Seventeen controlled suites cover the shipped logic with test doubles. They need
+Eighteen controlled suites cover the shipped logic with test doubles. They need
 no network, no inference and no runtime connection, and each finishes in well
 under a second:
 
 ```sh
 for s in findings review selection retention preview publication publish-later \
   checkout config context fixture target safeguards prior incremental revalidation \
-  cost; do node scripts/smoke-$s.mjs; done
+  cost benchmark; do node scripts/smoke-$s.mjs; done
 ```
 
 They cover PR capture and its gates, revision-bound context assembly, all four
@@ -1050,7 +1050,8 @@ its schemas, the publication payload and its journal, publish-later, the
 configuration and trust rules, prior-review discovery and its head
 classification, the confinement of a re-review to the new commits, the
 revalidation of an earlier review's findings, what a run reports about its own
-cost, and the safeguard path end to end.
+cost, the seeded benchmark corpus and its scorer, and the safeguard path end to
+end.
 
 Their limits matter as much as their coverage. Their semantic accept and reject
 decisions are explicit test doubles, not live-model evidence, and their `gh` is
@@ -1148,8 +1149,9 @@ the point of this project:
   what a discovery pass reports is not something a run can arrange.
 - **Recall is unmeasured.** One review has run against a substantial code diff,
   1427 changed lines over 16 files, and its single finding was real. That is
-  precision. What a review misses needs a defect corpus with agreed ground
-  truth, which this project does not have.
+  precision. `scripts/benchmark/` now holds a seeded corpus with explicit ground
+  truth and a scorer that needs no model, but no review has been collected
+  against it, so there is still no recall number.
 - **No revalidation has run live.** Every verdict this tool reports about an
   earlier finding, and every reply it would post to a thread, rests on fixture
   coverage alone. Closing this needs a pull request this tool has published a

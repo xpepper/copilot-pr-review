@@ -18,9 +18,8 @@ and `G1` was the last increment scheduled before the backlog was agreed; **every
 increment scheduled up to `G1` is complete.** On 2026-09-12 the user triaged
 `G1`'s twelve proposals one at a time and scheduled six of them: `T1`, `B1`,
 `W1`, `N1`, `H1` and `K1`, in that order, and the same day scheduled `X1`
-immediately after `B1`. **`T1`, `B1` and `X1` are complete and archived, and no
-entry is live below until `W1` writes one**; `W1` is complete below and the three
-`Pending` rows are what is left.
+immediately after `B1`. **`T1`, `B1`, `X1` and `W1` are complete and archived, and
+`N1` is complete below**; the two `Pending` rows are what is left.
 The closing section records what was decided, and what stays open as a
 limitation rather than as work.
 
@@ -85,13 +84,13 @@ posting them.
 | B1 | Completed | A pass whose context the runtime compacted or truncated is a coverage gap rather than silence: `runReviewer` records the runtime's own events, and a reviewer or adjudicator with any adds one gap naming the pass, never a file. Findings survive, the review is INCOMPLETE, and nothing stops, retries or falls back. **The honesty half only.** This project's own logs held seven compacted reviewer sessions in four reviews that no run reported. Pull request #39, reviewed once with this plugin at the user's authorization: deep, 31.73861 credits, INCOMPLETE on one exact gap and one refused candidate, rejected, and no false gap. No live compaction has run through this code. `G1`'s menu item 11. | T1; [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | X1 | Completed | `--long-context`, one flag chosen per run and saved nowhere, asks every model pass for its model's long-context window when its session catalog lists one. A model that lists none keeps its own window and says so; a window the runtime does not keep is refused before any send. Every pass names its window in the display and on the evidence line. A probe spending nothing found `getCurrent()` echoes any tier, so the catalog decides. `SCOPE.md` gained one paragraph the user approved. Pull request #41, reviewed once at the user's authorization: deep with `--long-context` on `gpt-5.6-terra` at high effort, 45.55611 credits, the first live long-context pass, INCOMPLETE on two test-coverage gaps and 0 findings. | B1; [Models/execution](SCOPE.md#models-configuration-and-execution) |
 | W1 | Completed | Every validated finding carries one adjudicated remediation sentence in its presented and published forms. Missing, multi-line, multi-sentence and code-block-bearing prose is refused at ingestion and again before publication; older retained results still load but cannot publish without a new review. No committable suggestion block. Pull request #42, reviewed once with this plugin at the user's authorization: deep on `gpt-5.6-terra` at high effort and its default window, 81.62026 credits, INCOMPLETE on two invalid citation paths, 0 validated findings and two useful candidate signals, one fixed and one retained as an explicit parser limitation. | X1; [Selection/publication](SCOPE.md#selection-publication-and-cached-results) |
-| N1 | Pending | A seeded corpus and a deterministic scorer, so that recall and precision can be measured at all. **The free half only**: small synthetic diffs pinned by content hash, each seeded defect carrying a stable identity, a target severity, the severities that count, acceptable locations and the concepts a matching report must contain, plus clean controls that must draw nothing; and a scorer needing no model and no network, running in the controlled suite and in CI, which rejects an explicit non-finding before matching so that a reviewer calling a thing safe cannot score as having found it. **The collection runs that spend credits are not scheduled, and neither is a baseline gate.** Fits `SCOPE.md` as written: it changes no product behaviour. `G1`'s menu item 5. | W1; [Modes/findings](SCOPE.md#review-modes-and-findings) |
+| N1 | Completed | A seeded corpus and a deterministic scorer, **the free half only**: five plain-text diffs pinned by content hash, three seeded cases carrying four defects with stable ids, target and allowed severities, acceptable locations and concept groups, and two clean controls; a scorer needing no model or network that rejects explicit non-findings before matching and pairs findings with defects one-to-one, run by an eighteenth controlled suite and CI. No collection run, recall number or gate. Pull request #43, reviewed once with this plugin at the standing authorization: balanced, 127.050688 credits, INCOMPLETE, 0 validated findings, and one real candidate raised by two reviewers and refused on its citation, fixed anyway. | W1; [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | H1 | Pending | Opt-in, the project's own written standards steer the review. The checkout's instruction files, which `--verify` discovery already collects and hands to no reviewer, reach one, and a finding raised on that basis must quote the instruction it relies on; that quote is checked against the collected file the way a source citation is checked against bound source, and a finding whose quoted rule cannot be found is refused. **This increment settles what evidence a claim not grounded in a provable code effect must carry**, which is the rule the history lenses and path-conditioned lenses would inherit if they are ever taken. Pull request #42 supplies a concrete acceptance case: changed handoff instructions contradicted or over-attributed the authoritative `AGENTS.md` workflow. Needs a scope decision, because `SCOPE.md` says nothing about convention review. Opt-in, consistent with `I1b` and `I1c`. `G1`'s menu item 4. | N1; [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | K1 | Pending | A published review asks what it found useful, and a later run reads the reactions and the resolution state of its own threads. `I1c` already reads an earlier review's threads fresh from GitHub on every run, so the read path exists. It is the only scheduled item that would produce evidence about real pull requests rather than a synthetic corpus, and it is last because it needs a review actually published to a pull request before there is anything to read back, and findings stay local unless the user authorizes posting. Needs a scope decision. `G1`'s menu item 12. | H1, I1c; [Publication controls](SCOPE.md#selection-publication-and-cached-results) |
 
-## Every completed increment, `F1` through `X1`, is archived
+## Every completed increment, `F1` through `W1`, is archived
 
-Fifty-four sections were here and twelve increments plus the backlog triage moved
+Fifty-five sections were here and thirteen increments plus the backlog triage moved
 every one of them
 verbatim to
 [docs/roadmap-archive-2026-09-10.md](docs/roadmap-archive-2026-09-10.md): `A1`
@@ -101,11 +100,11 @@ moved `A1`'s entry and then `L1`'s, `O1` moved `D1`'s, `U1` moved `O1`'s, `I1a`
 moved `E1`'s, `I1b` moved `U1`'s and then `I1a`'s, `I1c` moved `I1b`'s
 15018 bytes, `G1` moved `I1c`'s 13014 bytes, **the backlog triage moved
 `G1`'s own 8863 bytes**, **`B1` moved `T1`'s 5951**, **`X1` moved `B1`'s
-5124**, and **`W1` moved `X1`'s 5123**, the last in that file. Forty-six are
-completed-increment entries, covering the forty-four increments `F1`, `F2`, `F3`, `Q1`, `Q2`, `Q3`, `Q4`,
+5124**, **`W1` moved `X1`'s 5123**, and **`N1` moved `W1`'s 4684**, the last in that file. Forty-seven are
+completed-increment entries, covering the forty-five increments `F1`, `F2`, `F3`, `Q1`, `Q2`, `Q3`, `Q4`,
 `P1`, `P2`, `P3`, `P4`, `P5`, `C1`, `C2`, `F4`, `R1`, `M1`, `F5`, `F6`, `M2`,
 `C3`, `C4`, `Q5`, `Q6`, `C5`, `Q7`, `V1a`, `V1b`, `V1c`, `V2a`, `V2b`, `A1`,
-`L1`, `D1`, `O1`, `E1`, `U1`, `I1a`, `I1b`, `I1c`, `G1`, `T1`, `B1` and `X1`, with `R1` and `M1` each recorded in two halves. The remaining eight are the
+`L1`, `D1`, `O1`, `E1`, `U1`, `I1a`, `I1b`, `I1c`, `G1`, `T1`, `B1`, `X1` and `W1`, with `R1` and `M1` each recorded in two halves. The remaining eight are the
 working record kept between them:
 
 - the `Q4` acceptance criteria recorded at the `Q3` checkpoint;
@@ -117,7 +116,7 @@ working record kept between them:
 - the `R1` second-half harness checkpoint;
 - the documentation checkpoint for pull request #4 and its review.
 
-Nothing was rewritten, condensed or corrected in any of the twelve moves, so each
+Nothing was rewritten, condensed or corrected in any of the thirteen moves, so each
 section still reads exactly as the session that wrote it left it, and the
 archive is the evidence of record for every increment it holds: reproduction
 commands, the models and efforts actually used, credit costs, findings and
@@ -134,7 +133,7 @@ than from this file.
 [docs/upstream-licensing.md](docs/upstream-licensing.md) is still the record of
 that licence work and did not move.
 
-**`W1` is the only live entry.** The backlog triage added no entry of its
+**`N1` is the only live entry.** The backlog triage added no entry of its
 own, because agreeing a backlog is not a numbered increment, so archiving `G1`
 left none behind and `T1`'s was written into that empty space. The rule these
 moves established is to keep
@@ -166,89 +165,91 @@ entry has ever been written in less than that, so `T1`'s session would have had
 to do this move first. **`B1` archived `T1`'s 5951 bytes** on that rule before
 writing a word of its own, because 1313 bytes were spare. **`X1` archived `B1`'s
 5124 bytes** on the same rule, because 1032 bytes were spare. **`W1` archived
-`X1`'s 5123 bytes** on the same rule, because 956 bytes were spare.
+`X1`'s 5123 bytes** on the same rule, because 956 bytes were spare. **`N1`
+archived `W1`'s 4684 bytes** on the same rule, because 1003 bytes were spare.
 
-## `W1`: every validated finding says what to do about it
+## `N1`: a seeded corpus and a deterministic scorer
 
-The user approved the exact `SCOPE.md` paragraph before code changed: one
-remediation sentence is part of the finding the reviewer produced, is shown and
-published, and is prose rather than code, so it is neither an editor nor a
-committable suggestion block.
+**The free half only.** No collection runner, no review collected against the
+corpus, no mode matrix, no published recall or precision and no baseline gate.
+`SCOPE.md` is unchanged, because no product behaviour moved.
 
-`remediation` is required at candidate ingestion and the isolated adjudicator
-must support it like every other claim. The sentence appears as `Fix:` before
-validation in the presented finding and before confidence in an inline comment.
-Candidate ingestion and publication independently refuse a missing sentence, a
-line break, more than one English sentence, or a line in any published prose
-field that opens a backtick or tilde code fence. `Intl.Segmenter` keeps ordinary
-abbreviations and inline code from becoming false sentence boundaries. Results
-retained before `W1` still load and inspect, but publication refuses them and
-asks for a new review. `I1c` reads the optional `Fix:` paragraph back and keeps
-pre-`W1` comments readable.
+`scripts/benchmark/corpus/` holds five plain-text diffs: three seeded cases
+carrying four defects, two targeted P1 and two P2, and two clean controls.
+`corpus.json` gives each defect a stable id, a summary, a target severity, its
+allowed severities, acceptable locations and concept groups. Its own sha256
+versions the set and `smoke-benchmark.mjs` pins it. The loader refuses, naming
+the case or defect, a diff that no longer matches its pin, a control byte or
+carriage return, a hunk header its body contradicts, an unlisted fixture, an
+unknown or missing field, a control with a defect, a target outside its allowed
+list or a severity this tool never reports, a location outside one hunk or
+covering no changed line on its side, and an unnormalised term. It reuses
+`parseDiffFiles` and full mode's severities rather than restating either.
+
+`scoreReports` reads findings in the shape this tool validates, and:
+
+- rejects an explicit non-finding before matching, reading `title` and
+  `actual` for a listed phrase such as "is correct";
+- matches only at an overlapping acceptable location, an allowed severity and
+  a whole-word term from every concept group;
+- pairs findings and defects by a maximum one-to-one matching over a canonical
+  order, so no report or finding order changes a score;
+- bands opportunities by target severity, counts a second report of a detected
+  defect as a duplicate, names a control that drew a finding, and leaves a case
+  with no report unscored rather than missed.
+
+`formatScore` prints counts only and, for every false positive, which check
+failed against which defect.
 
 ### The review
 
-Pull request #42 was reviewed once with the installed plugin at the user's
-authorization, **deep without `--long-context`**: integrated reviewer and
-adjudicator on `gpt-5.6-terra` at high effort and `contextTier: default`, 3
-reported requests across 2 paid passes, **81.62026 credits**, 89.115 s of model
-work against 113.423 s elapsed. The integrated reviewer made 6 approved tool
-calls, all confined reads, with no permission or tool denial; the adjudicator
-used no tools. Neither pass reported context loss. No finding was posted.
+Pull request #43 was reviewed once with the installed plugin, **balanced**, at
+head `c205f03`: four heavy specialists on `gpt-5.6-terra` and the overview on
+`gpt-5.6-luna`, all at high effort on the default window, 14 requests,
+**127.050688 credits**, 232.9 s of model work against 114.0 s elapsed. All 32
+permission requests were approved for 31 confined reads; nothing was denied, no
+pass lost context, and no finding was posted.
 
-Coverage is **INCOMPLETE**, with 0 validated, rejected, duplicate, capped or
-outside findings. Two candidates produced useful signals but no publishable
-finding:
+Coverage is **INCOMPLETE** with 0 validated findings. Correctness and contracts
+each raised one P2 candidate, the same defect: `checkFinding` accepted a
+reversed or non-positive range, so `4-3` overlapped `3-4` and detected the
+defect. Both were refused at the evidence boundary for citing
+`score.mjs:213-216` with a five-line quote. **Fixed anyway**: the new test
+failed on `4-3`, a finding now needs `1 <= startLine <= endLine`, and disabling
+either half fails the suite. Overview's envelope failed to parse at character
+2789, an execution failure. Contracts and performance-resources each named a
+coverage gap and security a caveat, all the same observation: no collection
+runner or other caller exists to assess, which is this increment's boundary.
 
-- A pre-`W1` introduction ending in a one-line `Fix:` paragraph can be read as a
-  remediation because the old and new encodings are byte-identical. Its
-  citation failed the evidence boundary. **No change:** the pull-request
-  description, parser comment and test already state this unavoidable
-  compatibility ambiguity; refusing that byte shape would also refuse every
-  genuine post-`W1` comment without version evidence.
-- Two sentences on one physical line passed both deterministic gates. The
-  adjudicator accepted the defect, but its own citation failed exact validation,
-  so the candidate still did not become a finding. **Fixed anyway:** one shared
-  sentence-segmentation check now guards ingestion and publication, with
-  abbreviations pinned as accepted prose.
-
-The reviewer also retained one caveat: it did not independently exercise GitHub
-rendering. There were no withheld findings.
-
-After the review-response commits, the user requested two external reviews.
-GitHub Copilot reviewed all 15 changed files and found two contradictions in
-the new `HANDOFF.md`: it wrongly asked for fresh authorization despite
-`AGENTS.md`'s standing first-review authorization, and attributed the
-environment's co-author trailer rule to `AGENTS.md`. Commits `9e4682b` and
-`3ee3c7e` fix them; both threads were answered and resolved. Codex reviewed
-`3c5ffd4`, found no actionable change, and reported one firewall-blocked GitHub
-query that did not prevent its assessment.
-
-Those exact lines were added after this plugin reviewed `9896b23`, so they are a
-finalization gap rather than findings it missed in the reviewed diff. Their
-class is still useful evidence: instruction consistency against authoritative
-project rules is now an explicit `H1` acceptance case. Reviewer behavior is not
-widened inside `W1`, and no second paid plugin review is authorized.
+GitHub Copilot's later review of `e92f9a2` left one inline comment: the scorer
+checked only that a range was positive, so `src/paginate.js:1-999` or `3-13`
+detected `pagination-inclusive-bound`, though the tool refuses a location over
+ten lines or off the changed lines of one hunk. **`230f982` fixes it**, test
+first: a submitted finding now takes the loader's anchor check, which reads the
+same as `findings.mjs:266-272`, plus the ten-line cap. `1-999`, `3-13`, `3-9`,
+`5-6`, a missing path and `10-20` each scored before it, and disabling each of
+seven rules fails the suite. Two scripted findings off changed lines moved; the
+corpus and its hash did not. No plugin review covers the fix. Codex found
+nothing at `e92f9a2`, and `@claude[agent]` had not replied.
 
 ### Verified, and not
 
-The boundary and publication tests first failed on
-`"Multiply instead. Then retest."`; disabling either new guard makes its own
-suite fail. All seventeen controlled suites pass, `git diff --check` is clean,
-no tracked text carries a control byte, and discovery reads all six root files
-and skips none. The controlled CI passed on review-response head `9e1ebca`.
-The separate `claude-review` workflow failed before inference: its action
-initialized, then returned `is_error:true` in 494 ms with zero cost, empty model
-usage and no buffered comments. It was recorded rather than rerun.
+**Test first**: the suite failed on the missing module, then on the missing
+scorer exports, then, with matching written and no rejection, on `No issue: the
+loop only reads one past the end with <=` detecting its defect. Disabling each
+of thirteen loader guards and fifteen scorer rules in turn fails the suite. All
+eighteen suites pass, `git diff --check` is clean, no tracked text including
+`*.diff` carries a control byte, and discovery reads all six root files and
+skips none. CI now runs the suite and checks `*.diff` too.
 
-- The live reviewer produced both remediation sentences in the required shape,
-  demonstrating real model output, but no candidate survived to presentation or
-  publication.
-- GitHub rendering and publication of `Fix:` remain unexercised; posting stays
-  the user's decision.
-- A model-decided `I1c` reply still carries the model's reason verbatim and can
-  contain a code fence. It is a reply rather than a finding and is not widened
-  into `W1`.
+- **No model output has been scored.** Every report is scripted, so nothing
+  shows the concept groups are neither too strict nor too loose for real prose.
+- **Non-finding phrases are literal.** A real finding whose title or actual
+  says "is correct" before naming a defect is rejected, with the phrase shown.
+- **The seeded code was written to carry no other defect.** A reviewer that
+  finds one anyway scores a false positive until the corpus is repinned.
+- **Five cases test the scorer; they are not a benchmark.** Collection runs,
+  and any number from them, stay unscheduled.
 
 ## v1 is complete, and seven increments are scheduled on top of it
 
@@ -267,7 +268,7 @@ was built, and `I1a`, `I1b` and `I1c` are all done.
 through all twelve one at a time, cheapest first, and **scheduled six**: `T1`,
 `B1`, `W1`, `N1`, `H1`, `K1`, in that order, which is the order of the remaining
 rows above and the order the next session works in, with `X1` inserted after
-`B1` the same day. **`T1`, `B1`, `X1` and `W1` are done and `N1` is the next increment.** The user chose that order over starting with the measurement and
+`B1` the same day. **`T1`, `B1`, `X1`, `W1` and `N1` are done and `H1` is the next increment.** The user chose that order over starting with the measurement and
 over starting with the largest capability gap, and chose the mnemonic IDs over
 one series off `G1`.
 
@@ -294,7 +295,7 @@ approved paragraph. `H1` needs one because the scope says nothing about conventi
 
 ### What is settled and must not be redone
 
-**`E1`, `U1`, `I1a`, `I1b`, `I1c`, `G1`, `T1`, `B1`, `X1` and `W1` are done: do not redo any.**
+**`E1`, `U1`, `I1a`, `I1b`, `I1c`, `G1`, `T1`, `B1`, `X1`, `W1` and `N1` are done: do not redo any.**
 **`E1` raised three items and `T1` closed the first**, a run that never reported
 its own cost. The other two stay recorded and stay unscheduled: the evidence lines are still truncated by the interactive UI, and
 per-reviewer progress still says nothing while a reviewer works. `U1` is settled as one preflight flag that refuses. **`I1a`'s slicing is
@@ -426,7 +427,7 @@ It is not an increment, has no roadmap row, and was not part of what the plugin
 reviewed. **It went green on #31 before that pull request was merged**, running
 all fifteen suites, reading all six instruction files and skipping none.
 
-It runs every controlled suite, seventeen of them since `T1`, and two
+It runs every controlled suite, eighteen of them since `N1`, and two
 invariants this repository has
 broken before: that safeguard discovery still reads every instruction file at
 the checkout root, which fails the job if one crosses 65536 bytes, and that no
@@ -476,7 +477,7 @@ except where a bullet says so:
   stays open after it is recall: nobody has measured what a review misses, and
   doing so needs a defect corpus with agreed ground truth that this project does
   not have. **`G1` established that upstream has exactly that** and publishes
-  numbers from it, and **`N1` now schedules the half of that which costs
+  numbers from it, and **`N1` has delivered the half of that which costs
   nothing**: the corpus and the deterministic scorer. **The collection runs that
   would actually produce a recall number are not scheduled**, so recall stays
   unmeasured until the user authorizes them.
