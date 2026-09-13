@@ -144,7 +144,7 @@ export function contextWindows(hunks, side, lineCount, radius) {
   return merged;
 }
 
-function splitLines(text) {
+export function splitLines(text) {
   const lines = text.split("\n");
   if (lines.length && lines[lines.length - 1] === "") lines.pop();
   return lines;

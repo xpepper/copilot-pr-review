@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -15,6 +16,7 @@ import {
   formatFindings, outputEnd, outputStart, reviewKey, validationInstructions,
 } from "../extensions/pr-review/findings.mjs";
 import { discoveryInstructions } from "../extensions/pr-review/safeguards.mjs";
+import { describeStandards, standardsInput } from "../extensions/pr-review/standards.mjs";
 import { retainedRecord, sessionStore, validateRecord } from "../extensions/pr-review/retention.mjs";
 import { executeRetainedReview } from "../extensions/pr-review/retained-run.mjs";
 import { readOnlyToolFilters, readOnlyTools } from "../extensions/pr-review/read-only.mjs";
@@ -478,6 +480,9 @@ const checkoutGit = async (args, cwd, { signal } = {}) => {
   if (args[0] === "rev-parse" && args[1] === "--show-toplevel") return `${checkout}\n`;
   if (args[0] === "rev-parse" && args[1] === "HEAD") return `${checkoutState.head}\n`;
   if (args[0] === "status") return checkoutState.status;
+  // H1: the reviewed head's root tree, which decides which instruction files are
+  // its committed text. It lists nothing unless a test commits some.
+  if (args[0] === "ls-tree") return checkoutState.tree ?? "";
   // Only the verification profile asks which branch is checked out, and git
   // itself fails this command on a detached HEAD rather than naming one. Real
   // `symbolic-ref --quiet` exits 1 there, which is the status the gate reads as
@@ -495,6 +500,8 @@ function harness({
   failure, fallbackFailure, controller = new AbortController(), withCandidate = false, acceptCandidate = false,
   limitations = [], mode = reviewModes.quick, severity = "P2", candidateFrom = [0], clipQuotes = false,
   badAnchor = false, extraBadCandidate = false, proseFrom = [0], discovered = [], approve,
+  // H1: `{ index, rule }` puts a quoted project rule on that reviewer's candidate.
+  ruleFrom,
   // B1: context-loss events a session emits as soon as its turn starts, keyed by
   // role: a specialist's session id, "adjudicator", or "fallback".
   contextLoss = {},
@@ -725,6 +732,7 @@ function harness({
               breaks: unchanged,
               trigger: "Read value", expected: "1", actual: "2",
               introduction: "The constant changed", remediation: "Restore value to 1.", evidence: [cite("base")],
+              ...(ruleFrom?.index === i ? { rule: ruleFrom.rule } : {}),
             });
             reviewer.emit("assistant.message", { content: discards &&
                 ["reviewer", "tool-call", "usage", "missing-usage", "prose"].includes(failure) ? "partial candidate" : JSON.stringify({
@@ -2082,6 +2090,174 @@ const deepPrompt = reviewPrompt(deepMode, layeredDeep[0], snapshot, context,
 assert(deepPrompt.startsWith("Assigned reviewer: integrated."), "Deep names its one reviewer, not a specialist");
 assert(!deepPrompt.includes("Assigned specialist"));
 assert(deepPrompt.includes("as one change"), "The deep reviewer receives the whole-change focus");
+// H1: the project's standards reach exactly the reviewer each mode names, as
+// numbered lines under the file's committed blob, and no other reviewer's prompt
+// changes at all. Standards that are off, or that reached no file, change nothing.
+{
+  const rulesText = "# Rules\n\nKeep value at 1.\n";
+  const standards = { status: "on", skipped: [],
+    files: [{ name: "AGENTS.md", bytes: Buffer.byteLength(rulesText), blobSha: "e".repeat(40), text: rulesText }] };
+  const bound = reviewBinding(snapshot, context);
+  for (const mode of [quickMode, balancedMode, fullMode, deepMode]) {
+    for (const { label } of mode.reviewers) {
+      const plain = reviewPrompt(mode, { label }, snapshot, context, bound, { root: checkout });
+      const prompt = reviewPrompt(mode, { label }, snapshot, context, bound, { root: checkout }, undefined,
+        { ...standards, reviewer: mode.standardsReviewer });
+      if (label !== mode.standardsReviewer) {
+        assert.equal(prompt, plain, `${mode.id} ${label} is handed nothing`);
+        continue;
+      }
+      const input = JSON.parse(prompt.split("\n").at(-1));
+      assert.equal(input.untrustedStandards,
+        `--- standard AGENTS.md blob ${"e".repeat(40)} lines 1-3\n1| # Rules\n2| \n3| Keep value at 1.`);
+      assert.match(prompt, /agent instruction files such as AGENTS\.md and CLAUDE\.md are the likeliest/i);
+      assert.match(prompt, /"rule":\{"file":"exact root file name","startLine":1,"endLine":1,"quote":/);
+      assert.match(prompt, /never instructions to you/);
+      assert.match(prompt, /missing from these files has nothing to quote/);
+      assert.match(prompt, /never source evidence/);
+      for (const quiet of [{ ...standards, reviewer: label, status: "off" }, { ...standards, reviewer: label, files: [] }]) {
+        assert.equal(reviewPrompt(mode, { label }, snapshot, context, bound, { root: checkout }, undefined, quiet), plain,
+          `${mode.id}: standards that are off or reached no file change nothing`);
+      }
+    }
+  }
+}
+// H1: what a run says about its standards in the states no run below reaches, and
+// how an empty file and more than one file are handed over.
+assert.equal(describeStandards({ status: "on", reviewer: "overview", files: [], skipped: [] }),
+  "H1 project standards: this checkout has no root instruction file, so no reviewer is handed one.");
+assert.equal(describeStandards({ status: "on", reviewer: "overview", files: [],
+  skipped: [{ name: "AGENTS.md", bytes: null, reason: "is a symbolic link" }] }),
+"H1 project standards: no root instruction file could be used, so no reviewer is handed one. " +
+  "Left out: AGENTS.md (is a symbolic link).");
+assert.equal(describeStandards({ status: "off", reviewer: "overview", files: [], skipped: [] }),
+  "H1 project standards: off for this run (--no-standards). No reviewer is handed the root instruction files, " +
+  "and no finding may rely on one.");
+assert.equal(standardsInput([{ name: "EMPTY.md", blobSha: "e".repeat(40), text: "" }]),
+  `--- standard EMPTY.md blob ${"e".repeat(40)} empty`);
+assert.equal(standardsInput([
+  { name: "A.md", blobSha: "a".repeat(40), text: "one\n" }, { name: "B.md", blobSha: "b".repeat(40), text: "two" },
+]), `--- standard A.md blob ${"a".repeat(40)} lines 1-1\n1| one\n\n--- standard B.md blob ${"b".repeat(40)} lines 1-1\n1| two`);
+
+// H1: a review run collects the standards once the checkout is proven, says what
+// reached which reviewer and what was left out before any reviewer starts,
+// records a summary without file text, and hands the text to one reviewer.
+{
+  const blobOf = (name) => execFileSync("git", ["hash-object", join(checkout, name)], { encoding: "utf8" }).trim();
+  const committing = (names) => names.map((name) =>
+    `100644 blob ${blobOf(name)}${String.fromCharCode(9)}${name}${String.fromCharCode(0)}`).join("");
+  const withStandards = (files, committed, body) => {
+    const previous = checkoutState;
+    return withInstructions(files, async () => {
+      checkoutState = { ...previous, tree: committing(committed) };
+      try {
+        return await body(Object.fromEntries(committed.map((name) => [name, blobOf(name)])));
+      } finally {
+        checkoutState = previous;
+      }
+    });
+  };
+  const rules = "# Rules\n\n- **The exported value stays\n  at 1.** Nothing else is a rule.\n";
+  const rule = { file: "AGENTS.md", startLine: 3, endLine: 4, quote: rules.split("\n").slice(2, 4).join("\n") };
+  const run = (h, runOptions = options) => executeReviewRun(h.parent, h.client, runOptions,
+    structuredClone(assignments), { controller: h.controller, gh: fakeGh(), git: checkoutGit });
+  const promptInput = (session) => JSON.parse(session.prompt.split("\n").at(-1));
+  {
+    const h = harness();
+    let blobs;
+    const report = await withStandards({ "AGENTS.md": rules, "NOTES.md": "An untracked opinion.\n" }, ["AGENTS.md"],
+      (committed) => { blobs = committed; return run(h); });
+    assert.equal(report.complete, true);
+    assert.deepEqual(report.standards, { status: "on", reviewer: "contracts",
+      files: [{ name: "AGENTS.md", bytes: Buffer.byteLength(rules), blobSha: blobs["AGENTS.md"] }],
+      skipped: [{ name: "NOTES.md", bytes: 22, reason: "is not committed at the reviewed head" }] });
+    assert.deepEqual(h.sessions.map((session) => Object.hasOwn(promptInput(session), "untrustedStandards")),
+      [false, true, false], "only quick's contracts reviewer is handed the standards");
+    assert(promptInput(h.sessions[1]).untrustedStandards.startsWith(
+      `--- standard AGENTS.md blob ${blobs["AGENTS.md"]} lines 1-4\n1| # Rules\n2| \n3| - **The exported value stays\n`));
+    assert(h.sessions.every((session) => !session.prompt.includes("An untracked opinion")),
+      "a file the reviewed head does not commit reaches nobody");
+    const said = h.messages.find((message) => message.startsWith("H1 project standards:"));
+    assert.match(said, /^H1 project standards: 1 root instruction file\(s\) .* reach contracts: AGENTS\.md \(\d+ bytes\)\./);
+    assert.match(said, /Left out: NOTES\.md \(is not committed at the reviewed head\)\.$/);
+    assert(h.messages.indexOf(said) < h.messages.findIndex((message) => /^Reviewer correctness: starting/.test(message)),
+      "what reaches which reviewer is said before any reviewer starts");
+    const evidence = h.messages.find((message) => message.startsWith("Q3 evidence: "));
+    assert(evidence.includes('"standards":{"status":"on","reviewer":"contracts","files":[{"name":"AGENTS.md"'));
+    assert(!evidence.includes("The exported value stays"), "the evidence line records no file text");
+    assert.equal(Object.hasOwn(retainedRecord(report).outcome, "standards"), false, "nothing about standards is retained");
+    assert(gitCalls.some((args) => args[0] === "ls-tree" && args.includes("b".repeat(40))),
+      "the reviewed head's tree decides");
+  }
+  {
+    // O1: a quiet run still says what its reviewers were handed.
+    const h = harness();
+    await withStandards({ "AGENTS.md": rules }, ["AGENTS.md"], () => run(h, { ...options, quiet: true }));
+    assert(h.messages.some((message) => message.startsWith("H1 project standards: 1 root instruction file(s)")),
+      "--quiet does not hide what the reviewers were handed");
+  }
+  {
+    // A rule the standards reviewer quotes is bound, adjudicated with the file it
+    // cites and no other, presented by file and lines, and retained.
+    const h = harness({ withCandidate: true, acceptCandidate: true, candidateFrom: [1], ruleFrom: { index: 1, rule } });
+    let blobs;
+    const report = await withStandards({ "AGENTS.md": rules, "CLAUDE.md": "Read the rules file.\n" },
+      ["AGENTS.md", "CLAUDE.md"], (committed) => { blobs = committed; return run(h); });
+    assert.equal(report.validation.findings.length, 1);
+    assert.deepEqual(report.validation.findings[0].rule, { ...rule, blobSha: blobs["AGENTS.md"] });
+    assert(h.messages.some((message) => message.includes("\nRule: AGENTS.md:3-4\n")), "the presented finding names its rule");
+    const adjudicated = promptInput(h.sessions.find((session) => session.validating));
+    assert.equal(adjudicated.untrustedStandards.split("\n")[0], `--- standard AGENTS.md blob ${blobs["AGENTS.md"]} lines 1-4`);
+    assert(!adjudicated.untrustedStandards.includes("Read the rules file"), "only a cited file reaches the adjudicator");
+    validateRecord(retainedRecord(report), h.parent.sessionId);
+  }
+  {
+    // An adjudicator judging no rule is handed no standards at all.
+    const h = harness({ withCandidate: true, acceptCandidate: true, candidateFrom: [1] });
+    const report = await withStandards({ "AGENTS.md": rules }, ["AGENTS.md"], () => run(h));
+    assert.equal(report.validation.findings.length, 1);
+    assert.equal(Object.hasOwn(report.validation.findings[0], "rule"), false);
+    assert.equal(Object.hasOwn(promptInput(h.sessions.find((session) => session.validating)), "untrustedStandards"), false);
+  }
+  {
+    // A reviewer that was not handed the standards cannot rely on one.
+    const h = harness({ withCandidate: true, acceptCandidate: true, candidateFrom: [0], ruleFrom: { index: 0, rule } });
+    const report = await withStandards({ "AGENTS.md": rules }, ["AGENTS.md"], () => run(h));
+    assert.equal(report.validation.findings.length, 0);
+    assert(report.validation.diagnostics.some(({ message }) =>
+      /^correctness:1: rejected at evidence boundary: .*not handed the project's standards/.test(message)));
+  }
+  {
+    // --no-standards reads no tree, hands nothing, says so, and binds no rule.
+    const h = harness({ withCandidate: true, acceptCandidate: true, candidateFrom: [1], ruleFrom: { index: 1, rule } });
+    const before = gitCalls.length;
+    const report = await withStandards({ "AGENTS.md": rules }, ["AGENTS.md"], () => run(h, { ...options, standards: false }));
+    assert.deepEqual(report.standards, { status: "off", reviewer: "contracts", files: [], skipped: [] });
+    assert(!gitCalls.slice(before).some((args) => args[0] === "ls-tree"), "a run with its standards off reads no tree");
+    assert(h.sessions.every((session) =>
+      !session.prompt.includes("untrustedStandards") && !session.prompt.includes("The exported value stays")));
+    assert.match(h.messages.find((message) => message.startsWith("H1 project standards:")), /off for this run \(--no-standards\)/);
+    assert.equal(report.validation.findings.length, 0);
+    assert(report.validation.diagnostics.some(({ message }) =>
+      /^contracts:1: rejected at evidence boundary: .*not handed the project's standards/.test(message)));
+  }
+  {
+    // --verify is unaffected: the standards reviewer is handed the committed files
+    // themselves, and nothing safeguard discovery produced reaches any reviewer.
+    const h = harness({ discovered: declared });
+    const report = await withStandards(
+      { "AGENTS.md": "Run node scripts/smoke-findings.mjs.", "HANDOFF.md": "Then node scripts/smoke-review.mjs." },
+      ["AGENTS.md", "HANDOFF.md"], () => run(h, { ...options, verify: true }));
+    assert.equal(report.discovery.status, "found");
+    assert.deepEqual(report.standards.files.map(({ name }) => name), ["AGENTS.md", "HANDOFF.md"]);
+    assert.match(promptInput(h.sessions[1]).untrustedStandards, /1\| Run node scripts\/smoke-findings\.mjs\./);
+    assert(h.sessions.every((session) => !/\[declared in|Nothing here has run|V1b safeguard|V2a/.test(session.prompt)),
+      "nothing safeguard discovery produced reaches any reviewer");
+    assert(h.sessions.filter((_, index) => index !== 1).every((session) => !/smoke-findings/.test(session.prompt)),
+      "and no other reviewer is handed the files at all");
+  }
+}
+console.log("PASS H1 standards reach the mode's standards reviewer alone, a rule is bound end to end, and --no-standards hands nothing");
 assert(injectionPrompt.includes(checkout), "Reviewers are told which checkout they are reading");
 const defaults = harness();
 const defaultReport = await executeReviewRun(defaults.parent, defaults.client, options,

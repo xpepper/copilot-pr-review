@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
-import { formatContext, parseDiffFiles } from "./context.mjs";
+import { formatContext, parseDiffFiles, splitLines } from "./context.mjs";
 import { blockingIssues, contextLossGap, formatCoverage } from "./coverage.mjs";
 import { confinementCaveat, isConfined, withinNewRange } from "./incremental.mjs";
 import { admitsMinor, capsMinor, isMinor, reviewModes, severityRank } from "./modes.mjs";
@@ -282,8 +282,7 @@ export function evidenceBoundary(snapshot, context, binding, standards) {
     }
     const source = ruleFiles.get(file);
     if (!source) throw new Error("Rule citation names no project standard this review was handed.");
-    const lines = source.text.split("\n");
-    if (lines.at(-1) === "") lines.pop();
+    const lines = splitLines(source.text);
     if (endLine > lines.length) throw new Error("Rule citation does not exactly match the named file.");
     return { file, startLine, endLine, quote: lines.slice(startLine - 1, endLine).join("\n"), blobSha: source.blobSha };
   }
