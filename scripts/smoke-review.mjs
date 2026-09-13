@@ -1608,6 +1608,24 @@ const withInstructions = async (files, body) => {
   assert(!h.messages.some((message) => /safeguard discovery/i.test(message)));
 }
 {
+  // X1: the discovery pass is a model pass the run starts, so --long-context
+  // reaches it as it reaches the reviewers. It borrows the heavy assignment, asks
+  // for that model's long-context window, and names the window before it runs.
+  // Raised by #41's plugin review and by GitHub's reviewer.
+  const h = harness({ discovered: declared });
+  const longAssignments = await reviewerAssignments(parentModels, quickMode, {}, undefined, { longContext: true });
+  const report = await withInstructions(
+    { "AGENTS.md": "Run node scripts/smoke-findings.mjs.", "HANDOFF.md": "Then node scripts/smoke-review.mjs." },
+    () => executeReviewRun(h.parent, h.client, { ...options, verify: true, longContext: true },
+      longAssignments, { controller: h.controller, gh: fakeGh(), git: checkoutGit }));
+  assert.equal(report.discovery.status, "found");
+  assert.deepEqual(h.discoveries.map((session) => session.contextTier), ["long_context"],
+    "The discovery pass asks for the long-context window");
+  assert(h.sessions.length > 0 && h.sessions.every((session) => session.contextTier === "long_context"));
+  assert(h.messages.some((message) =>
+    message.startsWith("Assignment safeguard-discovery: model=heavy reasoning=high context=long_context")));
+}
+{
   // A root with no instruction file spends no model turn at all. The empty
   // answer is correct, and it is the answer this repository's own first
   // review will produce if its commands ever move out of the root.
