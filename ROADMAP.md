@@ -19,8 +19,8 @@ increment scheduled up to `G1` is complete.** On 2026-09-12 the user triaged
 `G1`'s twelve proposals one at a time and scheduled six of them: `T1`, `B1`,
 `W1`, `N1`, `H1` and `K1`, in that order, and the same day scheduled `X1`
 immediately after `B1`. **`T1`, `B1`, `X1` and `W1` are complete and archived, and
-no entry is live below until `N1` writes one**; the three `Pending` rows are what
-is left.
+`N1`'s entry below awaits its pull-request review**; the three `Pending` rows are
+what is left.
 The closing section records what was decided, and what stays open as a
 limitation rather than as work.
 
@@ -134,7 +134,7 @@ than from this file.
 [docs/upstream-licensing.md](docs/upstream-licensing.md) is still the record of
 that licence work and did not move.
 
-**No entry is live until `N1` writes one.** The backlog triage added no entry of its
+**`N1` is the only live entry.** The backlog triage added no entry of its
 own, because agreeing a backlog is not a numbered increment, so archiving `G1`
 left none behind and `T1`'s was written into that empty space. The rule these
 moves established is to keep
@@ -168,6 +168,58 @@ writing a word of its own, because 1313 bytes were spare. **`X1` archived `B1`'s
 5124 bytes** on the same rule, because 1032 bytes were spare. **`W1` archived
 `X1`'s 5123 bytes** on the same rule, because 956 bytes were spare. **`N1`
 archived `W1`'s 4684 bytes** on the same rule, because 1003 bytes were spare.
+
+## `N1`: a seeded corpus and a deterministic scorer
+
+**The free half only.** No collection runner, no review collected against the
+corpus, no mode matrix, no published recall or precision and no baseline gate.
+`SCOPE.md` is unchanged, because no product behaviour moved.
+
+`scripts/benchmark/corpus/` holds five plain-text diffs: three seeded cases
+carrying four defects, two targeted P1 and two P2, and two clean controls.
+`corpus.json` gives each defect a stable id, a summary, a target severity, its
+allowed severities, acceptable locations and concept groups. Its own sha256
+versions the set and `smoke-benchmark.mjs` pins it. The loader refuses, naming
+the case or defect, a diff that no longer matches its pin, a control byte or
+carriage return, a hunk header its body contradicts, an unlisted fixture, an
+unknown or missing field, a control with a defect, a target outside its allowed
+list or a severity this tool never reports, a location outside one hunk or
+covering no changed line on its side, and an unnormalised term. It reuses
+`parseDiffFiles` and full mode's severities rather than restating either.
+
+`scoreReports` reads findings in the shape this tool validates, and:
+
+- rejects an explicit non-finding before matching, reading `title` and
+  `actual` for a listed phrase such as "is correct";
+- matches only at an overlapping acceptable location, an allowed severity and
+  a whole-word term from every concept group;
+- pairs findings and defects by a maximum one-to-one matching over a canonical
+  order, so no report or finding order changes a score;
+- bands opportunities by target severity, counts a second report of a detected
+  defect as a duplicate, names a control that drew a finding, and leaves a case
+  with no report unscored rather than missed.
+
+`formatScore` prints counts only and, for every false positive, which check
+failed against which defect.
+
+### Verified, and not
+
+**Test first**: the suite failed on the missing module, then on the missing
+scorer exports, then, with matching written and no rejection, on `No issue: the
+loop only reads one past the end with <=` detecting its defect. Disabling each
+of thirteen loader guards and fifteen scorer rules in turn fails the suite. All
+eighteen suites pass, `git diff --check` is clean, no tracked text including
+`*.diff` carries a control byte, and discovery reads all six root files and
+skips none. CI now runs the suite and checks `*.diff` too.
+
+- **No model output has been scored.** Every report is scripted, so nothing
+  shows the concept groups are neither too strict nor too loose for real prose.
+- **Non-finding phrases are literal.** A real finding whose title or actual
+  says "is correct" before naming a defect is rejected, with the phrase shown.
+- **The seeded code was written to carry no other defect.** A reviewer that
+  finds one anyway scores a false positive until the corpus is repinned.
+- **Five cases test the scorer; they are not a benchmark.** Collection runs,
+  and any number from them, stay unscheduled.
 
 ## v1 is complete, and seven increments are scheduled on top of it
 
