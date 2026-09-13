@@ -108,6 +108,12 @@ configured explicitly. Preserve the upstream bounded fallback-attempt policy
 for eligible explicit failures: at most one configured fallback attempt per
 affected reviewer, rather than restarting the whole review.
 
+An explicit invocation flag puts every model pass of that one review on its
+model's long-context window, at that window's own and possibly higher price; it
+is never saved in configuration. A model with no long-context window runs on
+its own window instead of refusing the review, but a model that has one and does
+not keep it is refused. The review says which window each pass used.
+
 **Do not impose review timeouts.** Wait for completion or manual cancellation.
 A hung reviewer may therefore wait indefinitely; elapsed time alone must not
 trigger a fallback. Copilot or provider limits are external constraints, not

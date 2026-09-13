@@ -62,6 +62,32 @@ export function advertisesNoReasoningEffort(model, list) {
   return available !== undefined && reasoningEfforts(available).length === 0;
 }
 
+// X1: whether this catalog lists a long-context window for a model. A session's
+// catalog carries each window's prompt budget and prices under
+// billing.token_prices, and a model with no long_context entry has only its own
+// window. A live probe on 2026-09-13 found that the runtime reports back whichever
+// tier it was sent, even for a model that lists none, so this entry, and never
+// that report, is what says the window exists.
+export function listsLongContextWindow(model, list) {
+  const available = subscriptionModels(list).find((entry) => entry.id === model);
+  const listed = available?.billing?.token_prices?.long_context;
+  return listed !== null && typeof listed === "object";
+}
+
+// X1: the window a pass asks for. Without --long-context every pass asks for the
+// default window. With it, a model that lists a long-context window asks for that
+// one, and a model that lists none keeps its own and names the model as the
+// reason, as a model with no configurable effort does.
+export function contextWindow(model, list, longContext) {
+  if (!longContext) return { value: "default", source: "unset" };
+  return listsLongContextWindow(model, list)
+    ? { value: "long_context", source: "flag" }
+    : { value: "default", source: "model" };
+}
+
+export const describeWindow = ({ contextTier, origin }) =>
+  `${contextTier ?? "default"}${origin?.contextTier === "model" ? " (no long-context window)" : ""}`;
+
 export function validateModelAssignment({ model, reasoningEffort }, list) {
   const available = subscriptionModels(list).find((entry) => entry.id === model);
   if (!available) {
@@ -119,9 +145,13 @@ async function prepareReviewer(client, assignment, { systemMessage, access, sign
   const refusal = attempt === "fallback" ? "The fallback was not retried." : "No review started.";
   signal.throwIfAborted();
   const policy = reviewerEvidence(access);
+  // X1: every pass names its window, so a window the runtime kept from anywhere
+  // else cannot run unasked. A pass with no window of its own asks for the default.
+  const contextTier = assignment.contextTier ?? "default";
   const session = await client.createSession({
     model: assignment.model,
     reasoningEffort: assignment.reasoningEffort,
+    contextTier,
     ...(systemMessage ? { systemMessage } : {}),
     ...(access ? readingReviewerPolicy(policy, access.root) : reviewerPolicy(policy)),
   });
@@ -129,11 +159,25 @@ async function prepareReviewer(client, assignment, { systemMessage, access, sign
   // The owned runtime uses local CLI authentication; validate its own catalog too.
   const catalog = (await session.rpc.model.list()).list;
   validateModelAssignment(assignment, catalog);
+  // X1: a long-context window this session's own catalog does not list is one the
+  // model cannot hold here. It is refused, never quietly run on a smaller window.
+  if (contextTier === "long_context" && !listsLongContextWindow(assignment.model, catalog)) {
+    throw new Error(`Runtime lists no long-context window for ${assignment.model}, so ${assignment.label} ` +
+      `cannot hold the long-context window it was assigned. ${refusal}`);
+  }
   const current = await session.rpc.model.getCurrent();
   if (current.modelId !== assignment.model ||
       (assignment.reasoningEffort !== undefined && current.reasoningEffort !== assignment.reasoningEffort)) {
     throw new Error(`Runtime did not retain the explicit assignment for ${assignment.label}. ${refusal}`);
   }
+  // X1: checked the way model and effort are. It proves the runtime kept the
+  // request and not that inference ran on that window, because the runtime
+  // reports a tier back even for a model that lists no such window.
+  if (current.contextTier !== contextTier) {
+    throw new Error(`Runtime did not keep the ${contextTier === "long_context" ? "long-context" : "default"} ` +
+      `window for ${assignment.label}; it reported ${current.contextTier ?? "none"}. ${refusal}`);
+  }
+  assignment.contextTier = contextTier;
   // An unset effort uses the runtime's resolved default, which must also be displayed and checked.
   assignment.reasoningEffort = current.reasoningEffort;
   validateModelAssignment(assignment, catalog);
@@ -161,7 +205,7 @@ async function prepareReviewer(client, assignment, { systemMessage, access, sign
 const failedAttempt = (record) => ({
   model: record.model, reasoningEffort: record.reasoningEffort, sessionId: record.sessionId,
   status: record.status, error: record.error, usage: record.usage, billing: record.billing,
-  contextLoss: record.contextLoss,
+  contextLoss: record.contextLoss, contextTier: record.contextTier,
   startedAt: record.startedAt, completedAt: record.completedAt, policy: record.policy,
 });
 
@@ -188,8 +232,10 @@ export async function reviewAssignments(parent, client, assignments, {
   await log(intro);
   for (const assignment of assignments) {
     await log(`Assignment ${assignment.label}: model=${assignment.model} reasoning=${assignment.reasoningEffort ?? "(not configurable)"}` +
+      ` context=${describeWindow(assignment)}` +
       (assignment.fallback ? `; configured fallback model=${assignment.fallback.model} ` +
-        `reasoning=${assignment.fallback.reasoningEffort ?? "(not configurable)"}, used at most once if this ` +
+        `reasoning=${assignment.fallback.reasoningEffort ?? "(not configurable)"} ` +
+        `context=${describeWindow(assignment.fallback)}, used at most once if this ` +
         "reviewer's own execution fails" : ""));
   }
   const runAttempt = async (assignment, ready, display, index) => {
@@ -238,11 +284,13 @@ export async function reviewAssignments(parent, client, assignments, {
     const fallback = {
       label: assignment.label, tier: assignment.tier,
       model: assignment.fallback.model, reasoningEffort: assignment.fallback.reasoningEffort,
-      origin: assignment.fallback.origin,
+      contextTier: assignment.fallback.contextTier, origin: assignment.fallback.origin,
     };
     await log(`Reviewer ${assignment.label}: falling back once after an explicit failure. Primary ` +
-      `model=${primary.model} reasoning=${primary.reasoningEffort ?? "(not configurable)"} failed: ${primary.error} ` +
-      `Configured fallback model=${fallback.model} reasoning=${fallback.reasoningEffort ?? "(not configurable)"}. ` +
+      `model=${primary.model} reasoning=${primary.reasoningEffort ?? "(not configurable)"} ` +
+      `context=${describeWindow(primary)} failed: ${primary.error} ` +
+      `Configured fallback model=${fallback.model} reasoning=${fallback.reasoningEffort ?? "(not configurable)"} ` +
+      `context=${describeWindow(fallback)}. ` +
       "This is its only fallback attempt; no other reviewer is affected and the review is not restarted.", "error");
     let ready;
     try {

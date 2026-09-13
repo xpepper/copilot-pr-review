@@ -6,8 +6,8 @@ everything through `V1c`, by increment `L1` for `V2a` and `V2b`, by increment
 `D1` for `A1`'s own entry and then `L1`'s, by increment `O1` for `D1`'s, by
 increment `U1` for `O1`'s, by increment `I1a` for `E1`'s, by increment `I1b`
 for `U1`'s and then `I1a`'s, by increment `I1c` for `I1b`'s, by increment
-`G1` for `I1c`'s, by the backlog triage of 2026-09-12 for `G1`'s own, and by
-increment `B1` for `T1`'s, which is the
+`G1` for `I1c`'s, by the backlog triage of 2026-09-12 for `G1`'s own, by
+increment `B1` for `T1`'s, and by increment `X1` for `B1`'s, which is the
 last in this file. They are the
 project's
 evidence of record and are reproduced verbatim: nothing here was rewritten,
@@ -9572,3 +9572,89 @@ byte, and discovery reads all six root files and skips none.
   `/pr-review inspect` and `/pr-review publish` say nothing about the spend of
   the run they replay. Keeping them out avoided a schema version; recorded as a
   limitation rather than as work.
+
+## `B1`: a pass the runtime compacted is a coverage gap, not silence
+
+The Copilot runtime compacts a session once its conversation nears the model's
+prompt budget. `prepareReviewer` never sets `infiniteSessions`, so the SDK
+default applies and background compaction starts at 80%: a model writes a
+summary, and the pass carries on from it while its citations must still quote
+the captured diff and context exactly. **It happened on this project's own
+reviews and no run said so.** A census of 36 review invocations in
+`~/.copilot/session-state`, which spent nothing, found seven compacted reviewer
+sessions in four reviews: #3's four specialists at 912k characters of prompt,
+#24's deep reviewer at 835k, and #32's twice, at 834k and 942k. Nothing at 616k
+or below compacted. Each came after two turns, and #32's second review made 40
+of its 50 tool calls after it. #24 and #32 each discarded candidates that were
+real; compaction may explain that, as a hypothesis. The census command is in
+`git show 6ddd11d:HANDOFF.md`.
+
+### The decisions, taken with the user before anything was built
+
+- **The runtime's own events, measured by code**: not a reviewer's self-report,
+  since a compacted reviewer cannot know what its summary lost, and not a size
+  threshold, which would be a guess.
+- **A coverage gap, not an execution failure.** Findings survive and are still
+  adjudicated, and no fallback becomes eligible. Upstream's self-review child
+  fails closed; the user kept "coverage gap".
+- **The honesty half only**: what is embedded, `infiniteSessions`, the reviewer
+  count and the citation binding are unchanged.
+- **Declined**: reviewers fetching the diff with `gh` or `git`, since a shell is
+  not read-only and a read lands in the same memory; a DuckDB store, for the same
+  memory and a first dependency; and turning compaction off, since overflow is
+  then native code's decision and might drop the diff. That stays unscheduled
+  until a live run shows it, which is a credit decision.
+- **The long-context tier is next, as `X1`**, the ID the user chose on 2026-09-13.
+
+### What it does
+
+`runReviewer` records `session.compaction_start`, `session.compaction_complete`
+and `session.truncation` as `contextLoss`, with the runtime's figures and the
+turns and tool calls made when each began; the summary is not kept. A reviewer
+or adjudicator with any adds one `coverage-gap` to `validation.diagnostics`,
+which decides `outcome.complete`, naming the pass and the moment and never a
+file. An unfinished or failed compaction says so. A fallback's replaced primary
+keeps its `contextLoss` in `fallbackFrom` and adds no gap. The gap has no
+"Blocked assessment" clause, so two passes are never merged. It is printed,
+retained and published without a schema version, and `--quiet` suppresses none
+of it. `session.context_cleared` is left out: only a host calling `clearContext`
+emits it, this tool never does, and no local log holds one.
+
+### The review
+
+Pull request #39, reviewed once with this plugin at the user's authorization:
+deep on `gpt-5.6-terra` at high effort for all five requests, **31.73861
+credits**, 37.5 s of model work against 50.8 s elapsed, 15 approved tool calls
+and no denial, **INCOMPLETE** and 0 validated findings. **Its `contextLoss` was
+empty, so an ordinary run gained no false gap**, which is all a pull request
+this small can show. No adjudicator ran.
+
+Its coverage gap, that no live run has exercised the event handling, is exact
+and unfixable here. Its one candidate, P2 "Retain context-loss evidence with
+each reviewer record", was refused because its `breaks` citation quoted
+`retention.mjs`, which the diff does not change. **Its premise is true and it is
+rejected**: `retainedRecord` drops the structured events, but inspecting a
+retained result renders the gap with every figure, and the gap had to travel
+through diagnostics without a schema change, as `T1` did for `billing`.
+
+GitHub's own Copilot reviewer, requested on #39 at the user's authorization,
+left two comments in its review body and no thread. One restates the candidate
+above and is rejected for the same reason. The other says the start event's
+`currentTokens` and the complete event's `preCompactionTokens` measure different
+things; in all seven compactions on disk they are equal, so it is rejected too.
+
+### Verified, and not
+
+**Test first**: three suites gained the cases and failed for the right reason
+before the change. All seventeen pass, `git diff --check` is clean, discovery
+reads all six root files, and CI passed on #39.
+
+- **No live compaction has run through this code**, and that the events reach
+  `session.on` here is inferred. Reviewing a pull request large enough to
+  compact is a separate credit decision.
+- **A compaction's own charge may be missing from `T1`'s cost line.** The
+  complete event carries one, 9.2 and 11.6 credits on two real events, and usage
+  events are not persisted, so whether it is counted is unknown.
+- **The discovery and revalidation passes add no gap**, not being review
+  coverage. Follow-up.
+- `scripts/smoke-runtime.mjs --targets` still has not run; 81 is unverified.

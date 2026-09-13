@@ -20,7 +20,11 @@ import { executeRetainedReview } from "../extensions/pr-review/retained-run.mjs"
 import { readOnlyToolFilters, readOnlyTools } from "../extensions/pr-review/read-only.mjs";
 
 const catalog = [
-  { id: "heavy", capabilities: { supports: { reasoning_effort: ["low", "high"] } } },
+  // X1: the session catalog's own shape, read from the runtime on 2026-09-13.
+  // "heavy" lists a long-context window beside its default one, as gpt-5.6-terra
+  // does; "other" lists none, as kimi-k3 and claude-haiku-4.5 do.
+  { id: "heavy", capabilities: { supports: { reasoning_effort: ["low", "high"] } },
+    billing: { token_prices: { default: { max_prompt_tokens: 272000 }, long_context: { max_prompt_tokens: 922000 } } } },
   { id: "other", capabilities: { supports: { reasoning_effort: ["low"] } } },
   { id: "disabled", policy: { state: "disabled" } },
   { id: "plain" },
@@ -37,12 +41,12 @@ const deepMode = reviewModes.deep;
 const options = parseReviewArgs("1 --quick --no-comment");
 assert.deepEqual(options, { mode: "quick", captureOnly: false, captureArgs: "1", settings: {},
   all: false, comment: false, noComment: true, verify: false, quiet: false, unattended: false,
-  incremental: false, revalidate: false });
+  incremental: false, revalidate: false, longContext: false });
 assert.deepEqual(parseReviewArgs("  1 --major-only --no-comment  "), options);
 assert.deepEqual(parseReviewArgs("2 --quick --no-comment --include-drafts heavyModel=other heavyEffort=low"),
   { mode: "quick", captureOnly: false, captureArgs: "2 --include-drafts",
     settings: { heavyModel: "other", heavyEffort: "low" }, all: false, comment: false, noComment: true,
-    verify: false, quiet: false, unattended: false, incremental: false, revalidate: false });
+    verify: false, quiet: false, unattended: false, incremental: false, revalidate: false, longContext: false });
 assert.deepEqual(parseReviewArgs("1 --major-only --all --no-comment"), { ...options, all: true });
 assert.deepEqual(parseReviewArgs("1 --quick"), { ...options, noComment: false });
 assert.deepEqual(parseReviewArgs("1 --quick --all --comment"), { ...options, all: true, comment: true, noComment: false });
@@ -108,6 +112,15 @@ assert.deepEqual(parseReviewArgs("2 --full --unattended --all --no-comment --inc
 assert.equal(parseReviewArgs("2 --unattended --all --no-comment --include-drafts").captureArgs,
   "2 --include-drafts");
 assert.throws(() => parseTargetArgs("2 --unattended"), /Unsupported/);
+// X1: --long-context is chosen by the person running this one review and saved
+// nowhere, like --quiet. It asks for a window and authorizes nothing, so it
+// constrains no other option and never reaches target capture.
+assert.deepEqual(parseReviewArgs("1 --quick --no-comment --long-context"), { ...options, longContext: true });
+assert.deepEqual(parseReviewArgs("1 --long-context"), { ...balancedOptions, noComment: false, longContext: true });
+assert.deepEqual(parseReviewArgs("1 --deep --all --no-comment --unattended --long-context"),
+  { ...options, mode: "deep", all: true, unattended: true, longContext: true });
+assert.equal(parseReviewArgs("2 --long-context --include-drafts").captureArgs, "2 --include-drafts");
+assert.throws(() => parseTargetArgs("2 --long-context"), /Unsupported/);
 // Each refusal names the one thing that is missing, because the whole point of
 // the flag is that nobody is there to read a vague one.
 assert.throws(() => parseReviewArgs("1 --quick --no-comment --unattended"),
@@ -130,7 +143,7 @@ assert.doesNotMatch(postingRefusal, /autoPostReviews/,
 // Capture-only keeps the diagnostic capture path reachable without a reviewer.
 assert.deepEqual(parseReviewArgs("1 --capture-only"), { mode: undefined, captureOnly: true, captureArgs: "1",
   settings: {}, all: false, comment: false, noComment: false, verify: false, quiet: false, unattended: false,
-  incremental: false, revalidate: false });
+  incremental: false, revalidate: false, longContext: false });
 assert.equal(parseReviewArgs("2 --capture-only --include-drafts").captureArgs, "2 --include-drafts");
 
 // I1c: the second request rather than contract, recorded at parse time and
@@ -183,6 +196,10 @@ for (const args of [
   // with is a fact about the pull request, which parse time cannot know.
   "1 --capture-only --incremental", "1 --incremental --capture-only",
   "1 --quick --no-comment --incremental --incremental",
+  // X1: capture-only starts no model pass, so it has no window to choose, and a
+  // window is a flag, never a setting.
+  "1 --capture-only --long-context", "1 --long-context --capture-only",
+  "1 --quick --no-comment --long-context --long-context", "1 --quick longContext=true",
 ]) assert.throws(() => parseReviewArgs(args),
   /mutually exclusive|Duplicate|Invalid|Unsupported|integer|Conflicting|cannot be combined/, args);
 const assignments = await reviewerAssignments(parentModels, quickMode, {});
@@ -223,8 +240,8 @@ const layeredBalanced = await reviewerAssignments(parentModels, balancedMode, {}
 assert(layeredBalanced.slice(0, 4).every(({ model, reasoningEffort, origin }) =>
   model === "heavy" && reasoningEffort === "high" && origin.model === "configured:heavy"));
 assert.deepEqual(layeredBalanced.at(-1), {
-  label: "overview", tier: "light", model: "other", reasoningEffort: "low",
-  origin: { model: "project:light", reasoningEffort: "project:light",
+  label: "overview", tier: "light", model: "other", reasoningEffort: "low", contextTier: "default",
+  origin: { model: "project:light", reasoningEffort: "project:light", contextTier: "unset",
     tier: "light: model=other [project:light] reasoning=low [project:light]" },
 });
 const description = describeAssignments(balancedMode, layeredBalanced);
@@ -249,8 +266,8 @@ assert(ambientFull.every(({ model, origin }) => model === "heavy" && origin.mode
 // heavier one rather than silently downgrading.
 const layeredFull = await reviewerAssignments(parentModels, fullMode, {}, layered);
 assert.deepEqual(layeredFull.at(-1), {
-  label: "conventions-maintainability", tier: "medium", model: "heavy", reasoningEffort: "high",
-  origin: { model: "inherited:heavy", reasoningEffort: "inherited:heavy",
+  label: "conventions-maintainability", tier: "medium", model: "heavy", reasoningEffort: "high", contextTier: "default",
+  origin: { model: "inherited:heavy", reasoningEffort: "inherited:heavy", contextTier: "unset",
     tier: "medium: model=heavy [inherited:heavy] reasoning=high [inherited:heavy]" },
 });
 // With no heavy tier configured, the tie disappears and the medium tier
@@ -264,7 +281,7 @@ const lightOnly = {
 };
 const lightOnlyFull = await reviewerAssignments(parentModels, fullMode, {}, lightOnly);
 assert.deepEqual(lightOnlyFull.at(-1).origin, {
-  model: "inherited:light", reasoningEffort: "inherited:light",
+  model: "inherited:light", reasoningEffort: "inherited:light", contextTier: "unset",
   tier: "medium: model=other [inherited:light] reasoning=low [inherited:light]",
 }, "An unset medium tier inherits heavy only when a heavy tier is configured");
 const configuredMedium = {
@@ -276,8 +293,8 @@ const configuredMedium = {
 };
 const mediumFull = await reviewerAssignments(parentModels, fullMode, {}, configuredMedium);
 assert.deepEqual(mediumFull.at(-1), {
-  label: "conventions-maintainability", tier: "medium", model: "other", reasoningEffort: "low",
-  origin: { model: "configured:medium", reasoningEffort: "configured:medium",
+  label: "conventions-maintainability", tier: "medium", model: "other", reasoningEffort: "low", contextTier: "default",
+  origin: { model: "configured:medium", reasoningEffort: "configured:medium", contextTier: "unset",
     tier: "medium: model=other [configured:medium] reasoning=low [configured:medium]" },
 });
 assert(mediumFull.slice(0, 4).every(({ model, origin }) => model === "heavy" && origin.model === "configured:heavy"),
@@ -304,13 +321,13 @@ assert(ambientDeep.every(({ model, reasoningEffort, origin }) =>
   model === "heavy" && reasoningEffort === "high" && origin.model === "ambient"));
 const layeredDeep = await reviewerAssignments(parentModels, deepMode, {}, layered);
 assert.deepEqual(layeredDeep, [{
-  label: "integrated", tier: "heavy", model: "heavy", reasoningEffort: "high",
-  origin: { model: "configured:heavy", reasoningEffort: "configured:heavy",
+  label: "integrated", tier: "heavy", model: "heavy", reasoningEffort: "high", contextTier: "default",
+  origin: { model: "configured:heavy", reasoningEffort: "configured:heavy", contextTier: "unset",
     tier: "heavy: model=heavy [configured:heavy] reasoning=high [configured:heavy]" },
 }], "A configured light tier never reaches the deep reviewer");
 assert.deepEqual(await reviewerAssignments(parentModels, deepMode, { heavyModel: "other", heavyEffort: "low" }, layered),
-  [{ label: "integrated", tier: "heavy", model: "other", reasoningEffort: "low",
-    origin: { model: "flag", reasoningEffort: "flag",
+  [{ label: "integrated", tier: "heavy", model: "other", reasoningEffort: "low", contextTier: "default",
+    origin: { model: "flag", reasoningEffort: "flag", contextTier: "unset",
       tier: "heavy: model=other [flag] reasoning=low [flag]" } }]);
 const deepDescription = describeAssignments(deepMode, layeredDeep);
 assert.match(deepDescription, /^Effective reviewer assignments: deep mode, 1 reviewer\(s\)/);
@@ -338,8 +355,8 @@ const withFallback = (settings, flags = {}, mode = quickMode) => reviewerAssignm
 const quickFallback = await withFallback({});
 assert(quickFallback.every((a) => a.model === "heavy" && a.reasoningEffort === "high"));
 assert.deepEqual(quickFallback.map(({ fallback }) => fallback), Array(3).fill({
-  model: "other", reasoningEffort: "low",
-  origin: { model: "configured:heavy", reasoningEffort: "configured:heavy" },
+  model: "other", reasoningEffort: "low", contextTier: "default",
+  origin: { model: "configured:heavy", reasoningEffort: "configured:heavy", contextTier: "unset" },
 }), "Every reviewer on the configured tier carries that tier's one fallback");
 const balancedFallback = await withFallback({}, {}, balancedMode);
 assert.equal(balancedFallback.at(-1).label, "overview");
@@ -349,7 +366,8 @@ assert(balancedFallback.slice(0, 4).every(({ fallback }) => fallback.model === "
 const lightFallback = await withFallback({ lightModel: "other", lightEffort: "low", lightFallbackModel: "heavy" },
   {}, balancedMode);
 assert.deepEqual(lightFallback.at(-1).fallback,
-  { model: "heavy", reasoningEffort: "low", origin: { model: "configured:light", reasoningEffort: "primary" } },
+  { model: "heavy", reasoningEffort: "low", contextTier: "default",
+    origin: { model: "configured:light", reasoningEffort: "primary", contextTier: "unset" } },
   "The light tier's own fallback follows the light tier's effort");
 assert.deepEqual((await withFallback({}, {}, deepMode)).map(({ label, fallback }) => [label, fallback.model]),
   [["integrated", "other"]]);
@@ -371,14 +389,14 @@ const effortlessFallback = await reviewerAssignments(parentModels, quickMode, {}
   effective: { settings: { heavyModel: "heavy", heavyEffort: "high", heavyFallbackModel: "plain" }, origins: {} },
 });
 assert.deepEqual(effortlessFallback.map(({ fallback }) => fallback), Array(3).fill({
-  model: "plain", reasoningEffort: undefined,
-  origin: { model: "configured:heavy", reasoningEffort: "model" },
+  model: "plain", reasoningEffort: undefined, contextTier: "default",
+  origin: { model: "configured:heavy", reasoningEffort: "model", contextTier: "unset" },
 }), "A fallback model with no configurable effort carries none");
 assert.match(describeAssignments(quickMode, effortlessFallback),
   /\n {4}fallback: model=plain \[configured:heavy\] reasoning=\(not configurable\) \[model\]/);
 const fallbackDescription = describeAssignments(balancedMode, balancedFallback);
 assert.match(fallbackDescription,
-  /\n {2}correctness \[heavy\]: model=heavy \[configured:heavy\] reasoning=high \[configured:heavy\]\n {4}fallback: model=other \[configured:heavy\] reasoning=low \[configured:heavy\]\n/);
+  /\n {2}correctness \[heavy\]: model=heavy \[configured:heavy\] reasoning=high \[configured:heavy\] context=default \[unset\]\n {4}fallback: model=other \[configured:heavy\] reasoning=low \[configured:heavy\] context=default \[unset\]\n/);
 assert.equal(fallbackDescription.split("\n").filter((line) => line.startsWith("    fallback: ")).length, 4);
 assert.match(fallbackDescription,
   /\nConfigured fallbacks: 4 of 5 reviewer\(s\) have one; each gets at most one attempt, only after its own explicit failure\./);
@@ -386,6 +404,33 @@ assert.match(fallbackDescription, /Elapsed time never triggers one/);
 assert.match(describeAssignments(quickMode, assignments), /\nConfigured fallbacks: none;/);
 assert(!describeAssignments(quickMode, assignments).includes("fallback: model="));
 console.log("PASS configured tier fallbacks reach exactly their own reviewers, refuse when unusable, and are displayed");
+// X1: the long-context window is asked for by one flag and resolved per model.
+// A model the catalog lists a long-context window for gets it; a model that lists
+// none keeps its own window and names the model as the reason, as a model with no
+// configurable effort does; and a run without the flag asks for the default
+// window on every pass.
+assert(assignments.every(({ contextTier, origin }) => contextTier === "default" && origin.contextTier === "unset"),
+  "Without the flag every reviewer asks for the default window");
+assert.match(describeAssignments(quickMode, assignments),
+  /\n {2}correctness \[heavy\]: model=heavy \[ambient\] reasoning=high \[ambient\] context=default \[unset\]\n/);
+const longQuick = await reviewerAssignments(parentModels, quickMode, {}, undefined, { longContext: true });
+assert(longQuick.every(({ contextTier, origin }) => contextTier === "long_context" && origin.contextTier === "flag"));
+assert.match(describeAssignments(quickMode, longQuick),
+  /\n {2}correctness \[heavy\]: model=heavy \[ambient\] reasoning=high \[ambient\] context=long_context \[flag\]\n/);
+const noLongWindow = await reviewerAssignments(parentModels, quickMode, { heavyModel: "other", heavyEffort: "low" },
+  undefined, { longContext: true });
+assert(noLongWindow.every(({ contextTier, origin }) => contextTier === "default" && origin.contextTier === "model"),
+  "A model with no long-context window runs on its own window rather than refusing the review");
+assert.match(describeAssignments(quickMode, noLongWindow),
+  /\n {2}correctness \[heavy\]: model=other \[flag\] reasoning=low \[flag\] context=default \(no long-context window\) \[model\]\n/);
+// A tier's fallback is resolved against its own model, so a long-context primary
+// can fall back to a model with no such window, and the display says so.
+const longFallback = await reviewerAssignments(parentModels, quickMode, {}, fallbackConfig, { longContext: true });
+assert(longFallback.every(({ contextTier, fallback }) => contextTier === "long_context" &&
+  fallback.model === "other" && fallback.contextTier === "default" && fallback.origin.contextTier === "model"));
+assert.match(describeAssignments(quickMode, longFallback),
+  /context=long_context \[flag\]\n {4}fallback: model=other \[configured:heavy\] reasoning=low \[configured:heavy\] context=default \(no long-context window\) \[model\]\n/);
+console.log("PASS --long-context resolves each model's window, keeps a model's own when it has none, and is displayed");
 console.log("PASS mode parsing/defaulting, capture-only, all four topologies, tier resolution and origin reporting");
 
 function fakeGh() {
@@ -489,15 +534,26 @@ function harness({
       const index = discovering ? discoveries.length : sessions.length;
       const session = {
         sessionId: discovering ? `discovery-${index}` : `reviewer-${index}`,
-        model: config.model, reasoningEffort: config.reasoningEffort,
+        model: config.model, reasoningEffort: config.reasoningEffort, contextTier: config.contextTier,
         prompt: undefined, aborts: 0, discovering, validating, fallbackAttempt,
         rpc: {
           model: {
-            async list() { return { list: failure === "catalog" ? [] : catalog }; },
+            // X1: `long-window-catalog` is a session catalog that no longer lists
+            // the long-context window the assignment was resolved against.
+            async list() {
+              if (failure === "catalog") return { list: [] };
+              return { list: failure === "long-window-catalog"
+                ? catalog.map(({ billing, ...model }) => model) : catalog };
+            },
             async getCurrent() {
               return {
                 modelId: failure === "assignment" ? "other" : config.model,
                 reasoningEffort: config.reasoningEffort ?? "low",
+                // X1: the runtime echoes the tier it was sent, as a live probe
+                // showed on 2026-09-13, even for a model with no long-context
+                // window. `context-tier` is the runtime not keeping it.
+                ...(config.contextTier === undefined || failure === "context-tier"
+                  ? {} : { contextTier: config.contextTier }),
               };
             },
           },
@@ -1552,6 +1608,24 @@ const withInstructions = async (files, body) => {
   assert(!h.messages.some((message) => /safeguard discovery/i.test(message)));
 }
 {
+  // X1: the discovery pass is a model pass the run starts, so --long-context
+  // reaches it as it reaches the reviewers. It borrows the heavy assignment, asks
+  // for that model's long-context window, and names the window before it runs.
+  // Raised by #41's plugin review and by GitHub's reviewer.
+  const h = harness({ discovered: declared });
+  const longAssignments = await reviewerAssignments(parentModels, quickMode, {}, undefined, { longContext: true });
+  const report = await withInstructions(
+    { "AGENTS.md": "Run node scripts/smoke-findings.mjs.", "HANDOFF.md": "Then node scripts/smoke-review.mjs." },
+    () => executeReviewRun(h.parent, h.client, { ...options, verify: true, longContext: true },
+      longAssignments, { controller: h.controller, gh: fakeGh(), git: checkoutGit }));
+  assert.equal(report.discovery.status, "found");
+  assert.deepEqual(h.discoveries.map((session) => session.contextTier), ["long_context"],
+    "The discovery pass asks for the long-context window");
+  assert(h.sessions.length > 0 && h.sessions.every((session) => session.contextTier === "long_context"));
+  assert(h.messages.some((message) =>
+    message.startsWith("Assignment safeguard-discovery: model=heavy reasoning=high context=long_context")));
+}
+{
   // A root with no instruction file spends no model turn at all. The empty
   // answer is correct, and it is the answer this repository's own first
   // review will produce if its commands ever move out of the root.
@@ -1990,7 +2064,7 @@ const defaultReport = await executeReviewRun(defaults.parent, defaults.client, o
   assignments.map((a) => ({ ...a, reasoningEffort: undefined })), { controller: defaults.controller, gh: fakeGh(), git: checkoutGit });
 assert.equal(defaultReport.complete, true);
 assert(defaultReport.reviewers.every((r) => r.reasoningEffort === "low"));
-assert(defaults.messages.filter((m) => m.startsWith("Assignment ")).every((m) => m.endsWith("reasoning=low")));
+assert(defaults.messages.filter((m) => m.startsWith("Assignment ")).every((m) => m.endsWith("reasoning=low context=default")));
 console.log("PASS concurrent bound prompts, isolated sessions, partial results, usage, gates, cancellation and cleanup");
 
 for (const failure of [undefined, "validator-setup", "validator-malformed", "validator-cancel", "validator-tool-call", "cleanup"]) {
@@ -2311,6 +2385,12 @@ console.log("PASS a settled full run: six tiered reviewers, an uncapped minor po
   assert.equal(h.sessions.length, 2, "One integrated reviewer plus one adjudicator");
   assert.deepEqual(h.sessions.map((session) => session.model), ["heavy", "heavy"],
     "The deep reviewer and the adjudicator both resolve the heavy tier");
+  // X1: a run without --long-context asks for the default window on every pass
+  // explicitly, so a window the runtime kept from elsewhere cannot run unasked.
+  assert.deepEqual(h.sessions.map((session) => session.contextTier), ["default", "default"]);
+  assert(h.messages.some((message) =>
+    message.startsWith("Assignment integrated: model=heavy reasoning=high context=default")));
+  assert(h.messages.some((message) => message.startsWith("M2 evidence: ") && message.includes('"longContext":false')));
   assert.equal(h.messages.filter((message) => message.startsWith("Assignment ")).length, 2);
   assert(h.messages.some((message) => message.startsWith("Assignment integrated: model=heavy reasoning=high")));
   assert(h.messages.some((message) => message.startsWith("M2 binding: ")), "Deep evidence is labelled for its increment");
@@ -2342,6 +2422,74 @@ console.log("PASS a settled full run: six tiered reviewers, an uncapped minor po
   assert.throws(() => validateRecord(asQuick, h.parent.sessionId), /outside this mode's findings policy/);
 }
 console.log("PASS a settled deep run: one integrated heavy reviewer, an uncapped policy, retention and the proposed body");
+
+// X1: a deep run that asked for the long-context window. Every pass it starts
+// asks for it, the runtime is shown to have kept it before anything is sent, and
+// the run says which window each pass used, in the assignment lines and on the
+// evidence line.
+{
+  const h = harness({ mode: deepMode, withCandidate: true, acceptCandidate: true, severity: "nit", candidateFrom: [0] });
+  const longRun = { ...parseReviewArgs("1 --deep --no-comment --long-context"), all: true };
+  const longDeep = await reviewerAssignments(parentModels, deepMode, {}, undefined, { longContext: true });
+  const report = await executeReviewRun(h.parent, h.client, longRun, structuredClone(longDeep), {
+    controller: h.controller, gh: fakeGh(), git: checkoutGit,
+  });
+  assert.equal(report.complete, true);
+  assert.deepEqual(h.sessions.map((session) => [session.model, session.contextTier]),
+    [["heavy", "long_context"], ["heavy", "long_context"]], "The reviewer and the adjudicator both ask for it");
+  assert.equal(report.reviewers[0].contextTier, "long_context");
+  assert.equal(report.adjudicator.contextTier, "long_context");
+  for (const label of ["integrated", "evidence-validator"]) {
+    assert(h.messages.some((message) =>
+      message.startsWith(`Assignment ${label}: model=heavy reasoning=high context=long_context`)), label);
+  }
+  const evidence = JSON.parse(h.messages.find((message) => message.startsWith("M2 evidence: "))
+    .slice("M2 evidence: ".length));
+  assert.equal(evidence.longContext, true, "The evidence line records the request");
+  assert.equal(evidence.reviewers[0].contextTier, "long_context");
+  assert.equal(evidence.adjudicator.contextTier, "long_context");
+  // T1: a larger window changes no pass's route to the cost line.
+  assert.equal(report.cost.passes, 2);
+  // Like billing, the window is reported live and not retained.
+  const record = retainedRecord(report);
+  validateRecord(record, h.parent.sessionId);
+  assert.equal(record.outcome.reviewers[0].contextTier, undefined);
+}
+// X1: a model that has a long-context window and does not keep it is refused
+// before anything is sent, whether the runtime reports another window or the
+// session's own catalog no longer lists one. Nothing is substituted.
+for (const failure of ["context-tier", "long-window-catalog"]) {
+  const h = harness({ mode: deepMode, failure });
+  const longDeep = await reviewerAssignments(parentModels, deepMode, {}, undefined, { longContext: true });
+  const report = await executeReviewRun(h.parent, h.client,
+    { ...parseReviewArgs("1 --deep --no-comment --long-context"), all: true }, longDeep, {
+      controller: h.controller, gh: fakeGh(), git: checkoutGit,
+    });
+  assert.equal(report.coverage, "incomplete", failure);
+  assert.match(report.error, /long-context window/, failure);
+  assert.match(report.error, /No review started/, failure);
+  assert(h.sessions.every((session) => session.prompt === undefined), `nothing was sent (${failure})`);
+  assert.equal(report.cost, undefined, failure);
+}
+// X1: a long-context primary that fails falls back to a model with no such
+// window. The fallback runs on its own window, and both attempts say which.
+{
+  const h = harness({ failure: "reviewer" });
+  const longWithFallback = await reviewerAssignments(parentModels, quickMode, {}, fallbackConfig, { longContext: true });
+  const report = await executeReviewRun(h.parent, h.client, { ...options, longContext: true }, longWithFallback, {
+    controller: h.controller, gh: fakeGh(), git: checkoutGit,
+  });
+  assert.equal(report.coverage, "completed");
+  assert.deepEqual(h.sessions.map((session) => session.contextTier),
+    ["long_context", "long_context", "long_context", "default"]);
+  const recovered = report.reviewers[0];
+  assert.equal(recovered.contextTier, "default");
+  assert.equal(recovered.fallbackFrom.contextTier, "long_context");
+  assert(h.messages.some((m) => /Primary model=heavy reasoning=high context=long_context failed/.test(m)));
+  assert(h.messages.some((m) =>
+    /Configured fallback model=other reasoning=low context=default \(no long-context window\)/.test(m)));
+}
+console.log("PASS --long-context reaches every pass, is proven kept or refused, and each pass says which window it used");
 
 // U1: a settled unattended run, on a harness that does have an elicitation UI.
 // The point of the flag is that the run behaves the same way whether or not a
