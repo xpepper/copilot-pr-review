@@ -34,7 +34,8 @@ jobs:
         run: |
           set -euo pipefail
           for s in findings review selection retention preview publication publish-later \
-            checkout config context fixture target safeguards prior incremental revalidation cost; do
+            checkout config context fixture target safeguards prior incremental revalidation cost \
+            benchmark; do
             echo "--- smoke-$s"
             node "scripts/smoke-$s.mjs"
           done
@@ -62,7 +63,7 @@ jobs:
       - name: No control bytes in tracked text
         run: |
           set -euo pipefail
-          if git grep -In -P '[\x00-\x08\x0B\x0C\x0E-\x1F]' -- '*.md' '*.mjs' '*.js' '*.json' '*.yml'; then
+          if git grep -In -P '[\x00-\x08\x0B\x0C\x0E-\x1F]' -- '*.md' '*.mjs' '*.js' '*.json' '*.yml' '*.diff'; then
             echo "Tracked text carries a control byte; see the matches above."
             exit 1
           fi
