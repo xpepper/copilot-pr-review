@@ -564,7 +564,9 @@ A candidate may also rely on **one of your project's written rules**. The
 markdown files at the checkout root that the reviewed head commits, `AGENTS.md`
 and `CLAUDE.md` named as the likeliest to hold rules, go to the one reviewer
 that weighs the whole change: overview in balanced and full, integrated in deep,
-contracts in quick. They add to that reviewer's input on every review. Such a
+contracts in quick. Up to 48 KiB of them, taken in that order and counted as
+numbered, join that reviewer's input on every review; a file that does not fit
+is named. Such a
 candidate quotes the rule as exact lines of its file, checked like any
 quotation; the adjudicator is handed that file in full, and the finding shows
 `Rule: FILE:LINES` but never publishes it. Every run names the files it handed
