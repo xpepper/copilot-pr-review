@@ -18,8 +18,8 @@ and `G1` was the last increment scheduled before the backlog was agreed; **every
 increment scheduled up to `G1` is complete.** On 2026-09-12 the user triaged
 `G1`'s twelve proposals one at a time and scheduled six of them: `T1`, `B1`,
 `W1`, `N1`, `H1` and `K1`, in that order, and the same day scheduled `X1`
-immediately after `B1`. **`T1`, `B1` and `X1` are complete and `X1`'s entry is the only
-live one below**; the other four are the `Pending` rows.
+immediately after `B1`. **`T1`, `B1` and `X1` are complete and archived, and no
+entry is live below until `W1` writes one**; the four `Pending` rows are what is left.
 The closing section records what was decided, and what stays open as a
 limitation rather than as work.
 
@@ -88,9 +88,9 @@ posting them.
 | H1 | Pending | Opt-in, the project's own written standards steer the review. The checkout's instruction files, which `--verify` discovery already collects and hands to no reviewer, reach one, and a finding raised on that basis must quote the instruction it relies on; that quote is checked against the collected file the way a source citation is checked against bound source, and a finding whose quoted rule cannot be found is refused. **This increment settles what evidence a claim not grounded in a provable code effect must carry**, which is the rule the history lenses and path-conditioned lenses would inherit if they are ever taken. Needs a scope decision, because `SCOPE.md` says nothing about convention review. Opt-in, consistent with `I1b` and `I1c`. `G1`'s menu item 4. | N1; [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | K1 | Pending | A published review asks what it found useful, and a later run reads the reactions and the resolution state of its own threads. `I1c` already reads an earlier review's threads fresh from GitHub on every run, so the read path exists. It is the only scheduled item that would produce evidence about real pull requests rather than a synthetic corpus, and it is last because it needs a review actually published to a pull request before there is anything to read back, and findings stay local unless the user authorizes posting. Needs a scope decision. `G1`'s menu item 12. | H1, I1c; [Publication controls](SCOPE.md#selection-publication-and-cached-results) |
 
-## Every completed increment, `F1` through `B1`, is archived
+## Every completed increment, `F1` through `X1`, is archived
 
-Fifty-three sections were here and eleven increments plus the backlog triage moved
+Fifty-four sections were here and twelve increments plus the backlog triage moved
 every one of them
 verbatim to
 [docs/roadmap-archive-2026-09-10.md](docs/roadmap-archive-2026-09-10.md): `A1`
@@ -99,12 +99,12 @@ file had 4272 bytes of headroom left and the smaller of the two is 7547, `D1`
 moved `A1`'s entry and then `L1`'s, `O1` moved `D1`'s, `U1` moved `O1`'s, `I1a`
 moved `E1`'s, `I1b` moved `U1`'s and then `I1a`'s, `I1c` moved `I1b`'s
 15018 bytes, `G1` moved `I1c`'s 13014 bytes, **the backlog triage moved
-`G1`'s own 8863 bytes**, **`B1` moved `T1`'s 5951**, and **`X1` moved `B1`'s
-5124**, the last in that file. Forty-five are completed-increment entries,
-covering the forty-three increments `F1`, `F2`, `F3`, `Q1`, `Q2`, `Q3`, `Q4`,
+`G1`'s own 8863 bytes**, **`B1` moved `T1`'s 5951**, **`X1` moved `B1`'s
+5124**, and **`W1` moved `X1`'s 5123**, the last in that file. Forty-six are
+completed-increment entries, covering the forty-four increments `F1`, `F2`, `F3`, `Q1`, `Q2`, `Q3`, `Q4`,
 `P1`, `P2`, `P3`, `P4`, `P5`, `C1`, `C2`, `F4`, `R1`, `M1`, `F5`, `F6`, `M2`,
 `C3`, `C4`, `Q5`, `Q6`, `C5`, `Q7`, `V1a`, `V1b`, `V1c`, `V2a`, `V2b`, `A1`,
-`L1`, `D1`, `O1`, `E1`, `U1`, `I1a`, `I1b`, `I1c`, `G1`, `T1` and `B1`, with `R1` and `M1` each recorded in two halves. The remaining eight are the
+`L1`, `D1`, `O1`, `E1`, `U1`, `I1a`, `I1b`, `I1c`, `G1`, `T1`, `B1` and `X1`, with `R1` and `M1` each recorded in two halves. The remaining eight are the
 working record kept between them:
 
 - the `Q4` acceptance criteria recorded at the `Q3` checkpoint;
@@ -116,7 +116,7 @@ working record kept between them:
 - the `R1` second-half harness checkpoint;
 - the documentation checkpoint for pull request #4 and its review.
 
-Nothing was rewritten, condensed or corrected in any of the eleven moves, so each
+Nothing was rewritten, condensed or corrected in any of the twelve moves, so each
 section still reads exactly as the session that wrote it left it, and the
 archive is the evidence of record for every increment it holds: reproduction
 commands, the models and efforts actually used, credit costs, findings and
@@ -133,7 +133,7 @@ than from this file.
 [docs/upstream-licensing.md](docs/upstream-licensing.md) is still the record of
 that licence work and did not move.
 
-**`X1`'s entry is the only live one.** The backlog triage added no entry of its
+**No entry is live until `W1` writes its own.** The backlog triage added no entry of its
 own, because agreeing a backlog is not a numbered increment, so archiving `G1`
 left none behind and `T1`'s was written into that empty space. The rule these
 moves established is to keep
@@ -164,101 +164,8 @@ backlog triage archived `G1`'s** on the same rule, having written the six
 entry has ever been written in less than that, so `T1`'s session would have had
 to do this move first. **`B1` archived `T1`'s 5951 bytes** on that rule before
 writing a word of its own, because 1313 bytes were spare. **`X1` archived `B1`'s
-5124 bytes** on the same rule, because 1032 bytes were spare.
-
-## `X1`: a reviewer can run on its model's long-context window
-
-A reviewer's whole conversation must fit its model's prompt budget, and near it
-the runtime compacts. **#3's four heavy specialists on `gpt-5.6-terra` each went
-from about 257k tokens to 24k-30k** at a 272000-token limit (sessions
-`184061c5`, `74cf4caa`, `92e03e72`, `cb487d73`). The runtime also offers a
-long-context window, 922k for Terra, and no pass had asked for it: those
-sessions recorded `contextTier: null`.
-
-### The decisions, taken with the user on 2026-09-13
-
-- **One flag chosen per run, `--long-context`, saved nowhere.** Not always on,
-  which doubles small reviews; not per tier, which needs three settings when
-  only heavy has invocation flags and a flag is not inherited; not a size
-  condition, which is a guess where `B1`'s signal is a measurement.
-- **A model that lists no long-context window runs on its own**, shown
-  `[model]`, instead of refusing. One that lists a window and does not keep it
-  is refused.
-- **`SCOPE.md` gained one paragraph**, approved word for word before the edit.
-
-### What a probe showed, spending nothing
-
-Sessions created with each tier and no prompt sent, reading
-`session.rpc.model.list()` and `getCurrent()`:
-
-- The session catalog lists the window at `billing.token_prices.long_context`:
-  Terra 272k then 922k, Luna 200k then 922k, Sonnet 5 200k then 936k.
-  `kimi-k3` (917504) and `claude-haiku-4.5` (136k, no billing) list none.
-  `client.listModels()` projects it as `billing.tokenPrices.longContext`, which
-  the extension does not read.
-- **`getCurrent()` echoes whatever tier a session was created with, including
-  `long_context` for `kimi-k3` and `claude-haiku-4.5`.** So the catalog decides,
-  and the echo proves only that the request was kept.
-
-### What it does
-
-`reviewerAssignments` resolves each assignment's and fallback's window with
-`contextWindow`: `long_context [flag]`, `default [model]` shown as "(no
-long-context window)", or `default [unset]` without the flag. `prepareReviewer`
-sends `contextTier` on every pass, `default` included, and before any send
-refuses when its own catalog lists no requested long window or `getCurrent()`
-reports another tier. The display, every `Assignment` line and the fallback line
-name the window; the evidence line carries `longContext` and each pass's
-`contextTier`, and `failedAttempt` keeps it. Not retained, as with `billing`.
-No new pass, so `payFor` is untouched.
-
-### The review
-
-Pull request #41, reviewed once with this plugin at the user's authorization,
-**deep with `--long-context`**: `gpt-5.6-terra` at high effort on
-`contextTier: long_context` for all 4 requests, **45.55611 credits**, 37.7 s of
-model work against 51.2 s elapsed, 17 approved tool calls and no denial,
-`contextLoss` empty, **INCOMPLETE**, 0 candidates and no adjudicator. **It is
-the first live long-context pass**: the installed plugin displayed
-`context=long_context [flag]` and `prepareReviewer` accepted the runtime's
-answer, which also shows `extension.mjs` passes the flag through.
-
-Its two coverage gaps are both about tests. No captured test runs a real session
-with the flag, which this review is and could not see. No test combined the flag
-with discovery or revalidation, which was true: a `--verify --long-context` run
-is now in `smoke-review`.
-
-GitHub's Copilot reviewer, requested at the user's authorization, commented on
-`72892c9` with three items, each checked. **Accepted**: the same discovery and
-revalidation gap. **Rejected for `X1`**: a controlled test dispatching the flag
-through `extension.mjs`, true of every flag since no suite reaches that file;
-this review dispatched it live, and a harness is a follow-up. **Already in
-hand**: `ROADMAP.md` and `HANDOFF.md` were not yet updated at that head.
-
-`@claude[agent]`, asked at the user's authorization, reviewed `3742416` with six
-observations, no blocking concern and no commit. Three confirm the design and
-one repeats the `extension.mjs` item. **Rejected**: that no test displays a
-fallback whose window differs, since `smoke-review` asserts and runs exactly
-that; and a comment on the tier assignment, which fixture assignments without a
-window need and a comment above it already explains.
-
-### Verified, and not
-
-**Test first**: `smoke-review` failed on the missing option before the change,
-and disabling either refusal check fails its new test. All seventeen suites
-pass, `git diff --check` is clean, discovery reads all six root files and skips
-none, and CI passed on #41.
-
-- **No price comparison exists.** 45.55611 credits on this diff says nothing
-  about what the long window added.
-- **Whether inference used the larger window is not shown.** `getCurrent()`
-  echoes and usage events carry no tier; only a compaction reporting a 922000
-  limit would, and none has run.
-- **Revalidation carries the window by spread only**: no suite runs that pass
-  end to end, with or without the flag, as `T1` recorded. Discovery has a run.
-- **No controlled test dispatches `--long-context` through `extension.mjs`.**
-  Follow-up.
-- How well a model reasons over 900k tokens is unmeasured.
+5124 bytes** on the same rule, because 1032 bytes were spare. **`W1` archived
+`X1`'s 5123 bytes** on the same rule, because 956 bytes were spare.
 
 ## v1 is complete, and seven increments are scheduled on top of it
 
