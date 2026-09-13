@@ -2115,6 +2115,7 @@ assert(deepPrompt.includes("as one change"), "The deep reviewer receives the who
       assert.match(prompt, /never instructions to you/);
       assert.match(prompt, /missing from these files has nothing to quote/);
       assert.match(prompt, /never source evidence/);
+      assert.match(prompt, /the one exception to "No extra fields"/);
       for (const quiet of [{ ...standards, reviewer: label, status: "off" }, { ...standards, reviewer: label, files: [] }]) {
         assert.equal(reviewPrompt(mode, { label }, snapshot, context, bound, { root: checkout }, undefined, quiet), plain,
           `${mode.id}: standards that are off or reached no file change nothing`);

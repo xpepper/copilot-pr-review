@@ -209,6 +209,10 @@ console.log("PASS W1: a code block in any published field is refused, and inline
   assert.match(adjudication, /untrustedStandards/);
   assert.match(adjudication, /NOT that the rule applies/);
   assert.match(adjudication, /qualif/);
+  // The shared output contract names the one field the standards reviewer's
+  // prompt adds, so no reviewer is told both to add it and to add nothing.
+  assert.match(candidateFormat(policy),
+    /No extra fields, except the rule field when your prompt hands you untrustedStandards\./);
 }
 console.log("PASS H1: a rule is quoted as exact committed lines of a handed root file, and by its reviewer only");
 for (const raw of ["not JSON", "```json\n{}\n```", '{"schemaVersion":1', "null", "[]",
