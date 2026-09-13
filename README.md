@@ -569,7 +569,7 @@ numbered, join that reviewer's input on every review; a file that does not fit
 is named. Such a
 candidate quotes the rule as exact lines of its file, checked like any
 quotation; the adjudicator is handed that file in full, and the finding shows
-`Rule: FILE:LINES` but never publishes it. Every run names the files it handed
+`Rule: FILE:LINES` but never publishes it, nor a repaired quote of it. Every run names the files it handed
 on and those it left out, and `--no-standards` turns this off.
 
 One narrow repair exists. A quotation clipped at its end can be restored to the

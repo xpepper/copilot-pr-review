@@ -159,8 +159,18 @@ console.log("PASS W1: a code block in any published field is refused, and inline
   const repaired = collectCandidates([reviewer([clipped])], ruledBoundary, policy);
   assert.deepEqual(repaired.issues, []);
   assert.equal(repaired.candidates[0].rule.quote, rule().quote);
-  assert(repaired.diagnostics.some(({ kind, message }) =>
-    kind === "caveat" && /repaired clipped-end rule citation from AGENTS\.md/.test(message)));
+  // A caveat is printed in the published review body, which never names the
+  // rule, so the repair is reported without its file, its lines or its text.
+  assert.deepEqual(repaired.diagnostics, [{ kind: "caveat",
+    message: "correctness:1: repaired a clipped-end rule citation; claims still require adjudication." }]);
+  assert(!repaired.diagnostics.some(({ message }) => /Totals|AGENTS\.md|3-4/.test(message)),
+    "no diagnostic carries the rule");
+  // The coverage text preview.mjs puts in the published body prints every caveat
+  // verbatim, and so carries the repair and nothing of the rule.
+  const published = formatCoverage({ complete: true,
+    validation: adjudicateCandidates(repaired, validator(), ruledBoundary, policy) });
+  assert.match(published, /\nInformational caveat: correctness:1: repaired a clipped-end rule citation;/);
+  assert.doesNotMatch(published, /Totals|AGENTS\.md/, "the published review body never carries the rule");
 
   for (const [label, mutate, reason] of [
     ["a shifted range", (c) => { c.rule.startLine = 2; c.rule.endLine = 3; }, /does not exactly match/],

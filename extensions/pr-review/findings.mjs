@@ -384,10 +384,13 @@ function candidate(value, boundary, policy, diagnostics, id, ruleAllowed = false
   let rule;
   if (quotedRule !== undefined && quotedRule !== null) {
     if (!ruleAllowed) throw new Error("Rule citation from a reviewer that was not handed the project's standards.");
-    rule = boundary.repairRule(quotedRule, (original, restored) => {
-      diagnostics.push({ kind: "caveat", message:
-        `${id}: repaired clipped-end rule citation from ${original.file}; claims still require adjudication. ` +
-        JSON.stringify({ original, restored }) });
+    // Reported without its file, lines or text: a caveat is printed in the
+    // published review body, which never carries the rule, as pull request #44's
+    // claude-review found. The adjudicator still sees the restored lines and the
+    // whole cited file.
+    rule = boundary.repairRule(quotedRule, () => {
+      diagnostics.push({ kind: "caveat",
+        message: `${id}: repaired a clipped-end rule citation; claims still require adjudication.` });
     });
   }
   if (!Array.isArray(value.evidence) || !value.evidence.length) throw new Error("Missing supporting source evidence.");
