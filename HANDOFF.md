@@ -117,9 +117,8 @@ caused this tool to refuse its own review.
 ## Pull-request workflow
 
 Follow `AGENTS.md`: meaningful validated local checkpoint commits are
-authorized, each with the required co-author trailer. Push the `N1` branch and
-open its own pull request; never push directly to `main`, amend published
-history or force-push.
+authorized. Push the `N1` branch and open its own pull request; never push
+directly to `main`, amend published history or force-push.
 
 Because `N1` changes `scripts/`, its pull request still needs exactly one
 installed-plugin review as verification of record under this repository's
