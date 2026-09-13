@@ -7,7 +7,7 @@ import {
   describeAssignments, executeReviewRun, parseReviewArgs, reviewerAssignments, reviewBinding,
   reviewInstructions, reviewPrompt,
 } from "../extensions/pr-review/review.mjs";
-import { reviewModes } from "../extensions/pr-review/modes.mjs";
+import { modeIds, reviewModes } from "../extensions/pr-review/modes.mjs";
 import { captureTarget, parseTargetArgs } from "../extensions/pr-review/target.mjs";
 import { assembleContext } from "../extensions/pr-review/context.mjs";
 import { repository, respond } from "./target-fixture.mjs";
@@ -41,12 +41,13 @@ const deepMode = reviewModes.deep;
 const options = parseReviewArgs("1 --quick --no-comment");
 assert.deepEqual(options, { mode: "quick", captureOnly: false, captureArgs: "1", settings: {},
   all: false, comment: false, noComment: true, verify: false, quiet: false, unattended: false,
-  incremental: false, revalidate: false, longContext: false });
+  incremental: false, revalidate: false, longContext: false, standards: true });
 assert.deepEqual(parseReviewArgs("  1 --major-only --no-comment  "), options);
 assert.deepEqual(parseReviewArgs("2 --quick --no-comment --include-drafts heavyModel=other heavyEffort=low"),
   { mode: "quick", captureOnly: false, captureArgs: "2 --include-drafts",
     settings: { heavyModel: "other", heavyEffort: "low" }, all: false, comment: false, noComment: true,
-    verify: false, quiet: false, unattended: false, incremental: false, revalidate: false, longContext: false });
+    verify: false, quiet: false, unattended: false, incremental: false, revalidate: false, longContext: false,
+    standards: true });
 assert.deepEqual(parseReviewArgs("1 --major-only --all --no-comment"), { ...options, all: true });
 assert.deepEqual(parseReviewArgs("1 --quick"), { ...options, noComment: false });
 assert.deepEqual(parseReviewArgs("1 --quick --all --comment"), { ...options, all: true, comment: true, noComment: false });
@@ -121,6 +122,16 @@ assert.deepEqual(parseReviewArgs("1 --deep --all --no-comment --unattended --lon
   { ...options, mode: "deep", all: true, unattended: true, longContext: true });
 assert.equal(parseReviewArgs("2 --long-context --include-drafts").captureArgs, "2 --include-drafts");
 assert.throws(() => parseTargetArgs("2 --long-context"), /Unsupported/);
+// H1: the project's written rules steer every review unless this one run turns
+// them off. --no-standards is chosen per run and saved nowhere; it grants
+// nothing and constrains no other option, so it combines with every review flag.
+assert.equal(options.standards, true, "a run without the flag is steered by the project's standards");
+assert.deepEqual(parseReviewArgs("1 --quick --no-comment --no-standards"), { ...options, standards: false });
+assert.deepEqual(parseReviewArgs("1 --no-standards"), { ...balancedOptions, noComment: false, standards: false });
+assert.deepEqual(parseReviewArgs("1 --deep --all --no-comment --unattended --long-context --no-standards"),
+  { ...options, mode: "deep", all: true, unattended: true, longContext: true, standards: false });
+assert.equal(parseReviewArgs("2 --no-standards --include-drafts").captureArgs, "2 --include-drafts");
+assert.throws(() => parseTargetArgs("2 --no-standards"), /Unsupported/);
 // Each refusal names the one thing that is missing, because the whole point of
 // the flag is that nobody is there to read a vague one.
 assert.throws(() => parseReviewArgs("1 --quick --no-comment --unattended"),
@@ -143,7 +154,7 @@ assert.doesNotMatch(postingRefusal, /autoPostReviews/,
 // Capture-only keeps the diagnostic capture path reachable without a reviewer.
 assert.deepEqual(parseReviewArgs("1 --capture-only"), { mode: undefined, captureOnly: true, captureArgs: "1",
   settings: {}, all: false, comment: false, noComment: false, verify: false, quiet: false, unattended: false,
-  incremental: false, revalidate: false, longContext: false });
+  incremental: false, revalidate: false, longContext: false, standards: false });
 assert.equal(parseReviewArgs("2 --capture-only --include-drafts").captureArgs, "2 --include-drafts");
 
 // I1c: the second request rather than contract, recorded at parse time and
@@ -200,6 +211,10 @@ for (const args of [
   // window is a flag, never a setting.
   "1 --capture-only --long-context", "1 --long-context --capture-only",
   "1 --quick --no-comment --long-context --long-context", "1 --quick longContext=true",
+  // H1: capture-only hands no reviewer anything, so it has no standards to turn
+  // off, and turning them off is a flag, never a setting.
+  "1 --capture-only --no-standards", "1 --no-standards --capture-only",
+  "1 --quick --no-comment --no-standards --no-standards", "1 --quick standards=false",
 ]) assert.throws(() => parseReviewArgs(args),
   /mutually exclusive|Duplicate|Invalid|Unsupported|integer|Conflicting|cannot be combined/, args);
 const assignments = await reviewerAssignments(parentModels, quickMode, {});
@@ -260,6 +275,15 @@ assert.deepEqual(ambientFull.map(({ label }) => label),
   ["correctness", "contracts", "security", "performance-resources", "overview", "conventions-maintainability"]);
 assert.deepEqual(ambientFull.map(({ tier }) => tier),
   ["heavy", "heavy", "heavy", "heavy", "light", "medium"]);
+// H1: exactly one reviewer per mode receives the project's standards, the one
+// that weighs the whole change, and contracts in quick, which has no such
+// reviewer. It is declared with the mode, so no mode changes shape for it.
+assert.deepEqual(Object.fromEntries(modeIds.map((id) => [id, reviewModes[id].standardsReviewer])),
+  { quick: "contracts", balanced: "overview", full: "overview", deep: "integrated" });
+for (const id of modeIds) {
+  assert.equal(reviewModes[id].reviewers.filter(({ label }) => label === reviewModes[id].standardsReviewer).length, 1,
+    `${id}'s standards reviewer is one of its own reviewers`);
+}
 assert(ambientFull.every(({ model, origin }) => model === "heavy" && origin.model === "ambient"),
   "An unconfigured medium tier still falls back to the ambient session assignment");
 // An unset medium tier is equidistant from light and heavy, so it inherits the

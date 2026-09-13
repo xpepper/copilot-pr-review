@@ -7,6 +7,7 @@ import {
 import { formatCost, runCost } from "./cost.mjs";
 import { contextWindow, describeWindow, reviewAssignments, validateModelAssignment } from "./fixture.mjs";
 import { confinementInput, confinementSummary, incrementalFlag, isConfined } from "./incremental.mjs";
+import { noStandardsFlag } from "./standards.mjs";
 import { publishReplies, describeReplies } from "./replies.mjs";
 import {
   applyJudgedVerdicts, describeRevalidation, retainedRevalidation, revalidateFlag,
@@ -60,7 +61,7 @@ export function parseReviewArgs(args) {
     if (seen.has(token)) throw new Error(`Duplicate review argument: ${token}`);
     seen.add(token);
     if ([...modeFlags, captureOnlyFlag, verifyFlag, quietFlag, unattendedFlag, incrementalFlag,
-      revalidateFlag, longContextFlag, "--comment", "--no-comment", "--all"].includes(token)) continue;
+      revalidateFlag, longContextFlag, noStandardsFlag, "--comment", "--no-comment", "--all"].includes(token)) continue;
     if (token.includes("=")) {
       const [key, value, extra] = token.split("=");
       if (!settingKeys.includes(key) || !value || extra !== undefined || key in settings) {
@@ -82,7 +83,7 @@ export function parseReviewArgs(args) {
   if (seen.has(captureOnlyFlag)) {
     const conflicting = [...chosen,
       ...["--comment", "--no-comment", "--all", verifyFlag, quietFlag, unattendedFlag, incrementalFlag,
-        revalidateFlag, longContextFlag].filter((flag) => seen.has(flag)),
+        revalidateFlag, longContextFlag, noStandardsFlag].filter((flag) => seen.has(flag)),
       ...Object.keys(settings)];
     if (conflicting.length) {
       throw new Error(`${captureOnlyFlag} captures the target without reviewing it, ` +
@@ -90,7 +91,7 @@ export function parseReviewArgs(args) {
     }
     return { mode: undefined, captureOnly: true, captureArgs, settings, all: false, comment: false,
       noComment: false, verify: false, quiet: false, unattended: false, incremental: false,
-      revalidate: false, longContext: false };
+      revalidate: false, longContext: false, standards: false };
   }
   const mode = chosen.length ? modeForFlag(chosen[0]) : reviewMode(defaultModeId);
   const { policy } = postingAuthority({ comment: seen.has("--comment"), noComment: seen.has("--no-comment") });
@@ -149,6 +150,9 @@ export function parseReviewArgs(args) {
     // each pass can hold it is a fact about its model, resolved with the
     // assignments and displayed before any reviewer starts.
     longContext: seen.has(longContextFlag),
+    // H1: on unless this run turns it off. What the standards reviewer is handed
+    // is settled once the checkout is proven, so parse time records the request.
+    standards: !seen.has(noStandardsFlag),
   };
 }
 
