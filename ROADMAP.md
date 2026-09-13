@@ -18,9 +18,9 @@ and `G1` was the last increment scheduled before the backlog was agreed; **every
 increment scheduled up to `G1` is complete.** On 2026-09-12 the user triaged
 `G1`'s twelve proposals one at a time and scheduled six of them: `T1`, `B1`,
 `W1`, `N1`, `H1` and `K1`, in that order, and the same day scheduled `X1`
-immediately after `B1`. **`T1`, `B1` and `X1` are complete and archived, and no
-entry is live below until `W1` writes one**; `W1` is complete below and the three
-`Pending` rows are what is left.
+immediately after `B1`. **`T1`, `B1`, `X1` and `W1` are complete and archived, and
+no entry is live below until `N1` writes one**; the three `Pending` rows are what
+is left.
 The closing section records what was decided, and what stays open as a
 limitation rather than as work.
 
@@ -89,9 +89,9 @@ posting them.
 | H1 | Pending | Opt-in, the project's own written standards steer the review. The checkout's instruction files, which `--verify` discovery already collects and hands to no reviewer, reach one, and a finding raised on that basis must quote the instruction it relies on; that quote is checked against the collected file the way a source citation is checked against bound source, and a finding whose quoted rule cannot be found is refused. **This increment settles what evidence a claim not grounded in a provable code effect must carry**, which is the rule the history lenses and path-conditioned lenses would inherit if they are ever taken. Pull request #42 supplies a concrete acceptance case: changed handoff instructions contradicted or over-attributed the authoritative `AGENTS.md` workflow. Needs a scope decision, because `SCOPE.md` says nothing about convention review. Opt-in, consistent with `I1b` and `I1c`. `G1`'s menu item 4. | N1; [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | K1 | Pending | A published review asks what it found useful, and a later run reads the reactions and the resolution state of its own threads. `I1c` already reads an earlier review's threads fresh from GitHub on every run, so the read path exists. It is the only scheduled item that would produce evidence about real pull requests rather than a synthetic corpus, and it is last because it needs a review actually published to a pull request before there is anything to read back, and findings stay local unless the user authorizes posting. Needs a scope decision. `G1`'s menu item 12. | H1, I1c; [Publication controls](SCOPE.md#selection-publication-and-cached-results) |
 
-## Every completed increment, `F1` through `X1`, is archived
+## Every completed increment, `F1` through `W1`, is archived
 
-Fifty-four sections were here and twelve increments plus the backlog triage moved
+Fifty-five sections were here and thirteen increments plus the backlog triage moved
 every one of them
 verbatim to
 [docs/roadmap-archive-2026-09-10.md](docs/roadmap-archive-2026-09-10.md): `A1`
@@ -101,11 +101,11 @@ moved `A1`'s entry and then `L1`'s, `O1` moved `D1`'s, `U1` moved `O1`'s, `I1a`
 moved `E1`'s, `I1b` moved `U1`'s and then `I1a`'s, `I1c` moved `I1b`'s
 15018 bytes, `G1` moved `I1c`'s 13014 bytes, **the backlog triage moved
 `G1`'s own 8863 bytes**, **`B1` moved `T1`'s 5951**, **`X1` moved `B1`'s
-5124**, and **`W1` moved `X1`'s 5123**, the last in that file. Forty-six are
-completed-increment entries, covering the forty-four increments `F1`, `F2`, `F3`, `Q1`, `Q2`, `Q3`, `Q4`,
+5124**, **`W1` moved `X1`'s 5123**, and **`N1` moved `W1`'s 4684**, the last in that file. Forty-seven are
+completed-increment entries, covering the forty-five increments `F1`, `F2`, `F3`, `Q1`, `Q2`, `Q3`, `Q4`,
 `P1`, `P2`, `P3`, `P4`, `P5`, `C1`, `C2`, `F4`, `R1`, `M1`, `F5`, `F6`, `M2`,
 `C3`, `C4`, `Q5`, `Q6`, `C5`, `Q7`, `V1a`, `V1b`, `V1c`, `V2a`, `V2b`, `A1`,
-`L1`, `D1`, `O1`, `E1`, `U1`, `I1a`, `I1b`, `I1c`, `G1`, `T1`, `B1` and `X1`, with `R1` and `M1` each recorded in two halves. The remaining eight are the
+`L1`, `D1`, `O1`, `E1`, `U1`, `I1a`, `I1b`, `I1c`, `G1`, `T1`, `B1`, `X1` and `W1`, with `R1` and `M1` each recorded in two halves. The remaining eight are the
 working record kept between them:
 
 - the `Q4` acceptance criteria recorded at the `Q3` checkpoint;
@@ -117,7 +117,7 @@ working record kept between them:
 - the `R1` second-half harness checkpoint;
 - the documentation checkpoint for pull request #4 and its review.
 
-Nothing was rewritten, condensed or corrected in any of the twelve moves, so each
+Nothing was rewritten, condensed or corrected in any of the thirteen moves, so each
 section still reads exactly as the session that wrote it left it, and the
 archive is the evidence of record for every increment it holds: reproduction
 commands, the models and efforts actually used, credit costs, findings and
@@ -134,7 +134,7 @@ than from this file.
 [docs/upstream-licensing.md](docs/upstream-licensing.md) is still the record of
 that licence work and did not move.
 
-**`W1` is the only live entry.** The backlog triage added no entry of its
+**No entry is live until `N1` writes one.** The backlog triage added no entry of its
 own, because agreeing a backlog is not a numbered increment, so archiving `G1`
 left none behind and `T1`'s was written into that empty space. The rule these
 moves established is to keep
@@ -166,89 +166,8 @@ entry has ever been written in less than that, so `T1`'s session would have had
 to do this move first. **`B1` archived `T1`'s 5951 bytes** on that rule before
 writing a word of its own, because 1313 bytes were spare. **`X1` archived `B1`'s
 5124 bytes** on the same rule, because 1032 bytes were spare. **`W1` archived
-`X1`'s 5123 bytes** on the same rule, because 956 bytes were spare.
-
-## `W1`: every validated finding says what to do about it
-
-The user approved the exact `SCOPE.md` paragraph before code changed: one
-remediation sentence is part of the finding the reviewer produced, is shown and
-published, and is prose rather than code, so it is neither an editor nor a
-committable suggestion block.
-
-`remediation` is required at candidate ingestion and the isolated adjudicator
-must support it like every other claim. The sentence appears as `Fix:` before
-validation in the presented finding and before confidence in an inline comment.
-Candidate ingestion and publication independently refuse a missing sentence, a
-line break, more than one English sentence, or a line in any published prose
-field that opens a backtick or tilde code fence. `Intl.Segmenter` keeps ordinary
-abbreviations and inline code from becoming false sentence boundaries. Results
-retained before `W1` still load and inspect, but publication refuses them and
-asks for a new review. `I1c` reads the optional `Fix:` paragraph back and keeps
-pre-`W1` comments readable.
-
-### The review
-
-Pull request #42 was reviewed once with the installed plugin at the user's
-authorization, **deep without `--long-context`**: integrated reviewer and
-adjudicator on `gpt-5.6-terra` at high effort and `contextTier: default`, 3
-reported requests across 2 paid passes, **81.62026 credits**, 89.115 s of model
-work against 113.423 s elapsed. The integrated reviewer made 6 approved tool
-calls, all confined reads, with no permission or tool denial; the adjudicator
-used no tools. Neither pass reported context loss. No finding was posted.
-
-Coverage is **INCOMPLETE**, with 0 validated, rejected, duplicate, capped or
-outside findings. Two candidates produced useful signals but no publishable
-finding:
-
-- A pre-`W1` introduction ending in a one-line `Fix:` paragraph can be read as a
-  remediation because the old and new encodings are byte-identical. Its
-  citation failed the evidence boundary. **No change:** the pull-request
-  description, parser comment and test already state this unavoidable
-  compatibility ambiguity; refusing that byte shape would also refuse every
-  genuine post-`W1` comment without version evidence.
-- Two sentences on one physical line passed both deterministic gates. The
-  adjudicator accepted the defect, but its own citation failed exact validation,
-  so the candidate still did not become a finding. **Fixed anyway:** one shared
-  sentence-segmentation check now guards ingestion and publication, with
-  abbreviations pinned as accepted prose.
-
-The reviewer also retained one caveat: it did not independently exercise GitHub
-rendering. There were no withheld findings.
-
-After the review-response commits, the user requested two external reviews.
-GitHub Copilot reviewed all 15 changed files and found two contradictions in
-the new `HANDOFF.md`: it wrongly asked for fresh authorization despite
-`AGENTS.md`'s standing first-review authorization, and attributed the
-environment's co-author trailer rule to `AGENTS.md`. Commits `9e4682b` and
-`3ee3c7e` fix them; both threads were answered and resolved. Codex reviewed
-`3c5ffd4`, found no actionable change, and reported one firewall-blocked GitHub
-query that did not prevent its assessment.
-
-Those exact lines were added after this plugin reviewed `9896b23`, so they are a
-finalization gap rather than findings it missed in the reviewed diff. Their
-class is still useful evidence: instruction consistency against authoritative
-project rules is now an explicit `H1` acceptance case. Reviewer behavior is not
-widened inside `W1`, and no second paid plugin review is authorized.
-
-### Verified, and not
-
-The boundary and publication tests first failed on
-`"Multiply instead. Then retest."`; disabling either new guard makes its own
-suite fail. All seventeen controlled suites pass, `git diff --check` is clean,
-no tracked text carries a control byte, and discovery reads all six root files
-and skips none. The controlled CI passed on review-response head `9e1ebca`.
-The separate `claude-review` workflow failed before inference: its action
-initialized, then returned `is_error:true` in 494 ms with zero cost, empty model
-usage and no buffered comments. It was recorded rather than rerun.
-
-- The live reviewer produced both remediation sentences in the required shape,
-  demonstrating real model output, but no candidate survived to presentation or
-  publication.
-- GitHub rendering and publication of `Fix:` remain unexercised; posting stays
-  the user's decision.
-- A model-decided `I1c` reply still carries the model's reason verbatim and can
-  contain a code fence. It is a reply rather than a finding and is not widened
-  into `W1`.
+`X1`'s 5123 bytes** on the same rule, because 956 bytes were spare. **`N1`
+archived `W1`'s 4684 bytes** on the same rule, because 1003 bytes were spare.
 
 ## v1 is complete, and seven increments are scheduled on top of it
 

@@ -7,8 +7,8 @@ everything through `V1c`, by increment `L1` for `V2a` and `V2b`, by increment
 increment `U1` for `O1`'s, by increment `I1a` for `E1`'s, by increment `I1b`
 for `U1`'s and then `I1a`'s, by increment `I1c` for `I1b`'s, by increment
 `G1` for `I1c`'s, by the backlog triage of 2026-09-12 for `G1`'s own, by
-increment `B1` for `T1`'s, by increment `X1` for `B1`'s, and by increment
-`W1` for `X1`'s, which is the
+increment `B1` for `T1`'s, by increment `X1` for `B1`'s, by increment
+`W1` for `X1`'s, and by increment `N1` for `W1`'s, which is the
 last in this file. They are the
 project's
 evidence of record and are reproduced verbatim: nothing here was rewritten,
@@ -9753,3 +9753,85 @@ none, and CI passed on #41.
 - **No controlled test dispatches `--long-context` through `extension.mjs`.**
   Follow-up.
 - How well a model reasons over 900k tokens is unmeasured.
+
+## `W1`: every validated finding says what to do about it
+
+The user approved the exact `SCOPE.md` paragraph before code changed: one
+remediation sentence is part of the finding the reviewer produced, is shown and
+published, and is prose rather than code, so it is neither an editor nor a
+committable suggestion block.
+
+`remediation` is required at candidate ingestion and the isolated adjudicator
+must support it like every other claim. The sentence appears as `Fix:` before
+validation in the presented finding and before confidence in an inline comment.
+Candidate ingestion and publication independently refuse a missing sentence, a
+line break, more than one English sentence, or a line in any published prose
+field that opens a backtick or tilde code fence. `Intl.Segmenter` keeps ordinary
+abbreviations and inline code from becoming false sentence boundaries. Results
+retained before `W1` still load and inspect, but publication refuses them and
+asks for a new review. `I1c` reads the optional `Fix:` paragraph back and keeps
+pre-`W1` comments readable.
+
+### The review
+
+Pull request #42 was reviewed once with the installed plugin at the user's
+authorization, **deep without `--long-context`**: integrated reviewer and
+adjudicator on `gpt-5.6-terra` at high effort and `contextTier: default`, 3
+reported requests across 2 paid passes, **81.62026 credits**, 89.115 s of model
+work against 113.423 s elapsed. The integrated reviewer made 6 approved tool
+calls, all confined reads, with no permission or tool denial; the adjudicator
+used no tools. Neither pass reported context loss. No finding was posted.
+
+Coverage is **INCOMPLETE**, with 0 validated, rejected, duplicate, capped or
+outside findings. Two candidates produced useful signals but no publishable
+finding:
+
+- A pre-`W1` introduction ending in a one-line `Fix:` paragraph can be read as a
+  remediation because the old and new encodings are byte-identical. Its
+  citation failed the evidence boundary. **No change:** the pull-request
+  description, parser comment and test already state this unavoidable
+  compatibility ambiguity; refusing that byte shape would also refuse every
+  genuine post-`W1` comment without version evidence.
+- Two sentences on one physical line passed both deterministic gates. The
+  adjudicator accepted the defect, but its own citation failed exact validation,
+  so the candidate still did not become a finding. **Fixed anyway:** one shared
+  sentence-segmentation check now guards ingestion and publication, with
+  abbreviations pinned as accepted prose.
+
+The reviewer also retained one caveat: it did not independently exercise GitHub
+rendering. There were no withheld findings.
+
+After the review-response commits, the user requested two external reviews.
+GitHub Copilot reviewed all 15 changed files and found two contradictions in
+the new `HANDOFF.md`: it wrongly asked for fresh authorization despite
+`AGENTS.md`'s standing first-review authorization, and attributed the
+environment's co-author trailer rule to `AGENTS.md`. Commits `9e4682b` and
+`3ee3c7e` fix them; both threads were answered and resolved. Codex reviewed
+`3c5ffd4`, found no actionable change, and reported one firewall-blocked GitHub
+query that did not prevent its assessment.
+
+Those exact lines were added after this plugin reviewed `9896b23`, so they are a
+finalization gap rather than findings it missed in the reviewed diff. Their
+class is still useful evidence: instruction consistency against authoritative
+project rules is now an explicit `H1` acceptance case. Reviewer behavior is not
+widened inside `W1`, and no second paid plugin review is authorized.
+
+### Verified, and not
+
+The boundary and publication tests first failed on
+`"Multiply instead. Then retest."`; disabling either new guard makes its own
+suite fail. All seventeen controlled suites pass, `git diff --check` is clean,
+no tracked text carries a control byte, and discovery reads all six root files
+and skips none. The controlled CI passed on review-response head `9e1ebca`.
+The separate `claude-review` workflow failed before inference: its action
+initialized, then returned `is_error:true` in 494 ms with zero cost, empty model
+usage and no buffered comments. It was recorded rather than rerun.
+
+- The live reviewer produced both remediation sentences in the required shape,
+  demonstrating real model output, but no candidate survived to presentation or
+  publication.
+- GitHub rendering and publication of `Fix:` remain unexercised; posting stays
+  the user's decision.
+- A model-decided `I1c` reply still carries the model's reason verbatim and can
+  contain a code fence. It is a reply rather than a finding and is not widened
+  into `W1`.
