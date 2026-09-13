@@ -319,5 +319,12 @@ console.log("PASS strict version-2 retained previews, altered payload/authority 
   // Nor does a sentence that is not one line get posted, whatever a record holds.
   for (const finding of current.validation.findings) finding.remediation = "Multiply instead.\nThen retest.";
   assert.throws(() => buildReviewPreview(current, earlier.boundary), /remediation sentence/);
-  console.log("PASS W1 a result retained before remediation sentences still loads, and publishing it is refused");
+  // And a code block in any published field is refused at publication as well,
+  // because a retained record never passed back through the evidence boundary.
+  for (const finding of current.validation.findings) {
+    finding.remediation = "Multiply the unit price by quantity.";
+    finding.actual = "103 cents\n\n```suggestion\nreturn cents * quantity;\n```";
+  }
+  assert.throws(() => buildReviewPreview(current, earlier.boundary), /code block/);
+  console.log("PASS W1 a result retained before remediation sentences still loads, and publishing it, or a code block, is refused");
 }

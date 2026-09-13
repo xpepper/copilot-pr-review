@@ -95,6 +95,30 @@ for (const mutate of [
   assert.equal(rejected.candidates.length, 1, "Reject only the invalid candidate, retaining its valid sibling");
   assert.equal(rejected.issues.length, 1);
 }
+// W1: nothing a finding publishes may open a code block. A fence at the start of
+// a line is what GitHub renders as one, and a suggestion fence is what it offers
+// to commit, so code refuses the candidate whichever field carries it. A fence
+// may be indented up to three spaces; a fourth makes the line ordinary text.
+for (const field of ["title", "trigger", "expected", "actual", "introduction", "remediation"]) {
+  for (const fence of ["```suggestion", "~~~", "   ```js"]) {
+    const bad = structuredClone(candidate);
+    bad[field] = field === "remediation" ? fence + " return cents * quantity;"
+      : bad[field] + "\n\n" + fence + "\nreturn cents * quantity;\n```";
+    const refused = collectCandidates([reviewer([bad, candidate])], boundary, policy);
+    assert.equal(refused.candidates.length, 1, `A code block in ${field} is refused, and only that candidate`);
+    assert.match(refused.issues[0], /code block/);
+  }
+}
+{
+  const prose = structuredClone(candidate);
+  prose.actual += "\n\nSeen with `total(100, 3)` in the fixture.\n    ``` four spaces in is text, not a fence";
+  prose.remediation = "Use `*` rather than `+` between the unit price and the quantity.";
+  const kept = collectCandidates([reviewer([prose])], boundary, policy);
+  assert.equal(kept.candidates.length, 1, "Inline code, a blank line and a four-space indent are prose");
+  assert.deepEqual(kept.issues, []);
+}
+assert.match(candidateFormat(policy), /code block/i);
+console.log("PASS W1: a code block in any published field is refused, and inline code in prose is not");
 for (const raw of ["not JSON", "```json\n{}\n```", '{"schemaVersion":1', "null", "[]",
   JSON.stringify({ schemaVersion: 1, reviewKey: "wrong", candidates: [candidate], limitations: [] }),
   JSON.stringify({ schemaVersion: 1, reviewKey: key, candidates: [], limitations: [], clean: true }),

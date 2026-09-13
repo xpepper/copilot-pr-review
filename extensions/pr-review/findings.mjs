@@ -8,6 +8,14 @@ import { admitsMinor, capsMinor, isMinor, reviewModes, severityRank } from "./mo
 export const minimumConfidence = 0.8;
 export const reviewKey = (binding) => createHash("sha256").update(JSON.stringify(binding)).digest("hex");
 
+// W1: the finding text a published inline comment carries, and the one shape of
+// it code refuses. GitHub renders a line opening a fence, indented at most three
+// spaces, as a code block, and a suggestion fence as a change to commit, which a
+// tool that never writes source must not offer. One check, shared with
+// publication, so the boundary and the payload can never disagree about it.
+export const publishedProse = ["title", "trigger", "expected", "actual", "introduction", "remediation"];
+export const opensCodeBlock = (text) => /^ {0,3}(?:`{3}|~{3})/m.test(text);
+
 const citationFormat = 'CITATION is {"path":"exact source path","side":"head|base","startLine":1,"endLine":1,"quote":"exact full lines, joined with \\n, no final newline"}.';
 export const limitationFormat = [
   'Each limitations entry is {"kind":"coverage-gap|caveat","reason":"specific limitation","impact":null}.',
@@ -66,6 +74,7 @@ export const candidateFormat = (policy) => [
   "Check language-operator semantics and the complete expression/control flow before claiming an effect.",
   "Every assertion must be supported; omit speculative consequences or embellishments even when the core defect is real.",
   "Remediation is one sentence on one line saying what to do about the defect: prose, never code, a patch or a suggestion block.",
+  "No field may contain a code block: a line opening with ``` or ~~~ refuses the whole candidate.",
   `Omit candidates below confidence ${minimumConfidence}. ${severityGuide(policy)}`,
   "If evidence is missing, put that limitation in limitations rather than inventing a candidate.",
   limitationFormat,
@@ -283,6 +292,8 @@ function candidate(value, boundary, policy, diagnostics, id) {
   // W1: the sentence is published after its label on a line of its own, so it
   // stays one line and never becomes a paragraph, a list or a block.
   if (/[\r\n]/.test(value.remediation)) throw new Error("Remediation must be one sentence on one line.");
+  const block = publishedProse.find((key) => opensCodeBlock(value[key]));
+  if (block) throw new Error(`${block} opens a code block; a published finding carries no code block.`);
   if (!policy.severities.includes(value.severity) ||
       typeof value.confidence !== "number" || !Number.isFinite(value.confidence) ||
       value.confidence < minimumConfidence || value.confidence > 1) {

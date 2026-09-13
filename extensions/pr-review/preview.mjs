@@ -1,5 +1,5 @@
 import { isDeepStrictEqual } from "node:util";
-import { minimumConfidence, reviewKey } from "./findings.mjs";
+import { minimumConfidence, opensCodeBlock, publishedProse, reviewKey } from "./findings.mjs";
 import { reviewMode } from "./modes.mjs";
 import { waitForInteraction } from "./interaction.mjs";
 import { selectionBinding } from "./selection.mjs";
@@ -114,6 +114,7 @@ export function buildReviewPreview(outcome, boundary) {
     // through `reviewRequest`, but it is refused here rather than posted without.
     requirePreview(typeof finding.remediation === "string" && finding.remediation.trim() &&
       !/[\r\n]/.test(finding.remediation), "finding carries no one-line remediation sentence");
+    requirePreview(!publishedProse.some((key) => opensCodeBlock(finding[key])), "finding text opens a code block");
     const { ref, blobSha, ...citation } = finding.location;
     requirePreview(isDeepStrictEqual(boundary.cite(citation), finding.location), "changed source citation");
     const file = boundary.files.find((entry) =>
