@@ -10,7 +10,7 @@ import { reviewModes } from "./modes.mjs";
 //
 // The reader is held to the writer's template rather than to a guess about it.
 // `commentBody` in preview.mjs builds every published finding, the pattern below
-// is that same template with its six parts captured, and a parse is accepted
+// is that same template with its parts captured, and a parse is accepted
 // only when rebuilding it reproduces the input byte for byte. An emitted body
 // therefore always reads back, and a template change that forgot this parser
 // fails the round-trip in the suite instead of misreading somebody's comment.
@@ -30,6 +30,10 @@ const bodyPattern = new RegExp(
   "\\n\\nExpected: ([\\s\\S]+?)" +
   "\\n\\nActual: ([\\s\\S]+?)" +
   "\\n\\nIntroduced by this diff: ([\\s\\S]+?)" +
+  // W1: the remediation paragraph, one line, which a body published before W1
+  // does not have. A pre-W1 introduction whose last paragraph is a one-line
+  // "Fix: " reads as carrying one: those bytes admit both splits.
+  "(?:\\n\\nFix: ([^\\n]+))?" +
   "\\n\\nConfidence: (0(?:\\.\\d+)?|1(?:\\.0+)?)\\. Reported by: ([^\\n]+)\\.$");
 
 // Anchoring the pattern at both ends makes the round-trip automatic for any
@@ -42,20 +46,24 @@ const bodyPattern = new RegExp(
 const separators = ["When", "Expected", "Actual", "Introduced by this diff", "Confidence"]
   .map((label) => `\n\n${label}: `);
 
+// The optional remediation paragraph may open once or not at all, never twice.
+const fixSeparator = "\n\nFix: ";
+
 const unambiguous = (body) => separators.every((separator) => {
   const first = body.indexOf(separator);
   return first !== -1 && body.indexOf(separator, first + 1) === -1;
-});
+}) && body.indexOf(fixSeparator) === body.lastIndexOf(fixSeparator);
 
 export function parseCommentFinding(body) {
   if (typeof body !== "string" || !unambiguous(body)) return undefined;
   const match = bodyPattern.exec(body);
   if (!match) return undefined;
-  const [, severity, title, trigger, expected, actual, introduction, confidence, reporters] = match;
+  const [, severity, title, trigger, expected, actual, introduction, remediation, confidence, reporters] = match;
   const reportedBy = reporters.split(", ");
   if (reportedBy.some((reporter) => !reporter.trim())) return undefined;
   const parsed = {
     severity, title, trigger, expected, actual, introduction,
+    ...(remediation === undefined ? {} : { remediation }),
     confidence: Number(confidence), reportedBy,
   };
   // The invariant, asserted rather than assumed. A parse that cannot rebuild

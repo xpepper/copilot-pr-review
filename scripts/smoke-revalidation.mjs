@@ -26,6 +26,26 @@ const finding = {
   console.log("PASS I1c a published finding reads back into its parts");
 }
 
+// W1: a finding published since remediation sentences exist carries one more
+// paragraph, and it reads back as its own part. A body published before them has
+// no such paragraph and still reads back, without one.
+{
+  const fixed = { ...finding, remediation: "Multiply the unit price by the quantity again." };
+  const body = commentBody(fixed);
+  assert(body.includes("\n\nIntroduced by this diff: the changed line replaced * with +" +
+    "\n\nFix: Multiply the unit price by the quantity again.\n\nConfidence: 0.9."), "Fix sits before Confidence");
+  const parsed = parseCommentFinding(body);
+  assert.deepEqual(parsed, {
+    severity: "P2", title: finding.title, trigger: finding.trigger,
+    expected: finding.expected, actual: finding.actual, introduction: finding.introduction,
+    remediation: fixed.remediation, confidence: 0.9, reportedBy: ["correctness", "overview"],
+  });
+  assert.equal(commentBody(parsed), body, "The parse must rebuild the exact body");
+  const earlier = parseCommentFinding(commentBody(finding));
+  assert(earlier && !Object.hasOwn(earlier, "remediation"), "A body published before W1 reads back without one");
+  console.log("PASS W1 a published remediation sentence reads back, and an earlier body still reads without one");
+}
+
 // Every severity the mode table admits, and a single reporter, because a deep
 // review reports one and a balanced one reports several.
 {
@@ -935,6 +955,17 @@ const rangeRequests = (calls) => calls.filter((args) =>
   console.log("PASS I1c an unsettled verdict survives being retained, by every proof that reaches it");
 }
 
+// W1: an earlier finding published with its remediation sentence is read, judged
+// and retained with that sentence, and one published before W1 without it.
+{
+  const remediation = "Multiply the unit price by the quantity again.";
+  const result = revalidatePrior(found("diverged",
+    [priorComment({ body: commentBody({ ...finding, remediation }) })]), base.binding.head);
+  assert.equal(result.entries[0].finding.remediation, remediation);
+  validateRecord(retained(retainedRevalidation(result)), sessionId);
+  console.log("PASS W1 a revalidated finding keeps its remediation sentence in the retained record");
+}
+
 // #32 integrated:3. Anchoring the pattern at both ends makes the round-trip
 // automatic for any match, which is exactly why it proves nothing about which
 // split was chosen. A field whose own prose opens a paragraph with one of the
@@ -948,6 +979,12 @@ const rangeRequests = (calls) => calls.filter((args) =>
   for (const label of ["When", "Expected", "Actual", "Introduced by this diff", "Confidence"]) {
     const collision = commentBody({ ...finding, actual: `it fails\n\n${label}: more prose` });
     assert.equal(parseCommentFinding(collision), undefined, `A repeated ${label} label is ambiguous`);
+  }
+  // W1: the remediation paragraph is optional, so its label may open a paragraph
+  // once and never twice.
+  for (const field of ["actual", "introduction"]) {
+    const collision = commentBody({ ...finding, remediation: "Multiply again.", [field]: "it fails\n\nFix: more prose" });
+    assert.equal(parseCommentFinding(collision), undefined, `A repeated Fix label in ${field} is ambiguous`);
   }
   // A label that is not at a paragraph start is ordinary prose and reads fine.
   const inline = { ...finding, trigger: "any call where Expected: is written inline" };

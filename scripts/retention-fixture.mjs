@@ -29,6 +29,7 @@ export async function retentionFixture(sessionId, {
     title: "Multiply cents by quantity", severity: "P2", confidence: 0.95,
     trigger: "total(100, 3)", expected: "300 cents", actual: "103 cents",
     introduction: "The changed operator adds quantity instead of multiplying.",
+    remediation: "Multiply the unit price by quantity.",
     location: cite("head"), before: cite("base"), after: cite("head"), evidence: [cite("head", 1)],
   };
   const reviewers = reviewMode.reviewers.map(({ label }) => ({

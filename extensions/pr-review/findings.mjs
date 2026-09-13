@@ -8,6 +8,17 @@ import { admitsMinor, capsMinor, isMinor, reviewModes, severityRank } from "./mo
 export const minimumConfidence = 0.8;
 export const reviewKey = (binding) => createHash("sha256").update(JSON.stringify(binding)).digest("hex");
 
+// W1: the finding text a published inline comment carries, and the one shape of
+// it code refuses. GitHub renders a line opening a fence, indented at most three
+// spaces, as a code block, and a suggestion fence as a change to commit, which a
+// tool that never writes source must not offer. One check, shared with
+// publication, so the boundary and the payload can never disagree about it.
+export const publishedProse = ["title", "trigger", "expected", "actual", "introduction", "remediation"];
+export const opensCodeBlock = (text) => /^ {0,3}(?:`{3}|~{3})/m.test(text);
+const sentenceSegmenter = new Intl.Segmenter("en", { granularity: "sentence" });
+export const isOneLineSentence = (text) => typeof text === "string" && !/[\r\n]/.test(text) &&
+  [...sentenceSegmenter.segment(text)].filter(({ segment }) => segment.trim()).length === 1;
+
 const citationFormat = 'CITATION is {"path":"exact source path","side":"head|base","startLine":1,"endLine":1,"quote":"exact full lines, joined with \\n, no final newline"}.';
 export const limitationFormat = [
   'Each limitations entry is {"kind":"coverage-gap|caveat","reason":"specific limitation","impact":null}.',
@@ -51,6 +62,7 @@ export const candidateFormat = (policy) => [
   `"candidates":[{"title":"concise defect","severity":"${policy.severities.join("|")}","confidence":0.9,`,
   '"location":CITATION,"trigger":"concrete reachable condition","expected":"required behavior",',
   '"actual":"failing behavior and impact","introduction":"why this diff newly causes that failure",',
+  '"remediation":"one sentence on one line saying what to do about this defect",',
   '"before":CITATION_OR_NULL,"after":CITATION_OR_NULL,"breaks":CITATION_OR_NULL,',
   '"evidence":[CITATION]}],"limitations":[]}.',
   citationFormat,
@@ -64,6 +76,8 @@ export const candidateFormat = (policy) => [
   "Do not mistake an assertion, a hypothetical caller, or the PR description for independent source evidence.",
   "Check language-operator semantics and the complete expression/control flow before claiming an effect.",
   "Every assertion must be supported; omit speculative consequences or embellishments even when the core defect is real.",
+  "Remediation is one sentence on one line saying what to do about the defect: prose, never code, a patch or a suggestion block.",
+  "No field may contain a code block: a line opening with ``` or ~~~ refuses the whole candidate.",
   `Omit candidates below confidence ${minimumConfidence}. ${severityGuide(policy)}`,
   "If evidence is missing, put that limitation in limitations rather than inventing a candidate.",
   limitationFormat,
@@ -88,10 +102,11 @@ export const validationInstructions = (policy) => [
   "Use uncertain when the supplied context cannot settle a claim. Never accept on the candidate's assertions alone.",
   "For accept, cite independent source evidence establishing the causal argument and explain it in reason.",
   "Accept ONLY if EVERY assertion the candidate makes is supported, in its prose and in its citations alike:",
-  "title, trigger, expected, actual, introduction, severity, confidence, its breaks citation, and each null introduction side.",
+  "title, trigger, expected, actual, introduction, remediation, severity, confidence, its breaks citation, and each null introduction side.",
   "A null before claims this change removed nothing where the location is anchored; a null after claims it added nothing there.",
   "Code does not check that claim: test it against the captured diff, and reject a replacement presented as a pure addition or deletion.",
   "If the core defect is real but any detail is false or overstated, reject the ENTIRE candidate and set allClaimsSupported=false.",
+  "The remediation is advice the finding publishes: a wrong, partial or overstated remediation is such a detail.",
   "Do not accept with a caveat/correction in reason: the original candidate text is displayed unchanged. Finding editing is not implemented.",
   severityGuide(policy),
   "Only mark a duplicate when root cause, triggering condition, and resulting failure are the SAME defect.",
@@ -275,8 +290,12 @@ function sharedChangedEvidence(left, right, evidence, boundary) {
 
 function candidate(value, boundary, policy, diagnostics, id) {
   object(value, ["title", "severity", "confidence", "location", "trigger", "expected", "actual",
-    "introduction", "before", "after", "evidence"], "Candidate", ["breaks"]);
-  for (const key of ["title", "trigger", "expected", "actual", "introduction"]) text(value[key], key);
+    "introduction", "remediation", "before", "after", "evidence"], "Candidate", ["breaks"]);
+  for (const key of ["title", "trigger", "expected", "actual", "introduction", "remediation"]) text(value[key], key);
+  // W1: the sentence is published after its label on a line of its own.
+  if (!isOneLineSentence(value.remediation)) throw new Error("Remediation must be one sentence on one line.");
+  const block = publishedProse.find((key) => opensCodeBlock(value[key]));
+  if (block) throw new Error(`${block} opens a code block; a published finding carries no code block.`);
   if (!policy.severities.includes(value.severity) ||
       typeof value.confidence !== "number" || !Number.isFinite(value.confidence) ||
       value.confidence < minimumConfidence || value.confidence > 1) {
@@ -524,6 +543,8 @@ export function formatFindings(outcome) {
     `Expected: ${finding.expected}`,
     `Actual: ${finding.actual}`,
     `Introduced by this diff: ${finding.introduction}`,
+    // A result retained before W1 carries no sentence and is shown as it was.
+    ...(finding.remediation === undefined ? [] : [`Fix: ${finding.remediation}`]),
     `Validation: ${finding.validation.reason}`,
     `Reported by: ${[...new Set(finding.reportedBy)].join(", ")}`,
   ].join("\n"));

@@ -45,6 +45,7 @@ const candidate = {
   expected: "300 cents, per the documented multiplication contract",
   actual: "103 cents; the customer is undercharged by 197 cents",
   introduction: "The changed operator adds quantity instead of multiplying the unit price.",
+  remediation: "Multiply the unit price by quantity instead of adding them.",
   before: citation("base"), after: citation("head"), evidence: [citation("head", 1)],
 };
 const reviewer = (candidates = [candidate], changes = {}) => ({
@@ -70,11 +71,16 @@ assert.equal(result.findings[0].location.ref, binding.head);
 assert.equal(result.findings[0].before.blobSha, blobSha(baseText));
 assert.match(formatFindings({ validation: result, complete: true }), /\[P2\].*Multiply/);
 assert.match(formatFindings({ validation: result, complete: true }), /confidence 0.95/);
+assert.match(formatFindings({ validation: result, complete: true }),
+  /\nIntroduced by this diff: .*\nFix: Multiply the unit price by quantity instead of adding them\.\nValidation: /);
 
 for (const mutate of [
   (c) => { c.severity = "P3"; }, (c) => { c.confidence = 0.4; },
   (c) => { c.confidence = "0.95"; }, (c) => { c.confidence = 1.1; },
   (c) => { c.actual = " "; }, (c) => { c.extra = true; },
+  (c) => { delete c.remediation; }, (c) => { c.remediation = " "; },
+  (c) => { c.remediation = "Multiply instead. Then retest."; },
+  (c) => { c.remediation = "Multiply instead.\nThen retest."; }, (c) => { c.remediation = "Multiply instead.\r"; },
   (c) => { c.location.path = "../total.js"; }, (c) => { c.location.side = "RIGHT"; },
   (c) => { c.location.startLine = 0; }, (c) => { c.location.endLine = 3.5; },
   (c) => { c.location.quote = "  return cents - quantity;"; },
@@ -90,6 +96,31 @@ for (const mutate of [
   assert.equal(rejected.candidates.length, 1, "Reject only the invalid candidate, retaining its valid sibling");
   assert.equal(rejected.issues.length, 1);
 }
+// W1: nothing a finding publishes may open a code block. A fence at the start of
+// a line is what GitHub renders as one, and a suggestion fence is what it offers
+// to commit, so code refuses the candidate whichever field carries it. A fence
+// may be indented up to three spaces; a fourth makes the line ordinary text.
+for (const field of ["title", "trigger", "expected", "actual", "introduction", "remediation"]) {
+  for (const fence of ["```suggestion", "~~~", "   ```js"]) {
+    const bad = structuredClone(candidate);
+    bad[field] = field === "remediation" ? fence + " return cents * quantity;"
+      : bad[field] + "\n\n" + fence + "\nreturn cents * quantity;\n```";
+    const refused = collectCandidates([reviewer([bad, candidate])], boundary, policy);
+    assert.equal(refused.candidates.length, 1, `A code block in ${field} is refused, and only that candidate`);
+    assert.match(refused.issues[0], /code block/);
+  }
+}
+{
+  const prose = structuredClone(candidate);
+  prose.actual += "\n\nSeen with `total(100, 3)` in the fixture.\n    ``` four spaces in is text, not a fence";
+  prose.remediation = "Use Node.js multiplication, e.g. `*`, between the unit price and quantity.";
+  const kept = collectCandidates([reviewer([prose])], boundary, policy);
+  assert.equal(kept.candidates.length, 1,
+    "Inline code, abbreviations, a blank line and a four-space indent are prose");
+  assert.deepEqual(kept.issues, []);
+}
+assert.match(candidateFormat(policy), /code block/i);
+console.log("PASS W1: a code block in any published field is refused, and inline code in prose is not");
 for (const raw of ["not JSON", "```json\n{}\n```", '{"schemaVersion":1', "null", "[]",
   JSON.stringify({ schemaVersion: 1, reviewKey: "wrong", candidates: [candidate], limitations: [] }),
   JSON.stringify({ schemaVersion: 1, reviewKey: key, candidates: [], limitations: [], clean: true }),
@@ -795,6 +826,7 @@ const breaker = {
   expected: "An order exactly at the threshold ships free, per the unchanged comment on line 1",
   actual: "shipping(5000) now charges 500 cents, so every order exactly at the threshold is billed",
   introduction: "The changed comparison excludes the boundary its unchanged callers still assume.",
+  remediation: "Keep the threshold comparison inclusive, as the unchanged comment and callers require.",
   before: at("breakage.js", "base", 5), after: at("breakage.js", "head", 5),
   breaks: at("breakage.js", "head", 9), evidence: [at("breakage.js", "head", 1)],
 };
@@ -950,6 +982,15 @@ assert.match(validationInstructions(policy), /reject a replacement presented as 
 assert.match(validationInstructions(policy), /EVERY assertion the candidate makes is supported, in its prose and in its citations alike/);
 console.log("PASS Q5: a changed-line anchor can cite the code it breaks, and every citation refusal still fires");
 
+// W1: a reviewer is asked for one remediation sentence, and the adjudicator is
+// told it is a claim like every other, so a wrong one sinks the whole candidate.
+assert.match(candidateFormat(policy), /"remediation"/);
+assert.match(candidateFormat(policy), /one sentence on one line/i);
+assert.match(candidateFormat(policy), /never code/i);
+assert.match(validationInstructions(policy), /introduction, remediation, severity/);
+assert.match(validationInstructions(policy), /wrong, partial or overstated remediation/);
+console.log("PASS W1: both output contracts name the remediation sentence, and a missing or multi-line one is refused");
+
 // Q6 preserves the exact acceptance path. Only candidate ingestion can restore
 // clipped ends; adjudication evidence and publication still use strict cite().
 for (const field of ["location", "before", "after", "breaks", "evidence"]) {
@@ -1044,7 +1085,10 @@ for (const fixture of q6CitationCases) {
   const bound = evidenceBoundary(snapshot, context, reviewBinding(snapshot, context));
   const gathered = collectCandidates([{
     label: fixture.label, status: "completed", result: JSON.stringify({
-      schemaVersion: 2, reviewKey: bound.key, candidates: [fixture.candidate], limitations: [],
+      // W1: these real candidates were recorded before remediation sentences
+      // existed, so the reconstruction supplies one; nothing checked here reads it.
+      schemaVersion: 2, reviewKey: bound.key, limitations: [],
+      candidates: [{ ...fixture.candidate, remediation: "Correct what this candidate names." }],
     }),
   }], bound, reviewModes.balanced.policy);
   if (fixture.repairedFields === null) {

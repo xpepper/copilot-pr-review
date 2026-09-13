@@ -554,6 +554,12 @@ may be unchanged code, code in another hunk, or code in another changed file.
 That citation is bound, in-window and exactly quoted like any other, and it is a
 claim the adjudicator must prove, never evidence that the claim holds.
 
+Every candidate also says **what to do about the defect**, in one sentence on
+one line. It is prose, never code: a candidate whose sentence, or any other text
+it would publish, has a line opening a code block (```` ``` ```` or `~~~`) is
+refused, because GitHub offers a suggestion block as a change to commit and this
+tool never writes source.
+
 One narrow repair exists. A quotation clipped at its end can be restored to the
 exact full lines it is a contiguous span of, at candidate ingestion only. It
 must still cover every named line and carry non-whitespace text on its first and
@@ -565,7 +571,8 @@ Then one **separate isolated adjudication session**, on the heavy tier with no
 tools at all, tries to disprove each surviving candidate against the diff and
 bound source. Acceptance needs an explicit `allClaimsSupported: true` plus
 citations that code checks again. A partly correct candidate is rejected: a
-correction in the adjudicator's rationale does not repair the finding text.
+correction in the adjudicator's rationale does not repair the finding text. The
+sentence is one of those claims, so a wrong or overstated fix rejects the finding.
 
 **The exact checks are deterministic; the causal judgement is not.** A matching
 quotation is not proof of a defect, and a second model's agreement is not an
@@ -738,7 +745,9 @@ safeguard.**
 The payload is built by code, not by a model: the reviewed `commit_id`, the
 literal `event: "COMMENT"`, a concise coverage summary, and inline comments from
 the canonical selected findings only. Each comment keeps severity, trigger,
-expected and actual behaviour, introduction and reviewer attribution. Head and
+expected and actual behaviour, introduction, the `Fix:` sentence and reviewer
+attribution. A finding with no sentence, which only a result retained by an
+earlier version holds, is refused; rerun the review. Head and
 base anchors use `RIGHT` and `LEFT`; multi-line ranges carry `start_line` and
 `start_side`; a renamed file's base citation maps to the current diff path and a
 deleted file keeps its old path. Every current finding requires an inline
@@ -1014,6 +1023,8 @@ These are decisions, not gaps waiting to be filled:
   models only.
 - **No stale publication** and no body-only fallback when an anchor is invalid.
 - **No finding editor** and no interactive configuration menu.
+- **No committable suggestion block.** A finding says what to do in one
+  sentence and never proposes code to commit.
 
 Reviewer confinement is **model capability isolation, not an operating system
 sandbox**: a granted read tool is constrained by plugin-owned path checks.

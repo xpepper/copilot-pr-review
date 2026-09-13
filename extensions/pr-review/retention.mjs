@@ -111,8 +111,11 @@ function validation(value, target, policy) {
   for (const finding of value.findings) {
     object(finding, ["id", "reviewer", "title", "severity", "confidence", "location", "trigger",
       "expected", "actual", "introduction", "before", "after", "evidence", "reportedBy", "candidateIds",
-      "validation"], ["breaks"]);
+      "validation"], ["breaks", "remediation"]);
     for (const key of ["id", "reviewer", "title", "trigger", "expected", "actual", "introduction"]) text(finding[key]);
+    // W1: optional here, because a result retained before remediation sentences
+    // existed has none and must still load; publication is what refuses it.
+    if (finding.remediation !== undefined) text(finding.remediation);
     requireValue(!ids.has(finding.id), "duplicate canonical finding ID");
     ids.add(finding.id);
     requireValue(policy.severities.includes(finding.severity) &&
@@ -207,8 +210,10 @@ function revalidationEntry(value, judged) {
     (value.endLine === undefined || (Number.isSafeInteger(value.startLine) && value.startLine > 0 &&
       Number.isSafeInteger(value.endLine) && value.endLine >= value.startLine)), "invalid revalidated anchor");
   object(value.finding, ["severity", "title", "trigger", "expected", "actual", "introduction",
-    "confidence", "reportedBy"]);
+    "confidence", "reportedBy"], ["remediation"]);
   for (const key of ["severity", "title", "trigger", "expected", "actual", "introduction"]) text(value.finding[key]);
+  // A comment published before W1 carries no remediation sentence to keep.
+  if (value.finding.remediation !== undefined) text(value.finding.remediation);
   requireValue(Number.isFinite(value.finding.confidence) &&
     value.finding.confidence >= minimumConfidence && value.finding.confidence <= 1,
   "invalid revalidated confidence");

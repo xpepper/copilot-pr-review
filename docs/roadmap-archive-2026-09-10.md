@@ -7,7 +7,8 @@ everything through `V1c`, by increment `L1` for `V2a` and `V2b`, by increment
 increment `U1` for `O1`'s, by increment `I1a` for `E1`'s, by increment `I1b`
 for `U1`'s and then `I1a`'s, by increment `I1c` for `I1b`'s, by increment
 `G1` for `I1c`'s, by the backlog triage of 2026-09-12 for `G1`'s own, by
-increment `B1` for `T1`'s, and by increment `X1` for `B1`'s, which is the
+increment `B1` for `T1`'s, by increment `X1` for `B1`'s, and by increment
+`W1` for `X1`'s, which is the
 last in this file. They are the
 project's
 evidence of record and are reproduced verbatim: nothing here was rewritten,
@@ -9658,3 +9659,97 @@ reads all six root files, and CI passed on #39.
 - **The discovery and revalidation passes add no gap**, not being review
   coverage. Follow-up.
 - `scripts/smoke-runtime.mjs --targets` still has not run; 81 is unverified.
+
+## `X1`: a reviewer can run on its model's long-context window
+
+A reviewer's whole conversation must fit its model's prompt budget, and near it
+the runtime compacts. **#3's four heavy specialists on `gpt-5.6-terra` each went
+from about 257k tokens to 24k-30k** at a 272000-token limit (sessions
+`184061c5`, `74cf4caa`, `92e03e72`, `cb487d73`). The runtime also offers a
+long-context window, 922k for Terra, and no pass had asked for it: those
+sessions recorded `contextTier: null`.
+
+### The decisions, taken with the user on 2026-09-13
+
+- **One flag chosen per run, `--long-context`, saved nowhere.** Not always on,
+  which doubles small reviews; not per tier, which needs three settings when
+  only heavy has invocation flags and a flag is not inherited; not a size
+  condition, which is a guess where `B1`'s signal is a measurement.
+- **A model that lists no long-context window runs on its own**, shown
+  `[model]`, instead of refusing. One that lists a window and does not keep it
+  is refused.
+- **`SCOPE.md` gained one paragraph**, approved word for word before the edit.
+
+### What a probe showed, spending nothing
+
+Sessions created with each tier and no prompt sent, reading
+`session.rpc.model.list()` and `getCurrent()`:
+
+- The session catalog lists the window at `billing.token_prices.long_context`:
+  Terra 272k then 922k, Luna 200k then 922k, Sonnet 5 200k then 936k.
+  `kimi-k3` (917504) and `claude-haiku-4.5` (136k, no billing) list none.
+  `client.listModels()` projects it as `billing.tokenPrices.longContext`, which
+  the extension does not read.
+- **`getCurrent()` echoes whatever tier a session was created with, including
+  `long_context` for `kimi-k3` and `claude-haiku-4.5`.** So the catalog decides,
+  and the echo proves only that the request was kept.
+
+### What it does
+
+`reviewerAssignments` resolves each assignment's and fallback's window with
+`contextWindow`: `long_context [flag]`, `default [model]` shown as "(no
+long-context window)", or `default [unset]` without the flag. `prepareReviewer`
+sends `contextTier` on every pass, `default` included, and before any send
+refuses when its own catalog lists no requested long window or `getCurrent()`
+reports another tier. The display, every `Assignment` line and the fallback line
+name the window; the evidence line carries `longContext` and each pass's
+`contextTier`, and `failedAttempt` keeps it. Not retained, as with `billing`.
+No new pass, so `payFor` is untouched.
+
+### The review
+
+Pull request #41, reviewed once with this plugin at the user's authorization,
+**deep with `--long-context`**: `gpt-5.6-terra` at high effort on
+`contextTier: long_context` for all 4 requests, **45.55611 credits**, 37.7 s of
+model work against 51.2 s elapsed, 17 approved tool calls and no denial,
+`contextLoss` empty, **INCOMPLETE**, 0 candidates and no adjudicator. **It is
+the first live long-context pass**: the installed plugin displayed
+`context=long_context [flag]` and `prepareReviewer` accepted the runtime's
+answer, which also shows `extension.mjs` passes the flag through.
+
+Its two coverage gaps are both about tests. No captured test runs a real session
+with the flag, which this review is and could not see. No test combined the flag
+with discovery or revalidation, which was true: a `--verify --long-context` run
+is now in `smoke-review`.
+
+GitHub's Copilot reviewer, requested at the user's authorization, commented on
+`72892c9` with three items, each checked. **Accepted**: the same discovery and
+revalidation gap. **Rejected for `X1`**: a controlled test dispatching the flag
+through `extension.mjs`, true of every flag since no suite reaches that file;
+this review dispatched it live, and a harness is a follow-up. **Already in
+hand**: `ROADMAP.md` and `HANDOFF.md` were not yet updated at that head.
+
+`@claude[agent]`, asked at the user's authorization, reviewed `3742416` with six
+observations, no blocking concern and no commit. Three confirm the design and
+one repeats the `extension.mjs` item. **Rejected**: that no test displays a
+fallback whose window differs, since `smoke-review` asserts and runs exactly
+that; and a comment on the tier assignment, which fixture assignments without a
+window need and a comment above it already explains.
+
+### Verified, and not
+
+**Test first**: `smoke-review` failed on the missing option before the change,
+and disabling either refusal check fails its new test. All seventeen suites
+pass, `git diff --check` is clean, discovery reads all six root files and skips
+none, and CI passed on #41.
+
+- **No price comparison exists.** 45.55611 credits on this diff says nothing
+  about what the long window added.
+- **Whether inference used the larger window is not shown.** `getCurrent()`
+  echoes and usage events carry no tier; only a compaction reporting a 922000
+  limit would, and none has run.
+- **Revalidation carries the window by spread only**: no suite runs that pass
+  end to end, with or without the flag, as `T1` recorded. Discovery has a run.
+- **No controlled test dispatches `--long-context` through `extension.mjs`.**
+  Follow-up.
+- How well a model reasons over 900k tokens is unmeasured.
