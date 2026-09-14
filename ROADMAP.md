@@ -19,7 +19,8 @@ increment scheduled up to `G1` is complete.** On 2026-09-12 the user triaged
 `G1`'s twelve proposals one at a time and scheduled six of them: `T1`, `B1`,
 `W1`, `N1`, `H1` and `K1`, in that order, and the same day scheduled `X1`
 immediately after `B1`. **`T1`, `B1`, `X1`, `W1`, `N1`, `H1` and `K1` are
-complete and archived**, so no scheduled row is left and no entry is live.
+complete and archived.** On 2026-09-14, outside that backlog, the user
+scheduled `S1` as the one `Pending` row; no entry is live yet.
 The closing section records what was decided, and what stays open as a
 limitation rather than as work.
 
@@ -87,6 +88,7 @@ posting them.
 | N1 | Completed | A seeded corpus and a deterministic scorer, **the free half only**: five plain-text diffs pinned by content hash, three seeded cases carrying four defects with stable ids, target and allowed severities, acceptable locations and concept groups, and two clean controls; a scorer needing no model or network that rejects explicit non-findings before matching and pairs findings with defects one-to-one, run by an eighteenth controlled suite and CI. No collection run, recall number or gate. Pull request #43, reviewed once with this plugin at the standing authorization: balanced, 127.050688 credits, INCOMPLETE, 0 validated findings, and one real candidate raised by two reviewers and refused on its citation, fixed anyway. | W1; [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | H1 | Completed | By default the project's own written rules steer the review: the root instruction files the reviewed head commits reach the one reviewer that weighs the whole change, up to a 48 KiB budget; a finding relying on one must quote the rule as exact lines of its file, bound like a source citation; `--no-standards` turns it off for one run. The user reversed the opt-in this row first proposed and approved the `SCOPE.md` paragraph word for word. **It settles what a claim not grounded in a provable code effect must carry: a quotable rule**, which the history and path-conditioned lenses would inherit. Pull request #44, reviewed once at the standing authorization: balanced, 319.760535 credits, INCOMPLETE, 0 validated findings; three refused candidates were real and are fixed, one through the user's budget decision. `G1`'s menu item 4. | N1; [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | K1 | Completed | A later review reports how this tool's earlier review of the same pull request was received, on one line under `Prior review:` at every verbosity: threads resolved, unresolved and unread, and the thumbs counts. Reactions come from the listing `I1a` already reads; resolution is one paginated GraphQL read matched by database id. Unread is never unresolved or zero, a failed read is reported and the review proceeds, and nothing reaches a reviewer, the adjudicator, a verdict, the retained record or the published review. Built test first and mutation-checked. Pull request #45, reviewed once at the standing authorization: balanced, 184.483837 credits, INCOMPLETE, 0 validated findings, and one refused candidate, declined; Copilot's `databaseId` finding was fixed after it. No read of a review this tool published has run. `G1`'s menu item 12. | H1, I1c; [Publication controls](SCOPE.md#selection-publication-and-cached-results) |
+| S1 | Pending | Cut `v0.1.0` and list it, in one session: a pull request bumps `plugin.json` to `0.1.0`, the merge commit is tagged `v0.1.0`, an install from that tag is shown to load, and a `copilot-pr-review` entry pinned to that tag reaches `xpepper/copilot-plugins` through a pull request the user merges. Every tag, release and write to the index needs the user's explicit authorization in that session. Planned in `docs/release-and-marketplace-plan.md`, which records the seven decisions the user took on 2026-09-14 and the acceptance criteria. | K1; outside the backlog, at the user's request; no scope clause |
 
 ## Every completed increment, `F1` through `K1`, is archived
 
@@ -133,7 +135,7 @@ than from this file.
 [docs/upstream-licensing.md](docs/upstream-licensing.md) is still the record of
 that licence work and did not move.
 
-**No entry is live until the user schedules another increment.** The backlog triage added no entry of its
+**No entry is live until `S1`'s session writes one.** The backlog triage added no entry of its
 own, because agreeing a backlog is not a numbered increment, so archiving `G1`
 left none behind and `T1`'s was written into that empty space. The rule these
 moves established is to keep
@@ -193,9 +195,15 @@ rows above and the order the next session works in, with `X1` inserted after
 over starting with the largest capability gap, and chose the mnemonic IDs over
 one series off `G1`.
 
-**Nothing is scheduled after `K1`, so the next increment is the user's to
-choose.** Do not start anything under "Recorded, not scheduled" below, and do not
-pick one yourself. `K1`'s archived entry records what it did not demonstrate,
+**`S1` is scheduled next, outside this backlog**, at the user's request on
+2026-09-14. A planning session that was not a numbered increment, like the
+triage, put seven decisions to the user and recorded them in
+[docs/release-and-marketplace-plan.md](docs/release-and-marketplace-plan.md): the
+light glm-style release model with no `package.json`, the name
+`copilot-pr-review`, `0.1.0` first, the index changed only by a pull request the
+user merges, and a fresh authorization for every tag, release and index change.
+**Do not reopen them.** Do not start anything under "Recorded, not scheduled"
+below, and do not pick one yourself. `K1`'s archived entry records what it did not demonstrate,
 including any read of a review this tool published.
 
 **Three of the six were scheduled as a named half, and the other half of each is
