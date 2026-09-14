@@ -49,7 +49,10 @@ function rootEntries(listing) {
 // whose blob is exactly the text that was read. One Git call covers the root.
 // Anything else is named with its reason and never reaches a reviewer.
 export async function collectStandards(root, head, { git = runGit, signal, budgetBytes = standardsBudgetBytes } = {}) {
-  const collected = collectInstructionFiles(root);
+  // Not the discovery read budget: a file refused below is never handed on, so it
+  // must not spend what a committed file after it needs. The standards budget
+  // bounds what is handed on, and the collector's per-file cap still bounds a read.
+  const collected = collectInstructionFiles(root, { budgetBytes: Infinity });
   if (!collected.files.length) return { files: [], skipped: collected.skipped };
   let entries;
   try {

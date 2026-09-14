@@ -9,6 +9,7 @@ import {
   assertReviewableCheckout, refuseCheckout, runGit, verificationNotice,
 } from "../extensions/pr-review/checkout.mjs";
 import { reviewModes } from "../extensions/pr-review/modes.mjs";
+import { instructionBudgetBytes, instructionFileMaxBytes } from "../extensions/pr-review/safeguards.mjs";
 import { collectStandards, standardsBudgetBytes, standardsInput } from "../extensions/pr-review/standards.mjs";
 
 const temporary = [];
@@ -491,8 +492,31 @@ try {
     const exact = await collectStandards(budgeted, budgetHead, { budgetBytes: numbered });
     assert.deepEqual(exact.files.map(({ name }) => name), ["AGENTS.md"], "a file that fits exactly fits");
   }
+  // H1: a root file the standards refuse, for not being the reviewed head's text or
+  // for not fitting the standards budget, is never handed on, so it must not spend
+  // the discovery read budget a committed file after it needs. Four files at the
+  // per-file cap fill that budget exactly, untracked or committed.
+  for (const committed of [false, true]) {
+    const starved = realpathSync(mkdtempSync(join(tmpdir(), "pr-review-standards-starved-")));
+    temporary.push(starved);
+    const starvedGit = (...args) => execFileSync("git", ["-C", starved, ...args], { encoding: "utf8" });
+    execFileSync("git", ["init", "--quiet", "-b", "pr-branch", starved]);
+    const large = ["A.md", "B.md", "C.md", "D.md"];
+    const size = instructionBudgetBytes / large.length;
+    assert(size <= instructionFileMaxBytes, "each large file stays within the per-file cap");
+    for (const name of large) writeFileSync(join(starved, name), "x".repeat(size));
+    writeFileSync(join(starved, "SCOPE.md"), "Scope.\n");
+    starvedGit("add", "SCOPE.md", ...(committed ? large : []));
+    starvedGit("-c", "user.email=fixture@example.invalid", "-c", "user.name=Fixture", "commit", "--quiet", "-m", "head");
+    const result = await collectStandards(starved, starvedGit("rev-parse", "HEAD").trim());
+    assert.deepEqual(result.files.map(({ name }) => name), ["SCOPE.md"],
+      `${committed ? "committed files too large for the budget" : "untracked files"} must not starve a committed one`);
+    assert.deepEqual(result.skipped.map(({ name, reason }) => [name, reason]), large.map((name) => [name,
+      committed ? `does not fit the ${standardsBudgetBytes} byte standards budget` : "is not committed at the reviewed head"]));
+  }
   console.log("PASS H1 standards are the root markdown files proven to be the reviewed head's committed text");
   console.log("PASS H1 the standards a reviewer is handed are bounded by a numbered-byte budget, in reading order");
+  console.log("PASS H1 a root file the standards refuse never starves a committed one of the discovery read budget");
 } finally {
   for (const directory of temporary) rmSync(directory, { recursive: true, force: true });
 }
