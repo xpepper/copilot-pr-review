@@ -32,9 +32,11 @@ probes find it by that prefix.
    release. It is not documentation-only, so it gets its one plugin review
    before a merge is asked for. The user merges it.
 2. **With the user's explicit authorization for this release**, run the full
-   controlled set at the merge commit, then tag that commit `vX.Y.Z` and push
-   the tag. Nothing on GitHub gates a tag and CI does not run on tags, so the
-   local run is the only check. A GitHub Release is optional and needs its own
+   controlled set at the commit the merge put on `main` (a squash merge makes a
+   new commit, not a merge commit), then tag that commit `vX.Y.Z` and push the
+   tag. Nothing on GitHub gates a tag and CI does not run on tags, so the local
+   run is the only check. Never move, delete or re-push a published tag: the
+   index pins it by name. A GitHub Release is optional and needs its own
    authorization.
 3. Install from the tag and check the plugin loads and reports the new version,
    before anything points at the tag. Read `copilot plugin install --help`
@@ -47,8 +49,9 @@ probes find it by that prefix.
    agree.
 
 Merging the version bump authorizes none of steps 2 to 4. Doing them in this
-order means the index never names a tag that does not exist yet, and never
-lags behind one.
+order means the index never names a tag that does not exist yet. It does trail
+the new tag from step 2 until the index pull request merges, so do steps 2 to 5
+in the same sitting.
 
 ## The marketplace entry
 
