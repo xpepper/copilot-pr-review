@@ -234,8 +234,8 @@ citations, and **overview was compacted at 247,927 of its 200,000 tokens**.
   the source-citation repair the scope reuses is identical.
 - **Found after it, fixed.** The `claude-review` action commented that a
   repaired rule quote's caveat printed the rule in the published review body.
-  At the user's choice the caveat now names the repair only (`0262965`). No
-  reply was posted and the thread is open.
+  At the user's choice the caveat now names the repair only (`0262965`). At
+  the user's request one reply names that commit and the thread is resolved.
 
 No plugin review covers the five commits after `8e0b547`.
 

@@ -36,12 +36,11 @@ What else was said on #44:
 - The `claude-review` action left one inline comment (id 4000826177, on
   `extensions/pr-review/findings.mjs`) saying a repaired rule quote's caveat
   printed the rule in the published review body. It was right, and `0262965`
-  fixes it at the user's choice. **No reply was posted and the thread is not
-  resolved**; ask the user before replying or resolving.
-- The PR description says three of 62 mutations surfaced as a crash; the right
-  count is four, and 75 in all with the later fixes, as `ROADMAP.md` records.
-  It was not edited, because editing it is a GitHub write the user has not asked
-  for.
+  fixes it at the user's choice. At the user's request one reply naming that
+  commit was posted (4002945201) and the thread is resolved.
+- At the user's request the PR description's mutation count was corrected: 62
+  across the first five code commits with four as a thrown error, 75 in all
+  with five, as `ROADMAP.md` records.
 - If anyone has since commented with something actionable, report it to the
   user and ask before acting.
 
