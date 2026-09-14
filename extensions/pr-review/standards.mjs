@@ -68,7 +68,6 @@ export async function collectStandards(root, head, { git = runGit, signal, budge
   }
   const files = [];
   const skipped = [...collected.skipped];
-  let spent = 0;
   for (const { name, bytes, text } of collected.files) {
     const entry = entries.get(name);
     if (!entry) {
@@ -80,15 +79,14 @@ export async function collectStandards(root, head, { git = runGit, signal, budge
     } else if (blobId(Buffer.from(text, "utf8"), entry.object) !== entry.object) {
       skipped.push({ name, bytes, reason: "is not the reviewed head's committed text" });
     } else {
-      // Bounded as numbered in the prompt, in reading order. A file that does not
-      // fit is named, and a smaller file after it may still fit.
+      // Bounded as the prompt carries it, in reading order, blank lines between
+      // files included. A file that does not fit is named, and a smaller file
+      // after it may still fit.
       const file = { name, bytes, blobSha: entry.object, text };
-      const size = Buffer.byteLength(standardsInput([file]));
-      if (spent + size > budgetBytes) {
+      if (Buffer.byteLength(standardsInput([...files, file])) > budgetBytes) {
         skipped.push({ name, bytes, reason: `does not fit the ${budgetBytes} byte standards budget` });
       } else {
         files.push(file);
-        spent += size;
       }
     }
   }

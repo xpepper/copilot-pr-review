@@ -491,6 +491,22 @@ try {
     ]);
     const exact = await collectStandards(budgeted, budgetHead, { budgetBytes: numbered });
     assert.deepEqual(exact.files.map(({ name }) => name), ["AGENTS.md"], "a file that fits exactly fits");
+
+    // The prompt joins the files with a blank line, and the budget charges that too:
+    // one that holds both numbered files but not the line between them takes one.
+    const joined = Buffer.byteLength(standardsInput(bounded.files));
+    assert.equal(joined, numbered + Buffer.byteLength(standardsInput([bounded.files[1]])) + 2,
+      "two files are joined by one blank line");
+    const tight = await collectStandards(budgeted, budgetHead, { budgetBytes: joined - 1 });
+    assert.deepEqual(tight.files.map(({ name }) => name), ["AGENTS.md"], "the separator counts against the budget");
+    assert.deepEqual(tight.skipped.map(({ name, reason }) => [name, reason]), [
+      ["README.md", `does not fit the ${joined - 1} byte standards budget`],
+      ["NOTES.md", "is not committed at the reviewed head"],
+      ["SCOPE.md", `does not fit the ${joined - 1} byte standards budget`],
+    ]);
+    const filled = await collectStandards(budgeted, budgetHead, { budgetBytes: joined });
+    assert.deepEqual(filled.files.map(({ name }) => name), ["AGENTS.md", "SCOPE.md"]);
+    assert.equal(Buffer.byteLength(standardsInput(filled.files)), joined, "files that fit exactly fill it exactly");
   }
   // H1: a root file the standards refuse, for not being the reviewed head's text or
   // for not fitting the standards budget, is never handed on, so it must not spend
@@ -517,6 +533,7 @@ try {
   console.log("PASS H1 standards are the root markdown files proven to be the reviewed head's committed text");
   console.log("PASS H1 the standards a reviewer is handed are bounded by a numbered-byte budget, in reading order");
   console.log("PASS H1 a root file the standards refuse never starves a committed one of the discovery read budget");
+  console.log("PASS H1 the standards budget charges the blank line that joins two files");
 } finally {
   for (const directory of temporary) rmSync(directory, { recursive: true, force: true });
 }
