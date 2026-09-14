@@ -9,8 +9,8 @@ The standing checkpoint-commit, pull-request and fresh-session handoff workflow
 is recorded in [AGENTS.md](AGENTS.md); the replaceable next-session prompt lives
 in [HANDOFF.md](HANDOFF.md). Completed entries through `K1` were moved verbatim
 to [docs/roadmap-archive-2026-09-10.md](docs/roadmap-archive-2026-09-10.md) by
-`A1`, `L1`, `D1`, `O1`, `U1`, `I1a`, `I1b`, `I1c`, `G1`, `B1`, `X1`, `W1`, `N1`,
-`H1` and `K1`, so this file keeps the increments table and the closing section, and stays
+the moves listed under "Every completed increment" below, so this file keeps
+the increments table and the closing section, and stays
 small enough for this project's own safeguard discovery to read. **With `D1`
 complete v1 is done, and `O1`, `E1`, `U1`, `I1a`, `I1b`, `I1c` and `G1` have since
 landed on top of it.** `I1` was sliced into three with the user before anything was built,
@@ -153,8 +153,8 @@ then `I1a`'s 15217** under that same rule. The first move was forced before a
 word could be written: this file had 2766 bytes spare, less than any increment
 entry ever written here. The second was forced once the entry existed, because
 it left 1369 bytes spare and the review evidence an entry ends with does not fit
-in that. **One live entry rather than two is where that rule now lands**, and the
-archive holds the rest. `I1c` archived `I1b`'s 15018 bytes before writing a
+in that. **One live entry rather than two is where that rule landed until
+`K1`'s merge**, and the archive holds the rest. `I1c` archived `I1b`'s 15018 bytes before writing a
 word of its own, on that same rule and for that same reason: 7364 bytes were
 spare and no increment entry has ever been that small. **`G1` archived `I1c`'s
 13014 bytes** for the same reason again: 7916 bytes were spare, and an entry
