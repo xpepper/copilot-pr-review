@@ -290,6 +290,8 @@ export function priorSummary(prior, limit = 20) {
     ...(prior.comparison ? { comparison: prior.comparison } : {}),
     comments: anchors.length, anchors: anchors.slice(0, limit),
     ...(anchors.length > limit ? { undisplayedAnchors: anchors.length - limit } : {}),
+    // K1: counts and reasons only, bounded whatever the number of comments.
+    ...(prior.feedback ? { feedback: feedbackCounts(prior.feedback) } : {}),
     ...(prior.reason ? { reason: prior.reason } : {}),
   };
 }
@@ -307,6 +309,51 @@ const confinesNothing = "Fresh hunting is not confined to any commit range.";
 const confinesRange = "Fresh hunting is confined to the commit range reported below.";
 const revalidatesFindings = "What became of that review's own findings is revalidated and reported below.";
 const revalidatesNothing = "That review published no finding this tool could read back, so none is revalidated.";
+
+// K1: counts of what was read, and grouped reasons for what was not. A comment
+// whose thread or rollup is unread is counted as unread and in nothing else.
+export function feedbackCounts(feedback) {
+  const tally = (entries) => entries.reduce((reasons, { reason }) =>
+    ({ ...reasons, [reason]: (reasons[reason] ?? 0) + 1 }), {});
+  const threads = feedback.comments.map(({ thread }) => thread);
+  const unreadThreads = threads.filter(({ status }) => status === "unread");
+  const reactions = feedback.comments.map(({ reactions: read }) => read);
+  const read = reactions.filter(({ status }) => status === "read");
+  const unreadReactions = reactions.filter(({ status }) => status === "unread");
+  return {
+    threads: { ...feedback.threads,
+      resolved: threads.filter(({ status }) => status === "resolved").length,
+      unresolved: threads.filter(({ status }) => status === "unresolved").length,
+      unread: unreadThreads.length, ...(unreadThreads.length ? { unreadReasons: tally(unreadThreads) } : {}) },
+    reactions: {
+      plusOne: read.reduce((sum, { plusOne }) => sum + plusOne, 0),
+      minusOne: read.reduce((sum, { minusOne }) => sum + minusOne, 0),
+      read: read.length, unread: unreadReactions.length,
+      ...(unreadReactions.length ? { unreadReasons: tally(unreadReactions) } : {}) },
+  };
+}
+
+// The scope's own limit on this line, stated where it is read: it is reported,
+// and a resolved thread was resolved for a reason nobody recorded.
+const informationOnly = "Information only: no reviewer or verdict reads it, and a resolved thread is not " +
+  "evidence that a finding was fixed or was wrong.";
+
+function describeFeedback(feedback) {
+  if (feedback.threads.status === "none") {
+    return "Feedback on those comments: none to read, as that review left no inline comment.";
+  }
+  // gh's error output can span lines; this report is one line whatever it says.
+  const oneLine = (text) => String(text).replace(/\s+/g, " ").trim();
+  const { threads, reactions } = feedbackCounts(feedback);
+  const resolution = threads.status === "failed"
+    ? `thread resolution could not be read (${oneLine(threads.reason)}), so all ${threads.unread} thread(s) are unread`
+    : `${threads.resolved} thread(s) resolved, ${threads.unresolved} unresolved` +
+      `${threads.unread ? `, ${threads.unread} unread` : ""}` +
+      `${threads.status === "incomplete" ? ` (the thread listing was incomplete: ${oneLine(threads.reason)})` : ""}`;
+  const thumbs = `reactions +1 ${reactions.plusOne}, -1 ${reactions.minusOne}` +
+    `${reactions.unread ? ` on ${reactions.read} comment(s), ${reactions.unread} unread` : ""}`;
+  return `Feedback on those comments: ${resolution}; ${thumbs}. ${informationOnly}`;
+}
 
 export function describePrior(prior, head, confined = false, revalidating = false) {
   const acts = `${confined ? confinesRange : confinesNothing} ` +
@@ -337,6 +384,7 @@ export function describePrior(prior, head, confined = false, revalidating = fals
       `declaring ${review.declaredFindings} finding(s). ${review.url}`,
     `${prior.comments.length} inline comment(s) retained, bodies verbatim and anchors normalised` +
       `${outdated ? `, of which ${outdated} no longer anchor in the current diff` : ""}.`,
+    ...(prior.feedback ? [describeFeedback(prior.feedback)] : []),
     `Relationship to this review's head: ${relationship}`,
     acts,
   ].join("\n");

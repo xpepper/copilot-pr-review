@@ -425,6 +425,60 @@ assert.deepEqual(bare.feedback, { threads: { status: "none" }, comments: [] });
 assert.equal(graphqlCalls(bareScenario).length, 0, "A review with no inline comment has no thread to read");
 console.log("PASS K1 one paginated GraphQL read settles each thread it reached, and leaves the rest unread");
 
+// K1: one line joins the prior-review block, directly under the comments it is
+// about, and it counts only what was read.
+const feedbackLines = (text) => text.split("\n").filter((line) => line.startsWith("Feedback on those comments:"));
+const informationOnly = /Information only: no reviewer or verdict reads it, and a resolved thread is not evidence that a finding was fixed or was wrong\.$/;
+{
+  const described = describePrior(receivedOutcome, currentHead).split("\n");
+  assert.equal(feedbackLines(described.join("\n")).length, 1, "Exactly one feedback line");
+  assert.match(described[2], /^Feedback on those comments: 1 thread\(s\) resolved, 1 unresolved, 1 unread; reactions \+1 1, -1 0 on 2 comment\(s\), 1 unread\. /);
+  assert.match(described[2], informationOnly);
+  assert.match(described[1], /^3 inline comment\(s\) retained/, "The line sits under the comments it is about");
+
+  // The shape the user was shown, where everything was read.
+  const allRead = threadScenario([threadPage([[3948685115, true], [3948685116, true], [3948685117, true]])]);
+  const allReadOutcome = await discoverPriorReview(repository, target, { gh: allRead.gh, cwd });
+  allReadOutcome.feedback.comments[2].reactions = { status: "read", plusOne: 0, minusOne: 0 };
+  assert.match(describePrior(allReadOutcome, currentHead),
+    /^Feedback on those comments: 3 thread\(s\) resolved, 0 unresolved; reactions \+1 1, -1 0\. Information only: /m);
+
+  const shortListing = threadScenario([threadPage([[3948685115, false]], { total: 3, next: true })]);
+  assert.match(describePrior(await discoverPriorReview(repository, target, { gh: shortListing.gh, cwd }), currentHead),
+    /^Feedback on those comments: 0 thread\(s\) resolved, 1 unresolved, 2 unread \(the thread listing was incomplete: the last page read still reported a next page\); /m);
+
+  // gh's own error output spans lines; the report stays one line regardless.
+  const refused = threadScenario(async () => {
+    throw new Error("PR capture failed (api --hostname): Command failed: gh api graphql\nHTTP 502 Bad Gateway\n");
+  });
+  const refusedLines = feedbackLines(describePrior(
+    await discoverPriorReview(repository, target, { gh: refused.gh, cwd }), currentHead));
+  assert.equal(refusedLines.length, 1);
+  assert.match(refusedLines[0], /^Feedback on those comments: thread resolution could not be read \(PR capture failed \(api --hostname\): Command failed: gh api graphql HTTP 502 Bad Gateway\), so all 3 thread\(s\) are unread; reactions \+1 1, -1 0 on 2 comment\(s\), 1 unread\. /);
+
+  assert.equal(feedbackLines(describePrior(bare, currentHead))[0],
+    "Feedback on those comments: none to read, as that review left no inline comment.");
+  for (const [what, outcome] of [["no earlier review", none],
+    ["a failed discovery", { status: "failed", relationship: "unknown", comments: [], reason: "boom" }],
+    ["an outcome built without feedback", { ...receivedOutcome, feedback: undefined }]]) {
+    assert.equal(feedbackLines(describePrior(outcome, currentHead)).length, 0, `No feedback line: ${what}`);
+  }
+
+  // The evidence line carries the same counts, the listing's own status and the
+  // grouped reasons for what stayed unread, and no comment prose.
+  assert.deepEqual(priorSummary(receivedOutcome).feedback, {
+    threads: { status: "complete", pages: 2, listed: 4, resolved: 1, unresolved: 1, unread: 1,
+      unreadReasons: { "no review thread opens with this comment": 1 } },
+    reactions: { plusOne: 1, minusOne: 0, read: 2, unread: 1,
+      unreadReasons: { "GitHub returned no reactions rollup for this comment": 1 } },
+  });
+  assert.deepEqual(priorSummary(bare).feedback,
+    { threads: { status: "none", resolved: 0, unresolved: 0, unread: 0 }, reactions: { plusOne: 0, minusOne: 0, read: 0, unread: 0 } });
+  assert.equal(priorSummary(none).feedback, undefined);
+  assert(!JSON.stringify(priorSummary(receivedOutcome)).includes("Restore multiplication"));
+}
+console.log("PASS K1 one feedback line and one evidence summary report only what was read");
+
 // Discovery grounds nothing a finding depends on, so a failure is reported as
 // itself and the review still runs. A cancellation is never one of these.
 const broken = await collectPriorReview(repository, target,
@@ -489,4 +543,12 @@ const quietSession = { ...session, log: async (message) => quietLogs.push(messag
 await executeTargetCapture(quietSession, "1", { gh: capturing, quiet: true });
 assert(!quietLogs.some((line) => line.startsWith("I1 prior: ")), "Quiet drops the evidence dump");
 assert(quietLogs.some((line) => acts.test(line)), "Quiet never drops what the run did about it");
+// K1: the feedback line is part of what the run reports, so quiet keeps it, and
+// the evidence dump carries its summary. The fixture's comment has a zero
+// rollup and no review thread.
+const fixtureFeedback = "Feedback on those comments: 0 thread(s) resolved, 0 unresolved, 1 unread; reactions +1 0, -1 0. ";
+const printsFeedback = (message) => message.split("\n").some((line) => line.startsWith(fixtureFeedback));
+assert(printsFeedback(evidence), "A verbose run prints the feedback line");
+assert.match(evidence.split("\n")[0], /"feedback":\{"threads":\{"status":"complete","pages":1,"listed":0,"resolved":0,"unresolved":0,"unread":1,/);
+assert(quietLogs.some(printsFeedback), "Quiet never drops the feedback line");
 console.log("PASS I1a capture reports the prior review, verbosely and quietly, and confines nothing");
