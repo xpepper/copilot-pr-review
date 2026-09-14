@@ -103,6 +103,22 @@ export function priorCommentFrom(raw) {
   };
 }
 
+// K1: how a comment was received, read from the listing discovery already
+// requested. Only the two thumbs count. A rollup GitHub did not send, or sent in
+// a shape this does not recognise, is unread: a zero nobody measured would be
+// reported as a reception. It never refuses the comment, which is still ours.
+export function reactionsFrom(raw) {
+  const rollup = raw?.reactions;
+  if (rollup === null || rollup === undefined) {
+    return { status: "unread", reason: "GitHub returned no reactions rollup for this comment" };
+  }
+  const count = (value) => Number.isSafeInteger(value) && value >= 0;
+  if (typeof rollup !== "object" || Array.isArray(rollup) || !count(rollup["+1"]) || !count(rollup["-1"])) {
+    return { status: "unread", reason: "GitHub returned a malformed reactions rollup for this comment" };
+  }
+  return { status: "read", plusOne: rollup["+1"], minusOne: rollup["-1"] };
+}
+
 // Only `ahead` means the reviewed head descends from the head that review
 // evaluated, which is the one case where a forward range exists to confine
 // fresh hunting to. A rewound head is GitHub's `behind` and classifies as
@@ -146,9 +162,13 @@ export async function discoverPriorReview(repository, pull, { gh = runGh, cwd, s
     const [candidate, incumbent] = [Date.parse(raw.submitted_at), Date.parse(best.submitted_at)];
     return candidate > incumbent || (candidate === incumbent && raw.id > best.id) ? raw : best;
   }));
-  const comments = (await listed(`${endpoint}/comments`))
-    .filter((raw) => raw?.pull_request_review_id === review.id).map(priorCommentFrom);
-  const found = { ...base, status: "found", review, comments };
+  const listing = (await listed(`${endpoint}/comments`))
+    .filter((raw) => raw?.pull_request_review_id === review.id);
+  const comments = listing.map(priorCommentFrom);
+  // K1: kept beside the comments rather than on them, so nothing that reads a
+  // retained comment, revalidation included, can read how it was received.
+  const feedback = { comments: listing.map((raw) => ({ id: raw.id, reactions: reactionsFrom(raw) })) };
+  const found = { ...base, status: "found", review, comments, feedback };
   // Two equal heads settle the relationship without asking, and a comparison
   // this run never made has no place in its record.
   if (review.head === pull.head.sha) return { ...found, relationship: "same-head" };

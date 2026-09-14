@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import {
   classifyComparison, collectPriorReview, describePrior, discoverPriorReview, identityFrom,
-  isPriorReview, priorCommentFrom, priorReviewFrom, priorSummary, toolReviewBody,
+  isPriorReview, priorCommentFrom, priorReviewFrom, priorSummary, reactionsFrom, toolReviewBody,
 } from "../extensions/pr-review/prior.mjs";
 import { executeTargetCapture } from "../extensions/pr-review/target.mjs";
 import { identity, respond } from "./target-fixture.mjs";
@@ -27,6 +27,14 @@ function toolReview(overrides = {}) {
   };
 }
 
+// K1: the rollup GitHub attaches to every review comment in the listing, in the
+// shape a read-only probe of #44 returned.
+function rollup(counts = {}) {
+  const kinds = { "+1": 0, "-1": 0, laugh: 0, hooray: 0, confused: 0, heart: 0, rocket: 0, eyes: 0, ...counts };
+  return { url: "https://api.github.com/repos/fixture/repository/pulls/comments/3948685115/reactions",
+    total_count: Object.values(kinds).reduce((sum, count) => sum + (Number(count) || 0), 0), ...kinds };
+}
+
 function toolComment(overrides = {}) {
   return {
     id: 3948685115, pull_request_review_id: 5130714400,
@@ -35,6 +43,7 @@ function toolComment(overrides = {}) {
     original_line: 3, original_start_line: null,
     commit_id: currentHead, original_commit_id: reviewedHead,
     body: "[P2] Restore multiplication when calculating total cents\n\nWhen: any call.",
+    reactions: rollup(),
     ...overrides,
   };
 }
@@ -156,6 +165,31 @@ for (const broken of [{}, toolComment({ path: "" }), toolComment({ body: "" }), 
 }
 console.log("PASS I1a prior reviews and their comments are validated, not trusted");
 
+// K1: the listing discovery already reads carries each comment's reactions
+// rollup. Only the two thumbs are kept, and a rollup that is missing or
+// malformed is reported as unread, never guessed as zero. A comment is still a
+// comment without one, so neither case refuses discovery.
+assert.deepEqual(reactionsFrom(toolComment({ reactions: rollup({ "+1": 2, "-1": 1, heart: 4 }) })),
+  { status: "read", plusOne: 2, minusOne: 1 });
+assert.deepEqual(reactionsFrom(toolComment()), { status: "read", plusOne: 0, minusOne: 0 },
+  "A rollup GitHub sent with zero counts is a read zero");
+for (const [what, reactions, reason] of [
+  ["no rollup", undefined, /no reactions rollup/], ["a null rollup", null, /no reactions rollup/],
+  ["a list", [], /malformed reactions rollup/],
+  ["no thumbs-down", { ...rollup(), "-1": undefined }, /malformed reactions rollup/],
+  ["a string count", rollup({ "+1": "2" }), /malformed reactions rollup/],
+  ["a negative count", rollup({ "-1": -1 }), /malformed reactions rollup/],
+  ["a fractional count", rollup({ "+1": 1.5 }), /malformed reactions rollup/],
+]) {
+  const read = reactionsFrom(toolComment({ reactions }));
+  assert.equal(read.status, "unread", `Unread, never zero: ${what}`);
+  assert.match(read.reason, reason, what);
+  assert.equal(Object.hasOwn(read, "plusOne") || Object.hasOwn(read, "minusOne"), false,
+    `An unread rollup carries no count at all: ${what}`);
+  assert.doesNotThrow(() => priorCommentFrom(toolComment({ reactions })), what);
+}
+console.log("PASS K1 each earlier comment keeps its thumbs, and an unreadable rollup is unread, never zero");
+
 // Only `ahead` leaves a forward range to confine hunting to. A rewound head is
 // GitHub's `behind`, and folds into diverged for exactly that reason; GitHub's
 // own word stays in the record, so the fold loses nothing.
@@ -182,18 +216,20 @@ assert.equal(none.considered, 1);
 assert.deepEqual(none.comments, []);
 assert.deepEqual(absent.calls.map((call) => call.paginated), [false, true]);
 assert.match(describePrior(none, currentHead), /1 submitted review\(s\) considered/);
+assert.equal(none.feedback, undefined, "No earlier review, so no feedback on one");
 
 // Every page of both listings is read, so a page boundary can never be the
 // reason a prior review looks absent.
 const paged = priorGh({
   reviews: [[toolReview({ id: 1, submitted_at: "2026-09-07T09:00:00Z", commit_id: "9".repeat(40) })],
     [toolReview()]],
-  comments: [[toolComment({ id: 1, pull_request_review_id: 999 })],
+  comments: [[toolComment({ id: 1, pull_request_review_id: 999, reactions: rollup({ "-1": 7 }) })],
     // A person answering one of our findings. GitHub files the reply under a
     // review of its own, so it never carries the prior review's id and never
     // reaches priorCommentFrom, let alone I1c's reader.
-    [toolComment(), toolComment({ id: 2, pull_request_review_id: 5131451227,
-      in_reply_to_id: 3948685115, body: "Thanks, fixed in abc1234." })]],
+    [toolComment({ reactions: rollup({ "+1": 2, "-1": 1 }) }), toolComment({ id: 2,
+      pull_request_review_id: 5131451227, in_reply_to_id: 3948685115, body: "Thanks, fixed in abc1234.",
+      reactions: rollup({ "+1": 5 }) })]],
   compare: comparisons.ahead,
 });
 const incremental = await discoverPriorReview(repository, target, { gh: paged.gh, cwd });
@@ -203,6 +239,13 @@ assert.equal(incremental.relationship, "incremental");
 assert.equal(incremental.comments.length, 1,
   "Only the prior review's own comments are kept: not another review's, and not a reply to ours");
 assert.equal(incremental.comments[0].id, 3948685115);
+// K1: the thumbs come from the listing already read, for that review's own
+// comments only, and they live beside the comments rather than on them, so
+// nothing that reads a retained comment can read its reception.
+assert.deepEqual(incremental.feedback.comments.map(({ id, reactions }) => ({ id, reactions })),
+  [{ id: 3948685115, reactions: { status: "read", plusOne: 2, minusOne: 1 } }],
+  "Neither another review's comment nor a reply to ours lends its reactions");
+assert.equal(Object.hasOwn(incremental.comments[0], "reactions"), false);
 assert.equal(paged.calls.at(-1).path,
   `repos/${repository.nameWithOwner}/compare/${reviewedHead}...${currentHead}?per_page=1`);
 assert.match(describePrior(incremental, currentHead), /incremental\. 3 commit\(s\) were added after it/);
