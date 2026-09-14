@@ -175,7 +175,7 @@ bump chosen by hand anyway.
 
 ### The marketplace entry
 
-Shaped like the two existing entries, with the name still to be decided:
+Shaped like the two existing entries, under the name decision 3 chose:
 
 ```json
 {
