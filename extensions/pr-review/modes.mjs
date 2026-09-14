@@ -38,6 +38,10 @@ export const reviewModes = {
     label: "Quick review",
     evidencePrefix: "Q3",
     holistic: false,
+    // H1: the one reviewer handed the project's own written rules. It is the
+    // reviewer that weighs the whole change where a mode has one; quick has
+    // none, so its contracts specialist takes them. No mode changes shape.
+    standardsReviewer: "contracts",
     reviewers: [
       correctness,
       contracts,
@@ -58,6 +62,7 @@ export const reviewModes = {
     label: "Balanced review",
     evidencePrefix: "M1",
     holistic: false,
+    standardsReviewer: "overview",
     reviewers: [correctness, contracts, security, performanceResources, overview],
     policy: minorPolicy("Balanced review", 3),
   },
@@ -68,6 +73,7 @@ export const reviewModes = {
     label: "Full review",
     evidencePrefix: "M1",
     holistic: false,
+    standardsReviewer: "overview",
     reviewers: [
       correctness, contracts, security, performanceResources, overview,
       { label: "conventions-maintainability", tier: "medium",
@@ -88,6 +94,7 @@ export const reviewModes = {
     label: "Deep review",
     evidencePrefix: "M2",
     holistic: true,
+    standardsReviewer: "integrated",
     reviewers: [integrated],
     policy: minorPolicy("Deep review", Infinity),
   },

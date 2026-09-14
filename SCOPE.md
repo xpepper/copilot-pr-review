@@ -69,6 +69,22 @@ findings for selection. Review the PR's changes and their provable effects, not
 unrelated pre-existing repository problems. Reading surrounding code is permitted
 to establish context and confirm impact.
 
+By default, the project's own written rules also steer the review. The markdown
+files at the checkout root, where each is the reviewed head's committed text,
+reach the one reviewer that weighs the whole change: overview in balanced and
+full, integrated in deep, and contracts in quick. That reviewer is told that
+agent instruction files such as `AGENTS.md` and `CLAUDE.md` are the likeliest
+to hold the rules, though any of those files counts. It may report changed lines
+that break or contradict one of those rules, and such a finding must quote the
+rule as exact lines of a named file. Code checks that quote the way it checks a
+source citation and refuses the finding when the lines are not there. The
+adjudicator receives each cited file in full. The presented finding names the
+rule's file and lines; the published comment does not, as it names no other
+citation. A root file left out is named with its reason, and a claim that a rule
+is missing has nothing to quote, so it is not such a finding. `--no-standards`
+turns this off for one run and is never saved in configuration; safeguard
+discovery under `--verify` is unaffected.
+
 Preserve the original severity, location, confidence, and human-readable review
 structure. A failed or incomplete reviewer must remain visible as incomplete
 coverage; it must never become a clean-review claim. Useful validated findings

@@ -39,7 +39,7 @@ and how to reproduce each behaviour yourself.
 | [Re-reviewing a pull request](docs/re-review.md) | `--incremental`, `--revalidate`, and answering the last review's threads |
 | [Review modes](#review-modes) | Quick, balanced, full, deep, and what each costs |
 | [Models and configuration](#models-and-configuration) | Tiers, precedence, fallbacks, `--long-context`, project trust |
-| [Reading the result](#reading-the-result) | Findings, the evidence boundary, coverage |
+| [Reading the result](#reading-the-result) | Findings, the evidence boundary, your project's rules, coverage |
 | [Selecting findings](#selecting-findings) | The selection step and `--all` |
 | [Publishing](#publishing) | Posting authority, gates, uncertain writes |
 | [Publishing later](#publishing-later) | The retained result and `/pr-review publish` |
@@ -560,6 +560,18 @@ it would publish, has a line opening a code block (```` ``` ```` or `~~~`) is
 refused, because GitHub offers a suggestion block as a change to commit and this
 tool never writes source.
 
+A candidate may also rely on **one of your project's written rules**. The
+markdown files at the checkout root that the reviewed head commits, `AGENTS.md`
+and `CLAUDE.md` named as the likeliest to hold rules, go to the one reviewer
+that weighs the whole change: overview in balanced and full, integrated in deep,
+contracts in quick. Up to 48 KiB of them, taken in that order and counted as
+numbered, join that reviewer's input on every review; a file that does not fit
+is named. Such a
+candidate quotes the rule as exact lines of its file, checked like any
+quotation; the adjudicator is handed that file in full, and the finding shows
+`Rule: FILE:LINES` but never publishes it, nor a repaired quote of it. Every run names the files it handed
+on and those it left out, and `--no-standards` turns this off.
+
 One narrow repair exists. A quotation clipped at its end can be restored to the
 exact full lines it is a contiguous span of, at candidate ingestion only. It
 must still cover every named line and carry non-whitespace text on its first and
@@ -978,6 +990,7 @@ Review flags:
 | `--incremental` | Confine fresh hunting to the commits added since an earlier review of this pull request by this tool. A request, not a parse-time contract: a run with no forward commit range narrows nothing and says so. Authorizes nothing |
 | `--revalidate` | Buy one model pass over the earlier review's findings this tool cannot settle for free. Every review already reports the verdicts it can prove. A settled verdict is answered on the earlier review's thread under the review's own posting authority. Authorizes nothing |
 | `--long-context` | Ask every model pass for its model's long-context window, at that window's own and possibly higher price. A model with none keeps its own window and says so; one that lists a window and does not keep it is refused. Saved nowhere. Authorizes nothing |
+| `--no-standards` | Hand no reviewer the root instruction files this run. Otherwise every review hands them to its whole-change reviewer, which may rely on a rule only by quoting its exact lines. Saved nowhere. Authorizes nothing |
 | `--capture-only` | Stop after capture. Takes no mode, posting or model argument |
 | `heavyModel=ID`, `heavyEffort=LEVEL` | Override the heavy tier for this invocation only |
 
@@ -1178,10 +1191,9 @@ the point of this project:
   to the pull request. The quoted source citations are not published, which
   narrows this without closing it. Weigh it before authorizing posting on a
   repository whose diffs can carry secrets.
-- **No reviewer is told your project's conventions.** `--verify` reads your
-  instruction files to discover safeguard commands and hands them to no reviewer,
-  so a review judges your change against the code around it and never against
-  what you wrote down.
+- **A rule counts only when it can be quoted.** Only root instruction files
+  reach a reviewer, and only one reviewer per mode. A claim that a document
+  cites a rule your files do not contain has nothing to quote and is refused.
 - **Copilot CLI only.** Plugin-format support elsewhere does not establish
   equivalent execution, and no other client is demonstrated.
 

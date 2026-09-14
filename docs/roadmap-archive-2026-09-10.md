@@ -8,7 +8,8 @@ increment `U1` for `O1`'s, by increment `I1a` for `E1`'s, by increment `I1b`
 for `U1`'s and then `I1a`'s, by increment `I1c` for `I1b`'s, by increment
 `G1` for `I1c`'s, by the backlog triage of 2026-09-12 for `G1`'s own, by
 increment `B1` for `T1`'s, by increment `X1` for `B1`'s, by increment
-`W1` for `X1`'s, and by increment `N1` for `W1`'s, which is the
+`W1` for `X1`'s, by increment `N1` for `W1`'s, and by increment `H1` for
+`N1`'s, which is the
 last in this file. They are the
 project's
 evidence of record and are reproduced verbatim: nothing here was rewritten,
@@ -9835,3 +9836,86 @@ usage and no buffered comments. It was recorded rather than rerun.
 - A model-decided `I1c` reply still carries the model's reason verbatim and can
   contain a code fence. It is a reply rather than a finding and is not widened
   into `W1`.
+
+## `N1`: a seeded corpus and a deterministic scorer
+
+**The free half only.** No collection runner, no review collected against the
+corpus, no mode matrix, no published recall or precision and no baseline gate.
+`SCOPE.md` is unchanged, because no product behaviour moved.
+
+`scripts/benchmark/corpus/` holds five plain-text diffs: three seeded cases
+carrying four defects, two targeted P1 and two P2, and two clean controls.
+`corpus.json` gives each defect a stable id, a summary, a target severity, its
+allowed severities, acceptable locations and concept groups. Its own sha256
+versions the set and `smoke-benchmark.mjs` pins it. The loader refuses, naming
+the case or defect, a diff that no longer matches its pin, a control byte or
+carriage return, a hunk header its body contradicts, an unlisted fixture, an
+unknown or missing field, a control with a defect, a target outside its allowed
+list or a severity this tool never reports, a location outside one hunk or
+covering no changed line on its side, and an unnormalised term. It reuses
+`parseDiffFiles` and full mode's severities rather than restating either.
+
+`scoreReports` reads findings in the shape this tool validates, and:
+
+- rejects an explicit non-finding before matching, reading `title` and
+  `actual` for a listed phrase such as "is correct";
+- matches only at an overlapping acceptable location, an allowed severity and
+  a whole-word term from every concept group;
+- pairs findings and defects by a maximum one-to-one matching over a canonical
+  order, so no report or finding order changes a score;
+- bands opportunities by target severity, counts a second report of a detected
+  defect as a duplicate, names a control that drew a finding, and leaves a case
+  with no report unscored rather than missed.
+
+`formatScore` prints counts only and, for every false positive, which check
+failed against which defect.
+
+### The review
+
+Pull request #43 was reviewed once with the installed plugin, **balanced**, at
+head `c205f03`: four heavy specialists on `gpt-5.6-terra` and the overview on
+`gpt-5.6-luna`, all at high effort on the default window, 14 requests,
+**127.050688 credits**, 232.9 s of model work against 114.0 s elapsed. All 32
+permission requests were approved for 31 confined reads; nothing was denied, no
+pass lost context, and no finding was posted.
+
+Coverage is **INCOMPLETE** with 0 validated findings. Correctness and contracts
+each raised one P2 candidate, the same defect: `checkFinding` accepted a
+reversed or non-positive range, so `4-3` overlapped `3-4` and detected the
+defect. Both were refused at the evidence boundary for citing
+`score.mjs:213-216` with a five-line quote. **Fixed anyway**: the new test
+failed on `4-3`, a finding now needs `1 <= startLine <= endLine`, and disabling
+either half fails the suite. Overview's envelope failed to parse at character
+2789, an execution failure. Contracts and performance-resources each named a
+coverage gap and security a caveat, all the same observation: no collection
+runner or other caller exists to assess, which is this increment's boundary.
+
+GitHub Copilot's later review of `e92f9a2` left one inline comment: the scorer
+checked only that a range was positive, so `src/paginate.js:1-999` or `3-13`
+detected `pagination-inclusive-bound`, though the tool refuses a location over
+ten lines or off the changed lines of one hunk. **`230f982` fixes it**, test
+first: a submitted finding now takes the loader's anchor check, which reads the
+same as `findings.mjs:266-272`, plus the ten-line cap. `1-999`, `3-13`, `3-9`,
+`5-6`, a missing path and `10-20` each scored before it, and disabling each of
+seven rules fails the suite. Two scripted findings off changed lines moved; the
+corpus and its hash did not. No plugin review covers the fix. Codex found
+nothing at `e92f9a2`, and `@claude[agent]` had not replied.
+
+### Verified, and not
+
+**Test first**: the suite failed on the missing module, then on the missing
+scorer exports, then, with matching written and no rejection, on `No issue: the
+loop only reads one past the end with <=` detecting its defect. Disabling each
+of thirteen loader guards and fifteen scorer rules in turn fails the suite. All
+eighteen suites pass, `git diff --check` is clean, no tracked text including
+`*.diff` carries a control byte, and discovery reads all six root files and
+skips none. CI now runs the suite and checks `*.diff` too.
+
+- **No model output has been scored.** Every report is scripted, so nothing
+  shows the concept groups are neither too strict nor too loose for real prose.
+- **Non-finding phrases are literal.** A real finding whose title or actual
+  says "is correct" before naming a defect is rejected, with the phrase shown.
+- **The seeded code was written to carry no other defect.** A reviewer that
+  finds one anyway scores a false positive until the corpus is repinned.
+- **Five cases test the scorer; they are not a benchmark.** Collection runs,
+  and any number from them, stay unscheduled.

@@ -134,6 +134,36 @@ try {
     invalid.digest = reviewKey(invalid.outcome);
     assert.throws(() => validateRecord(invalid, sessionId), /Invalid retained result/);
   }
+  // H1: a finding may rely on a project rule. The retained record keeps the
+  // quoted lines, the root file they came from and that file's committed blob,
+  // and a record carrying no rule, as every earlier one does, still reloads.
+  assert.equal(Object.hasOwn(record.outcome.validation.findings[0], "rule"), false);
+  const ruled = structuredClone(record);
+  ruled.outcome.validation.findings[0].rule =
+    { file: "AGENTS.md", startLine: 3, endLine: 4, quote: "- **Totals multiply.**\n  Always.", blobSha: "e".repeat(40) };
+  ruled.digest = reviewKey(ruled.outcome);
+  validateRecord(ruled, sessionId);
+  const sha256Rule = structuredClone(ruled);
+  sha256Rule.outcome.validation.findings[0].rule.blobSha = "e".repeat(64);
+  sha256Rule.digest = reviewKey(sha256Rule.outcome);
+  validateRecord(sha256Rule, sessionId);
+  for (const mutate of [
+    (r) => { r.outcome.validation.findings[0].rule.quote += "\nextra"; },
+    (r) => { delete r.outcome.validation.findings[0].rule.blobSha; },
+    (r) => { r.outcome.validation.findings[0].rule.blobSha = "e".repeat(39); },
+    (r) => { r.outcome.validation.findings[0].rule.startLine = 0; },
+    (r) => { r.outcome.validation.findings[0].rule.endLine = 2; },
+    (r) => { r.outcome.validation.findings[0].rule.file = " "; },
+    (r) => { r.outcome.validation.findings[0].rule.file = "docs/AGENTS.md"; },
+    (r) => { r.outcome.validation.findings[0].rule.file = "docs\\AGENTS.md"; },
+    (r) => { r.outcome.validation.findings[0].rule.side = "head"; },
+    (r) => { r.outcome.validation.findings[0].rule = null; },
+  ]) {
+    const invalid = structuredClone(ruled);
+    mutate(invalid);
+    invalid.digest = reviewKey(invalid.outcome);
+    assert.throws(() => validateRecord(invalid, sessionId), /Invalid retained result/);
+  }
   store.write(record);
 
   const corrupt = structuredClone(record);

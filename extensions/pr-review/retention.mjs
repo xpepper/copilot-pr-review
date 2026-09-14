@@ -80,6 +80,17 @@ function binding(value) {
     }
   }
 }
+// H1: a rule names a root instruction file, never a path, and keeps that file's
+// committed blob beside the exact lines quoted from it.
+function ruleCitation(value) {
+  object(value, ["file", "startLine", "endLine", "quote", "blobSha"]);
+  text(value.file); text(value.quote);
+  requireValue(!value.file.includes("/") && !value.file.includes("\\") &&
+    Number.isSafeInteger(value.startLine) && value.startLine > 0 &&
+    Number.isSafeInteger(value.endLine) && value.endLine >= value.startLine &&
+    value.quote.split("\n").length === value.endLine - value.startLine + 1 &&
+    /^[0-9a-f]{40}(?:[0-9a-f]{24})?$/.test(value.blobSha), "invalid rule citation");
+}
 function citation(value, target) {
   object(value, ["path", "side", "startLine", "endLine", "quote", "ref", "blobSha"]);
   text(value.path); text(value.quote);
@@ -111,7 +122,7 @@ function validation(value, target, policy) {
   for (const finding of value.findings) {
     object(finding, ["id", "reviewer", "title", "severity", "confidence", "location", "trigger",
       "expected", "actual", "introduction", "before", "after", "evidence", "reportedBy", "candidateIds",
-      "validation"], ["breaks", "remediation"]);
+      "validation"], ["breaks", "remediation", "rule"]);
     for (const key of ["id", "reviewer", "title", "trigger", "expected", "actual", "introduction"]) text(finding[key]);
     // W1: optional here, because a result retained before remediation sentences
     // existed has none and must still load; publication is what refuses it.
@@ -137,6 +148,9 @@ function validation(value, target, policy) {
     // The code a finding breaks is optional and unanchored, but it is still a
     // citation bound to this reviewed revision.
     if (finding.breaks !== undefined && finding.breaks !== null) citation(finding.breaks, target);
+    // H1: the project rule a finding relies on is optional, and a record
+    // retained before H1 carries none.
+    if (finding.rule !== undefined) ruleCitation(finding.rule);
     requireValue(Array.isArray(finding.evidence) && finding.evidence.length, "missing evidence");
     finding.evidence.forEach((entry) => citation(entry, target));
     object(finding.validation, ["kind", "allClaimsSupported", "reason", "evidence"]);

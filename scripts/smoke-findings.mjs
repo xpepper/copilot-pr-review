@@ -121,6 +121,110 @@ for (const field of ["title", "trigger", "expected", "actual", "introduction", "
 }
 assert.match(candidateFormat(policy), /code block/i);
 console.log("PASS W1: a code block in any published field is refused, and inline code in prose is not");
+
+// H1: a finding that relies on the project's own written rules quotes the rule
+// as exact lines of a named root file. The boundary binds that quote to a file
+// proven to be the reviewed head's committed text, the way it binds a source
+// citation, and only the reviewer handed those standards may quote one.
+{
+  const rules = "# Rules\n\n- **Totals multiply every price by its quantity; they never\n  add the two.** Totals are in cents.\n";
+  const standards = { reviewer: "correctness",
+    files: [{ name: "AGENTS.md", bytes: Buffer.byteLength(rules), blobSha: "e".repeat(40), text: rules }] };
+  const ruledBoundary = evidenceBoundary(snapshot, context, binding, standards);
+  const lines = rules.split("\n");
+  const rule = (startLine = 3, endLine = 4) =>
+    ({ file: "AGENTS.md", startLine, endLine, quote: lines.slice(startLine - 1, endLine).join("\n") });
+  const ruled = { ...structuredClone(candidate), rule: rule() };
+
+  const kept = collectCandidates([reviewer([ruled])], ruledBoundary, policy);
+  assert.deepEqual(kept.issues, []);
+  assert(!kept.diagnostics.some(({ message }) => /repaired/.test(message)), "an exact rule is not reported as repaired");
+  assert.deepEqual(kept.candidates[0].rule, { ...rule(), blobSha: "e".repeat(40) });
+  const ruledResult = adjudicateCandidates(kept, validator(), ruledBoundary, policy);
+  assert.equal(ruledResult.findings.length, 1);
+  assert.deepEqual(ruledResult.findings[0].rule, { ...rule(), blobSha: "e".repeat(40) });
+  assert.match(formatFindings({ validation: ruledResult, complete: true }),
+    /\ntotal\.js:3-3 \(head, b{40}\); confidence 0\.95\nRule: AGENTS\.md:3-4\nWhen: /);
+
+  // A candidate that relies on no rule is unchanged, whether it omits the field or sends null.
+  for (const plain of [candidate, { ...structuredClone(candidate), rule: null }]) {
+    const entry = collectCandidates([reviewer([plain])], ruledBoundary, policy).candidates[0];
+    assert.equal(Object.hasOwn(entry, "rule"), false, "a candidate relying on no rule carries no rule field");
+  }
+  assert.doesNotMatch(formatFindings({ validation: result, complete: true }), /Rule:/);
+
+  // Clipped ends are restored from the file, as a source citation's are, and reported.
+  const clipped = structuredClone(ruled);
+  clipped.rule.quote = "Totals multiply every price by its quantity; they never\n  add the two.**";
+  const repaired = collectCandidates([reviewer([clipped])], ruledBoundary, policy);
+  assert.deepEqual(repaired.issues, []);
+  assert.equal(repaired.candidates[0].rule.quote, rule().quote);
+  // A caveat is printed in the published review body, which never names the
+  // rule, so the repair is reported without its file, its lines or its text.
+  assert.deepEqual(repaired.diagnostics, [{ kind: "caveat",
+    message: "correctness:1: repaired a clipped-end rule citation; claims still require adjudication." }]);
+  assert(!repaired.diagnostics.some(({ message }) => /Totals|AGENTS\.md|3-4/.test(message)),
+    "no diagnostic carries the rule");
+  // The coverage text preview.mjs puts in the published body prints every caveat
+  // verbatim, and so carries the repair and nothing of the rule.
+  const published = formatCoverage({ complete: true,
+    validation: adjudicateCandidates(repaired, validator(), ruledBoundary, policy) });
+  assert.match(published, /\nInformational caveat: correctness:1: repaired a clipped-end rule citation;/);
+  assert.doesNotMatch(published, /Totals|AGENTS\.md/, "the published review body never carries the rule");
+
+  for (const [label, mutate, reason] of [
+    ["a shifted range", (c) => { c.rule.startLine = 2; c.rule.endLine = 3; }, /does not exactly match/],
+    ["the rule rewritten on one line",
+      (c) => { c.rule.quote = "Totals multiply every price by its quantity; they never add the two."; },
+      /does not exactly match/],
+    ["a dropped named line", (c) => { c.rule.quote = lines[2]; }, /does not exactly match/],
+    ["a range past the end of the file",
+      (c) => { c.rule.startLine = 4; c.rule.endLine = 5; c.rule.quote = lines[3]; }, /does not exactly match/],
+    ["the empty line after the final newline",
+      (c) => { c.rule.startLine = 4; c.rule.endLine = 5; c.rule.quote = `${lines[3]}\n`; }, /does not exactly match/],
+    ["a quote whose last named line is left empty", (c) => { c.rule.quote = "they never\n"; }, /does not exactly match/],
+    ["a file this review was not handed", (c) => { c.rule.file = "CLAUDE.md"; }, /names no project standard/],
+    ["a path rather than a root file name", (c) => { c.rule.file = "./AGENTS.md"; }, /names no project standard/],
+    ["an inherited property name", (c) => { c.rule.file = "constructor"; }, /names no project standard/],
+    ["a zero start", (c) => { c.rule.startLine = 0; }, /Invalid rule citation/],
+    ["an end before its start", (c) => { c.rule.endLine = 2; }, /Invalid rule citation/],
+    ["a fractional line", (c) => { c.rule.endLine = 3.5; }, /Invalid rule citation/],
+    ["an empty quote", (c) => { c.rule.quote = " "; }, /Invalid rule citation/],
+    ["a missing quote", (c) => { delete c.rule.quote; }, /Rule citation: expected exactly/],
+    ["a source citation's side", (c) => { c.rule.side = "head"; }, /Rule citation: expected exactly/],
+    ["a rule that is not an object", (c) => { c.rule = "AGENTS.md:3-4"; }, /Rule citation: expected exactly/],
+  ]) {
+    const bad = structuredClone(ruled);
+    mutate(bad);
+    const refused = collectCandidates([reviewer([bad, candidate])], ruledBoundary, policy);
+    assert.equal(refused.candidates.length, 1, `${label} is refused, and only that candidate`);
+    assert.match(refused.issues[0], reason, label);
+  }
+
+  // Only the reviewer handed the standards may quote one, and a run with no
+  // standards, or whose standards reached no file, binds no rule at all.
+  for (const [label, from, gate, reason] of [
+    ["another reviewer", reviewer([ruled], { label: "contracts" }), ruledBoundary, /not handed the project's standards/],
+    ["a review with no standards", reviewer([ruled]), boundary, /not handed the project's standards/],
+    ["a review whose standards reached no file", reviewer([ruled]),
+      evidenceBoundary(snapshot, context, binding, { reviewer: "correctness", files: [] }), /names no project standard/],
+  ]) {
+    const refused = collectCandidates([from], gate, policy);
+    assert.equal(refused.candidates.length, 0, label);
+    assert.match(refused.issues[0], reason, label);
+  }
+
+  // The adjudicator is told what code checked about a rule, and what it did not.
+  const adjudication = validationInstructions(policy);
+  assert.match(adjudication, /untrustedStandards/);
+  assert.match(adjudication, /NOT that the rule applies/);
+  assert.match(adjudication, /qualif/);
+  // The shared output contract names the one field the standards reviewer's
+  // prompt adds, so no reviewer is told both to add it and to add nothing.
+  assert.match(candidateFormat(policy),
+    /No extra fields, except the rule field when your prompt hands you untrustedStandards\./);
+}
+console.log("PASS H1: a rule is quoted as exact committed lines of a handed root file, and by its reviewer only");
 for (const raw of ["not JSON", "```json\n{}\n```", '{"schemaVersion":1', "null", "[]",
   JSON.stringify({ schemaVersion: 1, reviewKey: "wrong", candidates: [candidate], limitations: [] }),
   JSON.stringify({ schemaVersion: 1, reviewKey: key, candidates: [], limitations: [], clean: true }),
