@@ -9,7 +9,8 @@ for `U1`'s and then `I1a`'s, by increment `I1c` for `I1b`'s, by increment
 `G1` for `I1c`'s, by the backlog triage of 2026-09-12 for `G1`'s own, by
 increment `B1` for `T1`'s, by increment `X1` for `B1`'s, by increment
 `W1` for `X1`'s, by increment `N1` for `W1`'s, by increment `H1` for
-`N1`'s, and by increment `K1` for `H1`'s, which is the
+`N1`'s, by increment `K1` for `H1`'s, and after pull request #45 merged for
+`K1`'s own, which is the
 last in this file. They are the
 project's
 evidence of record and are reproduced verbatim: nothing here was rewritten,
@@ -17,8 +18,8 @@ condensed or corrected in any of those moves, so a claim below still reads
 exactly as the session that demonstrated it wrote it.
 
 [../ROADMAP.md](../ROADMAP.md) remains the live roadmap and stays
-authoritative for the increments table, the most recent completed entry and the
-exact next increment. The safeguard decisions `V2a` and `V2b` settled
+authoritative for the increments table and the exact next increment. The
+safeguard decisions `V2a` and `V2b` settled
 are read from here now, not from the live roadmap.
 [../SCOPE.md](../SCOPE.md) remains authoritative for the product scope. Read
 those first; come here for the evidence behind a completed increment.
@@ -9995,3 +9996,83 @@ citations, and **overview was compacted at 247,927 of its 200,000 tokens**.
   and cost bullets were corrected.
 
 No plugin review covers the commits after `8e0b547`.
+
+## `K1`: how an earlier review's comments were received
+
+**Built on `k1-review-feedback`.** `H1` landed first (#44, `3e2b50f`, CI on
+`main` green), `d9a837a` archived its entry, and the user's four decisions of
+2026-09-14 stand: read back resolution and thumbs and ask for nothing; report
+only; on by default with no flag; and the `SCOPE.md` paragraph (`dc3a14b`).
+
+### What was built
+
+- **Reactions**: `reactionsFrom` keeps each earlier comment's `+1` and `-1` from
+  the `pulls/N/comments` listing `I1a` already reads. A missing or malformed
+  rollup is unread with its reason, never zero.
+- **Resolution**: `readReviewThreads` sends one `gh api graphql --paginate
+  --slurp` query for `reviewThreads` and each thread's first `fullDatabaseId`,
+  a lossless string; Copilot's review of #45 caught the deprecated `databaseId`.
+  `threadListingFrom` refuses a page with GraphQL errors or the wrong shape, and
+  calls a listing incomplete when its last page reports a next page, the declared
+  count changes, or fewer threads are listed than declared. A comment with no
+  thread, two threads, or beyond an incomplete listing is unread, never
+  unresolved. A failed read is reported and discovery proceeds; a cancellation
+  rethrows. No earlier review, or no inline comment, sends no GraphQL request.
+  gh sends it as a `POST`, so it lives only in discovery and `target-fixture.mjs`
+  answers it by exact shape.
+- **Report**: `prior.feedback` sits beside the comments. `describePrior` adds one
+  line, e.g. `Feedback on those comments: 6 thread(s) resolved, 0 unresolved;
+  reactions +1 0, -1 0.` plus an information-only sentence, printed under
+  `--quiet` too; `priorSummary` adds counts and grouped unread reasons.
+
+### Evidence
+
+- **Test first**, each new test watched failing for its reason: three `K1` cases
+  in `smoke-prior`, and pins in `smoke-revalidation` (capture) and
+  `smoke-review` (retained run). Two runs differing only in reception print
+  different lines and give identical reviewer and adjudicator prompts, verdicts,
+  revalidation prompt, proposed review and retained record, clock and invocation
+  id aside. `outcomeKeys` is unchanged.
+- **Mutation pass** in a copy outside the repository: 26 changes disable a guard
+  or inject the reception into a verdict, prompt, record or body; 25 fail a
+  suite. The survivor put it on `revalidation.review`, which
+  `retainedRevalidation` projects to named fields and `revalidationPrompt` never
+  reads, so it leaks nothing. The pass also showed the GraphQL errors check was
+  caught only by a reason regex; errors beside readable data is now its own case.
+- **All eighteen suites pass**, with `git diff --check`, the control-byte check
+  and `collectInstructionFiles` (six read, none skipped) clean.
+- **Read-only probe of #44 through `runGh`**, no credits: 6 threads complete on
+  one page; the same arguments at `first: 2` gave 3 complete pages; all 6 opening
+  REST comments matched by database id, reactions zero.
+
+**Not demonstrated**: a non-zero reaction, a real incomplete or failed listing,
+or any read of a review this tool published, since #44's threads are Copilot's.
+`README.md` does not document the line: it has 862 bytes spare.
+
+### The installed-plugin review
+
+#45, reviewed once at the standing authorization at head `0d28616` with the
+installed extension identical: `dogfood-review.mjs 45 --all --no-comment
+--unattended`, CLI 1.0.83, balanced. All five passes completed on their
+configured assignments, `gpt-5.6-terra` at high effort for the four specialists
+and `gpt-5.6-luna` at high for overview, default window, no context loss:
+**184.483837 credits, 19 requests, 312.7 s of model work, 105.3 s elapsed.**
+51 tool calls (`view`, `rg`), one refused: a nonexistent `gh.mjs`, with `Q7`'s
+absent-path reason.
+
+**INCOMPLETE, 0 validated, 0 withheld, no adjudication.** Three coverage gaps and
+a caveat say the live GraphQL shape, pagination and thread volume were not
+exercised, as recorded above. **One candidate was refused**: performance-resources'
+P2 that `threadListingFrom` keeps a root for every thread although only the
+earlier review's comments are looked up. Its location was exact, but one
+evidence citation quoted 7 lines for the 6-line range 244-249. The point is real
+but negligible, since the slurped pages already hold every thread, so **the user
+declined it in #45's triage.** The run also
+exercised `K1`'s no-earlier-review path live: `I1 prior:` said `none`, with no
+feedback line. CI and `claude-review` passed. Copilot's review of #45 then found the deprecated
+`databaseId`; `e25bd6b` fixed it after this review, which never saw the fix.
+
+### The exact next step
+
+Nothing is scheduled after `K1`. Merging #45 is the user's call; after a merge,
+archive this entry as `d9a837a` did `H1`'s, before writing any new entry.
