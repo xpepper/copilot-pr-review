@@ -195,7 +195,7 @@ discovery produced reaches any reviewer.
 ### Verified, and not
 
 **Test first**: each new test failed for its intended reason before its code
-existed. **75 guards** were disabled one at a time and the suite failed for
+existed. **77 guards** were disabled one at a time and the suite failed for
 every one, five as a thrown error rather than an assertion. All eighteen suites
 pass, `git diff --check` is
 clean, no new or changed file carries a control byte, and discovery reads all
@@ -236,8 +236,14 @@ citations, and **overview was compacted at 247,927 of its 200,000 tokens**.
   repaired rule quote's caveat printed the rule in the published review body.
   At the user's choice the caveat now names the repair only (`0262965`). At
   the user's request one reply names that commit and the thread is resolved.
+- **Found by Copilot's automatic review, fixed.** Refused root files spent the
+  discovery read budget and could starve a later committed one (`ea98dda`);
+  the budget did not charge the blank line between files (`58f9560`); a help
+  sentence was ungrammatical (`9ae0d08`). Its stale-handoff note was already
+  answered by `6f6ea52`, and at the user's choice the PR description's review
+  and cost bullets were corrected.
 
-No plugin review covers the five commits after `8e0b547`.
+No plugin review covers the commits after `8e0b547`.
 
 ## v1 is complete, and seven increments are scheduled on top of it
 
