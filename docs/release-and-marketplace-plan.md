@@ -1,10 +1,11 @@
 # Versioning, releases and a marketplace listing: a plan
 
-A planning increment, in the pattern `G1` set: analysis and a proposal now, and
-every decision in it put to the user one at a time. **Nothing here is built,
-nothing is scheduled, and nothing in it authorizes an outward-facing action.** No
-tag has been pushed, no GitHub Release created, no `package.json` added, and
-nothing written to another repository.
+A planning session, not a numbered increment, in the pattern `G1`'s analysis
+set: a proposal, and every decision in it put to the user one at a time. **Its
+outcome schedules one increment, `S1`**, described at the end. Nothing here is
+built yet, and nothing in it authorizes an outward-facing action: no tag has
+been pushed, no GitHub Release created, no `package.json` added, and nothing
+written to another repository.
 
 The user asked for this outside the `ROADMAP.md` backlog on 2026-09-14: real
 semantic versioning for this plugin, a release process modeled on two sibling
