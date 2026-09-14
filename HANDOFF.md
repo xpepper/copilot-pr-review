@@ -41,7 +41,8 @@ section "The scheduled increment, `S1`". Do not reopen those decisions:
    user's, not part of `S1`.
 7. One increment, in this order, stopping at each authorization:
    - a pull request on an `S1` branch bumping `plugin.json` to `0.1.0` and
-     adding a short `docs/release.md`; the user merges it;
+     adding a short `docs/release.md`, reviewed once with this plugin (see the
+     caveat below); the user merges it;
    - with authorization, tag the merge commit `v0.1.0` and push the tag;
    - install from the tag and confirm it loads and reports `0.1.0`;
    - with authorization, one pull request on `xpepper/copilot-plugins` adding
@@ -74,9 +75,13 @@ section "The scheduled increment, `S1`". Do not reopen those decisions:
   `z-pr-review` pinned `v0.2.7`, a tag that did not exist. That is recorded as
   evidence about the process only. **Do not fix either entry** in `S1`'s index
   pull request; mention it to the user if it is still true.
-- The pull request that bumps `plugin.json` changes nothing under `extensions/`
-  or `scripts/`, so its plugin review is the user's call under `AGENTS.md`:
-  ask, do not spend by default.
+- **The pull request that bumps `plugin.json` needs its one plugin review
+  before a merge is asked for.** It is not documentation-only, because
+  `plugin.json` is not documentation, so `AGENTS.md`'s optional-review exception
+  does not cover it, even though nothing under `extensions/` or `scripts/`
+  changes. The standing workflow authorizes that one review; record it in
+  `ROADMAP.md` like any increment's. Only the closing pull request, if it is
+  documentation-only, leaves its review to the user.
 
 Out of scope for `S1`: a GitHub Release unless separately authorized, a
 `package.json`, any script or workflow, a marketplace consistency check, a

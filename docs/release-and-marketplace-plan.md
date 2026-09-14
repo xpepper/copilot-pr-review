@@ -149,9 +149,11 @@ no build step" constraint as written, and the history above gives an
 automatic bump from commits nothing to work with.
 
 1. On a branch, bump `plugin.json`'s `version` in a pull request titled for the
-   release. It lands like every other change, through the ruleset. It touches
-   nothing under `extensions/` or `scripts/`, so a plugin review of it is the
-   user's call under `AGENTS.md`.
+   release. It lands like every other change, through the ruleset, and gets its
+   one plugin review before a merge is asked for: `plugin.json` is not
+   documentation, so `AGENTS.md`'s optional review for documentation-only pull
+   requests does not apply, even though nothing under `extensions/` or
+   `scripts/` changes.
 2. After it merges, and only with the user's explicit authorization for that
    release, tag the merge commit `vX.Y.Z` and push the tag. A GitHub Release is
    optional and is a separate authorization.
@@ -219,8 +221,9 @@ Cut `v0.1.0` and list it, in one session, stopping at each authorization.
 
 1. On its own branch, a pull request that bumps `plugin.json`'s `version` from
    `0.0.1` to `0.1.0` and adds `docs/release.md`, a short reference for the
-   process this plan chose. It changes nothing under `extensions/` or
-   `scripts/`, so its plugin review is the user's call.
+   process this plan chose. It is not documentation-only, so it is reviewed
+   once with this plugin before a merge is asked for, under the standing
+   authorization, and that review is recorded in `ROADMAP.md`.
 2. The user merges it.
 3. **With the user's explicit authorization**, tag that merge commit `v0.1.0`
    and push the tag. No GitHub Release unless separately authorized.
