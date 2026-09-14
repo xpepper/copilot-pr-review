@@ -8,8 +8,8 @@ increment `U1` for `O1`'s, by increment `I1a` for `E1`'s, by increment `I1b`
 for `U1`'s and then `I1a`'s, by increment `I1c` for `I1b`'s, by increment
 `G1` for `I1c`'s, by the backlog triage of 2026-09-12 for `G1`'s own, by
 increment `B1` for `T1`'s, by increment `X1` for `B1`'s, by increment
-`W1` for `X1`'s, by increment `N1` for `W1`'s, and by increment `H1` for
-`N1`'s, which is the
+`W1` for `X1`'s, by increment `N1` for `W1`'s, by increment `H1` for
+`N1`'s, and by increment `K1` for `H1`'s, which is the
 last in this file. They are the
 project's
 evidence of record and are reproduced verbatim: nothing here was rewritten,
@@ -9919,3 +9919,79 @@ skips none. CI now runs the suite and checks `*.diff` too.
   finds one anyway scores a false positive until the corpus is repinned.
 - **Five cases test the scorer; they are not a benchmark.** Collection runs,
   and any number from them, stay unscheduled.
+
+## `H1`: the project's written rules steer the review
+
+`SCOPE.md` gained one paragraph, approved word for word before the file was
+edited, after three decisions the user took one at a time: **on by default**,
+with `--no-standards` for one run and no setting; **the whole-change reviewer
+receives the files**, being overview in balanced and full, integrated in deep
+and contracts in quick; and **a rule is bound as exact lines**, like a source
+citation. The user added the hint naming `AGENTS.md` and `CLAUDE.md` as the
+likeliest files to hold rules.
+
+`collectStandards` keeps a root markdown file only when one `git ls-tree` of
+the reviewed head commits a regular file whose blob is exactly the text read,
+and names any other with its reason. The standards reviewer's prompt alone
+carries the numbered files and how to quote one; every other prompt is byte for
+byte unchanged. A candidate's `rule` is refused unless that reviewer sent it and
+its lines are exact, clipped ends repaired and reported. The adjudicator is
+handed each cited file in full and nothing otherwise. A finding shows `Rule:
+FILE:LINES`; its published comment does not. The run names what reached which
+reviewer and what was left out at every verbosity, and the evidence line
+records names, sizes and blobs, never text. Under `--verify` the standards
+reviewer is handed the committed files, which may name commands, and nothing
+discovery produced reaches any reviewer.
+
+### Verified, and not
+
+**Test first**: each new test failed for its intended reason before its code
+existed. **77 guards** were disabled one at a time and the suite failed for
+every one, five as a thrown error rather than an assertion. All eighteen suites
+pass, `git diff --check` is
+clean, no new or changed file carries a control byte, and discovery reads all
+six root files and skips none.
+
+- **No real model has quoted a rule**, in the review below either.
+- **An absent rule is refused, not reported.** #42's handoff attributing a
+  trailer rule to `AGENTS.md` has nothing to quote.
+- **The cost is bounded, not measured**: at most 48 KiB, about 12,000 tokens,
+  joins one pass of every review; here four files, about 10,000.
+- **Not handled**: a rule citation has no span cap, a CRLF file's multi-line
+  quote cannot match, and nothing below the root is read.
+
+### The review
+
+Pull request #44 was reviewed once with the installed plugin at the standing
+authorization, **balanced**, at head `8e0b547`: four heavy specialists and the
+adjudicator on `gpt-5.6-terra`, overview on `gpt-5.6-luna`, all at high effort
+on the default window. 25 requests, **319.760535 credits**, 439.1 s of model
+work against 262.4 s elapsed; 78 tool calls, 84 approved permissions, no denial.
+All six root files reached overview. Coverage is **INCOMPLETE** with 0
+validated findings: security's envelope did not parse, two candidates cited
+files outside the diff, three adjudications failed on the adjudicator's own
+citations, and **overview was compacted at 247,927 of its 200,000 tokens**.
+
+- **Real, fixed.** An unreadable root file threw out of the collector and
+  stopped every default review (`6b2f18f`). Every reviewer's contract said "No
+  extra fields" while the standards prompt asked for `rule`; the adjudicator
+  accepted that before its citation failed (`b1c9af2`).
+- **Real, decided by the user.** The standards were unbounded: this diff alone
+  was about 196,000 tokens and the six files added about 44,000. The user chose
+  a 48 KiB budget over numbered text in reading order (`05039e1`, `a4841b1`),
+  which names `README.md` and `ROADMAP.md` as left out here. Overview would
+  probably have compacted on this diff without them.
+- **Rejected.** Overview's P3 that rule repair accepts a start-clipped quote:
+  the source-citation repair the scope reuses is identical.
+- **Found after it, fixed.** The `claude-review` action commented that a
+  repaired rule quote's caveat printed the rule in the published review body.
+  At the user's choice the caveat now names the repair only (`0262965`). At
+  the user's request one reply names that commit and the thread is resolved.
+- **Found by Copilot's automatic review, fixed.** Refused root files spent the
+  discovery read budget and could starve a later committed one (`ea98dda`);
+  the budget did not charge the blank line between files (`58f9560`); a help
+  sentence was ungrammatical (`9ae0d08`). Its stale-handoff note was already
+  answered by `6f6ea52`, and at the user's choice the PR description's review
+  and cost bullets were corrected.
+
+No plugin review covers the commits after `8e0b547`.
