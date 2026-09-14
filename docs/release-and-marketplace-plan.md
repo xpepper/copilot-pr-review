@@ -113,7 +113,10 @@ pins its entry before its tag exists, by design, so for that window the entry
 names a ref that is not there. What an install does against a missing ref was
 **not tested**: doing so would change the user's installed plugins. This is
 recorded as evidence about the process, and nothing was changed in either
-repository.
+repository. At the user's request, both were reported to their projects the same
+day, as
+[xpepper/pr-review-gemini#58](https://github.com/xpepper/pr-review-gemini/issues/58)
+and [xpepper/pr-review-glm#45](https://github.com/xpepper/pr-review-glm/issues/45).
 
 ## Proposal
 

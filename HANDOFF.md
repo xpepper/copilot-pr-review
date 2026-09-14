@@ -74,7 +74,9 @@ section "The scheduled increment, `S1`". Do not reopen those decisions:
   `gem-pr-review` pinned `v0.3.3` while `v0.4.0` was released, and
   `z-pr-review` pinned `v0.2.7`, a tag that did not exist. That is recorded as
   evidence about the process only. **Do not fix either entry** in `S1`'s index
-  pull request; mention it to the user if it is still true.
+  pull request; mention it to the user if it is still true. Both are reported
+  as `xpepper/pr-review-gemini#58` and `xpepper/pr-review-glm#45`; check those
+  issues' state before raising it again.
 - **The pull request that bumps `plugin.json` needs its one plugin review
   before a merge is asked for.** It is not documentation-only, because
   `plugin.json` is not documentation, so `AGENTS.md`'s optional-review exception
