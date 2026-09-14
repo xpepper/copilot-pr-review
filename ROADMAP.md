@@ -184,7 +184,8 @@ only; on by default with no flag; and the `SCOPE.md` paragraph (`dc3a14b`).
   the `pulls/N/comments` listing `I1a` already reads. A missing or malformed
   rollup is unread with its reason, never zero.
 - **Resolution**: `readReviewThreads` sends one `gh api graphql --paginate
-  --slurp` query for `reviewThreads` and each thread's first `databaseId`.
+  --slurp` query for `reviewThreads` and each thread's first `fullDatabaseId`,
+  a lossless string; Copilot's review of #45 caught the deprecated `databaseId`.
   `threadListingFrom` refuses a page with GraphQL errors or the wrong shape, and
   calls a listing incomplete when its last page reports a next page, the declared
   count changes, or fewer threads are listed than declared. A comment with no

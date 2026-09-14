@@ -914,7 +914,8 @@ const rangeRequests = (calls) => calls.filter((args) =>
 {
   const page = (resolved) => [{ data: { repository: { pullRequest: { reviewThreads: {
     totalCount: 2, pageInfo: { hasNextPage: false, endCursor: null },
-    nodes: [3948685900, 3948685901].map((databaseId) => ({ isResolved: resolved, comments: { nodes: [{ databaseId }] } })),
+    nodes: ["3948685900", "3948685901"].map((fullDatabaseId) =>
+      ({ isResolved: resolved, comments: { nodes: [{ fullDatabaseId }] } })),
   } } } } }];
   const thumbs = (counts) => ({ total_count: 0, "+1": 0, "-1": 0, laugh: 0, hooray: 0, confused: 0, heart: 0,
     rocket: 0, eyes: 0, ...counts });

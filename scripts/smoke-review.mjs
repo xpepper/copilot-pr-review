@@ -2308,7 +2308,7 @@ console.log("PASS H1 standards reach the mode's standards reviewer alone, a rule
         if (args[5] === "graphql") {
           return JSON.stringify([{ data: { repository: { pullRequest: { reviewThreads: {
             totalCount: 1, pageInfo: { hasNextPage: false, endCursor: null },
-            nodes: [{ isResolved: resolved, comments: { nodes: [{ databaseId: 3948685115 }] } }],
+            nodes: [{ isResolved: resolved, comments: { nodes: [{ fullDatabaseId: "3948685115" }] } }],
           } } } } }]);
         }
         return readGh(args, cwd, settings);

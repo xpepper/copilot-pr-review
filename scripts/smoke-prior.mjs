@@ -59,14 +59,15 @@ const comparisons = {
     merge_base_commit: { sha: "3".repeat(40) } },
 };
 
-// K1: one slurped page of the review-thread connection, in the shape a read-only
-// probe of #44 returned. Each thread is `[databaseId of its first comment,
-// isResolved]`; a null id is a thread whose opening comment is gone.
+// K1: one slurped page of the review-thread connection, in the shape read-only
+// probes of #44 and #45 returned. Each thread is `[id of its first comment,
+// isResolved]`, sent the way GitHub sends `fullDatabaseId`: a BigInt encoded as
+// a decimal string. A null id is a thread whose opening comment is gone.
 function threadPage(threads, { total = threads.length, next = false } = {}) {
   return { data: { repository: { pullRequest: { reviewThreads: {
     totalCount: total, pageInfo: { hasNextPage: next, endCursor: next ? "Y3Vyc29yOnYyOpK0" : null },
-    nodes: threads.map(([databaseId, isResolved]) =>
-      ({ isResolved, comments: { nodes: databaseId === null ? [] : [{ databaseId }] } })),
+    nodes: threads.map(([id, isResolved]) =>
+      ({ isResolved, comments: { nodes: id === null ? [] : [{ fullDatabaseId: String(id) }] } })),
   } } } } };
 }
 
@@ -332,13 +333,25 @@ const [threadRead] = graphqlCalls(twoPages);
 assert.equal(graphqlCalls(twoPages).length, 1, "One paginated query reads every page");
 for (const field of ["query($owner: String!, $name: String!, $number: Int!, $endCursor: String)",
   "reviewThreads(first: 100, after: $endCursor)", "totalCount", "pageInfo { hasNextPage endCursor }",
-  "isResolved", "comments(first: 1) { nodes { databaseId } }"]) {
+  "isResolved", "comments(first: 1) { nodes { fullDatabaseId } }"]) {
   assert(threadRead.query.includes(field), `The thread query asks for ${field}`);
 }
 assert.doesNotMatch(threadRead.query, /mutation/i, "Sent as a POST, and still only a query");
+// #45's Copilot review: GitHub deprecates `databaseId` because it cannot carry a
+// 64-bit id, and its announced removal date has passed. `fullDatabaseId` carries
+// the same id whole, as a decimal string.
+assert.doesNotMatch(threadRead.query, /\bdatabaseId\b/, "Never the deprecated 32-bit identifier");
 assert.equal(receivedOutcome.relationship, "incremental", "The thread read changes no relationship");
 assert.equal(twoPages.calls.at(-1).path,
   `repos/${repository.nameWithOwner}/compare/${reviewedHead}...${currentHead}?per_page=1`);
+
+// An id past 2^53 does not survive as a JavaScript number; as a string it is
+// listed and counted whole, and it opens none of the earlier comments.
+const wide = threadScenario([threadPage([["9007199254740993", false], [3948685115, true]])]);
+const wideOutcome = await discoverPriorReview(repository, target, { gh: wide.gh, cwd });
+assert.deepEqual(wideOutcome.feedback.threads, { status: "complete", pages: 1, listed: 2 });
+assert.deepEqual(wideOutcome.feedback.comments.map(({ thread }) => thread.status), ["resolved", "unread", "unread"],
+  "A 64-bit thread id is read losslessly and matched to nothing it does not open");
 
 // A thread two threads claim to open says nothing about which state is true.
 const doubled = threadScenario([threadPage([[3948685115, true], [3948685115, false], [3948685116, false]])]);
@@ -391,10 +404,15 @@ for (const [what, threads, reason] of [
     ...unresolvedPage.data.repository.pullRequest.reviewThreads,
     nodes: [{ isResolved: "yes", comments: { nodes: [{ databaseId: 3948685115 }] } }] } } } } }],
   /not a review thread/],
-  ["a thread comment with no database id", [{ data: { repository: { pullRequest: { reviewThreads: {
-    ...unresolvedPage.data.repository.pullRequest.reviewThreads,
-    nodes: [{ isResolved: false, comments: { nodes: [{ databaseId: "3948685115" }] } }] } } } } }],
-  /database id/],
+  // #45's Copilot review: only `fullDatabaseId` identifies the comment, and only
+  // as the decimal string GitHub sends. A number may already have lost digits, a
+  // leading zero is not GitHub's encoding, and the deprecated field is not read.
+  ...[["a numeric full database id", { fullDatabaseId: 3948685115 }],
+    ["a full database id with a leading zero", { fullDatabaseId: "03948685115" }],
+    ["only the deprecated database id", { databaseId: 3948685115 }]].map(([what, root]) => [what,
+    [{ data: { repository: { pullRequest: { reviewThreads: {
+      ...unresolvedPage.data.repository.pullRequest.reviewThreads,
+      nodes: [{ isResolved: false, comments: { nodes: [root] } }] } } } } }], /full database id/]),
 ]) {
   const scenario = threadScenario(threads);
   const outcome = await discoverPriorReview(repository, target, { gh: scenario.gh, cwd });

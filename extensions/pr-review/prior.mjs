@@ -120,14 +120,17 @@ export function reactionsFrom(raw) {
 }
 
 // K1: thread resolution, which REST does not carry. The query lists the pull
-// request's review threads with each one's first comment, whose databaseId is
-// the REST id of the comment that opened it; a read-only probe of #44 showed the
-// two agree. gh sends GraphQL as a POST, but a query cannot mutate and this one
-// is only ever sent from discovery, never from a publication or reply path.
+// request's review threads with each one's first comment, whose fullDatabaseId
+// is the REST id of the comment that opened it; read-only probes of #44 and #45
+// showed the two agree. It is a BigInt sent as a decimal string, so it carries a
+// 64-bit id whole. GitHub deprecates databaseId because it cannot, and its
+// announced removal date has passed, as #45's Copilot review pointed out. gh
+// sends GraphQL as a POST, but a query cannot mutate and this one is only ever
+// sent from discovery, never from a publication or reply path.
 export const reviewThreadsQuery = "query($owner: String!, $name: String!, $number: Int!, $endCursor: String) { " +
   "repository(owner: $owner, name: $name) { pullRequest(number: $number) { " +
   "reviewThreads(first: 100, after: $endCursor) { totalCount pageInfo { hasNextPage endCursor } " +
-  "nodes { isResolved comments(first: 1) { nodes { databaseId } } } } } } }";
+  "nodes { isResolved comments(first: 1) { nodes { fullDatabaseId } } } } } } }";
 
 function requireThreads(condition, message) {
   if (!condition) throw new Error(`Review thread listing unreadable: ${message}.`);
@@ -156,9 +159,10 @@ export function threadListingFrom(pages) {
       listed++;
       // A thread whose opening comment is gone opens none of ours.
       if (!node.comments.nodes.length) continue;
-      const { databaseId } = node.comments.nodes[0] ?? {};
-      requireThreads(Number.isSafeInteger(databaseId) && databaseId > 0, "a thread comment without a database id");
-      roots.set(databaseId, roots.has(databaseId) ? "conflicting" : node.isResolved ? "resolved" : "unresolved");
+      // Kept as GitHub's string: a number past 2^53 would already have lost digits.
+      const { fullDatabaseId: id } = node.comments.nodes[0] ?? {};
+      requireThreads(typeof id === "string" && /^[1-9]\d*$/.test(id), "a thread comment without a full database id");
+      roots.set(id, roots.has(id) ? "conflicting" : node.isResolved ? "resolved" : "unresolved");
     }
   }
   const reason = connection.pageInfo.hasNextPage ? "the last page read still reported a next page"
@@ -169,8 +173,10 @@ export function threadListingFrom(pages) {
     ...(reason ? { reason } : {}) };
 }
 
+// A REST comment id is a safe integer, which priorCommentFrom enforces, so its
+// decimal string is exact and compares with a thread's fullDatabaseId losslessly.
 export function threadOf(id, listing) {
-  const state = listing.roots?.get(id);
+  const state = listing.roots?.get(String(id));
   if (state === "resolved" || state === "unresolved") return { status: state };
   return { status: "unread", reason: listing.status === "failed" ? "the review thread listing could not be read"
     : state === "conflicting" ? "more than one review thread opens with this comment"
