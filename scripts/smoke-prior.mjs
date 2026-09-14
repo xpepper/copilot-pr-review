@@ -379,6 +379,10 @@ for (const [what, threads, reason] of [
   }, /502/],
   ["an unparsable response", async () => "{not json", /JSON/],
   ["no pages at all", [], /no pages/],
+  // GraphQL can answer part of a query and name what it could not. A page that
+  // carries errors is not trusted for the threads it does list.
+  ["GraphQL errors beside a readable page",
+    [{ ...threadPage([[3948685115, true]]), errors: [{ message: "Resource limits exceeded" }] }], /errors/],
   ["GraphQL errors", [{ errors: [{ message: "Something went wrong" }], data: null }], /errors/],
   ["no pull request", [{ data: { repository: { pullRequest: null } } }], /not a review thread page/],
   ["an unreadable page after a readable one",
