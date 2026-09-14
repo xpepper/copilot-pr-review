@@ -200,6 +200,8 @@ coverage gaps and three caveats. **1 validated finding, 0 withheld, 1 rejected.*
 - Contracts' rejected P2, no demonstrated install-from-a-tag command: real, and
   only step 4 can answer it, so the closing pull request puts the command it
   demonstrates into `docs/release.md`.
+- Copilot's comment on `1ae141e`: the install step lacked the ask the plan
+  requires before changing the user's environment. Real, fixed.
 
 **Not done yet**: the merge, the tag, an install from it, the index pull request
 and the closing pull request. The user's direct install is now `v0.1.0` from

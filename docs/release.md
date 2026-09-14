@@ -38,9 +38,11 @@ probes find it by that prefix.
    run is the only check. Never move, delete or re-push a published tag: the
    index pins it by name. A GitHub Release is optional and needs its own
    authorization.
-3. Install from the tag and check the plugin loads and reports the new version,
-   before anything points at the tag. Read `copilot plugin install --help`
-   first: on CLI 1.0.83 it names no syntax for a ref.
+3. **With the user's agreement**, install from the tag and check the plugin
+   loads and reports the new version, before anything points at the tag.
+   Replacing their existing install, or adding one beside it, changes their
+   environment, so ask first. Read `copilot plugin install --help` first: on
+   CLI 1.0.83 it names no syntax for a ref.
 4. **With the user's explicit authorization**, open one pull request on
    `xpepper/copilot-plugins` that sets this plugin's entry `version` and
    `source.ref` together and updates the index README's table in the same
@@ -48,7 +50,8 @@ probes find it by that prefix.
 5. Read the merged manifest back and check `version`, `source.ref` and the tag
    agree.
 
-Merging the version bump authorizes none of steps 2 to 4. Doing them in this
+Merging the version bump authorizes none of steps 2 to 4, and none of them
+authorizes the next: each is asked for in its turn. Doing them in this
 order means the index never names a tag that does not exist yet. It does trail
 the new tag from step 2 until the index pull request merges, so do steps 2 to 5
 in the same sitting.
