@@ -18,9 +18,8 @@ and `G1` was the last increment scheduled before the backlog was agreed; **every
 increment scheduled up to `G1` is complete.** On 2026-09-12 the user triaged
 `G1`'s twelve proposals one at a time and scheduled six of them: `T1`, `B1`,
 `W1`, `N1`, `H1` and `K1`, in that order, and the same day scheduled `X1`
-immediately after `B1`. **`T1`, `B1`, `X1`, `W1`, `N1` and `H1` are complete
-and archived, and `K1` is built and in review as the live entry below**; its
-row is what is left.
+immediately after `B1`. **`T1`, `B1`, `X1`, `W1`, `N1`, `H1` and `K1` are
+complete and archived**, so no scheduled row is left and no entry is live.
 The closing section records what was decided, and what stays open as a
 limitation rather than as work.
 
@@ -87,12 +86,12 @@ posting them.
 | W1 | Completed | Every validated finding carries one adjudicated remediation sentence in its presented and published forms. Missing, multi-line, multi-sentence and code-block-bearing prose is refused at ingestion and again before publication; older retained results still load but cannot publish without a new review. No committable suggestion block. Pull request #42, reviewed once with this plugin at the user's authorization: deep on `gpt-5.6-terra` at high effort and its default window, 81.62026 credits, INCOMPLETE on two invalid citation paths, 0 validated findings and two useful candidate signals, one fixed and one retained as an explicit parser limitation. | X1; [Selection/publication](SCOPE.md#selection-publication-and-cached-results) |
 | N1 | Completed | A seeded corpus and a deterministic scorer, **the free half only**: five plain-text diffs pinned by content hash, three seeded cases carrying four defects with stable ids, target and allowed severities, acceptable locations and concept groups, and two clean controls; a scorer needing no model or network that rejects explicit non-findings before matching and pairs findings with defects one-to-one, run by an eighteenth controlled suite and CI. No collection run, recall number or gate. Pull request #43, reviewed once with this plugin at the standing authorization: balanced, 127.050688 credits, INCOMPLETE, 0 validated findings, and one real candidate raised by two reviewers and refused on its citation, fixed anyway. | W1; [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | H1 | Completed | By default the project's own written rules steer the review: the root instruction files the reviewed head commits reach the one reviewer that weighs the whole change, up to a 48 KiB budget; a finding relying on one must quote the rule as exact lines of its file, bound like a source citation; `--no-standards` turns it off for one run. The user reversed the opt-in this row first proposed and approved the `SCOPE.md` paragraph word for word. **It settles what a claim not grounded in a provable code effect must carry: a quotable rule**, which the history and path-conditioned lenses would inherit. Pull request #44, reviewed once at the standing authorization: balanced, 319.760535 credits, INCOMPLETE, 0 validated findings; three refused candidates were real and are fixed, one through the user's budget decision. `G1`'s menu item 4. | N1; [Modes/findings](SCOPE.md#review-modes-and-findings) |
-| K1 | In review | A later review reports how this tool's earlier review of the same pull request was received, on one line under `Prior review:` at every verbosity: threads resolved, unresolved and unread, and the thumbs counts. Reactions come from the listing `I1a` already reads; resolution is one paginated GraphQL read matched by database id. Unread is never unresolved or zero, a failed read is reported and the review proceeds, and nothing reaches a reviewer, the adjudicator, a verdict, the retained record or the published review. Built test first and mutation-checked. Pull request #45, reviewed once at the standing authorization: balanced, 184.483837 credits, INCOMPLETE, 0 validated findings, and one refused candidate, declined; Copilot's `databaseId` finding was fixed after it. No read of a review this tool published has run. `G1`'s menu item 12. | H1, I1c; [Publication controls](SCOPE.md#selection-publication-and-cached-results) |
+| K1 | Completed | A later review reports how this tool's earlier review of the same pull request was received, on one line under `Prior review:` at every verbosity: threads resolved, unresolved and unread, and the thumbs counts. Reactions come from the listing `I1a` already reads; resolution is one paginated GraphQL read matched by database id. Unread is never unresolved or zero, a failed read is reported and the review proceeds, and nothing reaches a reviewer, the adjudicator, a verdict, the retained record or the published review. Built test first and mutation-checked. Pull request #45, reviewed once at the standing authorization: balanced, 184.483837 credits, INCOMPLETE, 0 validated findings, and one refused candidate, declined; Copilot's `databaseId` finding was fixed after it. No read of a review this tool published has run. `G1`'s menu item 12. | H1, I1c; [Publication controls](SCOPE.md#selection-publication-and-cached-results) |
 
-## Every completed increment, `F1` through `H1`, is archived
+## Every completed increment, `F1` through `K1`, is archived
 
-Fifty-seven sections were here and fifteen increments plus the backlog triage moved
-every one of them
+Fifty-eight sections were here and fifteen increments, the backlog triage and the
+archiving after `K1`'s merge moved every one of them
 verbatim to
 [docs/roadmap-archive-2026-09-10.md](docs/roadmap-archive-2026-09-10.md): `A1`
 moved the thirty-nine through `V1c`, `L1` moved `V2a` and `V2b` because this
@@ -101,11 +100,11 @@ moved `A1`'s entry and then `L1`'s, `O1` moved `D1`'s, `U1` moved `O1`'s, `I1a`
 moved `E1`'s, `I1b` moved `U1`'s and then `I1a`'s, `I1c` moved `I1b`'s
 15018 bytes, `G1` moved `I1c`'s 13014 bytes, **the backlog triage moved
 `G1`'s own 8863 bytes**, **`B1` moved `T1`'s 5951**, **`X1` moved `B1`'s
-5124**, **`W1` moved `X1`'s 5123**, **`N1` moved `W1`'s 4684**, **`H1` moved `N1`'s 4982**, and **`K1` moved `H1`'s 4586**, the last in that file. Forty-nine are
-completed-increment entries, covering the forty-seven increments `F1`, `F2`, `F3`, `Q1`, `Q2`, `Q3`, `Q4`,
+5124**, **`W1` moved `X1`'s 5123**, **`N1` moved `W1`'s 4684**, **`H1` moved `N1`'s 4982**, **`K1` moved `H1`'s 4586**, and **the archiving after `K1`'s merge moved `K1`'s own 4818**, the last in that file. Fifty are
+completed-increment entries, covering the forty-eight increments `F1`, `F2`, `F3`, `Q1`, `Q2`, `Q3`, `Q4`,
 `P1`, `P2`, `P3`, `P4`, `P5`, `C1`, `C2`, `F4`, `R1`, `M1`, `F5`, `F6`, `M2`,
 `C3`, `C4`, `Q5`, `Q6`, `C5`, `Q7`, `V1a`, `V1b`, `V1c`, `V2a`, `V2b`, `A1`,
-`L1`, `D1`, `O1`, `E1`, `U1`, `I1a`, `I1b`, `I1c`, `G1`, `T1`, `B1`, `X1`, `W1`, `N1` and `H1`, with `R1` and `M1` each recorded in two halves. The remaining eight are the
+`L1`, `D1`, `O1`, `E1`, `U1`, `I1a`, `I1b`, `I1c`, `G1`, `T1`, `B1`, `X1`, `W1`, `N1`, `H1` and `K1`, with `R1` and `M1` each recorded in two halves. The remaining eight are the
 working record kept between them:
 
 - the `Q4` acceptance criteria recorded at the `Q3` checkpoint;
@@ -117,7 +116,7 @@ working record kept between them:
 - the `R1` second-half harness checkpoint;
 - the documentation checkpoint for pull request #4 and its review.
 
-Nothing was rewritten, condensed or corrected in any of the fifteen moves, so each
+Nothing was rewritten, condensed or corrected in any of the sixteen moves, so each
 section still reads exactly as the session that wrote it left it, and the
 archive is the evidence of record for every increment it holds: reproduction
 commands, the models and efforts actually used, credit costs, findings and
@@ -134,7 +133,7 @@ than from this file.
 [docs/upstream-licensing.md](docs/upstream-licensing.md) is still the record of
 that licence work and did not move.
 
-**`K1` is the only live entry.** The backlog triage added no entry of its
+**No entry is live until the user schedules another increment.** The backlog triage added no entry of its
 own, because agreeing a backlog is not a numbered increment, so archiving `G1`
 left none behind and `T1`'s was written into that empty space. The rule these
 moves established is to keep
@@ -170,86 +169,8 @@ writing a word of its own, because 1313 bytes were spare. **`X1` archived `B1`'s
 archived `W1`'s 4684 bytes** on the same rule, because 1003 bytes were spare. **`H1`
 archived `N1`'s 4982 bytes** on the same rule, because 655 bytes were spare. **`K1`
 archived `H1`'s 4586 bytes** on the same rule, because 1058 bytes were spare.
-
-## `K1`: how an earlier review's comments were received
-
-**Built on `k1-review-feedback`.** `H1` landed first (#44, `3e2b50f`, CI on
-`main` green), `d9a837a` archived its entry, and the user's four decisions of
-2026-09-14 stand: read back resolution and thumbs and ask for nothing; report
-only; on by default with no flag; and the `SCOPE.md` paragraph (`dc3a14b`).
-
-### What was built
-
-- **Reactions**: `reactionsFrom` keeps each earlier comment's `+1` and `-1` from
-  the `pulls/N/comments` listing `I1a` already reads. A missing or malformed
-  rollup is unread with its reason, never zero.
-- **Resolution**: `readReviewThreads` sends one `gh api graphql --paginate
-  --slurp` query for `reviewThreads` and each thread's first `fullDatabaseId`,
-  a lossless string; Copilot's review of #45 caught the deprecated `databaseId`.
-  `threadListingFrom` refuses a page with GraphQL errors or the wrong shape, and
-  calls a listing incomplete when its last page reports a next page, the declared
-  count changes, or fewer threads are listed than declared. A comment with no
-  thread, two threads, or beyond an incomplete listing is unread, never
-  unresolved. A failed read is reported and discovery proceeds; a cancellation
-  rethrows. No earlier review, or no inline comment, sends no GraphQL request.
-  gh sends it as a `POST`, so it lives only in discovery and `target-fixture.mjs`
-  answers it by exact shape.
-- **Report**: `prior.feedback` sits beside the comments. `describePrior` adds one
-  line, e.g. `Feedback on those comments: 6 thread(s) resolved, 0 unresolved;
-  reactions +1 0, -1 0.` plus an information-only sentence, printed under
-  `--quiet` too; `priorSummary` adds counts and grouped unread reasons.
-
-### Evidence
-
-- **Test first**, each new test watched failing for its reason: three `K1` cases
-  in `smoke-prior`, and pins in `smoke-revalidation` (capture) and
-  `smoke-review` (retained run). Two runs differing only in reception print
-  different lines and give identical reviewer and adjudicator prompts, verdicts,
-  revalidation prompt, proposed review and retained record, clock and invocation
-  id aside. `outcomeKeys` is unchanged.
-- **Mutation pass** in a copy outside the repository: 26 changes disable a guard
-  or inject the reception into a verdict, prompt, record or body; 25 fail a
-  suite. The survivor put it on `revalidation.review`, which
-  `retainedRevalidation` projects to named fields and `revalidationPrompt` never
-  reads, so it leaks nothing. The pass also showed the GraphQL errors check was
-  caught only by a reason regex; errors beside readable data is now its own case.
-- **All eighteen suites pass**, with `git diff --check`, the control-byte check
-  and `collectInstructionFiles` (six read, none skipped) clean.
-- **Read-only probe of #44 through `runGh`**, no credits: 6 threads complete on
-  one page; the same arguments at `first: 2` gave 3 complete pages; all 6 opening
-  REST comments matched by database id, reactions zero.
-
-**Not demonstrated**: a non-zero reaction, a real incomplete or failed listing,
-or any read of a review this tool published, since #44's threads are Copilot's.
-`README.md` does not document the line: it has 862 bytes spare.
-
-### The installed-plugin review
-
-#45, reviewed once at the standing authorization at head `0d28616` with the
-installed extension identical: `dogfood-review.mjs 45 --all --no-comment
---unattended`, CLI 1.0.83, balanced. All five passes completed on their
-configured assignments, `gpt-5.6-terra` at high effort for the four specialists
-and `gpt-5.6-luna` at high for overview, default window, no context loss:
-**184.483837 credits, 19 requests, 312.7 s of model work, 105.3 s elapsed.**
-51 tool calls (`view`, `rg`), one refused: a nonexistent `gh.mjs`, with `Q7`'s
-absent-path reason.
-
-**INCOMPLETE, 0 validated, 0 withheld, no adjudication.** Three coverage gaps and
-a caveat say the live GraphQL shape, pagination and thread volume were not
-exercised, as recorded above. **One candidate was refused**: performance-resources'
-P2 that `threadListingFrom` keeps a root for every thread although only the
-earlier review's comments are looked up. Its location was exact, but one
-evidence citation quoted 7 lines for the 6-line range 244-249. The point is real
-but negligible, since the slurped pages already hold every thread, so **the user
-declined it in #45's triage.** The run also
-exercised `K1`'s no-earlier-review path live: `I1 prior:` said `none`, with no
-feedback line. CI and `claude-review` passed. Copilot's review of #45 then found the deprecated
-`databaseId`; `e25bd6b` fixed it after this review, which never saw the fix.
-
-### The exact next step
-
-Nothing is scheduled after `K1`. Merging #45 is the user's call; after a merge,
-archive this entry as `d9a837a` did `H1`'s, before writing any new entry.
+**After #45 merged, `K1`'s own 4818 bytes moved** on the same rule, because 413
+bytes were spare.
 
 ## v1 is complete, and seven increments are scheduled on top of it
 
@@ -268,9 +189,14 @@ was built, and `I1a`, `I1b` and `I1c` are all done.
 through all twelve one at a time, cheapest first, and **scheduled six**: `T1`,
 `B1`, `W1`, `N1`, `H1`, `K1`, in that order, which is the order of the remaining
 rows above and the order the next session works in, with `X1` inserted after
-`B1` the same day. **`T1`, `B1`, `X1`, `W1`, `N1` and `H1` are done and `K1` is built and in review.** The user chose that order over starting with the measurement and
+`B1` the same day. **`T1`, `B1`, `X1`, `W1`, `N1`, `H1` and `K1` are done.** The user chose that order over starting with the measurement and
 over starting with the largest capability gap, and chose the mnemonic IDs over
 one series off `G1`.
+
+**Nothing is scheduled after `K1`, so the next increment is the user's to
+choose.** Do not start anything under "Recorded, not scheduled" below, and do not
+pick one yourself. `K1`'s archived entry records what it did not demonstrate,
+including any read of a review this tool published.
 
 **Three of the six were scheduled as a named half, and the other half of each is
 not scheduled.** `B1` takes the honesty half of the large-diff item and not the
@@ -295,7 +221,7 @@ an approved paragraph. `K1` took an approved paragraph on 2026-09-14, in
 
 ### What is settled and must not be redone
 
-**`E1`, `U1`, `I1a`, `I1b`, `I1c`, `G1`, `T1`, `B1`, `X1`, `W1`, `N1` and `H1` are done: do not redo any.**
+**`E1`, `U1`, `I1a`, `I1b`, `I1c`, `G1`, `T1`, `B1`, `X1`, `W1`, `N1`, `H1` and `K1` are done: do not redo any.**
 **`E1` raised three items and `T1` closed the first**, a run that never reported
 its own cost. The other two stay recorded and stay unscheduled: the evidence lines are still truncated by the interactive UI, and
 per-reviewer progress still says nothing while a reviewer works. `U1` is settled as one preflight flag that refuses. **`I1a`'s slicing is
