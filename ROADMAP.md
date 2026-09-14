@@ -19,7 +19,7 @@ increment scheduled up to `G1` is complete.** On 2026-09-12 the user triaged
 `G1`'s twelve proposals one at a time and scheduled six of them: `T1`, `B1`,
 `W1`, `N1`, `H1` and `K1`, in that order, and the same day scheduled `X1`
 immediately after `B1`. **`T1`, `B1`, `X1`, `W1`, `N1` and `H1` are complete
-and archived, and no entry is live below until `K1` writes one**; the `Pending`
+and archived, and `K1`'s settled scope is the live entry below**; the `Pending`
 row is what is left.
 The closing section records what was decided, and what stays open as a
 limitation rather than as work.
@@ -87,7 +87,7 @@ posting them.
 | W1 | Completed | Every validated finding carries one adjudicated remediation sentence in its presented and published forms. Missing, multi-line, multi-sentence and code-block-bearing prose is refused at ingestion and again before publication; older retained results still load but cannot publish without a new review. No committable suggestion block. Pull request #42, reviewed once with this plugin at the user's authorization: deep on `gpt-5.6-terra` at high effort and its default window, 81.62026 credits, INCOMPLETE on two invalid citation paths, 0 validated findings and two useful candidate signals, one fixed and one retained as an explicit parser limitation. | X1; [Selection/publication](SCOPE.md#selection-publication-and-cached-results) |
 | N1 | Completed | A seeded corpus and a deterministic scorer, **the free half only**: five plain-text diffs pinned by content hash, three seeded cases carrying four defects with stable ids, target and allowed severities, acceptable locations and concept groups, and two clean controls; a scorer needing no model or network that rejects explicit non-findings before matching and pairs findings with defects one-to-one, run by an eighteenth controlled suite and CI. No collection run, recall number or gate. Pull request #43, reviewed once with this plugin at the standing authorization: balanced, 127.050688 credits, INCOMPLETE, 0 validated findings, and one real candidate raised by two reviewers and refused on its citation, fixed anyway. | W1; [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | H1 | Completed | By default the project's own written rules steer the review: the root instruction files the reviewed head commits reach the one reviewer that weighs the whole change, up to a 48 KiB budget; a finding relying on one must quote the rule as exact lines of its file, bound like a source citation; `--no-standards` turns it off for one run. The user reversed the opt-in this row first proposed and approved the `SCOPE.md` paragraph word for word. **It settles what a claim not grounded in a provable code effect must carry: a quotable rule**, which the history and path-conditioned lenses would inherit. Pull request #44, reviewed once at the standing authorization: balanced, 319.760535 credits, INCOMPLETE, 0 validated findings; three refused candidates were real and are fixed, one through the user's budget decision. `G1`'s menu item 4. | N1; [Modes/findings](SCOPE.md#review-modes-and-findings) |
-| K1 | Pending | A published review asks what it found useful, and a later run reads the reactions and the resolution state of its own threads. `I1c` already reads an earlier review's threads fresh from GitHub on every run, so the read path exists. It is the only scheduled item that would produce evidence about real pull requests rather than a synthetic corpus, and it is last because it needs a review actually published to a pull request before there is anything to read back, and findings stay local unless the user authorizes posting. Needs a scope decision. `G1`'s menu item 12. | H1, I1c; [Publication controls](SCOPE.md#selection-publication-and-cached-results) |
+| K1 | Pending | A later review reports how this tool's earlier review of the same pull request was received: its threads' resolution and their thumbs reactions. Nothing asks for them. `I1a` already reads that review's comments fresh from GitHub on every run, and their reactions arrive with that request; resolution needs one GraphQL read. It is the only scheduled item that would produce evidence about real pull requests rather than a synthetic corpus, and it is last because it needs a review actually published to a pull request before there is anything to read back, and findings stay local unless the user authorizes posting. Scope settled on 2026-09-14 in `dc3a14b`: report only, on by default, nothing asked, published, retained or fed to a reviewer. `G1`'s menu item 12. | H1, I1c; [Publication controls](SCOPE.md#selection-publication-and-cached-results) |
 
 ## Every completed increment, `F1` through `H1`, is archived
 
@@ -134,7 +134,7 @@ than from this file.
 [docs/upstream-licensing.md](docs/upstream-licensing.md) is still the record of
 that licence work and did not move.
 
-**No entry is live until `K1` writes one.** The backlog triage added no entry of its
+**`K1` is the only live entry, and it records scope rather than a build.** The backlog triage added no entry of its
 own, because agreeing a backlog is not a numbered increment, so archiving `G1`
 left none behind and `T1`'s was written into that empty space. The rule these
 moves established is to keep
@@ -170,6 +170,56 @@ writing a word of its own, because 1313 bytes were spare. **`X1` archived `B1`'s
 archived `W1`'s 4684 bytes** on the same rule, because 1003 bytes were spare. **`H1`
 archived `N1`'s 4982 bytes** on the same rule, because 655 bytes were spare. **`K1`
 archived `H1`'s 4586 bytes** on the same rule, because 1058 bytes were spare.
+
+## `K1`: how an earlier review's comments were received
+
+**Scope settled, nothing built.** `H1` landed first: #44 squash-merged as
+`3e2b50f` after Copilot's review of it raised five threads, four right and
+fixed and one already fixed; `main`'s tree equals the final PR head's tree and
+CI on `main` passed. `d9a837a` then archived `H1`'s entry, and the user took
+four decisions one at a time before any code:
+
+- **Read back both signals**, thread resolution and reactions, and **ask for
+  nothing**: the published review is unchanged. On #44 all six threads were
+  resolved and no comment carried a reaction, so resolution is the signal this
+  project produces.
+- **Report only**: one line under the existing `Prior review:` block, read by
+  no reviewer, adjudicator or `I1c` verdict. #44's threads were resolved for
+  three different reasons, so resolved never means fixed.
+- **On by default**, with no flag, like `I1a`'s discovery; a failed read is
+  reported as itself and the review proceeds.
+- **The `SCOPE.md` paragraph**, approved word for word (`dc3a14b`). It also
+  states two consequences of settled rules: only the most recent earlier review
+  is read, because `I1a` picks it, and nothing is retained, because nothing
+  consumes it.
+
+### What a read-only probe of #44 demonstrated
+
+No credits and no write. `pulls/N/comments`, which `discoverPriorReview`
+already requests, carries a `reactions` rollup on every review comment that
+`priorCommentFrom` drops. REST carries no resolution state, and
+`pulls/N/reviews` no reactions. GraphQL `reviewThreads` exposes `isResolved`,
+`resolvedBy`, `isOutdated` and each comment's `databaseId`, which equals the
+REST comment id. **The tool makes no GraphQL request today**: every read is a
+REST `GET`, and a GraphQL query is sent as a `POST` although it writes nothing.
+
+### The exact next increment
+
+Build `K1` test first on `k1-review-feedback`, inside the approved paragraph:
+
+- keep each earlier comment's `+1` and `-1` counts from the response already read;
+- read that review's thread resolution with one paginated GraphQL query,
+  matched to its comments by database id;
+- print one feedback line under `Prior review:` at every verbosity, and a
+  summary on the `I1 prior:` evidence line;
+- report a failed or partial read as itself and never claim a thread state it
+  did not read;
+- feed nothing to a reviewer, the adjudicator, `I1c`, the retained record or
+  the published review.
+
+**Demonstrating it live needs a pull request this tool has published a review
+on.** The only two are playgrounds #1 and #2, never to be merged; reviewing
+there, or publishing anywhere, is the user's call.
 
 ## v1 is complete, and seven increments are scheduled on top of it
 
@@ -209,8 +259,8 @@ that list. **The triage itself was not a numbered increment.**
 **Five of the seven need a scope decision, and that decision is the user's every
 time, taken in the session that builds the increment and never assumed from this
 row.** `T1` took its as one approved sentence, and `X1`, `W1` and `H1` each took
-an approved paragraph. `K1` needs one because the scope says nothing about a
-feedback channel. **`B1` and `N1` fit
+an approved paragraph. `K1` took an approved paragraph on 2026-09-14, in
+`dc3a14b`. **`B1` and `N1` fit
 `SCOPE.md` as written** and need no decision at all.
 
 ### What is settled and must not be redone
