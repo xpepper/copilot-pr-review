@@ -11,7 +11,8 @@ import {
 import { modeIds, reviewModes } from "../extensions/pr-review/modes.mjs";
 import { captureTarget, parseTargetArgs } from "../extensions/pr-review/target.mjs";
 import { assembleContext } from "../extensions/pr-review/context.mjs";
-import { repository, respond } from "./target-fixture.mjs";
+import { identity, repository, respond } from "./target-fixture.mjs";
+import { commentBody } from "../extensions/pr-review/preview.mjs";
 import {
   formatFindings, outputEnd, outputStart, reviewKey, validationInstructions,
 } from "../extensions/pr-review/findings.mjs";
@@ -2259,6 +2260,94 @@ assert.equal(standardsInput([
   }
 }
 console.log("PASS H1 standards reach the mode's standards reviewer alone, a rule is bound end to end, and --no-standards hands nothing");
+
+// K1: how this tool's earlier review of the pull request was received is
+// reported to the person running the review, and to nothing else. Two retained
+// runs differ only in that reception: the earlier finding's thread resolved and
+// thumbed up, against open and thumbed down. Each prints what it read, and both
+// send every reviewer and the adjudicator the same prompt, propose the same
+// review and retain the same record, which holds no prior review at all.
+{
+  const head = "b".repeat(40);
+  const priorReview = {
+    id: 5130714400, state: "COMMENTED", commit_id: head, submitted_at: "2026-09-07T10:11:11Z",
+    user: { login: identity.login, id: identity.id, type: "User" },
+    html_url: `${repository.url}/pull/1#pullrequestreview-5130714400`,
+    body: "Quick review: 1 selected validated finding(s). Review coverage: completed. This is not a clean-review claim.",
+  };
+  const earlierFinding = {
+    severity: "P2", title: "Keep the exported value at one", trigger: "any import of value",
+    expected: "value is 1", actual: "value is 2", introduction: "the changed line set value to 2",
+    confidence: 0.9, reportedBy: ["correctness"],
+  };
+  const directory = mkdtempSync(join(tmpdir(), "pr-review-k1-"));
+  try {
+    const workspacePath = join(directory, "k1-reception");
+    mkdirSync(workspacePath);
+    const runs = [];
+    for (const [resolved, thumbs] of [[true, { "+1": 4, "-1": 0 }], [false, { "+1": 0, "-1": 3 }]]) {
+      const h = harness({ withCandidate: true, acceptCandidate: true });
+      h.parent.sessionId = "k1-reception";
+      h.parent.rpc.metadata.snapshot = async () => ({
+        sessionId: h.parent.sessionId, workspacePath, isRemote: false, workingDirectory: directory,
+      });
+      const readGh = fakeGh();
+      const gh = async (args, cwd, settings) => {
+        if (args[5] === "repos/fixture/repository/pulls/1/reviews?per_page=100") return JSON.stringify([[priorReview]]);
+        if (args[5] === "repos/fixture/repository/pulls/1/comments?per_page=100") {
+          return JSON.stringify([[{
+            id: 3948685115, pull_request_review_id: priorReview.id,
+            html_url: `${repository.url}/pull/1#discussion_r3948685115`,
+            path: "example.js", side: "RIGHT", start_side: null, line: 1, start_line: null,
+            original_line: 1, original_start_line: null, commit_id: head, original_commit_id: head,
+            body: commentBody(earlierFinding),
+            reactions: { total_count: thumbs["+1"] + thumbs["-1"], laugh: 0, hooray: 0, confused: 0, heart: 0,
+              rocket: 0, eyes: 0, ...thumbs },
+          }]]);
+        }
+        if (args[5] === "graphql") {
+          return JSON.stringify([{ data: { repository: { pullRequest: { reviewThreads: {
+            totalCount: 1, pageInfo: { hasNextPage: false, endCursor: null },
+            nodes: [{ isResolved: resolved, comments: { nodes: [{ fullDatabaseId: "3948685115" }] } }],
+          } } } } }]);
+        }
+        return readGh(args, cwd, settings);
+      };
+      const result = await executeRetainedReview(h.parent, h.client, parseReviewArgs("1 --quick --all --no-comment"),
+        structuredClone(assignments), { controller: h.controller, gh, git: checkoutGit });
+      runs.push({ h, result, record: (await sessionStore(h.parent)).read() });
+    }
+    const [welcomed, rebuffed] = runs;
+    assert(welcomed.h.messages.some((message) =>
+      message.includes("Feedback on those comments: 1 thread(s) resolved, 0 unresolved; reactions +1 4, -1 0.")));
+    assert(rebuffed.h.messages.some((message) =>
+      message.includes("Feedback on those comments: 0 thread(s) resolved, 1 unresolved; reactions +1 0, -1 3.")));
+    assert.equal(welcomed.h.sessions.filter((session) => session.validating).length, 1, "The adjudicator ran");
+    assert.equal(welcomed.result.revalidation.entries.length, 1, "The earlier finding was revalidated");
+    assert(welcomed.result.preview.request.payload.comments.length > 0, "A review was proposed");
+    assert.deepEqual(rebuffed.h.sessions.map((session) => session.prompt),
+      welcomed.h.sessions.map((session) => session.prompt),
+      "No reviewer and no adjudicator is told how the earlier review was received");
+    // Only the clock and each run's own invocation id differ between two runs,
+    // and the digest that hashes them.
+    const stable = (record) => JSON.parse(JSON.stringify(record, (key, value) =>
+      ["startedAt", "completedAt", "elapsedMs", "modelMs", "invocationId", "digest"].includes(key) ? undefined : value));
+    assert.deepEqual(rebuffed.result.preview.request.payload, welcomed.result.preview.request.payload,
+      "The proposed review does not change");
+    assert.deepEqual(stable(rebuffed.result.preview.request), stable(welcomed.result.preview.request));
+    assert.deepEqual(stable(rebuffed.record), stable(welcomed.record), "The retained record does not change");
+    for (const { h, record, result } of runs) {
+      assert.equal(Object.hasOwn(record.outcome, "prior"), false, "The retained outcome holds no prior review");
+      for (const text of [JSON.stringify(record), JSON.stringify(result.preview.request),
+        ...h.sessions.map((session) => session.prompt)]) {
+        assert.doesNotMatch(text, /Feedback on those comments|plusOne|minusOne|isResolved|"reactions"|"feedback"/);
+      }
+    }
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+}
+console.log("PASS K1 how an earlier review was received reaches no reviewer, adjudicator, retained record or proposed review");
 assert(injectionPrompt.includes(checkout), "Reviewers are told which checkout they are reading");
 const defaults = harness();
 const defaultReport = await executeReviewRun(defaults.parent, defaults.client, options,

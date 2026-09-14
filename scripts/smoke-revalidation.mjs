@@ -906,6 +906,42 @@ const rangeRequests = (calls) => calls.filter((args) =>
   console.log("PASS I1c a pull request with no earlier review revalidates nothing and costs nothing");
 }
 
+// K1: how the earlier review's comments were received is reported and read by
+// no verdict. Two captures that differ only in that reception, every thread
+// resolved and thumbed up against every thread open and thumbed down, settle
+// exactly the same revalidation, put exactly the same prompt to --revalidate and
+// retain exactly the same record. A resolved thread is never evidence of a fix.
+{
+  const page = (resolved) => [{ data: { repository: { pullRequest: { reviewThreads: {
+    totalCount: 2, pageInfo: { hasNextPage: false, endCursor: null },
+    nodes: ["3948685900", "3948685901"].map((fullDatabaseId) =>
+      ({ isResolved: resolved, comments: { nodes: [{ fullDatabaseId }] } })),
+  } } } } }];
+  const thumbs = (counts) => ({ total_count: 0, "+1": 0, "-1": 0, laugh: 0, hooray: 0, confused: 0, heart: 0,
+    rocket: 0, eyes: 0, ...counts });
+  const runs = [];
+  for (const [resolved, reactions] of [[true, thumbs({ "+1": 3 })], [false, thumbs({ "-1": 2 })]]) {
+    const { gh: inner } = capturingGh([captured({ reactions }),
+      captured({ id: 3948685901, path: "total.js", line: 3, reactions })]);
+    const gh = async (args, directory) => (args[5] === "graphql" ? JSON.stringify(page(resolved)) : inner(args, directory));
+    const sink = [];
+    runs.push({ run: await executeTargetCapture(session(sink), "13", { gh }), sink });
+  }
+  const [welcomed, rebuffed] = runs;
+  assert(welcomed.sink.some((line) =>
+    line.includes("Feedback on those comments: 2 thread(s) resolved, 0 unresolved; reactions +1 6, -1 0.")));
+  assert(rebuffed.sink.some((line) =>
+    line.includes("Feedback on those comments: 0 thread(s) resolved, 2 unresolved; reactions +1 0, -1 4.")));
+  assert.equal(welcomed.run.revalidation.entries.length, 2, "Both comments were judged, so the comparison means something");
+  assert.deepEqual(rebuffed.run.revalidation, welcomed.run.revalidation, "No reception changes a verdict");
+  const key = "a".repeat(64);
+  assert.equal(revalidationPrompt(rebuffed.run.revalidation, key), revalidationPrompt(welcomed.run.revalidation, key),
+    "No reception reaches the revalidation pass");
+  assert.deepEqual(retainedRevalidation(rebuffed.run.revalidation), retainedRevalidation(welcomed.run.revalidation));
+  assert.doesNotMatch(JSON.stringify(welcomed.run.revalidation), /feedback|reactions|plusOne|minusOne|thread/i);
+  console.log("PASS K1 how an earlier review was received changes no verdict, no revalidation prompt and no retained revalidation");
+}
+
 // ---------------------------------------------------------------------------
 // A reply this tool writes must never come back to it as something it wrote a
 // review for. Discovery keeps only the comments of the review it recognised, and

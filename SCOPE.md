@@ -204,6 +204,16 @@ the original session-scoped reload/resume behavior where supported; do not
 introduce a cross-session review archive. Publishing the cache must not rerun
 reviewers or silently accept a changed head.
 
+A review that finds this tool's most recent earlier review of the same pull
+request also reports how that review's inline comments were received: how many
+of their threads are resolved and how many are not, and the thumbs-up and
+thumbs-down reactions on those comments. This is read fresh from GitHub on every
+such review, spends no credits, and a failed read is reported as itself without
+stopping the review. It is information only. No reviewer, adjudicator or
+revalidation verdict reads it, a resolved thread is never evidence that a finding
+was fixed or was wrong, and it is not retained with the result. The published
+review does not ask for reactions.
+
 ## Optional project safeguards
 
 Ordinary review is read-only. `--verify` opts into running existing project

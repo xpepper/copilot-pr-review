@@ -103,6 +103,101 @@ export function priorCommentFrom(raw) {
   };
 }
 
+// K1: how a comment was received, read from the listing discovery already
+// requested. Only the two thumbs count. A rollup GitHub did not send, or sent in
+// a shape this does not recognise, is unread: a zero nobody measured would be
+// reported as a reception. It never refuses the comment, which is still ours.
+export function reactionsFrom(raw) {
+  const rollup = raw?.reactions;
+  if (rollup === null || rollup === undefined) {
+    return { status: "unread", reason: "GitHub returned no reactions rollup for this comment" };
+  }
+  const count = (value) => Number.isSafeInteger(value) && value >= 0;
+  if (typeof rollup !== "object" || Array.isArray(rollup) || !count(rollup["+1"]) || !count(rollup["-1"])) {
+    return { status: "unread", reason: "GitHub returned a malformed reactions rollup for this comment" };
+  }
+  return { status: "read", plusOne: rollup["+1"], minusOne: rollup["-1"] };
+}
+
+// K1: thread resolution, which REST does not carry. The query lists the pull
+// request's review threads with each one's first comment, whose fullDatabaseId
+// is the REST id of the comment that opened it; read-only probes of #44 and #45
+// showed the two agree. It is a BigInt sent as a decimal string, so it carries a
+// 64-bit id whole. GitHub deprecates databaseId because it cannot, and its
+// announced removal date has passed, as #45's Copilot review pointed out. gh
+// sends GraphQL as a POST, but a query cannot mutate and this one is only ever
+// sent from discovery, never from a publication or reply path.
+export const reviewThreadsQuery = "query($owner: String!, $name: String!, $number: Int!, $endCursor: String) { " +
+  "repository(owner: $owner, name: $name) { pullRequest(number: $number) { " +
+  "reviewThreads(first: 100, after: $endCursor) { totalCount pageInfo { hasNextPage endCursor } " +
+  "nodes { isResolved comments(first: 1) { nodes { fullDatabaseId } } } } } } }";
+
+function requireThreads(condition, message) {
+  if (!condition) throw new Error(`Review thread listing unreadable: ${message}.`);
+}
+
+// Every page must be the connection the query asked for. A page that is not
+// cannot say which threads it held, so the whole listing is refused rather than
+// partly trusted. A listing that is readable but stops short is incomplete: the
+// threads it reached are read, and a comment it did not reach stays unread.
+export function threadListingFrom(pages) {
+  requireThreads(Array.isArray(pages) && pages.length > 0, "no pages");
+  const roots = new Map();
+  const declared = new Set();
+  let listed = 0;
+  let connection;
+  for (const page of pages) {
+    requireThreads(page?.errors === undefined, "GitHub returned errors");
+    connection = page?.data?.repository?.pullRequest?.reviewThreads;
+    requireThreads(Number.isSafeInteger(connection?.totalCount) && connection.totalCount >= 0 &&
+      typeof connection.pageInfo?.hasNextPage === "boolean" && Array.isArray(connection.nodes),
+    "not a review thread page");
+    declared.add(connection.totalCount);
+    for (const node of connection.nodes) {
+      requireThreads(typeof node?.isResolved === "boolean" && Array.isArray(node.comments?.nodes),
+        "not a review thread");
+      listed++;
+      // A thread whose opening comment is gone opens none of ours.
+      if (!node.comments.nodes.length) continue;
+      // Kept as GitHub's string: a number past 2^53 would already have lost digits.
+      const { fullDatabaseId: id } = node.comments.nodes[0] ?? {};
+      requireThreads(typeof id === "string" && /^[1-9]\d*$/.test(id), "a thread comment without a full database id");
+      roots.set(id, roots.has(id) ? "conflicting" : node.isResolved ? "resolved" : "unresolved");
+    }
+  }
+  const reason = connection.pageInfo.hasNextPage ? "the last page read still reported a next page"
+    : declared.size > 1 ? "the declared thread count changed between pages"
+      : listed !== connection.totalCount ? `${listed} thread(s) listed of ${connection.totalCount} declared`
+        : undefined;
+  return { status: reason ? "incomplete" : "complete", pages: pages.length, listed, roots,
+    ...(reason ? { reason } : {}) };
+}
+
+// A REST comment id is a safe integer, which priorCommentFrom enforces, so its
+// decimal string is exact and compares with a thread's fullDatabaseId losslessly.
+export function threadOf(id, listing) {
+  const state = listing.roots?.get(String(id));
+  if (state === "resolved" || state === "unresolved") return { status: state };
+  return { status: "unread", reason: listing.status === "failed" ? "the review thread listing could not be read"
+    : state === "conflicting" ? "more than one review thread opens with this comment"
+      : listing.status === "incomplete" ? "the incomplete review thread listing did not reach this comment"
+        : "no review thread opens with this comment" };
+}
+
+// A failed read is reported as itself, exactly as a failed discovery is. A
+// cancellation is never one of these and belongs to the run.
+export async function readReviewThreads(repository, pull, { gh = runGh, cwd, signal } = {}) {
+  const [owner, name] = repository.nameWithOwner.split("/");
+  try {
+    return threadListingFrom(JSON.parse(await gh(["api", "--hostname", repository.host, "--method", "POST",
+      "graphql", "--paginate", "--slurp", "-f", `query=${reviewThreadsQuery}`, "-f", `owner=${owner}`,
+      "-f", `name=${name}`, "-F", `number=${pull.number}`], cwd, { signal })));
+  } catch (error) {
+    if (signal?.aborted) throw error;
+    return { status: "failed", reason: String(error.message ?? error) };
+  }
+}
+
 // Only `ahead` means the reviewed head descends from the head that review
 // evaluated, which is the one case where a forward range exists to confine
 // fresh hunting to. A rewound head is GitHub's `behind` and classifies as
@@ -146,9 +241,20 @@ export async function discoverPriorReview(repository, pull, { gh = runGh, cwd, s
     const [candidate, incumbent] = [Date.parse(raw.submitted_at), Date.parse(best.submitted_at)];
     return candidate > incumbent || (candidate === incumbent && raw.id > best.id) ? raw : best;
   }));
-  const comments = (await listed(`${endpoint}/comments`))
-    .filter((raw) => raw?.pull_request_review_id === review.id).map(priorCommentFrom);
-  const found = { ...base, status: "found", review, comments };
+  const listing = (await listed(`${endpoint}/comments`))
+    .filter((raw) => raw?.pull_request_review_id === review.id);
+  const comments = listing.map(priorCommentFrom);
+  // K1: kept beside the comments rather than on them, so nothing that reads a
+  // retained comment, revalidation included, can read how it was received. A
+  // review that left no inline comment has no thread to read, so nothing is asked.
+  const { roots, ...threads } = listing.length
+    ? await readReviewThreads(repository, pull, { gh, cwd, signal }) : { status: "none" };
+  const feedback = {
+    threads,
+    comments: listing.map((raw) =>
+      ({ id: raw.id, reactions: reactionsFrom(raw), thread: threadOf(raw.id, { ...threads, roots }) })),
+  };
+  const found = { ...base, status: "found", review, comments, feedback };
   // Two equal heads settle the relationship without asking, and a comparison
   // this run never made has no place in its record.
   if (review.head === pull.head.sha) return { ...found, relationship: "same-head" };
@@ -190,6 +296,8 @@ export function priorSummary(prior, limit = 20) {
     ...(prior.comparison ? { comparison: prior.comparison } : {}),
     comments: anchors.length, anchors: anchors.slice(0, limit),
     ...(anchors.length > limit ? { undisplayedAnchors: anchors.length - limit } : {}),
+    // K1: counts and reasons only, bounded whatever the number of comments.
+    ...(prior.feedback ? { feedback: feedbackCounts(prior.feedback) } : {}),
     ...(prior.reason ? { reason: prior.reason } : {}),
   };
 }
@@ -207,6 +315,51 @@ const confinesNothing = "Fresh hunting is not confined to any commit range.";
 const confinesRange = "Fresh hunting is confined to the commit range reported below.";
 const revalidatesFindings = "What became of that review's own findings is revalidated and reported below.";
 const revalidatesNothing = "That review published no finding this tool could read back, so none is revalidated.";
+
+// K1: counts of what was read, and grouped reasons for what was not. A comment
+// whose thread or rollup is unread is counted as unread and in nothing else.
+export function feedbackCounts(feedback) {
+  const tally = (entries) => entries.reduce((reasons, { reason }) =>
+    ({ ...reasons, [reason]: (reasons[reason] ?? 0) + 1 }), {});
+  const threads = feedback.comments.map(({ thread }) => thread);
+  const unreadThreads = threads.filter(({ status }) => status === "unread");
+  const reactions = feedback.comments.map(({ reactions: read }) => read);
+  const read = reactions.filter(({ status }) => status === "read");
+  const unreadReactions = reactions.filter(({ status }) => status === "unread");
+  return {
+    threads: { ...feedback.threads,
+      resolved: threads.filter(({ status }) => status === "resolved").length,
+      unresolved: threads.filter(({ status }) => status === "unresolved").length,
+      unread: unreadThreads.length, ...(unreadThreads.length ? { unreadReasons: tally(unreadThreads) } : {}) },
+    reactions: {
+      plusOne: read.reduce((sum, { plusOne }) => sum + plusOne, 0),
+      minusOne: read.reduce((sum, { minusOne }) => sum + minusOne, 0),
+      read: read.length, unread: unreadReactions.length,
+      ...(unreadReactions.length ? { unreadReasons: tally(unreadReactions) } : {}) },
+  };
+}
+
+// The scope's own limit on this line, stated where it is read: it is reported,
+// and a resolved thread was resolved for a reason nobody recorded.
+const informationOnly = "Information only: no reviewer or verdict reads it, and a resolved thread is not " +
+  "evidence that a finding was fixed or was wrong.";
+
+function describeFeedback(feedback) {
+  if (feedback.threads.status === "none") {
+    return "Feedback on those comments: none to read, as that review left no inline comment.";
+  }
+  // gh's error output can span lines; this report is one line whatever it says.
+  const oneLine = (text) => String(text).replace(/\s+/g, " ").trim();
+  const { threads, reactions } = feedbackCounts(feedback);
+  const resolution = threads.status === "failed"
+    ? `thread resolution could not be read (${oneLine(threads.reason)}), so all ${threads.unread} thread(s) are unread`
+    : `${threads.resolved} thread(s) resolved, ${threads.unresolved} unresolved` +
+      `${threads.unread ? `, ${threads.unread} unread` : ""}` +
+      `${threads.status === "incomplete" ? ` (the thread listing was incomplete: ${oneLine(threads.reason)})` : ""}`;
+  const thumbs = `reactions +1 ${reactions.plusOne}, -1 ${reactions.minusOne}` +
+    `${reactions.unread ? ` on ${reactions.read} comment(s), ${reactions.unread} unread` : ""}`;
+  return `Feedback on those comments: ${resolution}; ${thumbs}. ${informationOnly}`;
+}
 
 export function describePrior(prior, head, confined = false, revalidating = false) {
   const acts = `${confined ? confinesRange : confinesNothing} ` +
@@ -237,6 +390,7 @@ export function describePrior(prior, head, confined = false, revalidating = fals
       `declaring ${review.declaredFindings} finding(s). ${review.url}`,
     `${prior.comments.length} inline comment(s) retained, bodies verbatim and anchors normalised` +
       `${outdated ? `, of which ${outdated} no longer anchor in the current diff` : ""}.`,
+    ...(prior.feedback ? [describeFeedback(prior.feedback)] : []),
     `Relationship to this review's head: ${relationship}`,
     acts,
   ].join("\n");

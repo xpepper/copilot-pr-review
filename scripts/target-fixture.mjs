@@ -235,11 +235,29 @@ function paginatedResponse(args, cwd) {
   return JSON.stringify([[]]);
 }
 
+// K1: the review-thread read discovery makes once it has found an earlier review
+// with inline comments. gh sends it as a POST, but it is a query, so it is
+// answered here by its exact shape and never reaches the publication fixture.
+// The fixture's own pull requests carry no review thread, so one empty page.
+function threadsResponse(args, cwd) {
+  if (args.length !== 16 || JSON.stringify(args.slice(0, 9)) !== JSON.stringify(["api", "--hostname",
+    "github.com", "--method", "POST", "graphql", "--paginate", "--slurp", "-f"]) ||
+      !args[9].startsWith("query=query(") || /mutation/i.test(args[9]) ||
+      JSON.stringify(args.slice(10, 15)) !== JSON.stringify(["-f", "owner=fixture", "-f", "name=repository", "-F"]) ||
+      !/^number=[1-9]\d*$/.test(args[15])) {
+    throw new Error(`Unexpected GraphQL gh command: ${JSON.stringify(args)} in ${cwd}`);
+  }
+  return JSON.stringify([{ data: { repository: { pullRequest: { reviewThreads: {
+    totalCount: 0, pageInfo: { hasNextPage: false, endCursor: null }, nodes: [],
+  } } } } }]);
+}
+
 export function respond(args, cwd, history, stdin, { head = "b".repeat(40) } = {}) {
   if (!/^[0-9a-f]{40}$/.test(head)) throw new Error("Invalid fixture head");
   if (JSON.stringify(args) === JSON.stringify(["repo", "view", "--json", "id,nameWithOwner,url"])) {
     return JSON.stringify(repository);
   }
+  if (args[0] === "api" && args[5] === "graphql") return threadsResponse(args, cwd);
   if (args[0] === "api" && args[3] === "--method" && args[4] === "POST") {
     return postResponse(args, cwd, stdin, head);
   }
