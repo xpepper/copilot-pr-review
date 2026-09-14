@@ -7,10 +7,10 @@ An item is complete only with repository evidence. Later items may be split
 further when their implementation context is known, without changing scope.
 The standing checkpoint-commit, pull-request and fresh-session handoff workflow
 is recorded in [AGENTS.md](AGENTS.md); the replaceable next-session prompt lives
-in [HANDOFF.md](HANDOFF.md). Completed entries through `I1c` were moved verbatim
+in [HANDOFF.md](HANDOFF.md). Completed entries through `K1` were moved verbatim
 to [docs/roadmap-archive-2026-09-10.md](docs/roadmap-archive-2026-09-10.md) by
-`A1`, `L1`, `D1`, `O1`, `U1`, `I1a`, `I1b`, `I1c` and `G1`, so this file keeps the increments
-table, the most recent completed entry and the closing section, and stays
+`A1`, `L1`, `D1`, `O1`, `U1`, `I1a`, `I1b`, `I1c`, `G1`, `B1`, `X1`, `W1`, `N1`,
+`H1` and `K1`, so this file keeps the increments table and the closing section, and stays
 small enough for this project's own safeguard discovery to read. **With `D1`
 complete v1 is done, and `O1`, `E1`, `U1`, `I1a`, `I1b`, `I1c` and `G1` have since
 landed on top of it.** `I1` was sliced into three with the user before anything was built,

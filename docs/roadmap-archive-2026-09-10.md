@@ -18,8 +18,8 @@ condensed or corrected in any of those moves, so a claim below still reads
 exactly as the session that demonstrated it wrote it.
 
 [../ROADMAP.md](../ROADMAP.md) remains the live roadmap and stays
-authoritative for the increments table, the most recent completed entry and the
-exact next increment. The safeguard decisions `V2a` and `V2b` settled
+authoritative for the increments table and the exact next increment. The
+safeguard decisions `V2a` and `V2b` settled
 are read from here now, not from the live roadmap.
 [../SCOPE.md](../SCOPE.md) remains authoritative for the product scope. Read
 those first; come here for the evidence behind a completed increment.
