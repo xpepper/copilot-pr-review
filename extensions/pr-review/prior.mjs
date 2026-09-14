@@ -119,6 +119,79 @@ export function reactionsFrom(raw) {
   return { status: "read", plusOne: rollup["+1"], minusOne: rollup["-1"] };
 }
 
+// K1: thread resolution, which REST does not carry. The query lists the pull
+// request's review threads with each one's first comment, whose databaseId is
+// the REST id of the comment that opened it; a read-only probe of #44 showed the
+// two agree. gh sends GraphQL as a POST, but a query cannot mutate and this one
+// is only ever sent from discovery, never from a publication or reply path.
+export const reviewThreadsQuery = "query($owner: String!, $name: String!, $number: Int!, $endCursor: String) { " +
+  "repository(owner: $owner, name: $name) { pullRequest(number: $number) { " +
+  "reviewThreads(first: 100, after: $endCursor) { totalCount pageInfo { hasNextPage endCursor } " +
+  "nodes { isResolved comments(first: 1) { nodes { databaseId } } } } } } }";
+
+function requireThreads(condition, message) {
+  if (!condition) throw new Error(`Review thread listing unreadable: ${message}.`);
+}
+
+// Every page must be the connection the query asked for. A page that is not
+// cannot say which threads it held, so the whole listing is refused rather than
+// partly trusted. A listing that is readable but stops short is incomplete: the
+// threads it reached are read, and a comment it did not reach stays unread.
+export function threadListingFrom(pages) {
+  requireThreads(Array.isArray(pages) && pages.length > 0, "no pages");
+  const roots = new Map();
+  const declared = new Set();
+  let listed = 0;
+  let connection;
+  for (const page of pages) {
+    requireThreads(page?.errors === undefined, "GitHub returned errors");
+    connection = page?.data?.repository?.pullRequest?.reviewThreads;
+    requireThreads(Number.isSafeInteger(connection?.totalCount) && connection.totalCount >= 0 &&
+      typeof connection.pageInfo?.hasNextPage === "boolean" && Array.isArray(connection.nodes),
+    "not a review thread page");
+    declared.add(connection.totalCount);
+    for (const node of connection.nodes) {
+      requireThreads(typeof node?.isResolved === "boolean" && Array.isArray(node.comments?.nodes),
+        "not a review thread");
+      listed++;
+      // A thread whose opening comment is gone opens none of ours.
+      if (!node.comments.nodes.length) continue;
+      const { databaseId } = node.comments.nodes[0] ?? {};
+      requireThreads(Number.isSafeInteger(databaseId) && databaseId > 0, "a thread comment without a database id");
+      roots.set(databaseId, roots.has(databaseId) ? "conflicting" : node.isResolved ? "resolved" : "unresolved");
+    }
+  }
+  const reason = connection.pageInfo.hasNextPage ? "the last page read still reported a next page"
+    : declared.size > 1 ? "the declared thread count changed between pages"
+      : listed !== connection.totalCount ? `${listed} thread(s) listed of ${connection.totalCount} declared`
+        : undefined;
+  return { status: reason ? "incomplete" : "complete", pages: pages.length, listed, roots,
+    ...(reason ? { reason } : {}) };
+}
+
+export function threadOf(id, listing) {
+  const state = listing.roots?.get(id);
+  if (state === "resolved" || state === "unresolved") return { status: state };
+  return { status: "unread", reason: listing.status === "failed" ? "the review thread listing could not be read"
+    : state === "conflicting" ? "more than one review thread opens with this comment"
+      : listing.status === "incomplete" ? "the incomplete review thread listing did not reach this comment"
+        : "no review thread opens with this comment" };
+}
+
+// A failed read is reported as itself, exactly as a failed discovery is. A
+// cancellation is never one of these and belongs to the run.
+export async function readReviewThreads(repository, pull, { gh = runGh, cwd, signal } = {}) {
+  const [owner, name] = repository.nameWithOwner.split("/");
+  try {
+    return threadListingFrom(JSON.parse(await gh(["api", "--hostname", repository.host, "--method", "POST",
+      "graphql", "--paginate", "--slurp", "-f", `query=${reviewThreadsQuery}`, "-f", `owner=${owner}`,
+      "-f", `name=${name}`, "-F", `number=${pull.number}`], cwd, { signal })));
+  } catch (error) {
+    if (signal?.aborted) throw error;
+    return { status: "failed", reason: String(error.message ?? error) };
+  }
+}
+
 // Only `ahead` means the reviewed head descends from the head that review
 // evaluated, which is the one case where a forward range exists to confine
 // fresh hunting to. A rewound head is GitHub's `behind` and classifies as
@@ -166,8 +239,15 @@ export async function discoverPriorReview(repository, pull, { gh = runGh, cwd, s
     .filter((raw) => raw?.pull_request_review_id === review.id);
   const comments = listing.map(priorCommentFrom);
   // K1: kept beside the comments rather than on them, so nothing that reads a
-  // retained comment, revalidation included, can read how it was received.
-  const feedback = { comments: listing.map((raw) => ({ id: raw.id, reactions: reactionsFrom(raw) })) };
+  // retained comment, revalidation included, can read how it was received. A
+  // review that left no inline comment has no thread to read, so nothing is asked.
+  const { roots, ...threads } = listing.length
+    ? await readReviewThreads(repository, pull, { gh, cwd, signal }) : { status: "none" };
+  const feedback = {
+    threads,
+    comments: listing.map((raw) =>
+      ({ id: raw.id, reactions: reactionsFrom(raw), thread: threadOf(raw.id, { ...threads, roots }) })),
+  };
   const found = { ...base, status: "found", review, comments, feedback };
   // Two equal heads settle the relationship without asking, and a comparison
   // this run never made has no place in its record.

@@ -59,10 +59,31 @@ const comparisons = {
     merge_base_commit: { sha: "3".repeat(40) } },
 };
 
-function priorGh({ reviews = [[]], comments = [[]], compare, unreachable = false } = {}) {
+// K1: one slurped page of the review-thread connection, in the shape a read-only
+// probe of #44 returned. Each thread is `[databaseId of its first comment,
+// isResolved]`; a null id is a thread whose opening comment is gone.
+function threadPage(threads, { total = threads.length, next = false } = {}) {
+  return { data: { repository: { pullRequest: { reviewThreads: {
+    totalCount: total, pageInfo: { hasNextPage: next, endCursor: next ? "Y3Vyc29yOnYyOpK0" : null },
+    nodes: threads.map(([databaseId, isResolved]) =>
+      ({ isResolved, comments: { nodes: databaseId === null ? [] : [{ databaseId }] } })),
+  } } } } };
+}
+
+function priorGh({ reviews = [[]], comments = [[]], compare, unreachable = false, threads = [threadPage([])] } = {}) {
   const calls = [];
   const gh = async (args, directory, options) => {
     assert.equal(directory, cwd);
+    // The one request that is not a REST GET. Its every argument is pinned, so
+    // the thread read cannot drift into a different request unnoticed.
+    if (args[5] === "graphql") {
+      assert.deepEqual(args.filter((_, index) => index !== 9), ["api", "--hostname", repository.host,
+        "--method", "POST", "graphql", "--paginate", "--slurp", "-f", "-f", "owner=fixture",
+        "-f", "name=repository", "-F", `number=${target.number}`]);
+      assert.match(args[9], /^query=query\(/);
+      calls.push({ path: "graphql", query: args[9], paginated: true, signal: options?.signal });
+      return typeof threads === "function" ? threads(args, options) : JSON.stringify(threads);
+    }
     assert.equal(args[1], "--hostname");
     assert.equal(args[2], repository.host);
     assert.equal(args[3], "--method");
@@ -282,6 +303,128 @@ assert.match(unmeasured.reason, /404/);
 assert.match(describePrior(unmeasured, currentHead), /unmeasured\. GitHub could not compare/);
 console.log("PASS I1a the head relationship is measured, folded honestly, or reported as unmeasured");
 
+// K1: thread resolution is not in REST, so it is one paginated GraphQL read of
+// the pull request's review threads, matched to the earlier review's comments by
+// the database id of the comment that opened each thread.
+const received = [toolComment({ reactions: rollup({ "+1": 1 }) }),
+  toolComment({ id: 3948685116, html_url: `${repository.url}/pull/7#discussion_r3948685116` }),
+  toolComment({ id: 3948685117, html_url: `${repository.url}/pull/7#discussion_r3948685117`, reactions: undefined })];
+const threadScenario = (threads) =>
+  priorGh({ reviews: [[toolReview()]], comments: [received], compare: comparisons.ahead, threads });
+const graphqlCalls = (scenario) => scenario.calls.filter((call) => call.path === "graphql");
+const twoPages = threadScenario([
+  // Another review's thread, and one of ours, on the first page.
+  threadPage([[1, true], [3948685116, false]], { total: 4, next: true }),
+  // One of ours resolved, and a thread whose opening comment is gone.
+  threadPage([[3948685115, true], [null, false]], { total: 4 }),
+]);
+const receivedOutcome = await discoverPriorReview(repository, target, { gh: twoPages.gh, cwd });
+assert.deepEqual(receivedOutcome.feedback, {
+  threads: { status: "complete", pages: 2, listed: 4 },
+  comments: [
+    { id: 3948685115, reactions: { status: "read", plusOne: 1, minusOne: 0 }, thread: { status: "resolved" } },
+    { id: 3948685116, reactions: { status: "read", plusOne: 0, minusOne: 0 }, thread: { status: "unresolved" } },
+    { id: 3948685117, reactions: { status: "unread", reason: "GitHub returned no reactions rollup for this comment" },
+      thread: { status: "unread", reason: "no review thread opens with this comment" } },
+  ],
+}, "A comment with no thread of its own is unread, never unresolved");
+const [threadRead] = graphqlCalls(twoPages);
+assert.equal(graphqlCalls(twoPages).length, 1, "One paginated query reads every page");
+for (const field of ["query($owner: String!, $name: String!, $number: Int!, $endCursor: String)",
+  "reviewThreads(first: 100, after: $endCursor)", "totalCount", "pageInfo { hasNextPage endCursor }",
+  "isResolved", "comments(first: 1) { nodes { databaseId } }"]) {
+  assert(threadRead.query.includes(field), `The thread query asks for ${field}`);
+}
+assert.doesNotMatch(threadRead.query, /mutation/i, "Sent as a POST, and still only a query");
+assert.equal(receivedOutcome.relationship, "incremental", "The thread read changes no relationship");
+assert.equal(twoPages.calls.at(-1).path,
+  `repos/${repository.nameWithOwner}/compare/${reviewedHead}...${currentHead}?per_page=1`);
+
+// A thread two threads claim to open says nothing about which state is true.
+const doubled = threadScenario([threadPage([[3948685115, true], [3948685115, false], [3948685116, false]])]);
+const doubledOutcome = await discoverPriorReview(repository, target, { gh: doubled.gh, cwd });
+assert.equal(doubledOutcome.feedback.comments[0].thread.status, "unread");
+assert.match(doubledOutcome.feedback.comments[0].thread.reason, /more than one review thread/);
+assert.deepEqual(doubledOutcome.feedback.comments[1].thread, { status: "unresolved" });
+
+// A listing that is readable but stops short reads what it reached and leaves
+// the rest unread.
+for (const [what, pages, reason] of [
+  ["a last page that still reports a next page",
+    [threadPage([[3948685115, true]], { total: 3, next: true })], /still reported a next page/],
+  ["fewer threads than declared", [threadPage([[3948685115, true]], { total: 3 })], /1 thread\(s\) listed of 3 declared/],
+  ["a declared count that changed between pages",
+    [threadPage([[3948685115, true]], { total: 2, next: true }), threadPage([[1, false]], { total: 3 })],
+    /changed between pages/],
+]) {
+  const scenario = threadScenario(pages);
+  const outcome = await discoverPriorReview(repository, target, { gh: scenario.gh, cwd });
+  assert.equal(outcome.feedback.threads.status, "incomplete", what);
+  assert.match(outcome.feedback.threads.reason, reason, what);
+  assert.deepEqual(outcome.feedback.comments[0].thread, { status: "resolved" },
+    `A thread the listing did reach is read: ${what}`);
+  for (const { thread } of outcome.feedback.comments.slice(1)) {
+    assert.equal(thread.status, "unread", `Not reached is unread, never unresolved: ${what}`);
+    assert.match(thread.reason, /incomplete review thread listing/, what);
+  }
+}
+
+// A read that failed, or a page that is not the connection asked for, reads no
+// thread at all. Discovery still stands, the relationship is still measured and
+// the reactions already read are kept.
+const unresolvedPage = threadPage([[3948685115, false]]);
+for (const [what, threads, reason] of [
+  ["GitHub's refusal", async () => {
+    throw new Error("PR capture failed (api --hostname): HTTP 502 Bad Gateway");
+  }, /502/],
+  ["an unparsable response", async () => "{not json", /JSON/],
+  ["no pages at all", [], /no pages/],
+  ["GraphQL errors", [{ errors: [{ message: "Something went wrong" }], data: null }], /errors/],
+  ["no pull request", [{ data: { repository: { pullRequest: null } } }], /not a review thread page/],
+  ["an unreadable page after a readable one",
+    [threadPage([[3948685115, true]], { total: 2, next: true }), { data: {} }], /not a review thread page/],
+  ["a thread with no resolution state", [{ data: { repository: { pullRequest: { reviewThreads: {
+    ...unresolvedPage.data.repository.pullRequest.reviewThreads,
+    nodes: [{ isResolved: "yes", comments: { nodes: [{ databaseId: 3948685115 }] } }] } } } } }],
+  /not a review thread/],
+  ["a thread comment with no database id", [{ data: { repository: { pullRequest: { reviewThreads: {
+    ...unresolvedPage.data.repository.pullRequest.reviewThreads,
+    nodes: [{ isResolved: false, comments: { nodes: [{ databaseId: "3948685115" }] } }] } } } } }],
+  /database id/],
+]) {
+  const scenario = threadScenario(threads);
+  const outcome = await discoverPriorReview(repository, target, { gh: scenario.gh, cwd });
+  assert.equal(outcome.status, "found", `A failed thread read never fails discovery: ${what}`);
+  assert.equal(outcome.relationship, "incremental", `The relationship is still measured: ${what}`);
+  assert.equal(outcome.feedback.threads.status, "failed", what);
+  assert.match(outcome.feedback.threads.reason, reason, what);
+  assert(outcome.feedback.comments.every(({ thread }) => thread.status === "unread"),
+    `Nothing read is unread, never unresolved: ${what}`);
+  assert.deepEqual(outcome.feedback.comments[0].reactions, { status: "read", plusOne: 1, minusOne: 0 },
+    `A failed thread read loses no reaction: ${what}`);
+}
+
+// A cancellation during the thread read belongs to the run, not to the report.
+const cancelling = new AbortController();
+const cancelledRead = threadScenario(async () => {
+  cancelling.abort(new DOMException("cancelled", "AbortError"));
+  throw new Error("killed");
+});
+await assert.rejects(discoverPriorReview(repository, target, { gh: cancelledRead.gh, cwd, signal: cancelling.signal }),
+  /killed/, "A cancelled thread read is never reported as a failed one");
+await assert.rejects(collectPriorReview(repository, target, { gh: threadScenario(async () => {
+  throw new Error("killed");
+}).gh, cwd, signal: cancelling.signal }), /killed/);
+
+// Nothing to read back means nothing is asked: no earlier review, or one that
+// left no inline comment.
+assert.equal(graphqlCalls(absent).length, 0, "No earlier review, no GraphQL call");
+const bareScenario = priorGh({ reviews: [[toolReview({ commit_id: currentHead })]], comments: [[]] });
+const bare = await discoverPriorReview(repository, target, { gh: bareScenario.gh, cwd });
+assert.deepEqual(bare.feedback, { threads: { status: "none" }, comments: [] });
+assert.equal(graphqlCalls(bareScenario).length, 0, "A review with no inline comment has no thread to read");
+console.log("PASS K1 one paginated GraphQL read settles each thread it reached, and leaves the rest unread");
+
 // Discovery grounds nothing a finding depends on, so a failure is reported as
 // itself and the review still runs. A cancellation is never one of these.
 const broken = await collectPriorReview(repository, target,
@@ -334,6 +477,9 @@ const capturing = async (args, directory) => {
 const executed = await executeTargetCapture(session, "1", { gh: capturing });
 assert.equal(executed.prior.status, "found");
 assert.equal(executed.prior.relationship, "same-head");
+// K1: the shared fixture answers the thread read as the read it is, rather than
+// routing a GraphQL POST to its publication fixture and failing it.
+assert.deepEqual(executed.prior.feedback.threads, { status: "complete", pages: 1, listed: 0 });
 const evidence = logs.find((line) => line.startsWith("I1 prior: "));
 assert(evidence, "A verbose run dumps the discovery evidence like every other stage");
 assert.match(evidence, acts);
