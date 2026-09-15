@@ -20,7 +20,7 @@ increment scheduled up to `G1` is complete.** On 2026-09-12 the user triaged
 `W1`, `N1`, `H1` and `K1`, in that order, and the same day scheduled `X1`
 immediately after `B1`. **`T1`, `B1`, `X1`, `W1`, `N1`, `H1` and `K1` are
 complete and archived.** On 2026-09-14, outside that backlog, the user
-scheduled `S1` as the one `Pending` row; no entry is live yet.
+scheduled `S1`, now in progress; its entry is the one live entry.
 The closing section records what was decided, and what stays open as a
 limitation rather than as work.
 
@@ -88,7 +88,7 @@ posting them.
 | N1 | Completed | A seeded corpus and a deterministic scorer, **the free half only**: five plain-text diffs pinned by content hash, three seeded cases carrying four defects with stable ids, target and allowed severities, acceptable locations and concept groups, and two clean controls; a scorer needing no model or network that rejects explicit non-findings before matching and pairs findings with defects one-to-one, run by an eighteenth controlled suite and CI. No collection run, recall number or gate. Pull request #43, reviewed once with this plugin at the standing authorization: balanced, 127.050688 credits, INCOMPLETE, 0 validated findings, and one real candidate raised by two reviewers and refused on its citation, fixed anyway. | W1; [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | H1 | Completed | By default the project's own written rules steer the review: the root instruction files the reviewed head commits reach the one reviewer that weighs the whole change, up to a 48 KiB budget; a finding relying on one must quote the rule as exact lines of its file, bound like a source citation; `--no-standards` turns it off for one run. The user reversed the opt-in this row first proposed and approved the `SCOPE.md` paragraph word for word. **It settles what a claim not grounded in a provable code effect must carry: a quotable rule**, which the history and path-conditioned lenses would inherit. Pull request #44, reviewed once at the standing authorization: balanced, 319.760535 credits, INCOMPLETE, 0 validated findings; three refused candidates were real and are fixed, one through the user's budget decision. `G1`'s menu item 4. | N1; [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | K1 | Completed | A later review reports how this tool's earlier review of the same pull request was received, on one line under `Prior review:` at every verbosity: threads resolved, unresolved and unread, and the thumbs counts. Reactions come from the listing `I1a` already reads; resolution is one paginated GraphQL read matched by database id. Unread is never unresolved or zero, a failed read is reported and the review proceeds, and nothing reaches a reviewer, the adjudicator, a verdict, the retained record or the published review. Built test first and mutation-checked. Pull request #45, reviewed once at the standing authorization: balanced, 184.483837 credits, INCOMPLETE, 0 validated findings, and one refused candidate, declined; Copilot's `databaseId` finding was fixed after it. No read of a review this tool published has run. `G1`'s menu item 12. | H1, I1c; [Publication controls](SCOPE.md#selection-publication-and-cached-results) |
-| S1 | Pending | Cut `v0.1.0` and list it, in one session: a pull request bumps `plugin.json` to `0.1.0`, the merge commit is tagged `v0.1.0`, an install from that tag is shown to load, and a `copilot-pr-review` entry pinned to that tag reaches `xpepper/copilot-plugins` through a pull request the user merges. Every tag, release and write to the index needs the user's explicit authorization in that session. Planned in `docs/release-and-marketplace-plan.md`, which records the seven decisions the user took on 2026-09-14 and the acceptance criteria. | K1; outside the backlog, at the user's request; no scope clause |
+| S1 | In progress | Cut `v0.1.0` and list it, in one session: a pull request bumps `plugin.json` to `0.1.0`, the merge commit is tagged `v0.1.0`, an install from that tag is shown to load, and a `copilot-pr-review` entry pinned to that tag reaches `xpepper/copilot-plugins` through a pull request the user merges. Every tag, release and write to the index needs the user's explicit authorization in that session. Planned in `docs/release-and-marketplace-plan.md`, which records the seven decisions the user took on 2026-09-14 and the acceptance criteria. | K1; outside the backlog, at the user's request; no scope clause |
 
 ## Every completed increment, `F1` through `K1`, is archived
 
@@ -135,7 +135,7 @@ than from this file.
 [docs/upstream-licensing.md](docs/upstream-licensing.md) is still the record of
 that licence work and did not move.
 
-**No entry is live until `S1`'s session writes one.** The backlog triage added no entry of its
+**`S1`'s entry, the section after this one, is the one live entry.** The backlog triage added no entry of its
 own, because agreeing a backlog is not a numbered increment, so archiving `G1`
 left none behind and `T1`'s was written into that empty space. The rule these
 moves established is to keep
@@ -173,6 +173,39 @@ archived `N1`'s 4982 bytes** on the same rule, because 655 bytes were spare. **`
 archived `H1`'s 4586 bytes** on the same rule, because 1058 bytes were spare.
 **After #45 merged, `K1`'s own 4818 bytes moved** on the same rule, because 413
 bytes were spare.
+
+## `S1`: cut `v0.1.0` and list it, in progress
+
+**Step 1 is pull request #50**, branch `s1/release-v0.1.0`: `plugin.json`'s
+`version` from `0.0.1` to `0.1.0`, `name` untouched, and `docs/release.md`. All
+eighteen suites, `git diff --check`, the control-byte check and
+`collectInstructionFiles` (six read, none skipped) pass; CI and `claude-review`
+passed on `14f4781`.
+
+**The one plugin review**, at the standing authorization, at head `14f4781`. The
+installed copy was stale in `prior.mjs` and three suites (`e25bd6b`), so it was
+reinstalled from the branch head and `diff -rq` printed nothing. Then
+`dogfood-review.mjs 50 --all --no-comment --unattended`, CLI 1.0.83, balanced:
+`gpt-5.6-terra` at high for the four specialists and the adjudicator,
+`gpt-5.6-luna` at high for overview, default window. **34.887503 credits, 11
+requests, 142.2 s of model work, 71.8 s elapsed**, 16 tool calls (`view`, `rg`,
+`glob`), no denial. **INCOMPLETE**: security's and overview's only candidates
+were discarded because a citation's quote was one line off its range, plus two
+coverage gaps and three caveats. **1 validated finding, 0 withheld, 1 rejected.**
+
+- Validated P3, the doc claimed the index never lags a tag: real, fixed.
+- Overview's discarded P2, a "merge commit" after a squash merge: real, fixed.
+- Security's discarded P2, a tag is mutable: the tag-pinned entry is settled and
+  not reopened; a rule never to move a published tag was added.
+- Contracts' rejected P2, no demonstrated install-from-a-tag command: real, and
+  only step 4 can answer it, so the closing pull request puts the command it
+  demonstrates into `docs/release.md`.
+- Copilot's comment on `1ae141e`: the install step lacked the ask the plan
+  requires before changing the user's environment. Real, fixed.
+
+**Not done yet**: the merge, the tag, an install from it, the index pull request
+and the closing pull request. The user's direct install is now `v0.1.0` from
+this branch, reinstalled for the review.
 
 ## v1 is complete, and seven increments are scheduled on top of it
 
