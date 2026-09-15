@@ -201,6 +201,24 @@ console.log("PASS W1: a code block in any published field is refused, and inline
     assert.match(refused.issues[0], reason, label);
   }
 
+  // Q9: a rule citation is never a droppable supporting citation. Beside a
+  // dropped evidence entry, a wrong rule still refuses the candidate, and an
+  // exact one keeps it with only the drop reported.
+  {
+    const wrongEvidence = { ...citation("head", 1), quote: ` ${citation("head", 1).quote}` };
+    const dropped = { ...structuredClone(ruled), evidence: [wrongEvidence, citation("head")] };
+    const kept = collectCandidates([reviewer([dropped])], ruledBoundary, policy);
+    assert.deepEqual(kept.issues, []);
+    assert.deepEqual(kept.candidates[0].rule, { ...rule(), blobSha: "e".repeat(40) });
+    assert.deepEqual(kept.diagnostics.map(({ kind, message }) => [kind, message.split(":").slice(0, 3).join(":")]),
+      [["caveat", "correctness:1: dropped supporting citation evidence[0]"]]);
+    const shifted = { ...dropped, rule: { ...rule(), startLine: 2, endLine: 3 } };
+    const refused = collectCandidates([reviewer([shifted])], ruledBoundary, policy);
+    assert.equal(refused.candidates.length, 0, "a wrong rule is never dropped");
+    assert.deepEqual(refused.diagnostics, [{ kind: "discarded-candidate",
+      message: "correctness:1: rejected at evidence boundary: Rule citation does not exactly match the named file." }]);
+  }
+
   // Only the reviewer handed the standards may quote one, and a run with no
   // standards, or whose standards reached no file, binds no rule at all.
   for (const [label, from, gate, reason] of [
@@ -991,14 +1009,12 @@ for (const candidates of [[{ ...breaker, breaks: null }], [(() => {
     "A finding that cites no broken code displays no broken-code line");
 }
 
-// Every citation refusal still fires on the new field: unbound provenance, an
-// out-of-window range, a fabricated quote and a malformed citation object.
+// Unbound provenance and a malformed citation object still refuse the candidate
+// on the new field. Q9 drops a breaks citation failing the other three checks
+// instead, below.
 for (const [invalid, expected] of [
   [{ ...at("breakage.js", "head", 9), path: "../breakage.js" }, /outside bound source provenance/],
   [{ ...at("breakage.js", "head", 9), path: "shipping.js" }, /outside bound source provenance/],
-  [{ ...at("breakage.js", "head", 9), startLine: 40, endLine: 40 }, /outside every supplied context window/],
-  [{ ...at("breakage.js", "head", 9), quote: "  return qualifies(subtotal) ? 0 : 501;" }, /Citation quote does not match/],
-  [{ ...at("breakage.js", "head", 9), quote: "  return  qualifies(subtotal) ? 0 : 500;" }, /Citation quote does not match/],
   [{ ...at("breakage.js", "head", 9), ref: breakageBinding.head }, /Citation: expected exactly/],
   [{ path: "breakage.js", side: "head", startLine: 9, endLine: 9 }, /Citation: expected exactly/],
   ["breakage.js:9", /Citation: expected exactly/],
@@ -1043,6 +1059,85 @@ for (const [evidence, reason] of [
 // same cause.
 assert.throws(() => breakageBoundary.cite({ ...at("breakage.js", "head", 9), quote: "  return qualifies(subtotal) ? 0 : 501;" }),
   { message: "Citation quote does not match breakage.js head line 9: the range names 1 line(s) and the quote has 1." });
+
+// Q9: #65's three discarded candidates each had an exact location and one wrong
+// supporting citation, each wrong in its own way. A supporting citation failing
+// one of Q8's three checks is dropped instead of the candidate, reported as a
+// caveat the adjudicator also reads, and never forwarded or rewritten: every
+// citation that remains is exact under the strict path.
+const headLines = (start, end) => at("breakage.js", "head", start, end).quote.split("\n");
+const q9Shapes = [
+  ["a range one line short, #65's contracts:1", "breaks",
+    { ...at("breakage.js", "head", 8, 9), quote: at("breakage.js", "head", 8, 10).quote },
+    "Citation quote does not match breakage.js head lines 8-9: the range names 2 line(s) and the quote has 3."],
+  ["one line missing from the middle, #65's security:1", "breaks",
+    { ...at("breakage.js", "head", 12, 14), quote: [headLines(12, 14)[0], headLines(12, 14)[2]].join("\n") },
+    "Citation quote does not match breakage.js head lines 12-14: the range names 3 line(s) and the quote has 2."],
+  ["an extra leading space on every line, #65's overview:1", "evidence[0]",
+    { ...at("breakage.js", "head", 8, 10), quote: headLines(8, 10).map((line) => ` ${line}`).join("\n") },
+    "Citation quote does not match breakage.js head lines 8-10: the range names 3 line(s) and the quote has 3."],
+  ["a range outside every window", "breaks", { ...at("breakage.js", "head", 9), startLine: 40, endLine: 40 },
+    "Citation breakage.js head line 40 is outside every supplied context window."],
+  ["a clipped quote that cannot be repaired", "before",
+    { ...at("breakage.js", "base", 3, 4), quote: "\nexport function qualifies(subtotal)" },
+    "Citation quote is a clipped part of breakage.js base lines 3-4 whose first or last line is blank, " +
+    "so it cannot be repaired."],
+];
+const strictly = ({ path, side, startLine, endLine, quote }) =>
+  breakageBoundary.cite({ path, side, startLine, endLine, quote });
+for (const [label, field, wrong, reason] of q9Shapes) {
+  const supported = structuredClone(breaker);
+  if (field === "evidence[0]") supported.evidence = [wrong, at("breakage.js", "head", 1)];
+  else supported[field] = wrong;
+  const { gathered, result } = adjudicateBreakage([supported]);
+  const message = `correctness:1: dropped supporting citation ${field}: ${reason} ` +
+    "The candidate went on to adjudication without it.";
+  assert.deepEqual(gathered.diagnostics, [{ kind: "caveat", message }], label);
+  assert.deepEqual(gathered.issues, [], `${label}: a dropped citation does not block completed coverage`);
+  assert.deepEqual(gathered.candidates.map(({ id }) => id), ["correctness:1"], `${label} reaches adjudication`);
+  const [entry] = gathered.candidates;
+  if (field === "evidence[0]") assert.deepEqual(entry.evidence, [strictly(at("breakage.js", "head", 1))], label);
+  else assert.equal(entry[field], null, `${label}: the wrong citation is dropped, never forwarded`);
+  for (const kept of [entry.location, entry.before, entry.after, entry.breaks, ...entry.evidence].filter(Boolean)) {
+    assert.deepEqual(strictly(kept), kept, `${label}: every citation that remains is exact`);
+  }
+  assert.equal(result.findings.length, 1, `${label}: the adjudicator can still accept it`);
+  assert.equal(formatCoverage({ validation: result, complete: result.complete }), [
+    "Review coverage: completed.",
+    "Execution failures: 0; discarded candidates: 0; coverage gaps: 0; informational caveats: 1.",
+    `Informational caveat: ${message}`,
+  ].join("\n"));
+  const rejected = adjudicateBreakage([supported], [breakageDecision("correctness:1", {
+    verdict: "reject", allClaimsSupported: false, evidence: [],
+    reason: "Without the dropped citation the claim no longer stands.",
+  })]).result;
+  assert.deepEqual([rejected.findings.length, rejected.rejected.length], [0, 1],
+    `${label}: the adjudicator can reject a finding that no longer stands`);
+}
+assert.match(validationInstructions(policy), /dropped supporting citation/);
+assert.match(validationInstructions(policy), /not a null claim/);
+
+// What a drop never saves: a failing location, a candidate that fails another
+// check once the wrong citation is gone, and one whose every evidence entry
+// fails, which is refused for the first of them. None reports a drop, because a
+// discarded candidate is never judged.
+const [shortRange, , leadingSpace, outsideWindow, clippedBefore] = q9Shapes.map(([, , wrong]) => wrong);
+for (const [label, changes, reason] of [
+  ["a failing location", { location: { ...at("breakage.js", "head", 5), quote: "   return subtotal > threshold;" },
+    breaks: shortRange },
+  "location: Citation quote does not match breakage.js head line 5: the range names 1 line(s) and the quote has 1."],
+  ["another hunk's after beside a dropped before",
+    { before: clippedBefore, after: at("breakage.js", "head", 17) },
+    "Introduction citations and location must identify the same changed hunk."],
+  ["every evidence entry failing", { breaks: shortRange, evidence: [outsideWindow, leadingSpace] },
+    "evidence[0]: Citation breakage.js head line 40 is outside every supplied context window."],
+]) {
+  const refused = collectCandidates([breakageReviewer([{ ...breaker, ...changes }])], breakageBoundary, policy);
+  assert.equal(refused.candidates.length, 0, label);
+  assert.deepEqual(refused.diagnostics, [{ kind: "discarded-candidate",
+    message: `correctness:1: rejected at evidence boundary: ${reason}` }], label);
+}
+console.log("PASS Q9: a failing supporting citation is dropped, reported and never forwarded; the candidate is judged");
 
 // Reconstructed rejection, pull requests #4 and #10: the introduction citations
 // named one changed hunk while the location named another. That refusal is

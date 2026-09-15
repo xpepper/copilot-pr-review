@@ -94,6 +94,9 @@ export const validationInstructions = (policy) => [
   "Candidate diagnostics report any clipped-end quotation repaired from the cited source lines, with original and restored text.",
   "A repair changes only the quotation, never the candidate's claims. Test those claims against the restored full lines:",
   "reject a claim that depends on the omitted text or whitespace being absent, even when the repaired citation is exact.",
+  "Candidate diagnostics also report each dropped supporting citation: one that failed the exact-quote check, removed by code.",
+  "A dropped before, after or breaks is null because code removed it, not a null claim; its quote is never supplied.",
+  "Judge that part of the claim from the source, and reject a candidate whose claims no longer stand without it.",
   "Independently trace each trigger, required contract, actual effect, and before/after behavior in the source.",
   "Actively disprove each claim: look for guards, unreachable conditions, intentional contract changes, and pre-existing failures.",
   "A valid quote or another reviewer's agreement is NOT proof of impact or of introduction by this diff.",
@@ -232,7 +235,11 @@ export function evidenceBoundary(snapshot, context, binding, standards) {
   // the range, or a clipped quote could not be repaired.
   const where = ({ path, side, startLine, endLine }) =>
     `${path} ${side} ${startLine === endLine ? `line ${startLine}` : `lines ${startLine}-${endLine}`}`;
-  const quoteMismatch = (value) => new Error(`Citation quote does not match ${where(value)}: the range names ` +
+  // Q9: those three are the exact-quote check, marked so that a supporting
+  // citation failing one can be dropped instead of its candidate. A provenance
+  // or shape refusal is not one of them.
+  const exactQuoteFailure = (message) => Object.assign(new Error(message), { exactQuote: true });
+  const quoteMismatch = (value) => exactQuoteFailure(`Citation quote does not match ${where(value)}: the range names ` +
     `${value.endLine - value.startLine + 1} line(s) and the quote has ${value.quote.split("\n").length}.`);
   function boundCitation(value) {
     object(value, ["path", "side", "startLine", "endLine", "quote"], "Citation");
@@ -249,7 +256,7 @@ export function evidenceBoundary(snapshot, context, binding, standards) {
         source.host !== binding.repository.host) throw new Error("Citation is outside bound source provenance.");
     if (!source.windows.some((window) => startLine >= window.start && endLine <= window.end) ||
         endLine > source.lines.length) {
-      throw new Error(`Citation ${where(value)} is outside every supplied context window.`);
+      throw exactQuoteFailure(`Citation ${where(value)} is outside every supplied context window.`);
     }
     return { ...value, quote: source.lines.slice(startLine - 1, endLine).join("\n"),
       ref: source.ref, blobSha: source.blobSha };
@@ -269,7 +276,7 @@ export function evidenceBoundary(snapshot, context, binding, standards) {
       throw quoteMismatch(value);
     }
     if (!lines[0].trim() || !lines.at(-1).trim()) {
-      throw new Error(`Citation quote is a clipped part of ${where(value)} whose first or last line is blank, ` +
+      throw exactQuoteFailure(`Citation quote is a clipped part of ${where(value)} whose first or last line is blank, ` +
         "so it cannot be repaired.");
     }
     const restored = { ...value, quote: bound.quote };
@@ -338,7 +345,7 @@ function sharedChangedEvidence(left, right, evidence, boundary) {
   }));
 }
 
-function candidate(value, boundary, policy, diagnostics, id, ruleAllowed = false) {
+function candidate(value, boundary, policy, diagnostics, id, ruleAllowed = false, dropped = []) {
   object(value, ["title", "severity", "confidence", "location", "trigger", "expected", "actual",
     "introduction", "remediation", "before", "after", "evidence"], "Candidate", ["breaks", "rule"]);
   for (const key of ["title", "trigger", "expected", "actual", "introduction", "remediation"]) text(value[key], key);
@@ -360,7 +367,19 @@ function candidate(value, boundary, policy, diagnostics, id, ruleAllowed = false
       });
     } catch (error) {
       // Q8: which citation failed, since a candidate carries several.
-      throw new Error(`${field}: ${error.message}`);
+      throw Object.assign(new Error(`${field}: ${error.message}`), { exactQuote: error.exactQuote === true });
+    }
+  };
+  // Q9: a supporting citation failing the exact-quote check is dropped, and is
+  // never forwarded or rewritten. The location and a rule are never supporting,
+  // and any other refusal still refuses the whole candidate.
+  const support = (value, field) => {
+    try {
+      return cite(value, field);
+    } catch (error) {
+      if (!error.exactQuote) throw error;
+      dropped.push(error);
+      return null;
     }
   };
   const location = cite(value.location, "location");
@@ -370,8 +389,8 @@ function candidate(value, boundary, policy, diagnostics, id, ruleAllowed = false
   if (!file || !includesChangedLine(location, file) || !file.hunks.some((hunk) => withinHunk(location, hunk))) {
     throw new Error("Location is not an anchor on changed lines in the captured diff.");
   }
-  const before = value.before === null ? null : cite(value.before, "before");
-  const after = value.after === null ? null : cite(value.after, "after");
+  const before = value.before === null ? null : support(value.before, "before");
+  const after = value.after === null ? null : support(value.after, "after");
   for (const [citation, side, path] of [[before, "base", file.oldPath], [after, "head", file.newPath]]) {
     if (citation && (citation.side !== side || citation.path !== path)) {
       throw new Error("Introduction must compare the same file's captured before/after revisions.");
@@ -393,7 +412,7 @@ function candidate(value, boundary, policy, diagnostics, id, ruleAllowed = false
   // The code the change breaks may be unchanged, in another hunk or in another
   // changed file, so it carries no anchoring rule of its own; it is bound,
   // in-window and exactly quoted like every other citation.
-  const breaks = value.breaks === undefined || value.breaks === null ? null : cite(value.breaks, "breaks");
+  const breaks = value.breaks === undefined || value.breaks === null ? null : support(value.breaks, "breaks");
   // H1: the project rule a finding relies on, when it relies on one. Only the
   // reviewer handed the standards may quote one, and the quote is bound like
   // every citation; a candidate relying on no rule carries no rule field at all.
@@ -411,8 +430,11 @@ function candidate(value, boundary, policy, diagnostics, id, ruleAllowed = false
     });
   }
   if (!Array.isArray(value.evidence) || !value.evidence.length) throw new Error("Missing supporting source evidence.");
-  return { ...fields, location, before, after, breaks, ...(rule ? { rule } : {}),
-    evidence: value.evidence.map((entry, index) => cite(entry, `evidence[${index}]`)) };
+  const evidence = value.evidence.map((entry, index) => support(entry, `evidence[${index}]`)).filter(Boolean);
+  // A finding still needs one exact evidence citation, so a candidate whose
+  // every entry failed is refused for the first of them.
+  if (!evidence.length) throw dropped.find((error) => error.message.startsWith("evidence["));
+  return { ...fields, location, before, after, breaks, ...(rule ? { rule } : {}), evidence };
 }
 
 // I1b: a confined run applies one extra filter here, after the evidence
@@ -449,7 +471,10 @@ export function collectCandidates(reviewers, boundary, policy, confinement) {
       const id = `${reviewer.label}:${index + 1}`;
       try {
         const ruleAllowed = boundary.standardsReviewer === reviewer.label;
-        const entry = { ...candidate(value, boundary, policy, diagnostics, id, ruleAllowed), id, reviewer: reviewer.label };
+        const dropped = [];
+        const entry = {
+          ...candidate(value, boundary, policy, diagnostics, id, ruleAllowed, dropped), id, reviewer: reviewer.label,
+        };
         // Outside the confined range is not a refusal and not a failure: the
         // candidate passed every check an unconfined run makes, and this run
         // was asked not to report that part of the diff. It is kept and shown,
@@ -461,6 +486,10 @@ export function collectCandidates(reviewers, boundary, policy, confinement) {
           continue;
         }
         candidates.push(entry);
+        // Q9: a caveat, settled with the user: the candidate is still judged, so
+        // nothing went unchecked. The adjudicator reads it among its diagnostics.
+        diagnostics.push(...dropped.map((error) => ({ kind: "caveat",
+          message: `${id}: dropped supporting citation ${error.message} The candidate went on to adjudication without it.` })));
       } catch (error) {
         // Q8: never judged, though its reviewer ran. C5's fallback eligibility is
         // the envelope alone, so this refusal starts no attempt.

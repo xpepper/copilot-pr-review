@@ -10273,6 +10273,70 @@ session; inferred from the code, not reproduced.
 
 `P7`, after #55 merges; archive this entry first if the next one does not fit.
 
+## `P7`: each inline comment leads with the problem and the fix, complete
+
+**Built on `p7/inline-comment-layout`, pull request #56**, after #55 merged; the
+decision and its worked example are in
+[docs/published-review-feedback-plan.md](docs/published-review-feedback-plan.md).
+
+### What was built
+
+- `commentBody` writes `**[P2] title**`, the actual behaviour, `**When:**` and
+  `**Expected:**` on adjacent lines, `**Fix:**`, then `<sub>Introduced by this
+  diff: … · Confidence 0.9 · security reviewer</sub>`. No field is dropped.
+- **Settled while building**: title and introduction fold their whitespace,
+  each rendering on one line; several reporters read `correctness, contracts
+  reviewers`.
+- `commentBodyBeforeP7` keeps the old template. `parseCommentFinding` tries
+  both, each with its own rebuild and ambiguity rule; the new footer's
+  ` · Confidence ` is counted on the footer line only.
+- **A proposal retained before `P7`**: `matchesRetainedProposal` accepts exactly
+  the current request, pre-`P7` comments beside the summary, or beside the
+  pre-`P6` body; publish-later posts the rebuilt comments.
+
+### Evidence
+
+- **Test first**: `smoke-revalidation` failed on the missing old writer,
+  `smoke-preview` on the new layout.
+- Pinned: the exact body, folding and reporter number; literal pre-`P7` bodies
+  with and without `Fix:` reading back to the new layout's fields; refusals for
+  both templates; new-layout ambiguity (disabling the footer guard in a scratch
+  copy fails the test); a pre-`P7` proposal loading and altered ones refused;
+  publish-later of pre-`P6` and pre-`P7` results posting the rebuilt comments.
+- All eighteen suites, `git diff --check`, the control-byte check and
+  `collectInstructionFiles` (six read, none skipped) pass.
+
+### The installed-plugin review
+
+One run, at the standing authorization and with the user's agreement to swap
+installs: the checkout replaced the marketplace copy, `diff -rq --exclude=.git`
+printed nothing, and it ran at `b9478db`. Balanced, `gpt-5.6-terra` high for the
+four specialists, `gpt-5.6-luna` high for overview, default window; no
+adjudicator ran, as no candidate survived. **125.319325 credits, 22 requests,
+121.6 s elapsed.** INCOMPLETE, 0 validated: 1 execution failure, 1 discarded
+candidate, 2 gaps, 1 caveat.
+
+- Overview's JSON did not parse (an unescaped quote at position 2832). Its one
+  candidate, read from its local log, said a title holding `**` becomes
+  unreadable: rejected, as the lazy title capture backtracks; nine such titles
+  read back exactly, and five are now pinned in `smoke-revalidation`.
+- Contracts' P2, discarded for an 11-line quote on a 10-line range, #65's shape:
+  an introduction holding ` · Confidence ` makes an emitted body unreadable.
+  True and deliberate, so rejected: those bytes admit a second split that
+  misreads the reporters, the suite pins it, and the parser's contract is exact
+  or unreadable, as the old template refuses a field opening `Confidence: `.
+- Both gaps asked whether model prose carrying HTML can break the `<sub>`
+  footer. Not settled; **recorded, not scheduled**: a field holding `<!--` or
+  `</sub>` can hide or unwrap the rest of a comment, as `<!--` already could in
+  every published field before `P7`.
+
+The marketplace install was restored, identical to `git archive v0.1.0`. Nothing
+was published, so the layout has had no live GitHub round trip.
+
+### The exact next step
+
+`Q9`, after #56 merges; archive this entry first if the next one does not fit.
+
 ## Every completed increment, `F1` through `S1`, is archived
 
 Fifty-nine sections were here and fifteen increments, the backlog triage, the
