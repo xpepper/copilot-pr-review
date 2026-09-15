@@ -9,85 +9,48 @@ assume, in the roadmap and in your final report.
 
 ## Where things stand
 
-The previous session started from `main` at `f5cf573` (#48 merged) and did a
-planning session, not a numbered increment, on branch
-`plan/release-and-marketplace`. That branch adds
-`docs/release-and-marketplace-plan.md`, an `S1` `Pending` row in `ROADMAP.md`,
-and this file, documentation only. **Check whether its pull request has
-merged** (`gh pr list --state all --head plan/release-and-marketplace`). If it
-has not, stop and ask the user: `S1` builds on it. Open pull requests #1 and #2
-remain the synthetic "do not merge" playgrounds; leave them alone. Verify with
+`S1` is complete. The previous session merged #50 (`5f63241`, `plugin.json` at
+`0.1.0`), pushed the annotated tag `v0.1.0` on it, and listed the plugin through
+`xpepper/copilot-plugins#1`, merged as `642dde5`. The user's install is now
+`copilot-pr-review@xpepper-copilot-plugins (v0.1.0)`. `ROADMAP.md`'s `S1` entry
+holds the evidence for every step, and for every step not taken.
+
+The closing pull request, branch `s1/close-v0.1.0`, is documentation only: the
+marketplace install in `README.md`, the demonstrated install commands in
+`docs/release.md`, the `S1` evidence in `ROADMAP.md`, and this file. **Check
+whether it has merged** (`gh pr list --state all --head s1/close-v0.1.0`). If it
+has not, stop and ask the user. Open pull requests #1 and #2 remain the
+synthetic "do not merge" playgrounds; leave them alone. Verify with
 `git status`, `git log --oneline -5` and `gh pr list --state open`.
 
-No git tag exists in this repository, and `plugin.json`'s `version` is `0.0.1`.
+## This session's task
 
-## This session's task: `S1`, cut `v0.1.0` and list it
-
-Scheduled by the user on 2026-09-14, outside the `ROADMAP.md` backlog. **Read
-`docs/release-and-marketplace-plan.md` first.** It holds the evidence, the seven
-decisions the user took one at a time, and `S1`'s acceptance criteria as its
-section "The scheduled increment, `S1`". Do not reopen those decisions:
-
-1. The light, glm-style release model: `plugin.json` is the only version, no
-   `package.json`, no bump script, no changelog generator, no release workflow.
-2. (Moot: no bump is computed from commits.)
-3. The marketplace name is `copilot-pr-review`. No rename.
-4. `xpepper/copilot-plugins` is changed only by a pull request the user merges,
-   only after a real `v0.1.0` tag here installs, in the same session.
-5. **Every tag push, GitHub Release and index pull request needs the user's
-   explicit authorization in the session that does it.** Merging the
-   version-bump pull request authorizes none of them.
-6. The first release is `0.1.0`. Declaring `1.0.0` is a later decision of the
-   user's, not part of `S1`.
-7. One increment, in this order, stopping at each authorization:
-   - a pull request on an `S1` branch bumping `plugin.json` to `0.1.0` and
-     adding a short `docs/release.md`, reviewed once with this plugin (see the
-     caveat below); the user merges it;
-   - with authorization, tag the merge commit `v0.1.0` and push the tag;
-   - install from the tag and confirm it loads and reports `0.1.0`;
-   - with authorization, one pull request on `xpepper/copilot-plugins` adding
-     the entry and its README table row; the user merges it;
-   - confirm the merged manifest reads back consistent and, with the user's
-     agreement, that `copilot plugin install
-     copilot-pr-review@xpepper-copilot-plugins` installs `0.1.0`;
-   - a closing pull request here with the `README.md` install line, the
-     `ROADMAP.md` evidence and this file.
+None is scheduled. Every increment in `ROADMAP.md`'s table is complete, and its
+closing section lists what stays open as a limitation rather than as work. Ask
+the user what to do next, one decision at a time; do not pick an item yourself.
 
 ### Caveats that are easy to miss
 
-- **Nothing on GitHub gates a tag.** The ruleset covers the default branch only
-  and CI does not run on tags. Run the full controlled set at the exact commit
-  you tag, before pushing the tag.
-- **The install-from-a-tag command is not established.** Read `copilot plugin
-  install --help` on the installed CLI rather than assuming a syntax.
-- **The user already has a direct install**, `copilot-pr-review (v0.0.1)` in
-  `copilot plugin list`. Replacing it, or adding a marketplace install beside
-  it, changes their environment: ask first.
+- **Releasing follows `docs/release.md`.** Every tag push, GitHub Release, index
+  pull request and change to the user's install needs the user's authorization
+  in the session that does it; merging a version bump authorizes none of them.
+  Never move, delete or re-push a published tag: the index pins it by name.
+- **The index entry moves with every release**: `version` and `source.ref`
+  together, plus the index README's table row, by a pull request the user
+  merges. Never push to `xpepper/copilot-plugins`'s `main`.
+- **Not demonstrated for this plugin**: that the entry's ref pin is honored,
+  because the tag and `main` held the same tree when it was installed, and
+  `copilot plugin update`.
 - **`plugin.json`'s `name` is load-bearing.** The runtime names the extension
   `plugin:copilot-pr-review:...` and `scripts/dogfood-review.mjs` plus three
   runtime probes match on it. Do not touch it.
-- **`README.md` is 64674 bytes**, 862 under the 65536 bytes past which this
-  tool's own discovery stops reading it. Measure it before the closing commit.
-- **The index has never had a pull request**: its history is direct pushes. The
-  user chose a pull request anyway; do not push to its `main`.
-- **The sibling entries in the index had drifted when read on 2026-09-14**:
-  `gem-pr-review` pinned `v0.3.3` while `v0.4.0` was released, and
-  `z-pr-review` pinned `v0.2.7`, a tag that did not exist. That is recorded as
-  evidence about the process only. **Do not fix either entry** in `S1`'s index
-  pull request; mention it to the user if it is still true. Both are reported
-  as `xpepper/pr-review-gemini#58` and `xpepper/pr-review-glm#45`; check those
-  issues' state before raising it again.
-- **The pull request that bumps `plugin.json` needs its one plugin review
-  before a merge is asked for.** It is not documentation-only, because
-  `plugin.json` is not documentation, so `AGENTS.md`'s optional-review exception
-  does not cover it, even though nothing under `extensions/` or `scripts/`
-  changes. The standing workflow authorizes that one review; record it in
-  `ROADMAP.md` like any increment's. Only the closing pull request, if it is
-  documentation-only, leaves its review to the user.
-
-Out of scope for `S1`: a GitHub Release unless separately authorized, a
-`package.json`, any script or workflow, a marketplace consistency check, a
-status line showing the version, and `1.0.0`.
+- **`README.md` and `ROADMAP.md` both sit within a kilobyte of 65536 bytes**,
+  past which this tool's own discovery stops reading them. Measure with `wc -c`
+  before every commit, and archive a `ROADMAP.md` entry under its recorded rule
+  before writing a new one.
+- **Sibling drift in the index**: `xpepper/pr-review-gemini#58` and
+  `xpepper/pr-review-glm#45` were open on 2026-09-15. Check their state before
+  raising them again, and do not fix those entries from here.
 
 ## Validation
 
