@@ -22,7 +22,7 @@ immediately after `B1`. **`T1`, `B1`, `X1`, `W1`, `N1`, `H1` and `K1` are
 complete and archived.** On 2026-09-14, outside that backlog, the user
 scheduled `S1`, now complete and archived. On 2026-09-15 the user scheduled five
 more from the first review published on somebody else's pull request: `Q8`,
-`P6`, `P7`, `Q9` and `O2`, in that order; `Q8`, `P6` and `P7` are complete, `Q9` is in progress, and `O2` is the `Pending` row below.
+`P6`, `P7`, `Q9` and `O2`, in that order; `Q8`, `P6`, `P7` and `Q9` are complete, and `O2` is the `Pending` row below.
 The closing section records what was decided, and what stays open as a
 limitation rather than as work.
 
@@ -94,7 +94,7 @@ posting them.
 | Q8 | Completed | A candidate discarded at the evidence boundary is its own diagnostic kind, `discarded-candidate`, still counting against completeness, not an execution failure; its message names the failing field and which citation check failed. `C5` eligibility unchanged. Pull request #54, reviewed twice with the user's authorization, the second run on the branch install. | S1; [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | P6 | Completed | The published body is a short Markdown summary: severity counts and head, one line per finding, one plain coverage sentence chosen by kind, a hidden marker; no caveats or internal errors, but a confined run still says it covers less. `prior.mjs` accepts the marker or the old phrases. Pull request #55, one plugin review on the branch install. | Q8; [Publication](SCOPE.md#selection-publication-and-cached-results) |
 | P7 | Completed | Each inline comment leads with the problem and a prominent fix, keeps every field, and footers introduction, confidence and reporter; `I1c` parses old and new templates byte for byte, and a proposal retained before `P7` still loads. Pull request #56, one plugin review on the branch install. | P6; [Publication](SCOPE.md#selection-publication-and-cached-results) |
-| Q9 | In progress | With an exact location citation, a failing supporting citation is dropped instead of the candidate and the adjudicator is told; a rule citation `H1` requires never is. | Q8; [Modes/findings](SCOPE.md#review-modes-and-findings) |
+| Q9 | Completed | With an exact location citation, a failing supporting citation is dropped instead of the candidate, reported as a caveat the adjudicator reads; the location and an `H1` rule citation never are. Pull request #57, one plugin review on the branch install. | Q8; [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | O2 | Pending | `--quiet` replaces static configuration policy, the capture-only sentence inside a review, and an authorized run's payload JSON with run-specific lines; every model, effort, window, fallback, coverage and publication line stays. | Q9; [Models/execution](SCOPE.md#models-configuration-and-execution) |
 
 ## Every completed increment, `F1` through `P7`, is archived
@@ -113,9 +113,9 @@ keep the most recent entries live, archive the rest verbatim, and measure this
 file with `wc -c` against the 65536-byte cap before opening a pull request.
 [docs/upstream-licensing.md](docs/upstream-licensing.md) did not move.
 
-## `Q9`: a wrong supporting citation is dropped, not the candidate, in progress
+## `Q9`: a wrong supporting citation is dropped, not the candidate, complete
 
-**Built on `q9/drop-supporting-citation`**, after #56 merged; the decision and
+**Built on `q9/drop-supporting-citation`, pull request #57**, after #56 merged; the decision and
 #65's three candidates are in
 [docs/published-review-feedback-plan.md](docs/published-review-feedback-plan.md).
 
@@ -155,11 +155,31 @@ file with `wc -c` against the 65536-byte cap before opening a pull request.
 
 ### The installed-plugin review
 
-Not yet run; the user agreed to swap installs for it.
+One run, at the standing authorization and with the user's agreement to swap
+installs: the checkout replaced the marketplace copy, `diff -rq --exclude=.git`
+printed nothing, and it ran at `b2439f4`. Balanced, `gpt-5.6-terra` high for the
+four specialists and the adjudicator, `gpt-5.6-luna` high for overview, default
+window, no fallbacks. **170.841755 credits, 21 requests, 306.4 s elapsed.**
+INCOMPLETE, 0 validated: 1 discarded candidate, 2 rejected, 0 gaps, 4 caveats.
+
+- **`Q9` ran on its own pull request**: correctness's P2 quoted 9 lines on an
+  8-line `evidence[0]` range, was reported as a dropped citation, and still
+  reached adjudication; before `Q9` it would have been discarded unjudged.
+- That P2 said a dropped `before` on the wrong side skips the side and hunk
+  checks. Rejected by the adjudicator and by me: a dropped citation is never
+  forwarded, so nothing is left to check.
+- Contracts' P3, and overview's same claim, discarded for a stray `)` in its
+  location quote, said a candidate a confined run sets aside reports no drop.
+  Rejected by the adjudicator and by me as deliberate: that candidate is never
+  judged, and the caveat says it went on to adjudication.
+- The other three caveats name what reviewers could not execute; no action.
+
+The marketplace install was restored, identical to `git archive v0.1.0`.
+Nothing was published. CI passed on #57.
 
 ### The exact next step
 
-Run the one plugin review of the pull request and record it here.
+`O2`, after #57 merges; archive this entry first if the next one does not fit.
 
 ## v1 is complete, and five more increments are scheduled on top of it
 
