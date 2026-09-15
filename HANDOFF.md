@@ -71,8 +71,8 @@ that and ask the user; do not pick the next work yourself.
   `git archive v0.1.0`. Do not edit repository files while the review runs. An
   unparsed reviewer's candidates can be read free from its `events.jsonl` under
   `~/.copilot/session-state/`; a run without `--quiet` also prints them.
-- **Sizes**: `README.md` is at 65465 bytes, 71 spare, so any README wording
-  must replace text rather than add it; `ROADMAP.md` is near 64.3 KB, so archive
+- **Sizes**: `README.md` is at 65468 bytes, 68 spare, so any README wording
+  must replace text rather than add it; `ROADMAP.md` is at 64144 bytes, so archive
   `Q9`'s entry verbatim just before the archive's last section, as `Q9` did
   `P7`'s (check with `cmp`), before writing `O2`'s. Measure both with `wc -c`
   before every commit against the 65536-byte cap; never condense archived history.
