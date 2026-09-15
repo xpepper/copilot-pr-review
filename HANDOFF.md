@@ -48,9 +48,9 @@ the user what to do next, one decision at a time; do not pick an item yourself.
   past which this tool's own discovery stops reading them. Measure with `wc -c`
   before every commit, and archive a `ROADMAP.md` entry under its recorded rule
   before writing a new one.
-- **Sibling drift in the index**: `xpepper/pr-review-gemini#58` and
-  `xpepper/pr-review-glm#45` were open on 2026-09-15. Check their state before
-  raising them again, and do not fix those entries from here.
+- **Sibling drift in the index**: `xpepper/pr-review-gemini#58` is open;
+  `xpepper/pr-review-glm#45` was closed as completed on 2026-09-15. Check their
+  state before raising them again, and do not fix those entries from here.
 
 ## Validation
 

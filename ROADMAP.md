@@ -220,10 +220,10 @@ was updated, the direct install removed, and the marketplace install listed
 
 **Not done or not shown**: no GitHub Release was authorized; `copilot plugin
 update` was not run; the ref pin is not shown honored, since the tag and `main`
-hold one tree. Sibling drift stays open in xpepper/pr-review-gemini#58 and
-xpepper/pr-review-glm#45.
+hold one tree. Sibling drift stays open in xpepper/pr-review-gemini#58;
+xpepper/pr-review-glm#45 was closed as completed on 2026-09-15.
 
-## v1 is complete, and seven increments are scheduled on top of it
+## v1 is complete, and every increment scheduled on top of it is done
 
 **`D1` delivered v1, and `O1`, `E1`, `U1`, `I1a`, `I1b`, `I1c` and `G1` have
 landed on top of it.**
@@ -244,8 +244,8 @@ rows above and the order the next session works in, with `X1` inserted after
 over starting with the largest capability gap, and chose the mnemonic IDs over
 one series off `G1`.
 
-**`S1` is scheduled next, outside this backlog**, at the user's request on
-2026-09-14. A planning session that was not a numbered increment, like the
+**`S1` followed, outside this backlog, and is complete**; the user asked for
+it on 2026-09-14. A planning session that was not a numbered increment, like the
 triage, put seven decisions to the user and recorded them in
 [docs/release-and-marketplace-plan.md](docs/release-and-marketplace-plan.md): the
 light glm-style release model with no `package.json`, the name
@@ -446,7 +446,7 @@ to them on its own and each answered:
   comments left on earlier pull requests touching the same files, and **firing
   reviewers on what the diff actually touched.** Both were put with `H1` as one
   question; the user took `H1` alone. **`H1` settles the evidence rule these
-  would inherit**, so neither should be revisited before it lands.
+  would inherit**, and it has landed, so that no longer holds either back.
 - **Anchoring findings that land outside the diff.** The deepest change on the
   menu, and the anchor rule it would loosen is what keeps a review about this
   pull request rather than about the repository. Not scheduled.
