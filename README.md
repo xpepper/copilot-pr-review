@@ -58,7 +58,8 @@ authenticated `gh`. Reviews use models from your Copilot subscription; no
 external provider credentials are involved and none are supported.
 
 ```sh
-copilot plugin install "$(pwd)"
+copilot plugin marketplace add xpepper/copilot-plugins
+copilot plugin install copilot-pr-review@xpepper-copilot-plugins
 copilot plugin list
 copilot --experimental
 ```
@@ -75,13 +76,14 @@ Wait for plugin loading to finish, then check the plugin answers:
 lists what your subscription actually offers, which is where to start before
 configuring anything.
 
-Reinstall after editing the plugin and start a fresh session: installed plugins
-are cached, so an old copy keeps running otherwise. During development you can
-skip installing with `copilot --experimental --plugin-dir .`, and remove an
-installed copy with `copilot plugin uninstall copilot-pr-review`.
-
-CLI 1.0.83 warns that direct local installs are deprecated for a future release.
-There is no marketplace packaging yet.
+The marketplace entry pins a release tag, so this installs the latest listed
+release. To run a checkout instead, skip installing with
+`copilot --experimental --plugin-dir .`, or install it with
+`copilot plugin install "$(pwd)"`, reinstalling after every edit and starting a
+fresh session: installed plugins are cached, so an old copy keeps running
+otherwise. CLI 1.0.83 warns that such direct installs are deprecated for a future
+release. Remove an installed copy with `copilot plugin uninstall
+copilot-pr-review`.
 
 ## Your first review
 

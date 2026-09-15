@@ -41,16 +41,26 @@ probes find it by that prefix.
 3. **With the user's agreement**, install from the tag and check the plugin
    loads and reports the new version, before anything points at the tag.
    Replacing their existing install, or adding one beside it, changes their
-   environment, so ask first. Read `copilot plugin install --help` first: on
-   CLI 1.0.83 it names no syntax for a ref.
+   environment, so ask first. On CLI 1.0.83 `copilot plugin install --help`
+   names no syntax for a ref, so install a detached checkout of the tag:
+   `git worktree add --detach <dir> vX.Y.Z`, then `copilot plugin install <dir>`.
+   `copilot plugin list` must show the new version, the cached copy must match
+   with `diff -rq --exclude=.git`, and `scripts/smoke-runtime.mjs --targets`
+   (the README's no-inference probe) must pass. The install is a copy, so the
+   worktree can be removed afterwards.
 4. **With the user's explicit authorization**, open one pull request on
    `xpepper/copilot-plugins` that sets this plugin's entry `version` and
    `source.ref` together and updates the index README's table in the same
    change. The user merges it. Never push to that repository's `main`.
 5. Read the merged manifest back and check `version`, `source.ref` and the tag
-   agree.
+   agree. Then, **with the user's agreement**, run `copilot plugin marketplace
+   update xpepper-copilot-plugins`, remove the direct install with
+   `copilot plugin uninstall copilot-pr-review` rather than adding a second copy
+   beside it, and run
+   `copilot plugin install copilot-pr-review@xpepper-copilot-plugins`. Check
+   `copilot plugin list`, `diff -rq` against `git archive vX.Y.Z`, and the probe.
 
-Merging the version bump authorizes none of steps 2 to 4, and none of them
+Merging the version bump authorizes none of steps 2 to 5, and none of them
 authorizes the next: each is asked for in its turn. Doing them in this
 order means the index never names a tag that does not exist yet. It does trail
 the new tag from step 2 until the index pull request merges, so do steps 2 to 5
