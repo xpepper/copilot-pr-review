@@ -9,7 +9,7 @@ import { parseReviewArgs } from "../extensions/pr-review/review.mjs";
 import { reviewKey } from "../extensions/pr-review/findings.mjs";
 import { respond } from "./target-fixture.mjs";
 import { retentionFixture } from "./retention-fixture.mjs";
-import { formatCoverage } from "../extensions/pr-review/coverage.mjs";
+import { blockingIssues, formatCoverage } from "../extensions/pr-review/coverage.mjs";
 
 const directory = mkdtempSync(join(tmpdir(), "pr-review-retention-"));
 const sessionId = randomUUID();
@@ -244,6 +244,25 @@ try {
       assert.match(messages.at(-2), /Coverage gap: Adjudicator: Rounding contract absent/);
       assert.match(messages.at(-2), /Execution failure: security-performance-resources: incomplete; Synthetic reviewer crash/);
     } else assert.doesNotMatch(messages.at(-2), /INCOMPLETE|incomplete/);
+  }
+  // Q8: a discarded candidate is retained as its own kind, and a result retained
+  // before Q8, which recorded the same refusal as an execution failure, still loads.
+  for (const [kind, label, message] of [
+    ["discarded-candidate", "Discarded candidate", "correctness:1: rejected at evidence boundary: evidence[0]: " +
+      "Citation quote does not match total.js head line 1: the range names 1 line(s) and the quote has 1."],
+    ["execution-failure", "Execution failure",
+      "correctness:1: rejected at evidence boundary: Error: Citation does not exactly match a supplied context window."],
+  ]) {
+    const value = structuredClone(outcome);
+    value.validation.diagnostics = [...(value.validation.diagnostics ?? []), { kind, message }];
+    value.validation.issues = blockingIssues(value.validation.diagnostics);
+    value.validation.complete = value.complete = value.reviewComplete = false;
+    value.coverage = "incomplete";
+    store.write(retainedRecord(value));
+    const loaded = (await sessionStore(parent)).read();
+    assert.deepEqual(loaded.outcome.validation.diagnostics.at(-1), { kind, message });
+    await inspectRetained(parent);
+    assert(messages.at(-2).includes(`\n${label}: ${message}`), label);
   }
   const legacy = structuredClone(outcome);
   delete legacy.validation.diagnostics;

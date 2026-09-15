@@ -609,12 +609,13 @@ Every result reports coverage, and it is the part worth reading first.
 | Coverage | Meaning |
 | --- | --- |
 | `completed` | Every reviewer ran and produced usable output, and validation finished |
-| `incomplete` | At least one reviewer failed, or a substantive coverage gap was reported |
+| `incomplete` | At least one reviewer failed, a candidate was discarded, or a substantive coverage gap was reported |
 | `not-started` | Skipped, declined, unconfirmed, or refused by the revision gate |
 
-Diagnostics distinguish three kinds of limitation. **Execution failures**,
-including output this tool could not read, and **substantive coverage gaps**
-both make a result incomplete. **Informational caveats** do not. A coverage gap
+Diagnostics distinguish four kinds of limitation. **Execution failures**,
+including output this tool could not read, **discarded candidates**, refused at
+the evidence boundary and so never judged, and **substantive coverage gaps** all
+make a result incomplete. **Informational caveats** do not. A coverage gap
 must say which assessment it blocks; a caveat carries no impact. Not
 independently auditing a dependency is a caveat unless missing evidence blocks a
 specific assessment of this diff.

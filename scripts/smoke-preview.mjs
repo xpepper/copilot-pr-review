@@ -8,6 +8,7 @@ import { retainedRecord, validateRecord } from "../extensions/pr-review/retentio
 import { selectionBinding } from "../extensions/pr-review/selection.mjs";
 import { retentionFixture } from "./retention-fixture.mjs";
 import { formatCoverage } from "../extensions/pr-review/coverage.mjs";
+import { toolReviewBody } from "../extensions/pr-review/prior.mjs";
 
 for (const autoPostReviews of [true, false]) {
   for (const comment of [true, false]) {
@@ -81,7 +82,8 @@ assert.deepEqual(request, {
   payload: {
     commit_id: "b".repeat(40), event: "COMMENT",
     body: "Quick review: 1 selected validated finding(s). Review coverage: completed.\n" +
-      "Execution failures: 0; coverage gaps: 0; informational caveats: 0.\nThis is not a clean-review claim.",
+      "Execution failures: 0; discarded candidates: 0; coverage gaps: 0; informational caveats: 0.\n" +
+      "This is not a clean-review claim.",
     comments: [{
       path: "total.js", line: 3, side: "RIGHT",
       body: "[P2] Multiply cents by quantity\n\nWhen: total(100, 3)\n\nExpected: 300 cents\n\nActual: 103 cents\n\n" +
@@ -101,12 +103,14 @@ assert.equal(request.payload.comments.length, 1, "Rejected/raw/duplicate bodies 
   assert.equal(commentBody(ruled), commentBody(finding));
   assert.doesNotMatch(commentBody(ruled), /Rule|AGENTS\.md/);
 }
-for (const kind of ["caveat", "coverage-gap", "execution-failure", "mixed", "legacy"]) {
+for (const kind of ["caveat", "coverage-gap", "execution-failure", "discarded-candidate", "mixed", "legacy"]) {
   const h = await harness({ options: { comment: true } });
   const diagnostics = [
     { kind: "caveat", message: "External library not independently audited." },
     { kind: "coverage-gap", message: "Changed adapter contract absent. Blocked assessment: compatibility cannot be settled." },
     { kind: "execution-failure", message: "contracts: invalid candidate output." },
+    { kind: "discarded-candidate", message: "contracts:1: rejected at evidence boundary: breaks: Citation quote does " +
+      "not match total.js head lines 1-2: the range names 2 line(s) and the quote has 3." },
   ].filter((entry) => kind === "mixed" || kind === "legacy" || entry.kind === kind);
   h.outcome.validation.diagnostics = diagnostics;
   h.outcome.validation.issues = diagnostics.filter((entry) => entry.kind !== "caveat").map((entry) => entry.message);
@@ -119,6 +123,8 @@ for (const kind of ["caveat", "coverage-gap", "execution-failure", "mixed", "leg
   assert.equal(result.preview.authorized, true);
   assert.equal(result.preview.request.payload.event, "COMMENT");
   assert.match(result.preview.request.payload.body, /not a clean-review claim/);
+  // I1a recognises a published review of ours by its body, whatever coverage it reports.
+  assert.equal(toolReviewBody(result.preview.request.payload.body)?.declaredFindings, 1, kind);
   if (kind === "legacy") {
     assert.equal(result.preview.request.payload.body,
       "Quick review: 1 selected validated finding(s). Review coverage: INCOMPLETE. This is not a clean-review claim.");

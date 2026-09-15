@@ -22,7 +22,7 @@ immediately after `B1`. **`T1`, `B1`, `X1`, `W1`, `N1`, `H1` and `K1` are
 complete and archived.** On 2026-09-14, outside that backlog, the user
 scheduled `S1`, now complete and archived. On 2026-09-15 the user scheduled five
 more from the first review published on somebody else's pull request: `Q8`,
-`P6`, `P7`, `Q9` and `O2`, in that order, the `Pending` rows below.
+`P6`, `P7`, `Q9` and `O2`, in that order; `Q8` is complete and the other four are the `Pending` rows below.
 The closing section records what was decided, and what stays open as a
 limitation rather than as work.
 
@@ -91,7 +91,7 @@ posting them.
 | H1 | Completed | By default the project's own written rules steer the review: the root instruction files the reviewed head commits reach the one reviewer that weighs the whole change, up to a 48 KiB budget; a finding relying on one must quote the rule as exact lines of its file, bound like a source citation; `--no-standards` turns it off for one run. The user reversed the opt-in this row first proposed and approved the `SCOPE.md` paragraph word for word. **It settles what a claim not grounded in a provable code effect must carry: a quotable rule**, which the history and path-conditioned lenses would inherit. Pull request #44, reviewed once at the standing authorization: balanced, 319.760535 credits, INCOMPLETE, 0 validated findings; three refused candidates were real and are fixed, one through the user's budget decision. `G1`'s menu item 4. | N1; [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | K1 | Completed | A later review reports how this tool's earlier review of the same pull request was received, on one line under `Prior review:` at every verbosity: threads resolved, unresolved and unread, and the thumbs counts. Reactions come from the listing `I1a` already reads; resolution is one paginated GraphQL read matched by database id. Unread is never unresolved or zero, a failed read is reported and the review proceeds, and nothing reaches a reviewer, the adjudicator, a verdict, the retained record or the published review. Built test first and mutation-checked. Pull request #45, reviewed once at the standing authorization: balanced, 184.483837 credits, INCOMPLETE, 0 validated findings, and one refused candidate, declined; Copilot's `databaseId` finding was fixed after it. No read of a review this tool published has run. `G1`'s menu item 12. | H1, I1c; [Publication controls](SCOPE.md#selection-publication-and-cached-results) |
 | S1 | Completed | Cut `v0.1.0` and list it, in one session: a pull request bumps `plugin.json` to `0.1.0`, the merge commit is tagged `v0.1.0`, an install from that tag is shown to load, and a `copilot-pr-review` entry pinned to that tag reaches `xpepper/copilot-plugins` through a pull request the user merges. Every tag, release and write to the index needs the user's explicit authorization in that session. Planned in `docs/release-and-marketplace-plan.md`, which records the seven decisions the user took on 2026-09-14 and the acceptance criteria. Pull request #50, reviewed once: balanced, 34.887503 credits, 1 validated finding, fixed. Listed by xpepper/copilot-plugins#1; the marketplace install is `0.1.0` and loads. | K1; outside the backlog, at the user's request; no scope clause |
-| Q8 | Pending | A candidate discarded at the evidence boundary is its own diagnostic kind, `discarded-candidate`, still counting against completeness, not an execution failure; its message names which citation check failed. `C5` eligibility unchanged. | S1; [Modes/findings](SCOPE.md#review-modes-and-findings) |
+| Q8 | Completed | A candidate discarded at the evidence boundary is its own diagnostic kind, `discarded-candidate`, still counting against completeness, not an execution failure; its message names the failing field and which citation check failed. `C5` eligibility unchanged. Pull request #54, reviewed twice with the user's authorization, the second run on the branch install. | S1; [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | P6 | Pending | The published body is a short Markdown summary: severity counts and head, one line per finding, one plain coverage sentence chosen by kind, a hidden marker; no caveats or internal errors. `prior.mjs` accepts the marker or the old phrases. | Q8; [Publication](SCOPE.md#selection-publication-and-cached-results) |
 | P7 | Pending | Each inline comment leads with the problem and a prominent fix, keeps every field, and footers introduction, confidence and reporter; `I1c` parses old and new templates byte for byte. | P6; [Publication](SCOPE.md#selection-publication-and-cached-results) |
 | Q9 | Pending | With an exact location citation, a failing supporting citation is dropped instead of the candidate and the adjudicator is told; a rule citation `H1` requires never is. | Q8; [Modes/findings](SCOPE.md#review-modes-and-findings) |
@@ -99,88 +99,88 @@ posting them.
 
 ## Every completed increment, `F1` through `S1`, is archived
 
-Fifty-nine sections were here and fifteen increments, the backlog triage, the
-archiving after `K1`'s merge and the planning of 2026-09-15 moved every one of them
-verbatim to
-[docs/roadmap-archive-2026-09-10.md](docs/roadmap-archive-2026-09-10.md): `A1`
-moved the thirty-nine through `V1c`, `L1` moved `V2a` and `V2b` because this
-file had 4272 bytes of headroom left and the smaller of the two is 7547, `D1`
-moved `A1`'s entry and then `L1`'s, `O1` moved `D1`'s, `U1` moved `O1`'s, `I1a`
-moved `E1`'s, `I1b` moved `U1`'s and then `I1a`'s, `I1c` moved `I1b`'s
-15018 bytes, `G1` moved `I1c`'s 13014 bytes, **the backlog triage moved
-`G1`'s own 8863 bytes**, **`B1` moved `T1`'s 5951**, **`X1` moved `B1`'s
-5124**, **`W1` moved `X1`'s 5123**, **`N1` moved `W1`'s 4684**, **`H1` moved `N1`'s 4982**, **`K1` moved `H1`'s 4586**, and **the archiving after `K1`'s merge moved `K1`'s own 4818**, and **the planning of 2026-09-15 moved `S1`'s 2905**, the last in that file. Fifty-one are
-completed-increment entries, covering the forty-nine increments `F1`, `F2`, `F3`, `Q1`, `Q2`, `Q3`, `Q4`,
-`P1`, `P2`, `P3`, `P4`, `P5`, `C1`, `C2`, `F4`, `R1`, `M1`, `F5`, `F6`, `M2`,
-`C3`, `C4`, `Q5`, `Q6`, `C5`, `Q7`, `V1a`, `V1b`, `V1c`, `V2a`, `V2b`, `A1`,
-`L1`, `D1`, `O1`, `E1`, `U1`, `I1a`, `I1b`, `I1c`, `G1`, `T1`, `B1`, `X1`, `W1`, `N1`, `H1`, `K1` and `S1`, with `R1` and `M1` each recorded in two halves. The remaining eight are the
-working record kept between them:
+Every completed increment entry, `F1` through `S1`, and the working record kept
+between them are in
+[docs/roadmap-archive-2026-09-10.md](docs/roadmap-archive-2026-09-10.md),
+verbatim, as the evidence of record. Read it for the evidence behind an older
+increment; do not redo, widen or reopen anything in it. **`Q8` moved this
+section's own record of the seventeen earlier moves there too**, verbatim, as
+that file's last section, because 870 bytes were spare here and no live entry
+was left to archive; the user chose that move on 2026-09-15. The rule stands:
+keep the most recent entries live, archive the rest verbatim, and measure this
+file with `wc -c` against the 65536-byte cap before opening a pull request.
+[docs/upstream-licensing.md](docs/upstream-licensing.md) did not move.
 
-- the `Q4` acceptance criteria recorded at the `Q3` checkpoint;
-- the manual-test blocker about CLI discovery without a harness override;
-- four manual-feedback sections, being the coverage classification and
-  presentation feedback and its completed fix, the completed fix that
-  consolidates equivalent coverage gaps, and the finding that the
-  consolidation did not fire on real reviewer wording;
-- the `R1` second-half harness checkpoint;
-- the documentation checkpoint for pull request #4 and its review.
+## `Q8`: a discarded candidate is its own diagnostic kind, complete
 
-Nothing was rewritten, condensed or corrected in any of the seventeen moves, so each
-section still reads exactly as the session that wrote it left it, and the
-archive is the evidence of record for every increment it holds: reproduction
-commands, the models and efforts actually used, credit costs, findings and
-rejections. Read it for the evidence behind an older increment. Do not redo,
-widen or reopen anything in it; those authorizations are spent. **`V2a`, `V2b`,
-`A1`, `L1`, `O1`, `E1`, `U1`, `I1a`, `I1b` and `I1c` are all there now**, so the safeguard
-decisions `V2` settled, the archiving `A1` performed, the upstream licence answer
-`L1` established, the quiet-output decisions `O1` settled, everything `E1` learned
-from reviewing somebody else's code, the unattended shape `U1` fixed, the
-three slicing decisions `I1a` took with the user, the six things `I1b` asked
-the next session to carry forward and **the six decisions `I1c` took with the
-user, none of which is to be reopened**, are read from the archive rather
-than from this file.
-[docs/upstream-licensing.md](docs/upstream-licensing.md) is still the record of
-that licence work and did not move.
+**Built on `q8/discarded-candidate`, pull request #54**, after #53 merged the
+plan; the decision and #65's evidence are in
+[docs/published-review-feedback-plan.md](docs/published-review-feedback-plan.md).
 
-**No increment entry is live**: `S1`'s moved and `Q8` has not started. The backlog triage added no entry of its
-own, because agreeing a backlog is not a numbered increment, so archiving `G1`
-left none behind and `T1`'s was written into that empty space. The rule these
-moves established is to keep
-the most recent entries and archive the rest, measuring this file with `wc -c`
-against the 65536-byte cap before opening a pull request. `O1` archived `D1`
-after its second review found the live file contradicting itself: `D1`'s
-remaining-limitations list still said a quieter review was undesigned and
-unscheduled, directly above the entry that shipped `--quiet`. **That sentence was
-true when `D1` wrote it**, which is why the entry moved verbatim rather than
-being corrected; the archive is history, and the live file is the answer.
-`U1` archived `O1` for headroom alone: the live file had 3679 bytes spare and an
-increment entry is five to eight kilobytes, so `O1`'s had to move before this
-one could be written. It moved verbatim for the same reason every earlier one
-did. `I1a` archived `E1` under the same rule and for the same reason, `E1` being
-the largest live entry at 10988 bytes. **`I1b` archived `U1`'s 7925 bytes and
-then `I1a`'s 15217** under that same rule. The first move was forced before a
-word could be written: this file had 2766 bytes spare, less than any increment
-entry ever written here. The second was forced once the entry existed, because
-it left 1369 bytes spare and the review evidence an entry ends with does not fit
-in that. **One live entry rather than two is where that rule landed until
-`K1`'s merge**, and the archive holds the rest. `I1c` archived `I1b`'s 15018 bytes before writing a
-word of its own, on that same rule and for that same reason: 7364 bytes were
-spare and no increment entry has ever been that small. **`G1` archived `I1c`'s
-13014 bytes** for the same reason again: 7916 bytes were spare, and an entry
-that has to record a comparison against ten sources does not fit in that. **The
-backlog triage archived `G1`'s** on the same rule, having written the six
-`Pending` rows and the closing section down to 181 bytes of spare: no increment
-entry has ever been written in less than that, so `T1`'s session would have had
-to do this move first. **`B1` archived `T1`'s 5951 bytes** on that rule before
-writing a word of its own, because 1313 bytes were spare. **`X1` archived `B1`'s
-5124 bytes** on the same rule, because 1032 bytes were spare. **`W1` archived
-`X1`'s 5123 bytes** on the same rule, because 956 bytes were spare. **`N1`
-archived `W1`'s 4684 bytes** on the same rule, because 1003 bytes were spare. **`H1`
-archived `N1`'s 4982 bytes** on the same rule, because 655 bytes were spare. **`K1`
-archived `H1`'s 4586 bytes** on the same rule, because 1058 bytes were spare.
-**After #45 merged, `K1`'s own 4818 bytes moved** on the same rule, because 413
-bytes were spare. **The planning of 2026-09-15 moved `S1`'s 2905 bytes** on the
-same rule, because 548 bytes were spare and five `Pending` rows did not fit.
+### What was built
+
+- `coverage.mjs` adds `discarded-candidate`, labelled `Discarded candidate`,
+  counted on its own (`Execution failures: 0; discarded candidates: 3; ...`). It
+  still blocks completed coverage: `blockingIssues` excludes only caveats.
+- `collectCandidates`' evidence-boundary catch records the new kind for every
+  candidate refusal, `H1` rule citations included. Failed reviewers, unusable
+  envelopes and adjudication failures stay execution failures.
+- The one `Citation does not exactly match a supplied context window` message is
+  three: `Citation <path> <side> lines A-B is outside every supplied context
+  window.`, `Citation quote does not match <path> <side> lines A-B: the range
+  names N line(s) and the quote has M.`, and a clipped quote whose first or last
+  line is blank `cannot be repaired`. A candidate's refusal names its field
+  (`breaks: `, `evidence[1]: `); strict `cite` names the same cause on re-cite.
+- `README.md` names four kinds and counts a discarded candidate as incomplete.
+
+### Evidence
+
+- **Test first**, each seen failing on the missing kind or the old wording: the
+  three causes in `smoke-findings`, one shaped like #65's `contracts:1`, pinning
+  kind, message, blocking issue and coverage lines; kind pins on `smoke-review`'s
+  four refusals; `smoke-retention` loading the new kind and the old
+  `execution-failure` wording; `smoke-preview` proving `toolReviewBody` still
+  recognises every published body. #65's envelopes stayed local.
+- **`C5` unchanged and pinned**: `envelopeVerifier` accepts an envelope whose
+  only candidate is discarded, and all refused starts no fallback.
+- All eighteen suites, `git diff --check`, the control-byte check and
+  `collectInstructionFiles` (six read, none skipped) pass.
+- **Room**: 870 bytes were spare. At the user's choice `033aa7a` moved the
+  6263-byte record of the earlier archiving moves verbatim to the archive's end,
+  `cmp`-identical, leaving a pointer.
+
+### The installed-plugin reviews
+
+Balanced both times, `gpt-5.6-terra` high for the four specialists and the
+adjudicator, `gpt-5.6-luna` high for overview, default window.
+
+**The first, at `a7e95fa`, ran the marketplace `v0.1.0`, not the branch**:
+`dogfood-review.mjs` only asserts that some copy is running, and `diff -rq` then
+showed `coverage.mjs` and `findings.mjs` differing. **147.799948 credits, 21
+requests, 111.5 s elapsed.** INCOMPLETE, 0 validated: overview's and the
+adjudicator's JSON did not parse. Contracts' P3, unjudged, that README's
+`incomplete` row omitted the kind: real, fixed in `854124d`. Performance's P3,
+that `quoteMismatch` splits an untrusted quote, was discarded for quoting 5 lines
+for a 4-line range, #65's shape: rejected, as `repairCitation` already split
+every inexact quote and the envelope is already parsed in memory.
+
+**The user authorized a rerun on the branch.** The marketplace copy was
+uninstalled, `copilot plugin install "$(pwd)"` installed the checkout, `diff -rq
+--exclude=.git` printed nothing, and it ran at `033aa7a`: **201.11283 credits, 26
+requests, 122.4 s elapsed.** All six passes completed; INCOMPLETE on one gap,
+overview compacted in turn 7 (163339 of 200000 tokens). The live count line read
+`discarded candidates: 0`, so the label was not seen live. Correctness' P2, that
+an `H1` refusal should stay an execution failure, was rejected by the adjudicator
+and by me: the reviewer ran and the candidate went unjudged, the kind's
+definition. It did catch #54's description wrongly saying so; corrected. The
+marketplace install was then restored, identical to `git archive v0.1.0`.
+
+**Recorded, not scheduled**: `dogfood-review.mjs` should refuse a review when the
+installed copy differs from the checkout.
+
+### The exact next step
+
+`P6`, after #54 merges; archive this entry first if the next one does not fit.
 
 ## v1 is complete, and five more increments are scheduled on top of it
 
