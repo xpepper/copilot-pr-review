@@ -609,7 +609,7 @@ Every result reports coverage, and it is the part worth reading first.
 | Coverage | Meaning |
 | --- | --- |
 | `completed` | Every reviewer ran and produced usable output, and validation finished |
-| `incomplete` | At least one reviewer failed, or a substantive coverage gap was reported |
+| `incomplete` | At least one reviewer failed, a candidate was discarded, or a substantive coverage gap was reported |
 | `not-started` | Skipped, declined, unconfirmed, or refused by the revision gate |
 
 Diagnostics distinguish four kinds of limitation. **Execution failures**,
