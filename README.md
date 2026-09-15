@@ -543,7 +543,9 @@ mode's policy admits, and citations that survive these checks:
   base, never read from your checkout.
 - **Exact quotation.** Quoted text must match the fetched source exactly. This
   is the check that most often discards a real observation, because a model that
-  paraphrases or normalises what it quotes loses its evidence.
+  paraphrases or normalises what it quotes loses its evidence. When the location
+  is exact, a failing supporting citation, never a rule, is dropped instead,
+  reported as a caveat, and the candidate is still judged.
 - **A changed anchor.** The primary location must span at most ten lines inside
   a diff hunk and must include a line this diff actually added or removed, not
   merely nearby unchanged code.
