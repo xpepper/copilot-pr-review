@@ -177,6 +177,11 @@ INCOMPLETE, 0 validated: 1 discarded candidate, 2 rejected, 0 gaps, 4 caveats.
 The marketplace install was restored, identical to `git archive v0.1.0`.
 Nothing was published. CI passed on #57.
 
+The user also ran GitHub's Copilot review on #57 at `b2439f4`: two comments,
+both accepted. README's new sentence read as if every such candidate is judged,
+though one left with no exact evidence entry is refused: reworded. The review
+record and the handoff were still missing at that head: both added since.
+
 ### The exact next step
 
 `O2`, after #57 merges; archive this entry first if the next one does not fit.
