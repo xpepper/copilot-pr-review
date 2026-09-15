@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { commentBody } from "../extensions/pr-review/preview.mjs";
+import { commentBody, commentBodyBeforeP7 } from "../extensions/pr-review/preview.mjs";
 import { parseCommentFinding } from "../extensions/pr-review/revalidation.mjs";
 
 const finding = {
@@ -32,8 +32,9 @@ const finding = {
 {
   const fixed = { ...finding, remediation: "Multiply the unit price by the quantity again." };
   const body = commentBody(fixed);
-  assert(body.includes("\n\nIntroduced by this diff: the changed line replaced * with +" +
-    "\n\nFix: Multiply the unit price by the quantity again.\n\nConfidence: 0.9."), "Fix sits before Confidence");
+  assert(body.includes("\n**Expected:** total is unit price multiplied by quantity" +
+    "\n\n**Fix:** Multiply the unit price by the quantity again.\n\n<sub>Introduced by this diff: "),
+  "Fix sits between Expected and the footer");
   const parsed = parseCommentFinding(body);
   assert.deepEqual(parsed, {
     severity: "P2", title: finding.title, trigger: finding.trigger,
@@ -44,6 +45,57 @@ const finding = {
   const earlier = parseCommentFinding(commentBody(finding));
   assert(earlier && !Object.hasOwn(earlier, "remediation"), "A body published before W1 reads back without one");
   console.log("PASS W1 a published remediation sentence reads back, and an earlier body still reads without one");
+}
+
+// P7: the published layout leads with the problem, makes the fix prominent and
+// puts introduction, confidence and reporter in a small footer. No field is
+// dropped, and every one reads back into its part.
+{
+  const fixed = { ...finding, remediation: "Multiply the unit price by the quantity again." };
+  assert.equal(commentBody(fixed), "**[P2] Restore multiplication when calculating total cents**\n\n" +
+    "total is unit price added to quantity\n\n" +
+    "**When:** any call with more than one unit\n" +
+    "**Expected:** total is unit price multiplied by quantity\n\n" +
+    "**Fix:** Multiply the unit price by the quantity again.\n\n" +
+    "<sub>Introduced by this diff: the changed line replaced * with + · Confidence 0.9 · " +
+    "correctness, overview reviewers</sub>");
+  assert(commentBody({ ...fixed, reportedBy: ["security", "security"] })
+    .endsWith(" · Confidence 0.9 · security reviewer</sub>"), "One reporter is one reviewer");
+  // A title and an introduction each render on one line, the title in bold and
+  // the introduction inside the footer's tag, so their whitespace folds. The
+  // folded body is what reads back, and it rebuilds itself exactly.
+  const spread = { ...fixed, title: " Restore\nmultiplication  now ", introduction: "the changed line\n\nreplaced * with +" };
+  const body = commentBody(spread);
+  assert(body.startsWith("**[P2] Restore multiplication now**\n\ntotal"), body);
+  assert(body.includes("\n\n<sub>Introduced by this diff: the changed line replaced * with + · Confidence 0.9 · "), body);
+  const parsed = parseCommentFinding(body);
+  assert.equal(parsed?.title, "Restore multiplication now");
+  assert.equal(parsed.introduction, "the changed line replaced * with +");
+  assert.equal(commentBody(parsed), body, "The folded body rebuilds itself");
+  console.log("PASS P7 an inline comment leads with the problem and the fix, and footers introduction, confidence and reporter");
+}
+
+// P7: a comment published before P7 stays readable, with the Fix paragraph W1
+// added and, from before W1, without it. These are the bytes those versions
+// posted, not a rebuild, and they read back into the same parts as the current
+// layout of the same finding.
+{
+  const remediation = "Multiply the unit price by the quantity again.";
+  const opening = "[P2] Restore multiplication when calculating total cents\n\n" +
+    "When: any call with more than one unit\n\nExpected: total is unit price multiplied by quantity\n\n" +
+    "Actual: total is unit price added to quantity\n\nIntroduced by this diff: the changed line replaced * with +\n\n";
+  const closing = "Confidence: 0.9. Reported by: correctness, overview.";
+  const withoutFix = parseCommentFinding(`${opening}${closing}`);
+  assert.deepEqual(withoutFix, { ...finding });
+  const withFix = parseCommentFinding(`${opening}Fix: ${remediation}\n\n${closing}`);
+  assert.deepEqual(withFix, { ...finding, remediation });
+  assert.deepEqual(parseCommentFinding(commentBody({ ...finding, remediation })), withFix);
+  assert.equal(commentBodyBeforeP7(withFix), `${opening}Fix: ${remediation}\n\n${closing}`);
+  assert.equal(commentBodyBeforeP7(withoutFix), `${opening}${closing}`);
+  // The earlier layout never folded a title, so one spread over lines reads back whole.
+  const spread = `[P2] Restore\nmultiplication${opening.slice(opening.indexOf("\n\nWhen: "))}${closing}`;
+  assert.equal(parseCommentFinding(spread)?.title, "Restore\nmultiplication");
+  console.log("PASS P7 a comment published before P7 reads back, with and without its Fix paragraph");
 }
 
 // Every severity the mode table admits, and a single reporter, because a deep
@@ -79,24 +131,46 @@ const finding = {
 }
 
 // Anything that is not this tool's own emitted shape is unreadable, and
-// unreadable is reported as itself rather than guessed at.
+// unreadable is reported as itself rather than guessed at. P7: the current layout
+// and the one published before it are each held to their own shape.
 {
-  const body = commentBody(finding);
+  const body = commentBody({ ...finding, remediation: "Multiply again." });
   const refused = {
     "a hand-written comment": "This looks wrong to me, can you double check the multiplication?",
     "an empty body": "",
-    "a missing label": body.replace("\n\nActual: ", "\n\n"),
-    "a reordered label": body.replace("When: ", "Actual: ").replace("\n\nActual: total is unit", "\n\nWhen: total is unit"),
+    "a missing label": body.replace("\n**Expected:** ", "\n"),
+    "a reordered label": body.replace("**When:** any", "**Expected:** any").replace("**Expected:** total", "**When:** total"),
+    "a label of the earlier layout": body.replace("**When:** ", "When: "),
     "an unknown severity": body.replace("[P2]", "[P9]"),
-    "a severity that is not bracketed": body.replace("[P2] ", "P2: "),
-    "a non-numeric confidence": body.replace("Confidence: 0.9", "Confidence: high"),
-    "no reporter at all": body.replace(" Reported by: correctness, overview.", " Reported by: ."),
+    "a severity that is not bracketed": body.replace("**[P2] ", "**P2: "),
+    "an empty title": body.replace(`**[P2] ${finding.title}**`, "**[P2] **"),
+    "an unfolded title": body.replace("Restore multiplication", "Restore  multiplication"),
+    "an unfolded introduction": body.replace("the changed line", "the changed\nline"),
+    "a footer outside its tag": body.replace("<sub>", ""),
+    "a non-numeric confidence": body.replace("Confidence 0.9", "Confidence high"),
+    "no reporter at all": body.replace("correctness, overview reviewers", "reviewers"),
+    "an empty reporter": body.replace("correctness, overview", "correctness, "),
+    "a reporter count the noun disagrees with": body.replace("overview reviewers", "overview reviewer"),
     "trailing whitespace": `${body}\n`,
     "a leading quote": `> ${body}`,
     "single newlines between the parts": body.replaceAll("\n\n", "\n"),
-    "an empty title": body.replace(`[P2] ${finding.title}`, "[P2] "),
   };
-  for (const [what, value] of Object.entries(refused)) {
+  const before = commentBodyBeforeP7(finding);
+  const refusedBefore = {
+    "a missing label": before.replace("\n\nActual: ", "\n\n"),
+    "a reordered label": before.replace("When: ", "Actual: ").replace("\n\nActual: total is unit", "\n\nWhen: total is unit"),
+    "an unknown severity": before.replace("[P2]", "[P9]"),
+    "a severity that is not bracketed": before.replace("[P2] ", "P2: "),
+    "a non-numeric confidence": before.replace("Confidence: 0.9", "Confidence: high"),
+    "no reporter at all": before.replace(" Reported by: correctness, overview.", " Reported by: ."),
+    "trailing whitespace": `${before}\n`,
+    "a leading quote": `> ${before}`,
+    "single newlines between the parts": before.replaceAll("\n\n", "\n"),
+    "an empty title": before.replace(`[P2] ${finding.title}`, "[P2] "),
+  };
+  for (const [what, value] of [...Object.entries(refused),
+    ...Object.entries(refusedBefore).map(([what, value]) => [`before P7, ${what}`, value])]) {
+    assert(value !== body && value !== before, `${what} must alter the body it starts from`);
     assert.equal(parseCommentFinding(value), undefined, `${what} must not read as a finding`);
   }
   assert.equal(parseCommentFinding(undefined), undefined);
@@ -1008,23 +1082,42 @@ const rangeRequests = (calls) => calls.filter((args) =>
 // five labels admits more than one split, and each rebuilds the same bytes.
 {
   const ambiguous = { ...finding, trigger: "any call\n\nExpected: something the reviewer wrote" };
-  const body = commentBody(ambiguous);
+  const body = commentBodyBeforeP7(ambiguous);
   const parsed = parseCommentFinding(body);
   assert.equal(parsed, undefined,
     "A body that admits more than one split is unreadable, never silently misread");
   for (const label of ["When", "Expected", "Actual", "Introduced by this diff", "Confidence"]) {
-    const collision = commentBody({ ...finding, actual: `it fails\n\n${label}: more prose` });
+    const collision = commentBodyBeforeP7({ ...finding, actual: `it fails\n\n${label}: more prose` });
     assert.equal(parseCommentFinding(collision), undefined, `A repeated ${label} label is ambiguous`);
   }
   // W1: the remediation paragraph is optional, so its label may open a paragraph
   // once and never twice.
   for (const field of ["actual", "introduction"]) {
-    const collision = commentBody({ ...finding, remediation: "Multiply again.", [field]: "it fails\n\nFix: more prose" });
+    const collision = commentBodyBeforeP7({ ...finding, remediation: "Multiply again.", [field]: "it fails\n\nFix: more prose" });
     assert.equal(parseCommentFinding(collision), undefined, `A repeated Fix label in ${field} is ambiguous`);
   }
   // A label that is not at a paragraph start is ordinary prose and reads fine.
   const inline = { ...finding, trigger: "any call where Expected: is written inline" };
-  assert.deepEqual(parseCommentFinding(commentBody(inline))?.trigger, inline.trigger);
+  assert.deepEqual(parseCommentFinding(commentBodyBeforeP7(inline))?.trigger, inline.trigger);
+  // P7: the current layout holds its own labels to the same rule, each opening its
+  // place once. The last collision would otherwise read as a misattributed
+  // reporter list: its footer rebuilds the same bytes with confidence 0.8.
+  const current = { ...finding, remediation: "Multiply again." };
+  for (const [field, prose] of [
+    ["actual", "it fails\n\n**When:** more prose"],
+    ["trigger", "any call\n**Expected:** more prose"],
+    ["expected", "a product\n\n**Fix:** more prose"],
+    ["actual", "it fails\n\n<sub>Introduced by this diff: more prose"],
+    ["introduction", "the operator changed · Confidence 0.8 · overview"],
+  ]) {
+    assert.equal(parseCommentFinding(commentBody({ ...current, [field]: prose })), undefined,
+      `${field} ${JSON.stringify(prose)} is ambiguous`);
+  }
+  // A label inside a line, and the footer's separator outside the footer, are prose.
+  const prose = { ...current, trigger: "any call where **Expected:** is written inline", actual: "rounds · Confidence 0.8 · off" };
+  const read = parseCommentFinding(commentBody(prose));
+  assert.equal(read?.trigger, prose.trigger);
+  assert.equal(read.actual, prose.actual);
   console.log("PASS I1c a body admitting more than one split is unreadable, not misread");
 }
 

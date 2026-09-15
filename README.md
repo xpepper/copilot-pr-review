@@ -759,9 +759,10 @@ safeguard.**
 
 The payload is built by code, not by a model: the reviewed `commit_id`, the
 literal `event: "COMMENT"`, a short summary, and inline comments from
-the canonical selected findings only. Each comment keeps severity, trigger,
-expected and actual behaviour, introduction, the `Fix:` sentence and reviewer
-attribution. A finding with no sentence, which only a result retained by an
+the canonical selected findings only. Each comment leads with severity, title
+and actual behaviour, then trigger, expected behaviour and the `Fix:` sentence,
+with introduction, confidence and reviewer attribution in a small footer. A
+finding with no sentence, which only a result retained by an
 earlier version holds, is refused; rerun the review. Head and
 base anchors use `RIGHT` and `LEFT`; multi-line ranges carry `start_line` and
 `start_side`; a renamed file's base citation maps to the current diff path and a
