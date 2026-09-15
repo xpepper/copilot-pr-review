@@ -10127,6 +10127,77 @@ update` was not run; the ref pin is not shown honored, since the tag and `main`
 hold one tree. Sibling drift stays open in xpepper/pr-review-gemini#58;
 xpepper/pr-review-glm#45 was closed as completed on 2026-09-15.
 
+## `Q8`: a discarded candidate is its own diagnostic kind, complete
+
+**Built on `q8/discarded-candidate`, pull request #54**, after #53 merged the
+plan; the decision and #65's evidence are in
+[docs/published-review-feedback-plan.md](docs/published-review-feedback-plan.md).
+
+### What was built
+
+- `coverage.mjs` adds `discarded-candidate`, labelled `Discarded candidate`,
+  counted on its own (`Execution failures: 0; discarded candidates: 3; ...`). It
+  still blocks completed coverage: `blockingIssues` excludes only caveats.
+- `collectCandidates`' evidence-boundary catch records the new kind for every
+  candidate refusal, `H1` rule citations included. Failed reviewers, unusable
+  envelopes and adjudication failures stay execution failures.
+- The one `Citation does not exactly match a supplied context window` message is
+  three: `Citation <path> <side> lines A-B is outside every supplied context
+  window.`, `Citation quote does not match <path> <side> lines A-B: the range
+  names N line(s) and the quote has M.`, and a clipped quote whose first or last
+  line is blank `cannot be repaired`. A candidate's refusal names its field
+  (`breaks: `, `evidence[1]: `); strict `cite` names the same cause on re-cite.
+- `README.md` names four kinds and counts a discarded candidate as incomplete.
+
+### Evidence
+
+- **Test first**, each seen failing on the missing kind or the old wording: the
+  three causes in `smoke-findings`, one shaped like #65's `contracts:1`, pinning
+  kind, message, blocking issue and coverage lines; kind pins on `smoke-review`'s
+  four refusals; `smoke-retention` loading the new kind and the old
+  `execution-failure` wording; `smoke-preview` proving `toolReviewBody` still
+  recognises every published body. #65's envelopes stayed local.
+- **`C5` unchanged and pinned**: `envelopeVerifier` accepts an envelope whose
+  only candidate is discarded, and all refused starts no fallback.
+- All eighteen suites, `git diff --check`, the control-byte check and
+  `collectInstructionFiles` (six read, none skipped) pass.
+- **Room**: 870 bytes were spare. At the user's choice `033aa7a` moved the
+  6263-byte record of the earlier archiving moves verbatim to the archive's end,
+  `cmp`-identical, leaving a pointer.
+
+### The installed-plugin reviews
+
+Balanced both times, `gpt-5.6-terra` high for the four specialists and the
+adjudicator, `gpt-5.6-luna` high for overview, default window.
+
+**The first, at `a7e95fa`, ran the marketplace `v0.1.0`, not the branch**:
+`dogfood-review.mjs` only asserts that some copy is running, and `diff -rq` then
+showed `coverage.mjs` and `findings.mjs` differing. **147.799948 credits, 21
+requests, 111.5 s elapsed.** INCOMPLETE, 0 validated: overview's and the
+adjudicator's JSON did not parse. Contracts' P3, unjudged, that README's
+`incomplete` row omitted the kind: real, fixed in `854124d`. Performance's P3,
+that `quoteMismatch` splits an untrusted quote, was discarded for quoting 5 lines
+for a 4-line range, #65's shape: rejected, as `repairCitation` already split
+every inexact quote and the envelope is already parsed in memory.
+
+**The user authorized a rerun on the branch.** The marketplace copy was
+uninstalled, `copilot plugin install "$(pwd)"` installed the checkout, `diff -rq
+--exclude=.git` printed nothing, and it ran at `033aa7a`: **201.11283 credits, 26
+requests, 122.4 s elapsed.** All six passes completed; INCOMPLETE on one gap,
+overview compacted in turn 7 (163339 of 200000 tokens). The live count line read
+`discarded candidates: 0`, so the label was not seen live. Correctness' P2, that
+an `H1` refusal should stay an execution failure, was rejected by the adjudicator
+and by me: the reviewer ran and the candidate went unjudged, the kind's
+definition. It did catch #54's description wrongly saying so; corrected. The
+marketplace install was then restored, identical to `git archive v0.1.0`.
+
+**Recorded, not scheduled**: `dogfood-review.mjs` should refuse a review when the
+installed copy differs from the checkout.
+
+### The exact next step
+
+`P6`, after #54 merges; archive this entry first if the next one does not fit.
+
 ## Every completed increment, `F1` through `S1`, is archived
 
 Fifty-nine sections were here and fifteen increments, the backlog triage, the

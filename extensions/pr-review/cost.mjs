@@ -1,9 +1,9 @@
 // T1: what a run cost and how long it took, as one line beside its coverage.
 //
-// This is deliberately not part of `formatCoverage`. That text is embedded in
-// the review body `preview.mjs` publishes, so a cost sentence written there
-// would post what a review cost to somebody's pull request. The figures belong
-// in the run's own timeline and nowhere else.
+// This is deliberately not part of `formatCoverage`, nor of the summary
+// `summary.mjs` builds for the review body `preview.mjs` publishes: a cost
+// sentence in that body would post what a review cost to somebody's pull
+// request. The figures belong in the run's own timeline and nowhere else.
 //
 // Nothing here is a budget. An elapsed figure is a report about a run that has
 // already finished; no stage reads it, and no stage may start doing so.

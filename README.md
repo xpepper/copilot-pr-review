@@ -758,7 +758,7 @@ key itself. `--comment --no-comment` is rejected before capture or inference.
 safeguard.**
 
 The payload is built by code, not by a model: the reviewed `commit_id`, the
-literal `event: "COMMENT"`, a concise coverage summary, and inline comments from
+literal `event: "COMMENT"`, a short summary, and inline comments from
 the canonical selected findings only. Each comment keeps severity, trigger,
 expected and actual behaviour, introduction, the `Fix:` sentence and reviewer
 attribution. A finding with no sentence, which only a result retained by an
@@ -768,6 +768,11 @@ base anchors use `RIGHT` and `LEFT`; multi-line ranges carry `start_line` and
 deleted file keeps its old path. Every current finding requires an inline
 location, and an invalid anchor is refused rather than silently converted into a
 body-only comment.
+
+The summary gives the mode, the finding count per severity and the reviewed
+head, one line per finding (severity, title, location), one plain sentence on
+coverage, partial coverage included, and a hidden marker. Diagnostics stay in the
+terminal and the retained result.
 
 Immediately before dispatch, code rereads the repository identity, the pull
 request identity, head and base revisions, lifecycle and the full diff, then

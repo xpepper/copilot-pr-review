@@ -1,4 +1,5 @@
 import { parseDiffFiles } from "./context.mjs";
+import { confinedCaveatPrefix } from "./summary.mjs";
 import { assertCompleteDiff, runGh } from "./target.mjs";
 
 // I1b: the declaration that this run wants fresh hunting confined to the commits
@@ -224,15 +225,16 @@ export function describeConfinement(confinement) {
   ].join("\n");
 }
 
-// The one sentence that must reach the published review body. It goes in as an
-// informational caveat rather than a coverage gap: nothing failed and no
-// assessment was blocked, so the run is complete over what it was asked to
-// review, and a run that reported INCOMPLETE for a narrowing the person asked
-// for would make that word mean two different things.
+// The one caveat whose meaning must reach the published review body, where P6
+// states it as summary.mjs's plain sentence. It goes in as an informational
+// caveat rather than a coverage gap: nothing failed and no assessment was
+// blocked, so the run is complete over what it was asked to review, and a run
+// that reported INCOMPLETE for a narrowing the person asked for would make that
+// word mean two different things.
 export function confinementCaveat(confinement, setAside) {
   if (!isConfined(confinement)) return undefined;
   return { kind: "caveat", message:
-    `Fresh hunting was confined to the ${confinement.range.commits} commit(s) added after ` +
+    `${confinedCaveatPrefix}${confinement.range.commits} commit(s) added after ` +
     `${confinement.range.priorHead}, the head an earlier review by this tool evaluated, so this review does ` +
     `not cover the whole pull request; ${setAside} candidate(s) anchored outside that range were set aside ` +
     "as already covered, and the earlier review's own coverage was not read." };

@@ -1387,8 +1387,12 @@ const lossGaps = (outcome) => outcome.validation.diagnostics.filter((entry) =>
   assert.equal(report.coverage, "incomplete");
   assert.equal(lossGaps(report).length, 1);
   assert.match(lossGaps(report)[0].message, /^evidence-validator: /);
-  assert.match(report.preview.request.payload.body, /\nCoverage gap: evidence-validator: .*compacted/,
+  // P6: the published summary says so in plain words, and the gap's own text
+  // stays in the terminal and the retained result.
+  assert.match(report.preview.request.payload.body,
+    /\n\nCoverage was partial: \d+ parts? of the change could not be fully assessed\. /,
     "The proposed review body carries the gap");
+  assert.doesNotMatch(report.preview.request.payload.body, /compacted/);
 }
 for (const compacted of ["reviewer-0", "fallback"]) {
   // The gap follows the attempt whose output the review rests on. A primary a
@@ -2564,10 +2568,10 @@ console.log("PASS final retention-log cancellation revokes an unsubmitted propos
   assert.equal(report.selection.findingIds.length, 3, "A withheld minor finding is never selectable");
   assert.equal(report.preview.status, "suppressed");
   assert.equal(report.preview.submitted, false);
-  assert.match(report.preview.request.payload.body, /^Balanced review: 3 selected validated finding\(s\)/);
-  // T1: what a review cost is the runner's business and nobody else's. The
-  // published body carries the coverage report, so a cost sentence written into
-  // formatCoverage would post this figure to a public pull request. It is a
+  assert.match(report.preview.request.payload.body, /^\*\*Balanced review: 3 findings \(/);
+  // T1: what a review cost is the runner's business and nobody else's. A cost
+  // sentence written into the published summary would post this figure to a
+  // public pull request. It is a
   // separate line on the run's own timeline, and these three assertions are what
   // keep it there.
   assert(!/Review cost|AI credits|elapsed/.test(report.preview.request.payload.body),
@@ -2637,7 +2641,7 @@ console.log("PASS a settled balanced run: five tiered reviewers, the minor cap, 
   assert.equal(report.validation.complete, true);
   assert.equal(report.selection.findingIds.length, 6);
   assert.equal(report.preview.status, "suppressed");
-  assert.match(report.preview.request.payload.body, /^Full review: 6 selected validated finding\(s\)/);
+  assert.match(report.preview.request.payload.body, /^\*\*Full review: 6 findings \(/);
   assert.equal(report.publication.attempted, false);
   const record = retainedRecord(report);
   validateRecord(record, h.parent.sessionId);
@@ -2695,7 +2699,7 @@ console.log("PASS a settled full run: six tiered reviewers, an uncapped minor po
   assert.equal(report.validation.complete, true);
   assert.equal(report.selection.findingIds.length, 1);
   assert.equal(report.preview.status, "suppressed");
-  assert.match(report.preview.request.payload.body, /^Deep review: 1 selected validated finding\(s\)/);
+  assert.match(report.preview.request.payload.body, /^\*\*Deep review: 1 finding \(/);
   assert.equal(report.publication.attempted, false);
   const record = retainedRecord(report);
   validateRecord(record, h.parent.sessionId);

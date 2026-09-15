@@ -3,6 +3,8 @@ import { randomUUID } from "node:crypto";
 import {
   buildReviewPreview, cancelPreview, commentBody, finishPreview, postingAuthority, validatePreview,
 } from "../extensions/pr-review/preview.mjs";
+import { summaryBody } from "../extensions/pr-review/summary.mjs";
+import { confinementCaveat } from "../extensions/pr-review/incremental.mjs";
 import { reviewKey } from "../extensions/pr-review/findings.mjs";
 import { retainedRecord, validateRecord } from "../extensions/pr-review/retention.mjs";
 import { selectionBinding } from "../extensions/pr-review/selection.mjs";
@@ -81,9 +83,10 @@ assert.deepEqual(request, {
   binding: selectionBinding(exact.outcome),
   payload: {
     commit_id: "b".repeat(40), event: "COMMENT",
-    body: "Quick review: 1 selected validated finding(s). Review coverage: completed.\n" +
-      "Execution failures: 0; discarded candidates: 0; coverage gaps: 0; informational caveats: 0.\n" +
-      "This is not a clean-review claim.",
+    body: "**Quick review: 1 finding (1 × P2)** at `bbbbbbb`\n\n" +
+      "- P2 · Multiply cents by quantity · `total.js:3`\n\n" +
+      "Coverage was complete. Finding nothing elsewhere does not mean nothing is there.\n\n" +
+      "<!-- copilot-pr-review: mode=quick findings=1 coverage=completed -->",
     comments: [{
       path: "total.js", line: 3, side: "RIGHT",
       body: "[P2] Multiply cents by quantity\n\nWhen: total(100, 3)\n\nExpected: 300 cents\n\nActual: 103 cents\n\n" +
@@ -122,22 +125,107 @@ for (const kind of ["caveat", "coverage-gap", "execution-failure", "discarded-ca
   validateRecord(record, h.parent.sessionId);
   assert.equal(result.preview.authorized, true);
   assert.equal(result.preview.request.payload.event, "COMMENT");
-  assert.match(result.preview.request.payload.body, /not a clean-review claim/);
+  // P6: one plain coverage sentence chosen by kind. The diagnostics themselves
+  // stay in the terminal and the retained result and are never published.
+  const body = result.preview.request.payload.body;
+  const sentence = {
+    caveat: "Coverage was complete.",
+    "coverage-gap": "Coverage was partial: 1 part of the change could not be fully assessed.",
+    "execution-failure": "Coverage was partial: part of the review did not run to completion.",
+    "discarded-candidate": "Coverage was partial: 1 more possible issue was dropped unchecked because its " +
+      "evidence could not be matched to the code.",
+    mixed: "Coverage was partial: part of the review did not run to completion; 1 more possible issue was " +
+      "dropped unchecked because its evidence could not be matched to the code; 1 part of the change could " +
+      "not be fully assessed.",
+    legacy: "Coverage was partial: 3 parts of the change could not be fully assessed.",
+  }[kind];
+  assert.equal(body, "**Quick review: 1 finding (1 × P2)** at `bbbbbbb`\n\n" +
+    "- P2 · Multiply cents by quantity · `total.js:3`\n\n" +
+    `${sentence} Finding nothing elsewhere does not mean nothing is there.\n\n` +
+    `<!-- copilot-pr-review: mode=quick findings=1 coverage=${kind === "caveat" ? "completed" : "incomplete"} -->`, kind);
+  for (const entry of diagnostics) assert(!body.includes(entry.message), `${kind} publishes no diagnostic`);
   // I1a recognises a published review of ours by its body, whatever coverage it reports.
-  assert.equal(toolReviewBody(result.preview.request.payload.body)?.declaredFindings, 1, kind);
-  if (kind === "legacy") {
-    assert.equal(result.preview.request.payload.body,
-      "Quick review: 1 selected validated finding(s). Review coverage: INCOMPLETE. This is not a clean-review claim.");
-    assert.match(formatCoverage(result), /Legacy unclassified issue \(kept incomplete\)/);
-  } else {
-    assert(result.preview.request.payload.body.includes(formatCoverage(record.outcome)),
-      "Publication and retained coverage descriptions must agree exactly");
-    for (const entry of diagnostics) assert(result.preview.request.payload.body.includes(entry.message));
-    if (kind === "caveat") assert.doesNotMatch(result.preview.request.payload.body, /INCOMPLETE/);
-    else assert.match(result.preview.request.payload.body, /INCOMPLETE/);
+  assert.equal(toolReviewBody(body)?.declaredFindings, 1, kind);
+  // The terminal and retained presentation is unchanged.
+  assert.match(formatCoverage(record.outcome), kind === "caveat" ? /^Review coverage: completed\./ : /INCOMPLETE/);
+  if (kind === "legacy") assert.match(formatCoverage(result), /Legacy unclassified issue \(kept incomplete\)/);
+}
+// P6: severities counted in rank order, one line per finding in canonical
+// order, a title folded onto one line with no HTML comment able to hide what
+// follows it, and a basename unless two different paths would read the same.
+assert.equal(summaryBody({
+  mode: "balanced", head: "0123456789abcdef0123456789abcdef01234567", complete: true, diagnostics: [],
+  findings: [
+    { severity: "P2", title: "Second", path: "skills/a/SKILL.md", startLine: 176, endLine: 176 },
+    { severity: "P1", title: "Spans\nlines  <!-- here", path: "skills/b/SKILL.md", startLine: 362, endLine: 364 },
+    { severity: "nit", title: "Third", path: "src/total.js", startLine: 3, endLine: 3 },
+    { severity: "P2", title: "Fourth", path: "skills/a/SKILL.md", startLine: 9, endLine: 9 },
+  ],
+}), "**Balanced review: 4 findings (1 × P1, 2 × P2, 1 × nit)** at `0123456`\n\n" +
+  "- P2 · Second · `skills/a/SKILL.md:176`\n" +
+  "- P1 · Spans lines &lt;!-- here · `skills/b/SKILL.md:362-364`\n" +
+  "- nit · Third · `total.js:3`\n" +
+  "- P2 · Fourth · `skills/a/SKILL.md:9`\n\n" +
+  "Coverage was complete. Finding nothing elsewhere does not mean nothing is there.\n\n" +
+  "<!-- copilot-pr-review: mode=balanced findings=4 coverage=completed -->");
+assert.match(summaryBody({ mode: "deep", head: "a".repeat(40), complete: false, diagnostics: [
+  { kind: "discarded-candidate", message: "a" }, { kind: "discarded-candidate", message: "b" },
+  { kind: "coverage-gap", message: "c" }, { kind: "coverage-gap", message: "d" },
+], findings: [{ severity: "P0", title: "Only", path: "x/y.js", startLine: 1, endLine: 1 }] }),
+/^\*\*Deep review: 1 finding \(1 × P0\)\*\* at `aaaaaaa`\n\n- P0 · Only · `y\.js:1`\n\nCoverage was partial: 2 more possible issues were dropped unchecked because their evidence could not be matched to the code; 2 parts of the change could not be fully assessed\. /);
+// A run that is incomplete for a reason no diagnostic names still says so.
+assert.match(summaryBody({ mode: "quick", head: "a".repeat(40), complete: false, diagnostics: [],
+  findings: [{ severity: "P1", title: "Only", path: "y.js", startLine: 1, endLine: 1 }] }),
+/\n\nCoverage was partial\. Finding nothing elsewhere does not mean nothing is there\.\n\n.*coverage=incomplete -->$/);
+// #55's review: a path is pull-request-controlled, and a backtick in it must not
+// close the location's code span, where `<!--` would open a comment hiding the
+// coverage sentence. The span's delimiter outruns any backtick run in the path,
+// and a line break cannot end the finding's line.
+{
+  const location = (path) => summaryBody({ mode: "quick", head: "a".repeat(40), complete: false, diagnostics: [],
+    findings: [{ severity: "P1", title: "Only", path, startLine: 3, endLine: 3 }] }).split("\n")[2];
+  assert.equal(location("dir/report`<!--.js"), "- P1 · Only · ``report`<!--.js:3``");
+  assert.equal(location("``x.js"), "- P1 · Only · ``` ``x.js:3 ```");
+  assert.equal(location("a\n\n<!--b.js"), "- P1 · Only · `a <!--b.js:3`");
+}
+// P6, at the user's decision: a confined run still says on GitHub that it does
+// not cover the whole pull request, as I1b promised, and nothing else of its
+// caveat. Only the caveat incremental.mjs builds carries it, not one quoting it.
+{
+  const caveat = confinementCaveat({ status: "confined", range: { commits: 3, priorHead: "1".repeat(40) } }, 2);
+  const input = (diagnostics) => ({ mode: "quick", head: "a".repeat(40), complete: true, diagnostics,
+    findings: [{ severity: "P1", title: "Only", path: "y.js", startLine: 1, endLine: 1 }] });
+  const body = summaryBody(input([{ kind: "caveat", message: "Unrelated caveat." }, caveat]));
+  assert(body.endsWith("Coverage was complete. Finding nothing elsewhere does not mean nothing is there.\n\n" +
+    "This review only looked at the commits added since this tool's earlier review, so it does not cover " +
+    "the whole pull request.\n\n<!-- copilot-pr-review: mode=quick findings=1 coverage=completed -->"), body);
+  assert(!body.includes("1".repeat(40)) && !body.includes("Unrelated caveat"), body);
+  assert(!summaryBody(input([{ kind: "caveat", message: `Reviewer note: ${caveat.message}` }]))
+    .includes("This review only looked"));
+}
+// P6: a result retained before P6 holds a proposal with the old body. It still
+// loads, because an unreadable record refuses every later review in that
+// session, and nothing else in that proposal may differ from what the retained
+// findings rebuild.
+{
+  const earlier = await harness({ options: { comment: true } });
+  const retained = await earlier.run();
+  const before = "Quick review: 1 selected validated finding(s). Review coverage: completed.\n" +
+    "Execution failures: 0; discarded candidates: 0; coverage gaps: 0; informational caveats: 0.\n" +
+    "This is not a clean-review claim.";
+  retained.preview.request.payload.body = before;
+  validateRecord(retainedRecord(retained), earlier.parent.sessionId);
+  for (const mutate of [
+    (request) => { request.payload.body = before.replace("completed", "INCOMPLETE"); },
+    (request) => { request.payload.body = `${before} `; },
+    (request) => { request.payload.comments[0].line++; },
+  ]) {
+    const altered = structuredClone(retained);
+    mutate(altered.preview.request);
+    assert.throws(() => validateRecord(retainedRecord(altered), earlier.parent.sessionId), /changed request/);
   }
 }
-console.log("PASS classified publication summaries and unchanged legacy payload reconstruction/authority");
+console.log("PASS P6 published summaries by coverage kind, marker, locations, confinement and pre-P6 proposals");
 const finding = exact.outcome.validation.findings[0];
 finding.location = { ...finding.before };
 let comments = buildReviewPreview(exact.outcome, exact.boundary).payload.comments;
@@ -235,7 +323,8 @@ degraded.outcome.reviewComplete = false;
 degraded.outcome.coverage = "incomplete";
 const degradedResult = await degraded.run();
 assert.equal(degradedResult.preview.authorized, true, "Degraded validated findings can still be authorized");
-assert.match(degradedResult.preview.request.payload.body, /INCOMPLETE/);
+assert.match(degradedResult.preview.request.payload.body,
+  /\n\nCoverage was partial\. Finding nothing elsewhere does not mean nothing is there\.\n\n.*coverage=incomplete -->$/);
 assert.match(degraded.requests[0].message, /INCOMPLETE/);
 validateRecord(retainedRecord(degradedResult), degraded.parent.sessionId);
 console.log("PASS decline, false/malformed/failed UI, empty/unavailable selection, and explicit degraded coverage");
