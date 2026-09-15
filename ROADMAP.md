@@ -20,7 +20,7 @@ increment scheduled up to `G1` is complete.** On 2026-09-12 the user triaged
 `W1`, `N1`, `H1` and `K1`, in that order, and the same day scheduled `X1`
 immediately after `B1`. **`T1`, `B1`, `X1`, `W1`, `N1`, `H1` and `K1` are
 complete and archived.** On 2026-09-14, outside that backlog, the user
-scheduled `S1`, now in progress; its entry is the one live entry.
+scheduled `S1`, now complete; its entry is the one live entry.
 The closing section records what was decided, and what stays open as a
 limitation rather than as work.
 
@@ -88,7 +88,7 @@ posting them.
 | N1 | Completed | A seeded corpus and a deterministic scorer, **the free half only**: five plain-text diffs pinned by content hash, three seeded cases carrying four defects with stable ids, target and allowed severities, acceptable locations and concept groups, and two clean controls; a scorer needing no model or network that rejects explicit non-findings before matching and pairs findings with defects one-to-one, run by an eighteenth controlled suite and CI. No collection run, recall number or gate. Pull request #43, reviewed once with this plugin at the standing authorization: balanced, 127.050688 credits, INCOMPLETE, 0 validated findings, and one real candidate raised by two reviewers and refused on its citation, fixed anyway. | W1; [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | H1 | Completed | By default the project's own written rules steer the review: the root instruction files the reviewed head commits reach the one reviewer that weighs the whole change, up to a 48 KiB budget; a finding relying on one must quote the rule as exact lines of its file, bound like a source citation; `--no-standards` turns it off for one run. The user reversed the opt-in this row first proposed and approved the `SCOPE.md` paragraph word for word. **It settles what a claim not grounded in a provable code effect must carry: a quotable rule**, which the history and path-conditioned lenses would inherit. Pull request #44, reviewed once at the standing authorization: balanced, 319.760535 credits, INCOMPLETE, 0 validated findings; three refused candidates were real and are fixed, one through the user's budget decision. `G1`'s menu item 4. | N1; [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | K1 | Completed | A later review reports how this tool's earlier review of the same pull request was received, on one line under `Prior review:` at every verbosity: threads resolved, unresolved and unread, and the thumbs counts. Reactions come from the listing `I1a` already reads; resolution is one paginated GraphQL read matched by database id. Unread is never unresolved or zero, a failed read is reported and the review proceeds, and nothing reaches a reviewer, the adjudicator, a verdict, the retained record or the published review. Built test first and mutation-checked. Pull request #45, reviewed once at the standing authorization: balanced, 184.483837 credits, INCOMPLETE, 0 validated findings, and one refused candidate, declined; Copilot's `databaseId` finding was fixed after it. No read of a review this tool published has run. `G1`'s menu item 12. | H1, I1c; [Publication controls](SCOPE.md#selection-publication-and-cached-results) |
-| S1 | In progress | Cut `v0.1.0` and list it, in one session: a pull request bumps `plugin.json` to `0.1.0`, the merge commit is tagged `v0.1.0`, an install from that tag is shown to load, and a `copilot-pr-review` entry pinned to that tag reaches `xpepper/copilot-plugins` through a pull request the user merges. Every tag, release and write to the index needs the user's explicit authorization in that session. Planned in `docs/release-and-marketplace-plan.md`, which records the seven decisions the user took on 2026-09-14 and the acceptance criteria. | K1; outside the backlog, at the user's request; no scope clause |
+| S1 | Completed | Cut `v0.1.0` and list it, in one session: a pull request bumps `plugin.json` to `0.1.0`, the merge commit is tagged `v0.1.0`, an install from that tag is shown to load, and a `copilot-pr-review` entry pinned to that tag reaches `xpepper/copilot-plugins` through a pull request the user merges. Every tag, release and write to the index needs the user's explicit authorization in that session. Planned in `docs/release-and-marketplace-plan.md`, which records the seven decisions the user took on 2026-09-14 and the acceptance criteria. Pull request #50, reviewed once: balanced, 34.887503 credits, 1 validated finding, fixed. Listed by xpepper/copilot-plugins#1; the marketplace install is `0.1.0` and loads. | K1; outside the backlog, at the user's request; no scope clause |
 
 ## Every completed increment, `F1` through `K1`, is archived
 
@@ -174,7 +174,7 @@ archived `H1`'s 4586 bytes** on the same rule, because 1058 bytes were spare.
 **After #45 merged, `K1`'s own 4818 bytes moved** on the same rule, because 413
 bytes were spare.
 
-## `S1`: cut `v0.1.0` and list it, in progress
+## `S1`: cut `v0.1.0` and list it, complete
 
 **Step 1 is pull request #50**, branch `s1/release-v0.1.0`: `plugin.json`'s
 `version` from `0.0.1` to `0.1.0`, `name` untouched, and `docs/release.md`. All
@@ -197,15 +197,31 @@ coverage gaps and three caveats. **1 validated finding, 0 withheld, 1 rejected.*
 - Overview's discarded P2, a "merge commit" after a squash merge: real, fixed.
 - Security's discarded P2, a tag is mutable: the tag-pinned entry is settled and
   not reopened; a rule never to move a published tag was added.
-- Contracts' rejected P2, no demonstrated install-from-a-tag command: real, and
-  only step 4 can answer it, so the closing pull request puts the command it
-  demonstrates into `docs/release.md`.
+- Contracts' rejected P2, no demonstrated install-from-a-tag command: real; the
+  closing pull request puts the commands step 3 used into `docs/release.md`.
 - Copilot's comment on `1ae141e`: the install step lacked the ask the plan
   requires before changing the user's environment. Real, fixed.
 
-**Not done yet**: the merge, the tag, an install from it, the index pull request
-and the closing pull request. The user's direct install is now `v0.1.0` from
-this branch, reinstalled for the review.
+**Step 2**, authorized after #50 merged as `5f63241`: the eighteen suites,
+`collectInstructionFiles`, the control-byte check and `git diff --check` passed
+there, as did CI. Annotated `v0.1.0` (`a63fe12`) peels to `5f63241`.
+
+**Step 3**, agreed: `copilot plugin install --help` names no ref syntax, so a
+detached worktree of the tag was installed by path. `copilot plugin list` showed
+`v0.1.0`, `diff -rq` matched the tag, and `smoke-runtime.mjs --targets` exited 0
+with 81 passes and the extension running.
+
+**Step 4**, authorized: xpepper/copilot-plugins#1, the index's first pull
+request, added the entry and its README row; merged as `642dde5`.
+
+**Step 5**: the merged manifest reads `0.1.0` and `v0.1.0`. Agreed: the catalog
+was updated, the direct install removed, and the marketplace install listed
+`v0.1.0`, matched `git archive v0.1.0`, and passed the same probe.
+
+**Not done or not shown**: no GitHub Release was authorized; `copilot plugin
+update` was not run; the ref pin is not shown honored, since the tag and `main`
+hold one tree. Sibling drift stays open in xpepper/pr-review-gemini#58 and
+xpepper/pr-review-glm#45.
 
 ## v1 is complete, and seven increments are scheduled on top of it
 
