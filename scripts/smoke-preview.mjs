@@ -177,6 +177,17 @@ assert.match(summaryBody({ mode: "deep", head: "a".repeat(40), complete: false, 
 assert.match(summaryBody({ mode: "quick", head: "a".repeat(40), complete: false, diagnostics: [],
   findings: [{ severity: "P1", title: "Only", path: "y.js", startLine: 1, endLine: 1 }] }),
 /\n\nCoverage was partial\. Finding nothing elsewhere does not mean nothing is there\.\n\n.*coverage=incomplete -->$/);
+// #55's review: a path is pull-request-controlled, and a backtick in it must not
+// close the location's code span, where `<!--` would open a comment hiding the
+// coverage sentence. The span's delimiter outruns any backtick run in the path,
+// and a line break cannot end the finding's line.
+{
+  const location = (path) => summaryBody({ mode: "quick", head: "a".repeat(40), complete: false, diagnostics: [],
+    findings: [{ severity: "P1", title: "Only", path, startLine: 3, endLine: 3 }] }).split("\n")[2];
+  assert.equal(location("dir/report`<!--.js"), "- P1 · Only · ``report`<!--.js:3``");
+  assert.equal(location("``x.js"), "- P1 · Only · ``` ``x.js:3 ```");
+  assert.equal(location("a\n\n<!--b.js"), "- P1 · Only · `a <!--b.js:3`");
+}
 // P6, at the user's decision: a confined run still says on GitHub that it does
 // not cover the whole pull request, as I1b promised, and nothing else of its
 // caveat. Only the caveat incremental.mjs builds carries it, not one quoting it.

@@ -49,13 +49,25 @@ function coverageSentence(complete, diagnostics) {
 
 const basename = (path) => path.slice(path.lastIndexOf("/") + 1);
 
+// A path is pull-request-controlled, as #55's review found. Inside a code span
+// nothing is Markdown or HTML, so the delimiter outruns every backtick run in
+// the text, and a text that starts or ends with a backtick is padded.
+function codeSpan(text) {
+  const fence = "`".repeat(Math.max(0, ...(text.match(/`+/g) ?? []).map((run) => run.length)) + 1);
+  const pad = /^`|`$/.test(text) ? " " : "";
+  return `${fence}${pad}${text}${pad}${fence}`;
+}
+
 // Each finding is { severity, title, path, startLine, endLine }, in canonical
 // order, with the path its inline comment is anchored on.
 export function summaryBody({ mode: id, head, complete, diagnostics, findings }) {
   const mode = modes.find((entry) => entry.id === id);
   // A basename unless two different paths in this summary share it.
   const sharing = new Map();
-  for (const { path } of findings) sharing.set(basename(path), new Set([...(sharing.get(basename(path)) ?? []), path]));
+  for (const { path } of findings) {
+    if (!sharing.has(basename(path))) sharing.set(basename(path), new Set());
+    sharing.get(basename(path)).add(path);
+  }
   const shown = (path) => (sharing.get(basename(path)).size > 1 ? path : basename(path));
   const severities = mode.policy.severities
     .map((severity) => [severity, findings.filter((finding) => finding.severity === severity).length])
@@ -64,7 +76,7 @@ export function summaryBody({ mode: id, head, complete, diagnostics, findings })
   // HTML comment that would hide the coverage sentence below it.
   const line = ({ severity, title, path, startLine, endLine }) =>
     `- ${severity} · ${title.replace(/\s+/g, " ").trim().replaceAll("<", "&lt;")} · ` +
-    `\`${shown(path)}:${startLine}${endLine === startLine ? "" : `-${endLine}`}\``;
+    codeSpan(`${shown(path).replace(/[\r\n]+/g, " ")}:${startLine}${endLine === startLine ? "" : `-${endLine}`}`);
   return [
     `**${mode.label}: ${counted(findings.length, "finding", "findings")} (${severities.join(", ")})** ` +
       `at \`${head.slice(0, 7)}\``,
