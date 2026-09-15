@@ -72,6 +72,10 @@ const finding = {
   assert.equal(parsed?.title, "Restore multiplication now");
   assert.equal(parsed.introduction, "the changed line replaced * with +");
   assert.equal(commentBody(parsed), body, "The folded body rebuilds itself");
+  // #56's overview: a title holding `**` still ends at its own line.
+  for (const title of ["a**", "**a**", "x ** y", "*", "a **b** c**"]) {
+    assert.equal(parseCommentFinding(commentBody({ ...fixed, title }))?.title, title, title);
+  }
   console.log("PASS P7 an inline comment leads with the problem and the fix, and footers introduction, confidence and reporter");
 }
 

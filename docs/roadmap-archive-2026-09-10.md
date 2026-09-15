@@ -10198,6 +10198,81 @@ installed copy differs from the checkout.
 
 `P6`, after #54 merges; archive this entry first if the next one does not fit.
 
+## `P6`: the published body is a short summary, complete
+
+**Built on `p6/published-summary`, pull request #55**, after #54 merged; the
+decision and its worked example are in
+[docs/published-review-feedback-plan.md](docs/published-review-feedback-plan.md).
+
+### What was built
+
+- New `summary.mjs` builds the body: `**Balanced review: 4 findings (4 × P2)**
+  at` a short head, one `- P2 · title · file:line` line per finding, one coverage
+  sentence ending `Finding nothing elsewhere does not mean nothing is there.`, and
+  `<!-- copilot-pr-review: mode=… findings=N coverage=… -->` as the last line. It
+  imports only `coverage.mjs` and `modes.mjs`: `preview.mjs` importing `prior.mjs`
+  or `incremental.mjs` would close a cycle through `target.mjs`.
+- `reviewRequest` publishes it; `formatCoverage` stays the terminal, confirmation
+  and retained presentation. `toolReviewBody` takes the marker, else the old three
+  phrases.
+- **Settled with the user while building**: a confined `--incremental` run still
+  says on GitHub it does not cover the whole pull request, as `I1b` promised,
+  detected by the caveat's shared prefix since retention keeps no confinement; an
+  execution failure is uncounted, gaps are counted after consolidation; a
+  location is a basename unless two paths in the summary share it.
+- A title folds whitespace and escapes `<`; a path sits in a code span whose
+  delimiter outruns its backticks. Neither can hide the coverage sentence.
+- **A proposal retained before `P6`**: `executeRetainedReview` reads the record
+  before its uncertain-journal check and an invalid record throws, so the old body
+  would have refused every later review in that session.
+  `matchesRetainedProposal` accepts a proposal differing only by that exact body;
+  publish-later posts the rebuilt, marked summary.
+
+### Evidence
+
+- **Test first**: `smoke-prior` failed on the marker, `smoke-preview` on the
+  missing builder, the confined sentence and the path's code span.
+- Pinned: the body per kind (caveat, gap, failure, discarded, mixed, legacy),
+  severity rank, a basename collision, a folded and escaped title, hostile paths,
+  an unexplained incomplete run, the confined sentence and a caveat merely quoting
+  it, refused marker variants, a pre-`P6` proposal loading and altered ones
+  refused, and publish-later posting the marked body for results retained before.
+- All eighteen suites, `git diff --check`, the control-byte check and
+  `collectInstructionFiles` (six read, none skipped) pass.
+
+### The installed-plugin review
+
+One run, at the standing authorization and with the user's agreement to swap
+installs: the marketplace copy was uninstalled, the checkout installed, `diff -rq
+--exclude=.git` printed nothing, and it ran at `9888350`. Balanced,
+`gpt-5.6-terra` high for the four specialists and the adjudicator, `gpt-5.6-luna`
+high for overview, default window. **191.475878 credits, 27 requests, 147.3 s
+elapsed.** All six passes completed; INCOMPLETE on 2 discarded candidates and 2
+coverage gaps, with 2 validated findings. The live payload carried the new body,
+`**Balanced review: 2 findings (1 × P2, 1 × P3)** at 9888350`, and the terminal
+printed `Discarded candidate:` live, which `Q8`'s run never showed.
+
+- Correctness' P2, a backtick in a path closing the location's code span so
+  `<!--` hides the coverage sentence: real, fixed test first in `bb25dac`.
+- Performance's P3, the basename map copying a Set per finding: real if trivial,
+  fixed in `bb25dac`.
+- Both discarded candidates were that P2 again, read from the log: `security:1`
+  (Markdown links from a path; an 8-line quote for a 7-line range) and
+  `overview:1` (a location quote missing one backtick). Nothing unjudged was lost.
+- Both gaps: the marker has had no live GitHub round trip. True; nothing was
+  published, so that stays undemonstrated.
+
+The marketplace install was restored, identical to `git archive v0.1.0`. The
+fixes were not re-reviewed.
+
+**Recorded, not scheduled**: `Q8` changed `formatCoverage`'s counts line, so a
+proposal retained before `Q8` appears not to load, refusing later reviews in its
+session; inferred from the code, not reproduced.
+
+### The exact next step
+
+`P7`, after #55 merges; archive this entry first if the next one does not fit.
+
 ## Every completed increment, `F1` through `S1`, is archived
 
 Fifty-nine sections were here and fifteen increments, the backlog triage, the

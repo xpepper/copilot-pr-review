@@ -22,7 +22,7 @@ immediately after `B1`. **`T1`, `B1`, `X1`, `W1`, `N1`, `H1` and `K1` are
 complete and archived.** On 2026-09-14, outside that backlog, the user
 scheduled `S1`, now complete and archived. On 2026-09-15 the user scheduled five
 more from the first review published on somebody else's pull request: `Q8`,
-`P6`, `P7`, `Q9` and `O2`, in that order; `Q8` and `P6` are complete and the other three are the `Pending` rows below.
+`P6`, `P7`, `Q9` and `O2`, in that order; `Q8`, `P6` and `P7` are complete and the other two are the `Pending` rows below.
 The closing section records what was decided, and what stays open as a
 limitation rather than as work.
 
@@ -93,13 +93,13 @@ posting them.
 | S1 | Completed | Cut `v0.1.0` and list it, in one session: a pull request bumps `plugin.json` to `0.1.0`, the merge commit is tagged `v0.1.0`, an install from that tag is shown to load, and a `copilot-pr-review` entry pinned to that tag reaches `xpepper/copilot-plugins` through a pull request the user merges. Every tag, release and write to the index needs the user's explicit authorization in that session. Planned in `docs/release-and-marketplace-plan.md`, which records the seven decisions the user took on 2026-09-14 and the acceptance criteria. Pull request #50, reviewed once: balanced, 34.887503 credits, 1 validated finding, fixed. Listed by xpepper/copilot-plugins#1; the marketplace install is `0.1.0` and loads. | K1; outside the backlog, at the user's request; no scope clause |
 | Q8 | Completed | A candidate discarded at the evidence boundary is its own diagnostic kind, `discarded-candidate`, still counting against completeness, not an execution failure; its message names the failing field and which citation check failed. `C5` eligibility unchanged. Pull request #54, reviewed twice with the user's authorization, the second run on the branch install. | S1; [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | P6 | Completed | The published body is a short Markdown summary: severity counts and head, one line per finding, one plain coverage sentence chosen by kind, a hidden marker; no caveats or internal errors, but a confined run still says it covers less. `prior.mjs` accepts the marker or the old phrases. Pull request #55, one plugin review on the branch install. | Q8; [Publication](SCOPE.md#selection-publication-and-cached-results) |
-| P7 | Pending | Each inline comment leads with the problem and a prominent fix, keeps every field, and footers introduction, confidence and reporter; `I1c` parses old and new templates byte for byte. | P6; [Publication](SCOPE.md#selection-publication-and-cached-results) |
+| P7 | Completed | Each inline comment leads with the problem and a prominent fix, keeps every field, and footers introduction, confidence and reporter; `I1c` parses old and new templates byte for byte, and a proposal retained before `P7` still loads. Pull request #56, one plugin review on the branch install. | P6; [Publication](SCOPE.md#selection-publication-and-cached-results) |
 | Q9 | Pending | With an exact location citation, a failing supporting citation is dropped instead of the candidate and the adjudicator is told; a rule citation `H1` requires never is. | Q8; [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | O2 | Pending | `--quiet` replaces static configuration policy, the capture-only sentence inside a review, and an authorized run's payload JSON with run-specific lines; every model, effort, window, fallback, coverage and publication line stays. | Q9; [Models/execution](SCOPE.md#models-configuration-and-execution) |
 
-## Every completed increment, `F1` through `Q8`, is archived
+## Every completed increment, `F1` through `P6`, is archived
 
-Every completed increment entry, `F1` through `Q8`, and the working record kept
+Every completed increment entry, `F1` through `P6`, and the working record kept
 between them are in
 [docs/roadmap-archive-2026-09-10.md](docs/roadmap-archive-2026-09-10.md),
 verbatim, as the evidence of record. Read it for the evidence behind an older
@@ -108,85 +108,74 @@ section's own record of the seventeen earlier moves there too**, verbatim, as
 that file's last section, because 870 bytes were spare here and no live entry
 was left to archive; the user chose that move on 2026-09-15. **`P6` moved
 `Q8`'s 4105 bytes** verbatim, just before that section, because `P6`'s entry did
-not fit beside it. The rule stands:
+not fit beside it, and **`P7` moved `P6`'s 4273 bytes** the same way. The rule stands:
 keep the most recent entries live, archive the rest verbatim, and measure this
 file with `wc -c` against the 65536-byte cap before opening a pull request.
 [docs/upstream-licensing.md](docs/upstream-licensing.md) did not move.
 
-## `P6`: the published body is a short summary, complete
+## `P7`: each inline comment leads with the problem and the fix, complete
 
-**Built on `p6/published-summary`, pull request #55**, after #54 merged; the
+**Built on `p7/inline-comment-layout`, pull request #56**, after #55 merged; the
 decision and its worked example are in
 [docs/published-review-feedback-plan.md](docs/published-review-feedback-plan.md).
 
 ### What was built
 
-- New `summary.mjs` builds the body: `**Balanced review: 4 findings (4 × P2)**
-  at` a short head, one `- P2 · title · file:line` line per finding, one coverage
-  sentence ending `Finding nothing elsewhere does not mean nothing is there.`, and
-  `<!-- copilot-pr-review: mode=… findings=N coverage=… -->` as the last line. It
-  imports only `coverage.mjs` and `modes.mjs`: `preview.mjs` importing `prior.mjs`
-  or `incremental.mjs` would close a cycle through `target.mjs`.
-- `reviewRequest` publishes it; `formatCoverage` stays the terminal, confirmation
-  and retained presentation. `toolReviewBody` takes the marker, else the old three
-  phrases.
-- **Settled with the user while building**: a confined `--incremental` run still
-  says on GitHub it does not cover the whole pull request, as `I1b` promised,
-  detected by the caveat's shared prefix since retention keeps no confinement; an
-  execution failure is uncounted, gaps are counted after consolidation; a
-  location is a basename unless two paths in the summary share it.
-- A title folds whitespace and escapes `<`; a path sits in a code span whose
-  delimiter outruns its backticks. Neither can hide the coverage sentence.
-- **A proposal retained before `P6`**: `executeRetainedReview` reads the record
-  before its uncertain-journal check and an invalid record throws, so the old body
-  would have refused every later review in that session.
-  `matchesRetainedProposal` accepts a proposal differing only by that exact body;
-  publish-later posts the rebuilt, marked summary.
+- `commentBody` writes `**[P2] title**`, the actual behaviour, `**When:**` and
+  `**Expected:**` on adjacent lines, `**Fix:**`, then `<sub>Introduced by this
+  diff: … · Confidence 0.9 · security reviewer</sub>`. No field is dropped.
+- **Settled while building**: title and introduction fold their whitespace,
+  each rendering on one line; several reporters read `correctness, contracts
+  reviewers`.
+- `commentBodyBeforeP7` keeps the old template. `parseCommentFinding` tries
+  both, each with its own rebuild and ambiguity rule; the new footer's
+  ` · Confidence ` is counted on the footer line only.
+- **A proposal retained before `P7`**: `matchesRetainedProposal` accepts exactly
+  the current request, pre-`P7` comments beside the summary, or beside the
+  pre-`P6` body; publish-later posts the rebuilt comments.
 
 ### Evidence
 
-- **Test first**: `smoke-prior` failed on the marker, `smoke-preview` on the
-  missing builder, the confined sentence and the path's code span.
-- Pinned: the body per kind (caveat, gap, failure, discarded, mixed, legacy),
-  severity rank, a basename collision, a folded and escaped title, hostile paths,
-  an unexplained incomplete run, the confined sentence and a caveat merely quoting
-  it, refused marker variants, a pre-`P6` proposal loading and altered ones
-  refused, and publish-later posting the marked body for results retained before.
+- **Test first**: `smoke-revalidation` failed on the missing old writer,
+  `smoke-preview` on the new layout.
+- Pinned: the exact body, folding and reporter number; literal pre-`P7` bodies
+  with and without `Fix:` reading back to the new layout's fields; refusals for
+  both templates; new-layout ambiguity (disabling the footer guard in a scratch
+  copy fails the test); a pre-`P7` proposal loading and altered ones refused;
+  publish-later of pre-`P6` and pre-`P7` results posting the rebuilt comments.
 - All eighteen suites, `git diff --check`, the control-byte check and
   `collectInstructionFiles` (six read, none skipped) pass.
 
 ### The installed-plugin review
 
 One run, at the standing authorization and with the user's agreement to swap
-installs: the marketplace copy was uninstalled, the checkout installed, `diff -rq
---exclude=.git` printed nothing, and it ran at `9888350`. Balanced,
-`gpt-5.6-terra` high for the four specialists and the adjudicator, `gpt-5.6-luna`
-high for overview, default window. **191.475878 credits, 27 requests, 147.3 s
-elapsed.** All six passes completed; INCOMPLETE on 2 discarded candidates and 2
-coverage gaps, with 2 validated findings. The live payload carried the new body,
-`**Balanced review: 2 findings (1 × P2, 1 × P3)** at 9888350`, and the terminal
-printed `Discarded candidate:` live, which `Q8`'s run never showed.
+installs: the checkout replaced the marketplace copy, `diff -rq --exclude=.git`
+printed nothing, and it ran at `b9478db`. Balanced, `gpt-5.6-terra` high for the
+four specialists, `gpt-5.6-luna` high for overview, default window; no
+adjudicator ran, as no candidate survived. **125.319325 credits, 22 requests,
+121.6 s elapsed.** INCOMPLETE, 0 validated: 1 execution failure, 1 discarded
+candidate, 2 gaps, 1 caveat.
 
-- Correctness' P2, a backtick in a path closing the location's code span so
-  `<!--` hides the coverage sentence: real, fixed test first in `bb25dac`.
-- Performance's P3, the basename map copying a Set per finding: real if trivial,
-  fixed in `bb25dac`.
-- Both discarded candidates were that P2 again, read from the log: `security:1`
-  (Markdown links from a path; an 8-line quote for a 7-line range) and
-  `overview:1` (a location quote missing one backtick). Nothing unjudged was lost.
-- Both gaps: the marker has had no live GitHub round trip. True; nothing was
-  published, so that stays undemonstrated.
+- Overview's JSON did not parse (an unescaped quote at position 2832). Its one
+  candidate, read from its local log, said a title holding `**` becomes
+  unreadable: rejected, as the lazy title capture backtracks; nine such titles
+  read back exactly, and five are now pinned in `smoke-revalidation`.
+- Contracts' P2, discarded for an 11-line quote on a 10-line range, #65's shape:
+  an introduction holding ` · Confidence ` makes an emitted body unreadable.
+  True and deliberate, so rejected: those bytes admit a second split that
+  misreads the reporters, the suite pins it, and the parser's contract is exact
+  or unreadable, as the old template refuses a field opening `Confidence: `.
+- Both gaps asked whether model prose carrying HTML can break the `<sub>`
+  footer. Not settled; **recorded, not scheduled**: a field holding `<!--` or
+  `</sub>` can hide or unwrap the rest of a comment, as `<!--` already could in
+  every published field before `P7`.
 
-The marketplace install was restored, identical to `git archive v0.1.0`. The
-fixes were not re-reviewed.
-
-**Recorded, not scheduled**: `Q8` changed `formatCoverage`'s counts line, so a
-proposal retained before `Q8` appears not to load, refusing later reviews in its
-session; inferred from the code, not reproduced.
+The marketplace install was restored, identical to `git archive v0.1.0`. Nothing
+was published, so the layout has had no live GitHub round trip.
 
 ### The exact next step
 
-`P7`, after #55 merges; archive this entry first if the next one does not fit.
+`Q9`, after #56 merges; archive this entry first if the next one does not fit.
 
 ## v1 is complete, and five more increments are scheduled on top of it
 

@@ -9,72 +9,71 @@ declaration. Keep what you demonstrate apart from what you assume.
 
 ## Where things stand
 
-`P6` is built on branch `p6/published-summary`, pull request #55: the published
-review body is a short Markdown summary built by `extensions/pr-review/summary.mjs`
-and ending in a hidden marker, and `prior.mjs` recognises the marker or the old
-three phrases. `ROADMAP.md`'s `P6` entry has the evidence, the three details the
-user settled while building, and the plugin review. **Check whether #55 has
-merged** (`gh pr list --state all --head p6/published-summary`). If it has not,
-stop and ask the user. Open pull requests #1 and #2 remain the synthetic "do not
-merge" playgrounds; leave them alone.
+`P7` is built on branch `p7/inline-comment-layout`, pull request #56: each inline
+comment is `**[P2] title**`, the actual behaviour, `**When:**`/`**Expected:**`,
+`**Fix:**`, and a `<sub>` footer with introduction, confidence and reporter.
+`commentBodyBeforeP7` keeps the old template; `parseCommentFinding` reads both,
+and `matchesRetainedProposal` still loads a proposal retained before `P7`.
+`ROADMAP.md`'s `P7` entry has the evidence and the review. **Check whether #56 has
+merged** (`gh pr list --state all --head p7/inline-comment-layout`). If it has
+not, stop and ask the user. Open pull requests #1 and #2 remain the synthetic
+"do not merge" playgrounds; leave them alone.
 
-#55 was reviewed once, at the standing authorization, on a direct install of the
-branch that `diff -rq` showed identical to the checkout: 191.475878 credits, two
-validated findings (a backtick in a path breaking the location's code span, a
-Set copied per finding), both fixed test first in `bb25dac`; its two discarded
-candidates were the same path defect. The fixes were not re-reviewed. The user's
-marketplace install was restored, identical to `git archive v0.1.0`. Nothing was
-posted, so the marker has had no live GitHub round trip.
+#56 was reviewed once, at the standing authorization, on a direct install of the
+branch that `diff -rq` showed identical to the checkout: 125.319325 credits, 0
+validated, INCOMPLETE. Overview's JSON did not parse; its one candidate (a `**`
+title unreadable) was disproved by running the parser, and pinned. Contracts' P2
+(an introduction holding ` · Confidence ` is unreadable) was **discarded for an
+11-line quote on a 10-line `evidence[1]` range, exactly what `Q9` recovers**, and
+rejected as deliberate. The marketplace install was restored, identical to
+`git archive v0.1.0`. Nothing was posted.
 
-## This session's task: `P7`, and nothing after it
+## This session's task: `Q9`, and nothing after it
 
-Each inline comment leads with the problem and a prominent fix, keeps every
-field, and puts introduction, confidence and reporter in a small footer, as
-decided in the plan's `P7` section, with its worked example. Acceptance criteria:
+Decided in the plan's `Q9` section, with #65's three discarded candidates as the
+evidence. Acceptance criteria:
 
-- Order: title, actual, when, expected, fix, footer (introduction, confidence,
-  reporter). The footer carries the full introduction text, not an excerpt. No
-  field is dropped, so `SCOPE.md`'s "preserve severity, location, confidence"
-  holds with no scope change.
-- `commentBody` (`preview.mjs`) writes the new template. `I1c`'s parser
-  (`revalidation.mjs`) accepts both the old template and the new one, each held to
-  its own byte-for-byte rebuild; the old template stays for the round-trip,
-  including a body published before `W1` with no `Fix:`.
-- A comment published before `P7` stays readable by revalidation. Test both
-  templates, the old one with and without `Fix:`.
-- A proposal retained before `P7` carries old comment bodies. An invalid record
-  refuses every later review in its session (`executeRetainedReview` reads it
-  first), so it must still load, as `P6`'s `matchesRetainedProposal` does for the
-  summary body, or be refused cleanly; test it.
-- `P6`'s summary is unchanged; do not revisit its wording or marker.
-- Test first. One plugin review of the pull request at the standing
-  authorization; record it in `ROADMAP.md` as every increment does.
+- When a candidate's **location** citation passes, a **supporting** citation
+  (`breaks`, `before`, `after` where it differs from the location, `evidence`
+  entries) that fails the exact-quote check is dropped, and the candidate goes
+  on to adjudication. A failing location still discards the candidate, and so
+  does a failing `H1` rule citation: it is never a droppable supporting citation.
+- The adjudicator is told which supporting citation was dropped and why, and can
+  still reject a finding that no longer stands.
+- Code never forwards or rewrites an inexact quote; every remaining citation
+  passes the same bound, in-window, exact-quote checks. Whitespace is never
+  normalised; `Q5` and `Q6` are built on, not reopened.
+- The terminal reports each dropped citation, naming which of `Q8`'s three causes
+  applied. **How a dropped citation counts in coverage is to be settled with the
+  user while building**: put it to them as one decision with a recommendation.
+- Fixtures shaped like #65's three (a range one line short, one line missing
+  from the middle of a quote, an extra leading space on every line) all reach
+  adjudication; test first. One plugin review of the pull request; record it.
 
 ### Caveats that are easy to miss
 
 - **The review runs the installed plugin, and `dogfood-review.mjs` only checks
-  that some copy is running.** Before the review, and with the user's agreement
-  because it changes their environment: `copilot plugin uninstall
-  copilot-pr-review`, `copilot plugin install "$(pwd)"`, then `diff -rq
+  that some copy is running.** With the user's agreement: `copilot plugin
+  uninstall copilot-pr-review`, `copilot plugin install "$(pwd)"`, then `diff -rq
   --exclude=.git ~/.copilot/installed-plugins/_direct/pr-review .` must print
-  nothing. Afterwards restore with `copilot plugin uninstall copilot-pr-review`
-  and `copilot plugin install copilot-pr-review@xpepper-copilot-plugins`. Do not
-  edit repository files while the review runs; the reviewers read the checkout.
-- **Sizes**: `README.md` is at 65220 bytes, 316 spare, and documents the
-  published body and inline comments; `ROADMAP.md` is at 63922 bytes, so archive
-  `P6`'s entry verbatim, just before the archive's last section as `P6` did
-  `Q8`'s, before writing `P7`'s. Measure both with `wc -c` before every commit
-  against the 65536-byte cap; never condense archived history.
+  nothing. Afterwards `copilot plugin uninstall copilot-pr-review` and `copilot
+  plugin install copilot-pr-review@xpepper-copilot-plugins`, and compare with
+  `git archive v0.1.0`. Do not edit repository files while the review runs. An
+  unparsed reviewer's candidates can be read free from its `events.jsonl` under
+  `~/.copilot/session-state/`.
+- **Sizes**: `README.md` is at 65285 bytes, 251 spare; `ROADMAP.md` at 63324, so
+  archive `P7`'s entry verbatim, just before the archive's last section as `P7`
+  did `P6`'s (check with `cmp`), before writing `Q9`'s. Measure both with `wc -c`
+  before every commit against the 65536-byte cap; never condense archived history.
+- **Recorded, not scheduled** by `P7`: model prose holding `<!--` or `</sub>` can
+  hide or unwrap the rest of an inline comment. Do not fix it inside `Q9`.
 - **Import cycles**: `preview.mjs` must not import `prior.mjs` or
-  `incremental.mjs` (a cycle through `target.mjs` and `revalidation.mjs`, which
-  imports `commentBody`). Shared text goes in a module with no such imports, as
-  `summary.mjs` does.
-- **`Q9` never drops a rule citation** that `H1` requires, and **`O2` reopens
-  `O1` only as far as the plan records.** Do not start either early.
+  `incremental.mjs`. **`O2` reopens `O1` only as far as the plan records**; do
+  not start it early.
 - **Releasing follows `docs/release.md`**; every tag, release and index change
   needs the user's authorization in that session.
-- In zsh, a bare `====` argument is expanded and aborts a chained command; quote
-  separators.
+- In zsh, a bare `====` argument is expanded and aborts a chained command, and
+  an unquoted `--include=*.mjs` glob aborts `grep`; quote both.
 
 ## Validation
 
