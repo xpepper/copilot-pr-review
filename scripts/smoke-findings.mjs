@@ -841,6 +841,8 @@ for (const candidates of [
   const refused = collectCandidates([reviewer([], { result: raw })], boundary, policy);
   assert.equal(refused.candidates.length, candidates.length > 1 ? 1 : 0,
     "A usable sibling in the same envelope is still collected");
+  assert(refused.diagnostics.every((entry) => entry.kind === "discarded-candidate"),
+    "Q8: each refusal is a discarded candidate, not an execution failure");
 }
 // The adjudicator holds the same contract, on its own field.
 const verifyDecisions = envelopeVerifier(key, "decisions");
@@ -994,9 +996,9 @@ for (const candidates of [[{ ...breaker, breaks: null }], [(() => {
 for (const [invalid, expected] of [
   [{ ...at("breakage.js", "head", 9), path: "../breakage.js" }, /outside bound source provenance/],
   [{ ...at("breakage.js", "head", 9), path: "shipping.js" }, /outside bound source provenance/],
-  [{ ...at("breakage.js", "head", 9), startLine: 40, endLine: 40 }, /does not exactly match a supplied context window/],
-  [{ ...at("breakage.js", "head", 9), quote: "  return qualifies(subtotal) ? 0 : 501;" }, /does not exactly match/],
-  [{ ...at("breakage.js", "head", 9), quote: "  return  qualifies(subtotal) ? 0 : 500;" }, /does not exactly match/],
+  [{ ...at("breakage.js", "head", 9), startLine: 40, endLine: 40 }, /outside every supplied context window/],
+  [{ ...at("breakage.js", "head", 9), quote: "  return qualifies(subtotal) ? 0 : 501;" }, /Citation quote does not match/],
+  [{ ...at("breakage.js", "head", 9), quote: "  return  qualifies(subtotal) ? 0 : 500;" }, /Citation quote does not match/],
   [{ ...at("breakage.js", "head", 9), ref: breakageBinding.head }, /Citation: expected exactly/],
   [{ path: "breakage.js", side: "head", startLine: 9, endLine: 9 }, /Citation: expected exactly/],
   ["breakage.js:9", /Citation: expected exactly/],
@@ -1006,7 +1008,41 @@ for (const [invalid, expected] of [
     breakageBoundary, policy);
   assert.equal(refused.candidates.length, 0, `Refuse a broken-code citation: ${JSON.stringify(invalid).slice(0, 60)}`);
   assert.match(refused.diagnostics[0].message, expected);
+  assert.equal(refused.diagnostics[0].kind, "discarded-candidate");
 }
+
+// Q8: a candidate refused at the evidence boundary was never judged. That is not
+// an execution failure, because its reviewer ran, and it still blocks completed
+// coverage, because a possibly real issue went unchecked. The message names the
+// citation and which of the three checks it failed; the second case is
+// #65's contracts:1 in shape, a range one line shorter than its quote.
+for (const [evidence, reason] of [
+  [{ ...at("breakage.js", "head", 9), startLine: 40, endLine: 40 },
+    "Citation breakage.js head line 40 is outside every supplied context window."],
+  [{ ...at("breakage.js", "head", 4, 5), quote: at("breakage.js", "head", 4, 6).quote },
+    "Citation quote does not match breakage.js head lines 4-5: the range names 2 line(s) and the quote has 3."],
+  [{ ...at("breakage.js", "head", 3, 4), quote: "\nexport function qualifies(subtotal)" },
+    "Citation quote is a clipped part of breakage.js head lines 3-4 whose first or last line is blank, " +
+    "so it cannot be repaired."],
+]) {
+  const candidates = [{ ...breaker, evidence: [evidence] }];
+  const raw = JSON.stringify({ schemaVersion: 2, reviewKey: reviewKey(breakageBinding), candidates, limitations: [] });
+  assert.doesNotThrow(() => envelopeVerifier(reviewKey(breakageBinding), "candidates")(raw),
+    "C5: a discarded candidate inside a valid envelope never makes the attempt eligible for a fallback");
+  const refused = collectCandidates([breakageReviewer(candidates)], breakageBoundary, policy);
+  const message = `correctness:1: rejected at evidence boundary: evidence[0]: ${reason}`;
+  assert.deepEqual(refused.diagnostics, [{ kind: "discarded-candidate", message }]);
+  assert.deepEqual(refused.issues, [message], "A discarded candidate still blocks completed coverage");
+  assert.equal(formatCoverage({ validation: refused, complete: false }), [
+    "Review coverage: INCOMPLETE.",
+    "Execution failures: 0; discarded candidates: 1; coverage gaps: 0; informational caveats: 0.",
+    `Discarded candidate: ${message}`,
+  ].join("\n"));
+}
+// Publication and adjudication re-cite through the strict path, which names the
+// same cause.
+assert.throws(() => breakageBoundary.cite({ ...at("breakage.js", "head", 9), quote: "  return qualifies(subtotal) ? 0 : 501;" }),
+  { message: "Citation quote does not match breakage.js head line 9: the range names 1 line(s) and the quote has 1." });
 
 // Reconstructed rejection, pull requests #4 and #10: the introduction citations
 // named one changed hunk while the location named another. That refusal is
@@ -1105,7 +1141,7 @@ for (const field of ["location", "before", "after", "breaks", "evidence"]) {
     const supplied = { ...original, quote: clip(original.quote) };
     if (field === "evidence") entry.evidence[0] = supplied;
     else entry[field] = supplied;
-    assert.throws(() => breakageBoundary.cite(supplied), /does not exactly match/,
+    assert.throws(() => breakageBoundary.cite(supplied), /Citation quote does not match/,
       "The exact citation API must still refuse clipped text");
     const repaired = adjudicateBreakage([entry]);
     assert.equal(repaired.gathered.candidates.length, 1, `Repair either end of ${field}`);
@@ -1197,7 +1233,7 @@ for (const fixture of q6CitationCases) {
   }], bound, reviewModes.balanced.policy);
   if (fixture.repairedFields === null) {
     assert.equal(gathered.candidates.length, 0, "PR #4's inserted-space fabrication never reaches adjudication");
-    assert.match(gathered.issues[0], /does not exactly match/);
+    assert.match(gathered.issues[0], /Citation quote does not match/);
     continue;
   }
   assert.equal(gathered.candidates.length, 1, `PR #${fixture.pr}'s true finding reaches adjudication`);

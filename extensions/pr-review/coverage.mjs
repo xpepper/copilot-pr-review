@@ -1,4 +1,8 @@
-export const diagnosticKinds = ["execution-failure", "coverage-gap", "caveat"];
+// Q8: a candidate refused at the evidence boundary was never judged. Its
+// reviewer ran, so that is not an execution failure, and a possibly real issue
+// went unchecked, so it still blocks completed coverage like every kind but a
+// caveat.
+export const diagnosticKinds = ["execution-failure", "discarded-candidate", "coverage-gap", "caveat"];
 
 export const blockingIssues = (diagnostics) =>
   diagnostics.filter((entry) => entry.kind !== "caveat").map((entry) => entry.message);
@@ -170,6 +174,7 @@ export function presentationDiagnostics(diagnostics) {
 export function formatCoverage(outcome) {
   const labels = {
     "execution-failure": "Execution failure",
+    "discarded-candidate": "Discarded candidate",
     "coverage-gap": "Coverage gap",
     caveat: "Informational caveat",
   };
@@ -189,7 +194,8 @@ export function formatCoverage(outcome) {
   }
   return [
     `Review coverage: ${outcome.complete ? "completed" : outcome.coverage === "not-started" ? "not-started" : "INCOMPLETE"}.`,
-    `Execution failures: ${count("execution-failure")}; coverage gaps: ${gapCount}` +
+    `Execution failures: ${count("execution-failure")}; ` +
+      `discarded candidates: ${count("discarded-candidate")}; coverage gaps: ${gapCount}` +
       `${rawGapCount > gapCount ? ` (${rawGapCount} reports)` : ""}; ` +
       `informational caveats: ${count("caveat")}.`,
     ...lines,

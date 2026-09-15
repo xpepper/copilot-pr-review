@@ -227,6 +227,13 @@ export function evidenceBoundary(snapshot, context, binding, standards) {
   }
   const files = parseDiffFiles(snapshot.diff);
   const sources = context.files.flatMap((file) => file.sources);
+  // Q8: each of the three refusals below names itself, so a discarded candidate
+  // says whether its range left the supplied windows, its quote did not match
+  // the range, or a clipped quote could not be repaired.
+  const where = ({ path, side, startLine, endLine }) =>
+    `${path} ${side} ${startLine === endLine ? `line ${startLine}` : `lines ${startLine}-${endLine}`}`;
+  const quoteMismatch = (value) => new Error(`Citation quote does not match ${where(value)}: the range names ` +
+    `${value.endLine - value.startLine + 1} line(s) and the quote has ${value.quote.split("\n").length}.`);
   function boundCitation(value) {
     object(value, ["path", "side", "startLine", "endLine", "quote"], "Citation");
     const { path, side, startLine, endLine, quote } = value;
@@ -242,14 +249,14 @@ export function evidenceBoundary(snapshot, context, binding, standards) {
         source.host !== binding.repository.host) throw new Error("Citation is outside bound source provenance.");
     if (!source.windows.some((window) => startLine >= window.start && endLine <= window.end) ||
         endLine > source.lines.length) {
-      throw new Error("Citation does not exactly match a supplied context window.");
+      throw new Error(`Citation ${where(value)} is outside every supplied context window.`);
     }
     return { ...value, quote: source.lines.slice(startLine - 1, endLine).join("\n"),
       ref: source.ref, blobSha: source.blobSha };
   }
   function cite(value) {
     const bound = boundCitation(value);
-    if (bound.quote !== value.quote) throw new Error("Citation does not exactly match a supplied context window.");
+    if (bound.quote !== value.quote) throw quoteMismatch(value);
     return bound;
   }
   function repairCitation(value, report) {
@@ -258,9 +265,12 @@ export function evidenceBoundary(snapshot, context, binding, standards) {
     const lines = value.quote.split("\n");
     // Preserve the named physical lines: a substring alone could omit the very
     // changed line that authorizes the anchor or establishes a shared cause.
-    if (!bound.quote.includes(value.quote) || lines.length !== value.endLine - value.startLine + 1 ||
-        !lines[0].trim() || !lines.at(-1).trim()) {
-      throw new Error("Citation does not exactly match a supplied context window.");
+    if (!bound.quote.includes(value.quote) || lines.length !== value.endLine - value.startLine + 1) {
+      throw quoteMismatch(value);
+    }
+    if (!lines[0].trim() || !lines.at(-1).trim()) {
+      throw new Error(`Citation quote is a clipped part of ${where(value)} whose first or last line is blank, ` +
+        "so it cannot be repaired.");
     }
     const restored = { ...value, quote: bound.quote };
     const citation = cite(restored);
@@ -341,11 +351,18 @@ function candidate(value, boundary, policy, diagnostics, id, ruleAllowed = false
       value.confidence < minimumConfidence || value.confidence > 1) {
     throw new Error(`Candidate is not a high-confidence ${policy.severities.join("/")} finding.`);
   }
-  const cite = (value, field) => boundary.repairCitation(value, (original, restored) => {
-    diagnostics.push({ kind: "caveat", message:
-      `${id}: repaired clipped-end citation in ${field} from bound source; claims still require adjudication. ` +
-      JSON.stringify({ original, restored }) });
-  });
+  const cite = (value, field) => {
+    try {
+      return boundary.repairCitation(value, (original, restored) => {
+        diagnostics.push({ kind: "caveat", message:
+          `${id}: repaired clipped-end citation in ${field} from bound source; claims still require adjudication. ` +
+          JSON.stringify({ original, restored }) });
+      });
+    } catch (error) {
+      // Q8: which citation failed, since a candidate carries several.
+      throw new Error(`${field}: ${error.message}`);
+    }
+  };
   const location = cite(value.location, "location");
   if (location.endLine - location.startLine > 9) throw new Error("Location must span at most ten lines.");
   const file = boundary.files.find((entry) =>
@@ -445,7 +462,9 @@ export function collectCandidates(reviewers, boundary, policy, confinement) {
         }
         candidates.push(entry);
       } catch (error) {
-        diagnostics.push({ kind: "execution-failure", message: `${id}: rejected at evidence boundary: ${String(error)}` });
+        // Q8: never judged, though its reviewer ran. C5's fallback eligibility is
+        // the envelope alone, so this refusal starts no attempt.
+        diagnostics.push({ kind: "discarded-candidate", message: `${id}: rejected at evidence boundary: ${error.message}` });
       }
     }
   }

@@ -1128,8 +1128,9 @@ for (const failure of ["prose", "wrong-key"]) {
   const adjudicated = JSON.parse(h.sessions.find((s) => s.validating).prompt.split("\n").at(-1));
   assert.deepEqual(adjudicated.candidates.map(({ id }) => id), ["correctness:1"],
     "The valid sibling in the same envelope is kept and adjudicated");
-  assert.equal(report.validation.diagnostics.filter((d) =>
+  assert.equal(report.validation.diagnostics.filter((d) => d.kind === "discarded-candidate" &&
     /correctness:2: rejected at evidence boundary/.test(d.message)).length, 1);
+  assert(h.messages.some((m) => /\nDiscarded candidate: correctness:2: rejected at evidence boundary/.test(m)));
   assert(!report.validation.diagnostics.some((d) => /incomplete specialist execution/.test(d.message)));
 }
 {
@@ -1146,7 +1147,10 @@ for (const failure of ["prose", "wrong-key"]) {
   assert.equal(report.executionComplete, true);
   assert.equal(report.coverage, "incomplete", "The refusals still block completed coverage");
   assert.equal(report.validation.findings.length, 0);
-  assert.equal(report.validation.diagnostics.filter((d) => /rejected at evidence boundary/.test(d.message)).length, 3);
+  assert.equal(report.validation.diagnostics.filter((d) => d.kind === "discarded-candidate" &&
+    /rejected at evidence boundary/.test(d.message)).length, 3);
+  assert(!report.validation.diagnostics.some((d) => d.kind === "execution-failure"),
+    "Q8: every reviewer ran, so nothing here is an execution failure");
   assert(!h.messages.some((m) => /falling back once/.test(m)));
 }
 for (const fallbackFailure of ["run", "setup", "prose"]) {
@@ -2226,7 +2230,7 @@ assert.equal(standardsInput([
     const h = harness({ withCandidate: true, acceptCandidate: true, candidateFrom: [0], ruleFrom: { index: 0, rule } });
     const report = await withStandards({ "AGENTS.md": rules }, ["AGENTS.md"], () => run(h));
     assert.equal(report.validation.findings.length, 0);
-    assert(report.validation.diagnostics.some(({ message }) =>
+    assert(report.validation.diagnostics.some(({ kind, message }) => kind === "discarded-candidate" &&
       /^correctness:1: rejected at evidence boundary: .*not handed the project's standards/.test(message)));
   }
   {
@@ -2240,7 +2244,7 @@ assert.equal(standardsInput([
       !session.prompt.includes("untrustedStandards") && !session.prompt.includes("The exported value stays")));
     assert.match(h.messages.find((message) => message.startsWith("H1 project standards:")), /off for this run \(--no-standards\)/);
     assert.equal(report.validation.findings.length, 0);
-    assert(report.validation.diagnostics.some(({ message }) =>
+    assert(report.validation.diagnostics.some(({ kind, message }) => kind === "discarded-candidate" &&
       /^contracts:1: rejected at evidence boundary: .*not handed the project's standards/.test(message)));
   }
   {
