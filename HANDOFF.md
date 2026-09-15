@@ -9,61 +9,72 @@ declaration. Keep what you demonstrate apart from what you assume.
 
 ## Where things stand
 
-`Q8` is built on branch `q8/discarded-candidate`, pull request #54: a candidate
-refused at the evidence boundary is a `discarded-candidate` diagnostic, still
-blocking completed coverage, and its message names the failing field and which
-of three citation checks failed. `ROADMAP.md`'s `Q8` entry has the evidence and
-the plugin review. **Check whether #54 has merged**
-(`gh pr list --state all --head q8/discarded-candidate`). If it has not, stop
-and ask the user. Open pull requests #1 and #2 remain the synthetic "do not
+`P6` is built on branch `p6/published-summary`, pull request #55: the published
+review body is a short Markdown summary built by `extensions/pr-review/summary.mjs`
+and ending in a hidden marker, and `prior.mjs` recognises the marker or the old
+three phrases. `ROADMAP.md`'s `P6` entry has the evidence, the three details the
+user settled while building, and the plugin review. **Check whether #55 has
+merged** (`gh pr list --state all --head p6/published-summary`). If it has not,
+stop and ask the user. Open pull requests #1 and #2 remain the synthetic "do not
 merge" playgrounds; leave them alone.
 
-#54 was reviewed twice. The first run used the stale marketplace `v0.1.0`
-install, so the user authorized a second run on a direct install of the branch;
-both runs, their costs and every finding kept or rejected are in `Q8`'s entry.
-The user's marketplace install was restored afterwards. Nothing was posted.
+#55 was reviewed once, at the standing authorization, on a direct install of the
+branch that `diff -rq` showed identical to the checkout: 191.475878 credits, two
+validated findings (a backtick in a path breaking the location's code span, a
+Set copied per finding), both fixed test first in `bb25dac`; its two discarded
+candidates were the same path defect. The fixes were not re-reviewed. The user's
+marketplace install was restored, identical to `git archive v0.1.0`. Nothing was
+posted, so the marker has had no live GitHub round trip.
 
-## This session's task: `P6`, and nothing after it
+## This session's task: `P7`, and nothing after it
 
-The published review body becomes a short Markdown summary, as decided in the
-plan's `P6` section, with its worked example. Acceptance criteria:
+Each inline comment leads with the problem and a prominent fix, keeps every
+field, and puts introduction, confidence and reporter in a small footer, as
+decided in the plan's `P7` section, with its worked example. Acceptance criteria:
 
-- Headline: mode, finding count, count per severity, short reviewed head. One
-  line per finding: severity, title, location. One plain-language coverage
-  sentence chosen by diagnostic kind (`execution-failure`, `discarded-candidate`,
-  `coverage-gap`); caveats and internal error text are not published. Partial
-  coverage stays visible, as `SCOPE.md` requires. A hidden marker ends the body.
-- `formatCoverage` stays the terminal and retained-result presentation; only the
-  published body (`preview.mjs` `reviewRequest`) changes.
-- `prior.mjs` recognises a review of ours by the marker **or** by the old three
-  fixed phrases, so reviews already published stay recognisable. Test both.
-- Settle, while building, the two details the plan leaves open: the wording for a
-  real execution failure and for a coverage gap, and basename versus full path
-  when two files share a basename. Ask the user if either is a real choice.
-- `publish-later` rebuilds the same body from a retained result; a result
-  retained before `P6` must still publish or be refused cleanly, never with a
-  body `prior.mjs` cannot recognise.
+- Order: title, actual, when, expected, fix, footer (introduction, confidence,
+  reporter). The footer carries the full introduction text, not an excerpt. No
+  field is dropped, so `SCOPE.md`'s "preserve severity, location, confidence"
+  holds with no scope change.
+- `commentBody` (`preview.mjs`) writes the new template. `I1c`'s parser
+  (`revalidation.mjs`) accepts both the old template and the new one, each held to
+  its own byte-for-byte rebuild; the old template stays for the round-trip,
+  including a body published before `W1` with no `Fix:`.
+- A comment published before `P7` stays readable by revalidation. Test both
+  templates, the old one with and without `Fix:`.
+- A proposal retained before `P7` carries old comment bodies. An invalid record
+  refuses every later review in its session (`executeRetainedReview` reads it
+  first), so it must still load, as `P6`'s `matchesRetainedProposal` does for the
+  summary body, or be refused cleanly; test it.
+- `P6`'s summary is unchanged; do not revisit its wording or marker.
 - Test first. One plugin review of the pull request at the standing
   authorization; record it in `ROADMAP.md` as every increment does.
 
 ### Caveats that are easy to miss
 
 - **The review runs the installed plugin, and `dogfood-review.mjs` only checks
-  that some copy is running.** On #54 the first review ran the marketplace
-  `v0.1.0`, not the branch. Before the review, and with the user's agreement
+  that some copy is running.** Before the review, and with the user's agreement
   because it changes their environment: `copilot plugin uninstall
   copilot-pr-review`, `copilot plugin install "$(pwd)"`, then `diff -rq
   --exclude=.git ~/.copilot/installed-plugins/_direct/pr-review .` must print
   nothing. Afterwards restore with `copilot plugin uninstall copilot-pr-review`
-  and `copilot plugin install copilot-pr-review@xpepper-copilot-plugins`.
-- **Sizes**: `README.md` is at 64960 bytes, 576 spare, and it documents the
-  published body; `ROADMAP.md` is at 63523 bytes, so archive `Q8`'s entry
-  verbatim before writing `P6`'s. Measure both with `wc -c` before every commit; never condense
-  archived history.
+  and `copilot plugin install copilot-pr-review@xpepper-copilot-plugins`. Do not
+  edit repository files while the review runs; the reviewers read the checkout.
+- **Sizes**: `README.md` is at 65220 bytes, 316 spare, and documents the
+  published body and inline comments; `ROADMAP.md` is at 63922 bytes, so archive
+  `P6`'s entry verbatim, just before the archive's last section as `P6` did
+  `Q8`'s, before writing `P7`'s. Measure both with `wc -c` before every commit
+  against the 65536-byte cap; never condense archived history.
+- **Import cycles**: `preview.mjs` must not import `prior.mjs` or
+  `incremental.mjs` (a cycle through `target.mjs` and `revalidation.mjs`, which
+  imports `commentBody`). Shared text goes in a module with no such imports, as
+  `summary.mjs` does.
 - **`Q9` never drops a rule citation** that `H1` requires, and **`O2` reopens
   `O1` only as far as the plan records.** Do not start either early.
 - **Releasing follows `docs/release.md`**; every tag, release and index change
   needs the user's authorization in that session.
+- In zsh, a bare `====` argument is expanded and aborts a chained command; quote
+  separators.
 
 ## Validation
 
