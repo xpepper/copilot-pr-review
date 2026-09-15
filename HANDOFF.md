@@ -1,60 +1,73 @@
 # Next session prompt
 
-Read `CLAUDE.md`, `AGENTS.md`, `SCOPE.md` and `ROADMAP.md`, then inspect git
-state and the open pull requests before editing anything. Scope is
-authoritative; the roadmap records demonstrated evidence and what remains open.
-Do not rely on another conversation, reopen settled product decisions or infer
-behavior from an API declaration. Keep what you demonstrate apart from what you
-assume, in the roadmap and in your final report.
+Read `CLAUDE.md`, `AGENTS.md`, `SCOPE.md` and `ROADMAP.md`, then
+`docs/published-review-feedback-plan.md`, then inspect git state and the open
+pull requests before editing anything. Scope is authoritative; the roadmap
+records demonstrated evidence and what remains open. Do not rely on another
+conversation, reopen settled product decisions or infer behavior from an API
+declaration. Keep what you demonstrate apart from what you assume.
 
 ## Where things stand
 
-`S1` is complete. The previous session merged #50 (`5f63241`, `plugin.json` at
-`0.1.0`), pushed the annotated tag `v0.1.0` on it, and listed the plugin through
-`xpepper/copilot-plugins#1`, merged as `642dde5`. The user's install is now
-`copilot-pr-review@xpepper-copilot-plugins (v0.1.0)`. `ROADMAP.md`'s `S1` entry
-holds the evidence for every step, and for every step not taken.
+The previous session was planning, not a numbered increment. The user used the
+installed plugin on somebody else's pull request for the first time,
+`/pr-review 65 --comment --quiet --long-context` on
+`primait/prima-agent-skills#65`, and found the published review noisy and
+cryptic. Five decisions and the slicing were put to the user one at a time and
+answered. They are recorded, with worked examples, rejected alternatives and
+evidence, in `docs/published-review-feedback-plan.md`, and scheduled as five
+`Pending` rows in `ROADMAP.md`, in this order: **`Q8`, `P6`, `P7`, `Q9`, `O2`**.
+`S1`'s entry was archived verbatim to make room.
 
-The closing pull request, branch `s1/close-v0.1.0`, is documentation only: the
-marketplace install in `README.md`, the demonstrated install commands in
-`docs/release.md`, the `S1` evidence in `ROADMAP.md`, and this file. **Check
-whether it has merged** (`gh pr list --state all --head s1/close-v0.1.0`). If it
-has not, stop and ask the user. Open pull requests #1 and #2 remain the
-synthetic "do not merge" playgrounds; leave them alone. Verify with
-`git status`, `git log --oneline -5` and `gh pr list --state open`.
+That work is on branch `plan/published-review-feedback`, documentation only.
+**Check whether its pull request has merged**
+(`gh pr list --state all --head plan/published-review-feedback`). If it has not,
+stop and ask the user. Open pull requests #1 and #2 remain the synthetic "do not
+merge" playgrounds; leave them alone.
 
-## This session's task
+## This session's task: `Q8`, and nothing after it
 
-None is scheduled. Every increment in `ROADMAP.md`'s table is complete, and its
-closing section lists what stays open as a limitation rather than as work. Ask
-the user what to do next, one decision at a time; do not pick an item yourself.
+A candidate discarded at the evidence boundary becomes its own diagnostic kind
+instead of an execution failure. Acceptance criteria:
+
+- `coverage.mjs`: a `discarded-candidate` kind in `diagnosticKinds`, labelled
+  "Discarded candidate", counted on its own in `formatCoverage`'s count line. It
+  still counts against completeness (`blockingIssues` excludes only caveats).
+- `findings.mjs` `collectCandidates`: the `rejected at evidence boundary` catch
+  emits the new kind. Its message names which check failed. Today one message,
+  "Citation does not exactly match a supplied context window", is thrown for
+  three causes in `boundCitation`, `cite` and `repairCitation`: outside a
+  supplied window, a quote mismatch (give the claimed range and the quoted line
+  count), and a failed clipped-end repair. Check every other caller of those
+  functions (publication re-cites) keeps working.
+- `retention.mjs` accepts the kind; a retained result carrying the old wording
+  still loads.
+- `C5` is unchanged: fallback eligibility is `envelope()` throwing on the whole
+  output, never one candidate's rejection. Pin that in a test.
+- Test first. `scripts/smoke-review.mjs` pins the old label in four places.
+- `P6` has not landed, so `formatCoverage` is still embedded in the published
+  body; `prior.mjs` recognition must still match what `Q8` publishes.
+- One plugin review of the pull request at the standing authorization; record
+  it in `ROADMAP.md` as every increment does.
+
+**#65's three discarded envelopes** are readable locally in
+`~/.copilot/session-state/{1c2ba35c-d25d-4bb5-9ed9-5851a1dba82e,f182b4ec-82df-468e-a607-e4bb6161cb0a,40d654c8-1fac-4c8d-b422-0f1f69486e93}/events.jsonl`.
+They are private `primait` content: use them to understand the three causes,
+**never copy them into this public repository** as fixtures; write synthetic ones.
 
 ### Caveats that are easy to miss
 
-- **Releasing follows `docs/release.md`.** Every tag push, GitHub Release, index
-  pull request and change to the user's install needs the user's authorization
-  in the session that does it; merging a version bump authorizes none of them.
-  Never move, delete or re-push a published tag: the index pins it by name.
-- **The index entry moves with every release**: `version` and `source.ref`
-  together, plus the index README's table row, by a pull request the user
-  merges. Never push to `xpepper/copilot-plugins`'s `main`.
-- **Not demonstrated for this plugin**: that the entry's ref pin is honored,
-  because the tag and `main` held the same tree when it was installed, and
-  `copilot plugin update`.
-- **`plugin.json`'s `name` is load-bearing.** The runtime names the extension
-  `plugin:copilot-pr-review:...` and `scripts/dogfood-review.mjs` plus three
-  runtime probes match on it. Do not touch it.
-- **`README.md` and `ROADMAP.md` both sit within a kilobyte of 65536 bytes**,
-  past which this tool's own discovery stops reading them. Measure with `wc -c`
-  before every commit, and archive a `ROADMAP.md` entry under its recorded rule
-  before writing a new one.
-- **Sibling drift in the index**: `xpepper/pr-review-gemini#58` is open;
-  `xpepper/pr-review-glm#45` was closed as completed on 2026-09-15. Check their
-  state before raising them again, and do not fix those entries from here.
+- **`ROADMAP.md` is at 64666 bytes and has no live entry left to archive.** An
+  increment entry (five to eight kilobytes) will not fit. Ask the user how to
+  make room before writing `Q8`'s entry; do not condense archived history.
+  `README.md` is at 64855. Measure both with `wc -c` before every commit.
+- **`Q9` never drops a rule citation** that `H1` requires, and **`O2` reopens
+  `O1` only as far as the plan records.** Do not start either early.
+- **Releasing follows `docs/release.md`**; every tag, release and index change
+  needs the user's authorization in that session. `plugin.json`'s `name` is
+  load-bearing. `xpepper/pr-review-gemini#58` is still open; check before raising.
 
 ## Validation
-
-The controlled set is eighteen suites:
 
 ```sh
 for s in findings review selection retention preview publication publish-later \
@@ -64,23 +77,18 @@ for s in findings review selection retention preview publication publish-later \
 
 Also run `git diff --check`, the tracked-control-byte check CI runs, and
 `collectInstructionFiles`, which must read all six root files and skip none.
-Check new files for control bytes with plain `grep -rnP`, and build control
-characters with `String.fromCharCode` rather than typing an escape. Measure
-`ROADMAP.md` and `README.md` with `wc -c` before every commit.
+Build control characters with `String.fromCharCode` rather than typing an escape.
 
 ## Runtime and settled constraints
 
-CLI 1.0.83 remains the recorded runtime; direct local installs print a
-deprecation warning. Every increment lands on a branch and a pull request, never
-`main`; never amend published history or force-push. Findings stay local.
-Do not add review timeouts, weaken the shell gate, use `fs.realpathSync` in
-`read-only.mjs`, change `F6`'s marker unwrap, or treat a compaction event as a
-retry or stop condition. `K1`'s reception is information only: no reviewer,
-adjudicator, `I1c` verdict, retained record or published review may read it,
-and a resolved thread is never evidence of a fix. GitHub review-thread ids are
-matched by `fullDatabaseId` as strings, never by the deprecated `databaseId`.
+CLI 1.0.83 remains the recorded runtime. Every increment lands on a branch and a
+pull request, never `main`; never amend published history or force-push.
+Findings stay local. Do not add review timeouts, weaken the shell gate, use
+`fs.realpathSync` in `read-only.mjs`, change `F6`'s marker unwrap, or treat a
+compaction event as a retry or stop condition. `K1`'s reception is information
+only. GitHub review-thread ids are matched by `fullDatabaseId` as strings.
 
 Before ending, update `ROADMAP.md` with evidence and the exact next step, then
-replace this file as the final repository edit, commit both on the branch you
-are working on, push, and report what changed, what was verified and how, what
-was not, and what remains, pointing here.
+replace this file as the final repository edit, commit both on your branch, push,
+and report what changed, what was verified and how, what was not, and what
+remains, pointing here.

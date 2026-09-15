@@ -39,7 +39,7 @@ rest is noise.
 
 ## Decisions
 
-### D1: the published summary (decided 2026-09-15)
+### P6: the published summary (decided 2026-09-15)
 
 **Chosen: a short Markdown summary with a hidden marker.** Worked example on #65:
 
@@ -75,7 +75,7 @@ Details to settle when building, not reopened here: the plain-language wording
 for a real execution failure and for a coverage gap; whether a location shows the
 basename or the full path when two files share a basename.
 
-### D2: the inline comment format (decided 2026-09-15)
+### P7: the inline comment format (decided 2026-09-15)
 
 **Chosen: problem first, fix prominent, every field kept, supporting fields in a
 small footer.** Worked example on #65's fourth finding:
@@ -108,7 +108,7 @@ bold labels only in the old order (same parser cost, problem still fourth);
 drop introduction, confidence and reporter (needs a `SCOPE.md` change and leaves
 `I1c` less to revalidate from).
 
-### D3: a candidate discarded at the evidence boundary (decided 2026-09-15)
+### Q8: a candidate discarded at the evidence boundary (decided 2026-09-15)
 
 **Chosen: its own diagnostic kind, `discarded-candidate`, which still counts
 against completeness.** A candidate whose citation fails the exact-quote check
@@ -128,14 +128,14 @@ Discarded candidate: contracts:1: its quoted evidence did not match the code, so
   `C5` entry records that boundary.
 - `coverage.mjs` gains the kind and its label; `retention.mjs` accepts it; a
   retained result carrying the old `execution-failure` wording still loads.
-- D1's coverage sentence is chosen by kind, so a discarded candidate and a
+- P6's coverage sentence is chosen by kind, so a discarded candidate and a
   reviewer that did not finish read differently on GitHub.
 
 Rejected alternatives: keep the kind and reword by matching the message prefix
-(D1 would rest on a string match); a non-blocking kind (would call #65
+(P6 would rest on a string match); a non-blocking kind (would call #65
 "completed" with three unchecked issues); leave it as it is.
 
-### D4: what `--quiet` still prints (decided 2026-09-15)
+### O2: what `--quiet` still prints (decided 2026-09-15)
 
 **Chosen: under `--quiet`, keep what is specific to this run and drop what is
 the same every time.** This reopens part of `O1`, at the user's decision; a
@@ -195,7 +195,7 @@ one wrong *supporting* citation, and each for a different transcription error:
   count to equal the range, and refuses whitespace changes (#4's inserted-space
   fabrication).
 
-### D5: a wrong supporting citation (decided 2026-09-15)
+### Q9: a wrong supporting citation (decided 2026-09-15)
 
 **Chosen: when a candidate's location citation is exact, a supporting citation
 that fails the exact-quote check is dropped rather than the whole candidate, and
@@ -203,7 +203,9 @@ the candidate goes on to adjudication.**
 
 - Supporting means every citation other than the location (`breaks`, `before`,
   `after` where it differs, `evidence` entries). A location citation that fails
-  still discards the candidate, as today.
+  still discards the candidate, as today. So does a failing rule citation on a
+  standards finding: `SCOPE.md` (`H1`) requires that quote and refuses the
+  finding without it, so it is never a droppable supporting citation.
 - The adjudicator is told which supporting citation was dropped and why, and
   judges on the source it already reads; it can still reject a finding that no
   longer stands.
@@ -213,7 +215,7 @@ the candidate goes on to adjudication.**
 - The diagnostic names which of the three causes applied: outside a supplied
   window, quote mismatch (with claimed and quoted line counts), or failed repair.
 - The terminal reports each dropped citation; how a dropped citation is counted
-  in coverage is settled when building, alongside D3's kind.
+  in coverage is settled when building, alongside Q8's kind.
 - On #65 all three candidates, including the P1, would have reached adjudication.
 
 Rejected alternatives: only name the cause (recovers nothing); rebind a quote
@@ -223,5 +225,21 @@ is.
 
 ## Status
 
-All five decisions are taken. Slicing them into increments, their order, and
-their `SCOPE.md` impact are still to be agreed with the user; none is scheduled.
+All five decisions are taken, and on 2026-09-15 the user chose the slicing: five
+small increments, starting with what the pull request's author sees and ending
+with the terminal. They are scheduled in `ROADMAP.md` as `Pending` rows, each
+named after the decision it implements, in this order:
+
+| Order | Increment | Size | Why here |
+| --- | --- | --- | --- |
+| 1 | `Q8`: the discarded-candidate kind, and naming which check failed | Small | Unblocks `P6` and `Q9` |
+| 2 | `P6`: the published summary with its hidden marker | Small | The author's main complaint |
+| 3 | `P7`: the inline comment layout, `I1c` parsing both templates | Medium | The other half of the complaint |
+| 4 | `Q9`: drop a failing supporting citation, not the candidate | Medium | Recovers candidates like #65's P1 |
+| 5 | `O2`: a quieter `--quiet` | Small | Affects only the operator's terminal |
+
+Each lands on its own branch and pull request with one plugin review. None needs
+a `SCOPE.md` change as decided. Rejected slicings: bundling `Q8`, `P6` and `P7`
+into one increment (fewer reviews, one mixed diff); `Q9` before `P6` (lost
+findings stop sooner, published reviews stay hard to read longer); scheduling
+only `Q8`, `P6` and `P7`.

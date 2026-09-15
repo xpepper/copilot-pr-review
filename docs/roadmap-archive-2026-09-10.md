@@ -10,7 +10,7 @@ for `U1`'s and then `I1a`'s, by increment `I1c` for `I1b`'s, by increment
 increment `B1` for `T1`'s, by increment `X1` for `B1`'s, by increment
 `W1` for `X1`'s, by increment `N1` for `W1`'s, by increment `H1` for
 `N1`'s, by increment `K1` for `H1`'s, and after pull request #45 merged for
-`K1`'s own, which is the
+`K1`'s own, and by the planning of 2026-09-15 for `S1`'s, which is the
 last in this file. They are the
 project's
 evidence of record and are reproduced verbatim: nothing here was rewritten,
@@ -10076,3 +10076,52 @@ feedback line. CI and `claude-review` passed. Copilot's review of #45 then found
 
 Nothing is scheduled after `K1`. Merging #45 is the user's call; after a merge,
 archive this entry as `d9a837a` did `H1`'s, before writing any new entry.
+
+## `S1`: cut `v0.1.0` and list it, complete
+
+**Step 1 is pull request #50**, branch `s1/release-v0.1.0`: `plugin.json`'s
+`version` from `0.0.1` to `0.1.0`, `name` untouched, and `docs/release.md`. All
+eighteen suites, `git diff --check`, the control-byte check and
+`collectInstructionFiles` (six read, none skipped) pass; CI and `claude-review`
+passed on `14f4781`.
+
+**The one plugin review**, at the standing authorization, at head `14f4781`. The
+installed copy was stale in `prior.mjs` and three suites (`e25bd6b`), so it was
+reinstalled from the branch head and `diff -rq` printed nothing. Then
+`dogfood-review.mjs 50 --all --no-comment --unattended`, CLI 1.0.83, balanced:
+`gpt-5.6-terra` at high for the four specialists and the adjudicator,
+`gpt-5.6-luna` at high for overview, default window. **34.887503 credits, 11
+requests, 142.2 s of model work, 71.8 s elapsed**, 16 tool calls (`view`, `rg`,
+`glob`), no denial. **INCOMPLETE**: security's and overview's only candidates
+were discarded because a citation's quote was one line off its range, plus two
+coverage gaps and three caveats. **1 validated finding, 0 withheld, 1 rejected.**
+
+- Validated P3, the doc claimed the index never lags a tag: real, fixed.
+- Overview's discarded P2, a "merge commit" after a squash merge: real, fixed.
+- Security's discarded P2, a tag is mutable: the tag-pinned entry is settled and
+  not reopened; a rule never to move a published tag was added.
+- Contracts' rejected P2, no demonstrated install-from-a-tag command: real; the
+  closing pull request puts the commands step 3 used into `docs/release.md`.
+- Copilot's comment on `1ae141e`: the install step lacked the ask the plan
+  requires before changing the user's environment. Real, fixed.
+
+**Step 2**, authorized after #50 merged as `5f63241`: the eighteen suites,
+`collectInstructionFiles`, the control-byte check and `git diff --check` passed
+there, as did CI. Annotated `v0.1.0` (`a63fe12`) peels to `5f63241`.
+
+**Step 3**, agreed: `copilot plugin install --help` names no ref syntax, so a
+detached worktree of the tag was installed by path. `copilot plugin list` showed
+`v0.1.0`, `diff -rq` matched the tag, and `smoke-runtime.mjs --targets` exited 0
+with 81 passes and the extension running.
+
+**Step 4**, authorized: xpepper/copilot-plugins#1, the index's first pull
+request, added the entry and its README row; merged as `642dde5`.
+
+**Step 5**: the merged manifest reads `0.1.0` and `v0.1.0`. Agreed: the catalog
+was updated, the direct install removed, and the marketplace install listed
+`v0.1.0`, matched `git archive v0.1.0`, and passed the same probe.
+
+**Not done or not shown**: no GitHub Release was authorized; `copilot plugin
+update` was not run; the ref pin is not shown honored, since the tag and `main`
+hold one tree. Sibling drift stays open in xpepper/pr-review-gemini#58;
+xpepper/pr-review-glm#45 was closed as completed on 2026-09-15.
