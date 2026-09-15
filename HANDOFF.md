@@ -9,63 +9,61 @@ declaration. Keep what you demonstrate apart from what you assume.
 
 ## Where things stand
 
-The previous session was planning, not a numbered increment. The user used the
-installed plugin on somebody else's pull request for the first time,
-`/pr-review 65 --comment --quiet --long-context` on
-`primait/prima-agent-skills#65`, and found the published review noisy and
-cryptic. Five decisions and the slicing were put to the user one at a time and
-answered. They are recorded, with worked examples, rejected alternatives and
-evidence, in `docs/published-review-feedback-plan.md`, and scheduled as five
-`Pending` rows in `ROADMAP.md`, in this order: **`Q8`, `P6`, `P7`, `Q9`, `O2`**.
-`S1`'s entry was archived verbatim to make room.
-
-That work is on branch `plan/published-review-feedback`, documentation only.
-**Check whether its pull request has merged**
-(`gh pr list --state all --head plan/published-review-feedback`). If it has not,
-stop and ask the user. Open pull requests #1 and #2 remain the synthetic "do not
+`Q8` is built on branch `q8/discarded-candidate`, pull request #54: a candidate
+refused at the evidence boundary is a `discarded-candidate` diagnostic, still
+blocking completed coverage, and its message names the failing field and which
+of three citation checks failed. `ROADMAP.md`'s `Q8` entry has the evidence and
+the plugin review. **Check whether #54 has merged**
+(`gh pr list --state all --head q8/discarded-candidate`). If it has not, stop
+and ask the user. Open pull requests #1 and #2 remain the synthetic "do not
 merge" playgrounds; leave them alone.
 
-## This session's task: `Q8`, and nothing after it
+#54 was reviewed twice. The first run used the stale marketplace `v0.1.0`
+install, so the user authorized a second run on a direct install of the branch;
+both runs, their costs and every finding kept or rejected are in `Q8`'s entry.
+The user's marketplace install was restored afterwards. Nothing was posted.
 
-A candidate discarded at the evidence boundary becomes its own diagnostic kind
-instead of an execution failure. Acceptance criteria:
+## This session's task: `P6`, and nothing after it
 
-- `coverage.mjs`: a `discarded-candidate` kind in `diagnosticKinds`, labelled
-  "Discarded candidate", counted on its own in `formatCoverage`'s count line. It
-  still counts against completeness (`blockingIssues` excludes only caveats).
-- `findings.mjs` `collectCandidates`: the `rejected at evidence boundary` catch
-  emits the new kind. Its message names which check failed. Today one message,
-  "Citation does not exactly match a supplied context window", is thrown for
-  three causes in `boundCitation`, `cite` and `repairCitation`: outside a
-  supplied window, a quote mismatch (give the claimed range and the quoted line
-  count), and a failed clipped-end repair. Check every other caller of those
-  functions (publication re-cites) keeps working.
-- `retention.mjs` accepts the kind; a retained result carrying the old wording
-  still loads.
-- `C5` is unchanged: fallback eligibility is `envelope()` throwing on the whole
-  output, never one candidate's rejection. Pin that in a test.
-- Test first. `scripts/smoke-review.mjs` pins the old label in four places.
-- `P6` has not landed, so `formatCoverage` is still embedded in the published
-  body; `prior.mjs` recognition must still match what `Q8` publishes.
-- One plugin review of the pull request at the standing authorization; record
-  it in `ROADMAP.md` as every increment does.
+The published review body becomes a short Markdown summary, as decided in the
+plan's `P6` section, with its worked example. Acceptance criteria:
 
-**#65's three discarded envelopes** are readable locally in
-`~/.copilot/session-state/{1c2ba35c-d25d-4bb5-9ed9-5851a1dba82e,f182b4ec-82df-468e-a607-e4bb6161cb0a,40d654c8-1fac-4c8d-b422-0f1f69486e93}/events.jsonl`.
-They are private `primait` content: use them to understand the three causes,
-**never copy them into this public repository** as fixtures; write synthetic ones.
+- Headline: mode, finding count, count per severity, short reviewed head. One
+  line per finding: severity, title, location. One plain-language coverage
+  sentence chosen by diagnostic kind (`execution-failure`, `discarded-candidate`,
+  `coverage-gap`); caveats and internal error text are not published. Partial
+  coverage stays visible, as `SCOPE.md` requires. A hidden marker ends the body.
+- `formatCoverage` stays the terminal and retained-result presentation; only the
+  published body (`preview.mjs` `reviewRequest`) changes.
+- `prior.mjs` recognises a review of ours by the marker **or** by the old three
+  fixed phrases, so reviews already published stay recognisable. Test both.
+- Settle, while building, the two details the plan leaves open: the wording for a
+  real execution failure and for a coverage gap, and basename versus full path
+  when two files share a basename. Ask the user if either is a real choice.
+- `publish-later` rebuilds the same body from a retained result; a result
+  retained before `P6` must still publish or be refused cleanly, never with a
+  body `prior.mjs` cannot recognise.
+- Test first. One plugin review of the pull request at the standing
+  authorization; record it in `ROADMAP.md` as every increment does.
 
 ### Caveats that are easy to miss
 
-- **`ROADMAP.md` is at 64666 bytes and has no live entry left to archive.** An
-  increment entry (five to eight kilobytes) will not fit. Ask the user how to
-  make room before writing `Q8`'s entry; do not condense archived history.
-  `README.md` is at 64855. Measure both with `wc -c` before every commit.
+- **The review runs the installed plugin, and `dogfood-review.mjs` only checks
+  that some copy is running.** On #54 the first review ran the marketplace
+  `v0.1.0`, not the branch. Before the review, and with the user's agreement
+  because it changes their environment: `copilot plugin uninstall
+  copilot-pr-review`, `copilot plugin install "$(pwd)"`, then `diff -rq
+  --exclude=.git ~/.copilot/installed-plugins/_direct/pr-review .` must print
+  nothing. Afterwards restore with `copilot plugin uninstall copilot-pr-review`
+  and `copilot plugin install copilot-pr-review@xpepper-copilot-plugins`.
+- **Sizes**: `README.md` is at 64960 bytes, 576 spare, and it documents the
+  published body; `ROADMAP.md` is at 63523 bytes, so archive `Q8`'s entry
+  verbatim before writing `P6`'s. Measure both with `wc -c` before every commit; never condense
+  archived history.
 - **`Q9` never drops a rule citation** that `H1` requires, and **`O2` reopens
   `O1` only as far as the plan records.** Do not start either early.
 - **Releasing follows `docs/release.md`**; every tag, release and index change
-  needs the user's authorization in that session. `plugin.json`'s `name` is
-  load-bearing. `xpepper/pr-review-gemini#58` is still open; check before raising.
+  needs the user's authorization in that session.
 
 ## Validation
 

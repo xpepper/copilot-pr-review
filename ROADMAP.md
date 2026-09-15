@@ -22,7 +22,7 @@ immediately after `B1`. **`T1`, `B1`, `X1`, `W1`, `N1`, `H1` and `K1` are
 complete and archived.** On 2026-09-14, outside that backlog, the user
 scheduled `S1`, now complete and archived. On 2026-09-15 the user scheduled five
 more from the first review published on somebody else's pull request: `Q8`,
-`P6`, `P7`, `Q9` and `O2`, in that order, the `Pending` rows below.
+`P6`, `P7`, `Q9` and `O2`, in that order; `Q8` is complete and the other four are the `Pending` rows below.
 The closing section records what was decided, and what stays open as a
 limitation rather than as work.
 
@@ -91,7 +91,7 @@ posting them.
 | H1 | Completed | By default the project's own written rules steer the review: the root instruction files the reviewed head commits reach the one reviewer that weighs the whole change, up to a 48 KiB budget; a finding relying on one must quote the rule as exact lines of its file, bound like a source citation; `--no-standards` turns it off for one run. The user reversed the opt-in this row first proposed and approved the `SCOPE.md` paragraph word for word. **It settles what a claim not grounded in a provable code effect must carry: a quotable rule**, which the history and path-conditioned lenses would inherit. Pull request #44, reviewed once at the standing authorization: balanced, 319.760535 credits, INCOMPLETE, 0 validated findings; three refused candidates were real and are fixed, one through the user's budget decision. `G1`'s menu item 4. | N1; [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | K1 | Completed | A later review reports how this tool's earlier review of the same pull request was received, on one line under `Prior review:` at every verbosity: threads resolved, unresolved and unread, and the thumbs counts. Reactions come from the listing `I1a` already reads; resolution is one paginated GraphQL read matched by database id. Unread is never unresolved or zero, a failed read is reported and the review proceeds, and nothing reaches a reviewer, the adjudicator, a verdict, the retained record or the published review. Built test first and mutation-checked. Pull request #45, reviewed once at the standing authorization: balanced, 184.483837 credits, INCOMPLETE, 0 validated findings, and one refused candidate, declined; Copilot's `databaseId` finding was fixed after it. No read of a review this tool published has run. `G1`'s menu item 12. | H1, I1c; [Publication controls](SCOPE.md#selection-publication-and-cached-results) |
 | S1 | Completed | Cut `v0.1.0` and list it, in one session: a pull request bumps `plugin.json` to `0.1.0`, the merge commit is tagged `v0.1.0`, an install from that tag is shown to load, and a `copilot-pr-review` entry pinned to that tag reaches `xpepper/copilot-plugins` through a pull request the user merges. Every tag, release and write to the index needs the user's explicit authorization in that session. Planned in `docs/release-and-marketplace-plan.md`, which records the seven decisions the user took on 2026-09-14 and the acceptance criteria. Pull request #50, reviewed once: balanced, 34.887503 credits, 1 validated finding, fixed. Listed by xpepper/copilot-plugins#1; the marketplace install is `0.1.0` and loads. | K1; outside the backlog, at the user's request; no scope clause |
-| Q8 | Pending | A candidate discarded at the evidence boundary is its own diagnostic kind, `discarded-candidate`, still counting against completeness, not an execution failure; its message names which citation check failed. `C5` eligibility unchanged. | S1; [Modes/findings](SCOPE.md#review-modes-and-findings) |
+| Q8 | Completed | A candidate discarded at the evidence boundary is its own diagnostic kind, `discarded-candidate`, still counting against completeness, not an execution failure; its message names the failing field and which citation check failed. `C5` eligibility unchanged. Pull request #54, reviewed twice with the user's authorization, the second run on the branch install. | S1; [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | P6 | Pending | The published body is a short Markdown summary: severity counts and head, one line per finding, one plain coverage sentence chosen by kind, a hidden marker; no caveats or internal errors. `prior.mjs` accepts the marker or the old phrases. | Q8; [Publication](SCOPE.md#selection-publication-and-cached-results) |
 | P7 | Pending | Each inline comment leads with the problem and a prominent fix, keeps every field, and footers introduction, confidence and reporter; `I1c` parses old and new templates byte for byte. | P6; [Publication](SCOPE.md#selection-publication-and-cached-results) |
 | Q9 | Pending | With an exact location citation, a failing supporting citation is dropped instead of the candidate and the adjudicator is told; a rule citation `H1` requires never is. | Q8; [Modes/findings](SCOPE.md#review-modes-and-findings) |
@@ -110,6 +110,77 @@ was left to archive; the user chose that move on 2026-09-15. The rule stands:
 keep the most recent entries live, archive the rest verbatim, and measure this
 file with `wc -c` against the 65536-byte cap before opening a pull request.
 [docs/upstream-licensing.md](docs/upstream-licensing.md) did not move.
+
+## `Q8`: a discarded candidate is its own diagnostic kind, complete
+
+**Built on `q8/discarded-candidate`, pull request #54**, after #53 merged the
+plan; the decision and #65's evidence are in
+[docs/published-review-feedback-plan.md](docs/published-review-feedback-plan.md).
+
+### What was built
+
+- `coverage.mjs` adds `discarded-candidate`, labelled `Discarded candidate`,
+  counted on its own (`Execution failures: 0; discarded candidates: 3; ...`). It
+  still blocks completed coverage: `blockingIssues` excludes only caveats.
+- `collectCandidates`' evidence-boundary catch records the new kind for every
+  candidate refusal, `H1` rule citations included. Failed reviewers, unusable
+  envelopes and adjudication failures stay execution failures.
+- The one `Citation does not exactly match a supplied context window` message is
+  three: `Citation <path> <side> lines A-B is outside every supplied context
+  window.`, `Citation quote does not match <path> <side> lines A-B: the range
+  names N line(s) and the quote has M.`, and a clipped quote whose first or last
+  line is blank `cannot be repaired`. A candidate's refusal names its field
+  (`breaks: `, `evidence[1]: `); strict `cite` names the same cause on re-cite.
+- `README.md` names four kinds and counts a discarded candidate as incomplete.
+
+### Evidence
+
+- **Test first**, each seen failing on the missing kind or the old wording: the
+  three causes in `smoke-findings`, one shaped like #65's `contracts:1`, pinning
+  kind, message, blocking issue and coverage lines; kind pins on `smoke-review`'s
+  four refusals; `smoke-retention` loading the new kind and the old
+  `execution-failure` wording; `smoke-preview` proving `toolReviewBody` still
+  recognises every published body. #65's envelopes stayed local.
+- **`C5` unchanged and pinned**: `envelopeVerifier` accepts an envelope whose
+  only candidate is discarded, and all refused starts no fallback.
+- All eighteen suites, `git diff --check`, the control-byte check and
+  `collectInstructionFiles` (six read, none skipped) pass.
+- **Room**: 870 bytes were spare. At the user's choice `033aa7a` moved the
+  6263-byte record of the earlier archiving moves verbatim to the archive's end,
+  `cmp`-identical, leaving a pointer.
+
+### The installed-plugin reviews
+
+Balanced both times, `gpt-5.6-terra` high for the four specialists and the
+adjudicator, `gpt-5.6-luna` high for overview, default window.
+
+**The first, at `a7e95fa`, ran the marketplace `v0.1.0`, not the branch**:
+`dogfood-review.mjs` only asserts that some copy is running, and `diff -rq` then
+showed `coverage.mjs` and `findings.mjs` differing. **147.799948 credits, 21
+requests, 111.5 s elapsed.** INCOMPLETE, 0 validated: overview's and the
+adjudicator's JSON did not parse. Contracts' P3, unjudged, that README's
+`incomplete` row omitted the kind: real, fixed in `854124d`. Performance's P3,
+that `quoteMismatch` splits an untrusted quote, was discarded for quoting 5 lines
+for a 4-line range, #65's shape: rejected, as `repairCitation` already split
+every inexact quote and the envelope is already parsed in memory.
+
+**The user authorized a rerun on the branch.** The marketplace copy was
+uninstalled, `copilot plugin install "$(pwd)"` installed the checkout, `diff -rq
+--exclude=.git` printed nothing, and it ran at `033aa7a`: **201.11283 credits, 26
+requests, 122.4 s elapsed.** All six passes completed; INCOMPLETE on one gap,
+overview compacted in turn 7 (163339 of 200000 tokens). The live count line read
+`discarded candidates: 0`, so the label was not seen live. Correctness' P2, that
+an `H1` refusal should stay an execution failure, was rejected by the adjudicator
+and by me: the reviewer ran and the candidate went unjudged, the kind's
+definition. It did catch #54's description wrongly saying so; corrected. The
+marketplace install was then restored, identical to `git archive v0.1.0`.
+
+**Recorded, not scheduled**: `dogfood-review.mjs` should refuse a review when the
+installed copy differs from the checkout.
+
+### The exact next step
+
+`P6`, after #54 merges; archive this entry first if the next one does not fit.
 
 ## v1 is complete, and five more increments are scheduled on top of it
 
