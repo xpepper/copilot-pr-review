@@ -7,7 +7,7 @@ An item is complete only with repository evidence. Later items may be split
 further when their implementation context is known, without changing scope.
 The standing checkpoint-commit, pull-request and fresh-session handoff workflow
 is recorded in [AGENTS.md](AGENTS.md); the replaceable next-session prompt lives
-in [HANDOFF.md](HANDOFF.md). Completed entries through `K1` were moved verbatim
+in [HANDOFF.md](HANDOFF.md). Completed entries through `S1` were moved verbatim
 to [docs/roadmap-archive-2026-09-10.md](docs/roadmap-archive-2026-09-10.md) by
 the moves listed under "Every completed increment" below, so this file keeps
 the increments table and the closing section, and stays
@@ -20,7 +20,9 @@ increment scheduled up to `G1` is complete.** On 2026-09-12 the user triaged
 `W1`, `N1`, `H1` and `K1`, in that order, and the same day scheduled `X1`
 immediately after `B1`. **`T1`, `B1`, `X1`, `W1`, `N1`, `H1` and `K1` are
 complete and archived.** On 2026-09-14, outside that backlog, the user
-scheduled `S1`, now complete; its entry is the one live entry.
+scheduled `S1`, now complete and archived. On 2026-09-15 the user scheduled five
+more from the first review published on somebody else's pull request: `Q8`,
+`P6`, `P7`, `Q9` and `O2`, in that order, the `Pending` rows below.
 The closing section records what was decided, and what stays open as a
 limitation rather than as work.
 
@@ -89,11 +91,16 @@ posting them.
 | H1 | Completed | By default the project's own written rules steer the review: the root instruction files the reviewed head commits reach the one reviewer that weighs the whole change, up to a 48 KiB budget; a finding relying on one must quote the rule as exact lines of its file, bound like a source citation; `--no-standards` turns it off for one run. The user reversed the opt-in this row first proposed and approved the `SCOPE.md` paragraph word for word. **It settles what a claim not grounded in a provable code effect must carry: a quotable rule**, which the history and path-conditioned lenses would inherit. Pull request #44, reviewed once at the standing authorization: balanced, 319.760535 credits, INCOMPLETE, 0 validated findings; three refused candidates were real and are fixed, one through the user's budget decision. `G1`'s menu item 4. | N1; [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | K1 | Completed | A later review reports how this tool's earlier review of the same pull request was received, on one line under `Prior review:` at every verbosity: threads resolved, unresolved and unread, and the thumbs counts. Reactions come from the listing `I1a` already reads; resolution is one paginated GraphQL read matched by database id. Unread is never unresolved or zero, a failed read is reported and the review proceeds, and nothing reaches a reviewer, the adjudicator, a verdict, the retained record or the published review. Built test first and mutation-checked. Pull request #45, reviewed once at the standing authorization: balanced, 184.483837 credits, INCOMPLETE, 0 validated findings, and one refused candidate, declined; Copilot's `databaseId` finding was fixed after it. No read of a review this tool published has run. `G1`'s menu item 12. | H1, I1c; [Publication controls](SCOPE.md#selection-publication-and-cached-results) |
 | S1 | Completed | Cut `v0.1.0` and list it, in one session: a pull request bumps `plugin.json` to `0.1.0`, the merge commit is tagged `v0.1.0`, an install from that tag is shown to load, and a `copilot-pr-review` entry pinned to that tag reaches `xpepper/copilot-plugins` through a pull request the user merges. Every tag, release and write to the index needs the user's explicit authorization in that session. Planned in `docs/release-and-marketplace-plan.md`, which records the seven decisions the user took on 2026-09-14 and the acceptance criteria. Pull request #50, reviewed once: balanced, 34.887503 credits, 1 validated finding, fixed. Listed by xpepper/copilot-plugins#1; the marketplace install is `0.1.0` and loads. | K1; outside the backlog, at the user's request; no scope clause |
+| Q8 | Pending | A candidate discarded at the evidence boundary is its own diagnostic kind, `discarded-candidate`, still counting against completeness, not an execution failure; its message names which citation check failed. `C5` eligibility unchanged. | S1; [Modes/findings](SCOPE.md#review-modes-and-findings) |
+| P6 | Pending | The published body is a short Markdown summary: severity counts and head, one line per finding, one plain coverage sentence chosen by kind, a hidden marker; no caveats or internal errors. `prior.mjs` accepts the marker or the old phrases. | Q8; [Publication](SCOPE.md#selection-publication-and-cached-results) |
+| P7 | Pending | Each inline comment leads with the problem and a prominent fix, keeps every field, and footers introduction, confidence and reporter; `I1c` parses old and new templates byte for byte. | P6; [Publication](SCOPE.md#selection-publication-and-cached-results) |
+| Q9 | Pending | With an exact location citation, a failing supporting citation is dropped instead of the candidate and the adjudicator is told; a rule citation `H1` requires never is. | Q8; [Modes/findings](SCOPE.md#review-modes-and-findings) |
+| O2 | Pending | `--quiet` replaces static configuration policy, the capture-only sentence inside a review, and an authorized run's payload JSON with run-specific lines; every model, effort, window, fallback, coverage and publication line stays. | Q9; [Models/execution](SCOPE.md#models-configuration-and-execution) |
 
-## Every completed increment, `F1` through `K1`, is archived
+## Every completed increment, `F1` through `S1`, is archived
 
-Fifty-eight sections were here and fifteen increments, the backlog triage and the
-archiving after `K1`'s merge moved every one of them
+Fifty-nine sections were here and fifteen increments, the backlog triage, the
+archiving after `K1`'s merge and the planning of 2026-09-15 moved every one of them
 verbatim to
 [docs/roadmap-archive-2026-09-10.md](docs/roadmap-archive-2026-09-10.md): `A1`
 moved the thirty-nine through `V1c`, `L1` moved `V2a` and `V2b` because this
@@ -102,11 +109,11 @@ moved `A1`'s entry and then `L1`'s, `O1` moved `D1`'s, `U1` moved `O1`'s, `I1a`
 moved `E1`'s, `I1b` moved `U1`'s and then `I1a`'s, `I1c` moved `I1b`'s
 15018 bytes, `G1` moved `I1c`'s 13014 bytes, **the backlog triage moved
 `G1`'s own 8863 bytes**, **`B1` moved `T1`'s 5951**, **`X1` moved `B1`'s
-5124**, **`W1` moved `X1`'s 5123**, **`N1` moved `W1`'s 4684**, **`H1` moved `N1`'s 4982**, **`K1` moved `H1`'s 4586**, and **the archiving after `K1`'s merge moved `K1`'s own 4818**, the last in that file. Fifty are
-completed-increment entries, covering the forty-eight increments `F1`, `F2`, `F3`, `Q1`, `Q2`, `Q3`, `Q4`,
+5124**, **`W1` moved `X1`'s 5123**, **`N1` moved `W1`'s 4684**, **`H1` moved `N1`'s 4982**, **`K1` moved `H1`'s 4586**, and **the archiving after `K1`'s merge moved `K1`'s own 4818**, and **the planning of 2026-09-15 moved `S1`'s 2905**, the last in that file. Fifty-one are
+completed-increment entries, covering the forty-nine increments `F1`, `F2`, `F3`, `Q1`, `Q2`, `Q3`, `Q4`,
 `P1`, `P2`, `P3`, `P4`, `P5`, `C1`, `C2`, `F4`, `R1`, `M1`, `F5`, `F6`, `M2`,
 `C3`, `C4`, `Q5`, `Q6`, `C5`, `Q7`, `V1a`, `V1b`, `V1c`, `V2a`, `V2b`, `A1`,
-`L1`, `D1`, `O1`, `E1`, `U1`, `I1a`, `I1b`, `I1c`, `G1`, `T1`, `B1`, `X1`, `W1`, `N1`, `H1` and `K1`, with `R1` and `M1` each recorded in two halves. The remaining eight are the
+`L1`, `D1`, `O1`, `E1`, `U1`, `I1a`, `I1b`, `I1c`, `G1`, `T1`, `B1`, `X1`, `W1`, `N1`, `H1`, `K1` and `S1`, with `R1` and `M1` each recorded in two halves. The remaining eight are the
 working record kept between them:
 
 - the `Q4` acceptance criteria recorded at the `Q3` checkpoint;
@@ -118,7 +125,7 @@ working record kept between them:
 - the `R1` second-half harness checkpoint;
 - the documentation checkpoint for pull request #4 and its review.
 
-Nothing was rewritten, condensed or corrected in any of the sixteen moves, so each
+Nothing was rewritten, condensed or corrected in any of the seventeen moves, so each
 section still reads exactly as the session that wrote it left it, and the
 archive is the evidence of record for every increment it holds: reproduction
 commands, the models and efforts actually used, credit costs, findings and
@@ -135,7 +142,7 @@ than from this file.
 [docs/upstream-licensing.md](docs/upstream-licensing.md) is still the record of
 that licence work and did not move.
 
-**`S1`'s entry, the section after this one, is the one live entry.** The backlog triage added no entry of its
+**No increment entry is live**: `S1`'s moved and `Q8` has not started. The backlog triage added no entry of its
 own, because agreeing a backlog is not a numbered increment, so archiving `G1`
 left none behind and `T1`'s was written into that empty space. The rule these
 moves established is to keep
@@ -172,58 +179,10 @@ archived `W1`'s 4684 bytes** on the same rule, because 1003 bytes were spare. **
 archived `N1`'s 4982 bytes** on the same rule, because 655 bytes were spare. **`K1`
 archived `H1`'s 4586 bytes** on the same rule, because 1058 bytes were spare.
 **After #45 merged, `K1`'s own 4818 bytes moved** on the same rule, because 413
-bytes were spare.
+bytes were spare. **The planning of 2026-09-15 moved `S1`'s 2905 bytes** on the
+same rule, because 548 bytes were spare and five `Pending` rows did not fit.
 
-## `S1`: cut `v0.1.0` and list it, complete
-
-**Step 1 is pull request #50**, branch `s1/release-v0.1.0`: `plugin.json`'s
-`version` from `0.0.1` to `0.1.0`, `name` untouched, and `docs/release.md`. All
-eighteen suites, `git diff --check`, the control-byte check and
-`collectInstructionFiles` (six read, none skipped) pass; CI and `claude-review`
-passed on `14f4781`.
-
-**The one plugin review**, at the standing authorization, at head `14f4781`. The
-installed copy was stale in `prior.mjs` and three suites (`e25bd6b`), so it was
-reinstalled from the branch head and `diff -rq` printed nothing. Then
-`dogfood-review.mjs 50 --all --no-comment --unattended`, CLI 1.0.83, balanced:
-`gpt-5.6-terra` at high for the four specialists and the adjudicator,
-`gpt-5.6-luna` at high for overview, default window. **34.887503 credits, 11
-requests, 142.2 s of model work, 71.8 s elapsed**, 16 tool calls (`view`, `rg`,
-`glob`), no denial. **INCOMPLETE**: security's and overview's only candidates
-were discarded because a citation's quote was one line off its range, plus two
-coverage gaps and three caveats. **1 validated finding, 0 withheld, 1 rejected.**
-
-- Validated P3, the doc claimed the index never lags a tag: real, fixed.
-- Overview's discarded P2, a "merge commit" after a squash merge: real, fixed.
-- Security's discarded P2, a tag is mutable: the tag-pinned entry is settled and
-  not reopened; a rule never to move a published tag was added.
-- Contracts' rejected P2, no demonstrated install-from-a-tag command: real; the
-  closing pull request puts the commands step 3 used into `docs/release.md`.
-- Copilot's comment on `1ae141e`: the install step lacked the ask the plan
-  requires before changing the user's environment. Real, fixed.
-
-**Step 2**, authorized after #50 merged as `5f63241`: the eighteen suites,
-`collectInstructionFiles`, the control-byte check and `git diff --check` passed
-there, as did CI. Annotated `v0.1.0` (`a63fe12`) peels to `5f63241`.
-
-**Step 3**, agreed: `copilot plugin install --help` names no ref syntax, so a
-detached worktree of the tag was installed by path. `copilot plugin list` showed
-`v0.1.0`, `diff -rq` matched the tag, and `smoke-runtime.mjs --targets` exited 0
-with 81 passes and the extension running.
-
-**Step 4**, authorized: xpepper/copilot-plugins#1, the index's first pull
-request, added the entry and its README row; merged as `642dde5`.
-
-**Step 5**: the merged manifest reads `0.1.0` and `v0.1.0`. Agreed: the catalog
-was updated, the direct install removed, and the marketplace install listed
-`v0.1.0`, matched `git archive v0.1.0`, and passed the same probe.
-
-**Not done or not shown**: no GitHub Release was authorized; `copilot plugin
-update` was not run; the ref pin is not shown honored, since the tag and `main`
-hold one tree. Sibling drift stays open in xpepper/pr-review-gemini#58;
-xpepper/pr-review-glm#45 was closed as completed on 2026-09-15.
-
-## v1 is complete, and every increment scheduled on top of it is done
+## v1 is complete, and five more increments are scheduled on top of it
 
 **`D1` delivered v1, and `O1`, `E1`, `U1`, `I1a`, `I1b`, `I1c` and `G1` have
 landed on top of it.**
@@ -275,6 +234,18 @@ row.** `T1` took its as one approved sentence, and `X1`, `W1` and `H1` each took
 an approved paragraph. `K1` took an approved paragraph on 2026-09-14, in
 `dc3a14b`. **`B1` and `N1` fit
 `SCOPE.md` as written** and need no decision at all.
+
+### The published-review feedback the user agreed on 2026-09-15
+
+The first review this tool published on somebody else's pull request,
+`primait/prima-agent-skills#65`, read as noise to its author. The user took five
+decisions one at a time, then the slicing, and **scheduled `Q8`, `P6`, `P7`,
+`Q9` and `O2`, in that order**. Each decision, its worked example, the rejected
+alternatives, and the evidence that #65's only P1 candidate was discarded
+unjudged are in
+[docs/published-review-feedback-plan.md](docs/published-review-feedback-plan.md).
+**Do not reopen them.** None needs a `SCOPE.md` change as decided; `O2` reopens
+part of `O1` by the user's decision. The planning was not a numbered increment.
 
 ### What is settled and must not be redone
 
