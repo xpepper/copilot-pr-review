@@ -68,8 +68,9 @@ export async function publishRetained(parent, { controller, gh = runGh, store, a
   guard();
   const boundary = evidenceBoundary(snapshot, context, binding);
   const request = buildReviewPreview(outcome, boundary);
-  // P6: a proposal retained before P6 differs only by its old body, and what is
-  // published is the summary rebuilt here, which carries the marker.
+  // P6 and P7: a proposal retained before either differs only by its old body or
+  // its old inline comments, and what is published is the request rebuilt here:
+  // the summary carrying the marker, and the comments in the current layout.
   if (outcome.preview?.request) {
     refuse(matchesRetainedProposal(outcome, request),
       "the retained proposal no longer matches the canonical payload");

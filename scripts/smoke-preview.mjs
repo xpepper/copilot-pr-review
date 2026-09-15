@@ -89,10 +89,10 @@ assert.deepEqual(request, {
       "<!-- copilot-pr-review: mode=quick findings=1 coverage=completed -->",
     comments: [{
       path: "total.js", line: 3, side: "RIGHT",
-      body: "[P2] Multiply cents by quantity\n\nWhen: total(100, 3)\n\nExpected: 300 cents\n\nActual: 103 cents\n\n" +
-        "Introduced by this diff: The changed operator adds quantity instead of multiplying.\n\n" +
-        "Fix: Multiply the unit price by quantity.\n\n" +
-        "Confidence: 0.95. Reported by: correctness, contracts.",
+      body: "**[P2] Multiply cents by quantity**\n\n103 cents\n\n**When:** total(100, 3)\n**Expected:** 300 cents\n\n" +
+        "**Fix:** Multiply the unit price by quantity.\n\n" +
+        "<sub>Introduced by this diff: The changed operator adds quantity instead of multiplying. · " +
+        "Confidence 0.95 · correctness, contracts reviewers</sub>",
     }],
   },
 });
@@ -203,17 +203,24 @@ assert.match(summaryBody({ mode: "quick", head: "a".repeat(40), complete: false,
   assert(!summaryBody(input([{ kind: "caveat", message: `Reviewer note: ${caveat.message}` }]))
     .includes("This review only looked"));
 }
-// P6: a result retained before P6 holds a proposal with the old body. It still
-// loads, because an unreadable record refuses every later review in that
-// session, and nothing else in that proposal may differ from what the retained
-// findings rebuild.
+// The inline comment an earlier version posted for this fixture's finding, as
+// those bytes were: the layout before P7, with W1's Fix paragraph.
+const commentBeforeP7 = "[P2] Multiply cents by quantity\n\nWhen: total(100, 3)\n\nExpected: 300 cents\n\n" +
+  "Actual: 103 cents\n\nIntroduced by this diff: The changed operator adds quantity instead of multiplying.\n\n" +
+  "Fix: Multiply the unit price by quantity.\n\nConfidence: 0.95. Reported by: correctness, contracts.";
+const bodyBeforeP6 = "Quick review: 1 selected validated finding(s). Review coverage: completed.\n" +
+  "Execution failures: 0; discarded candidates: 0; coverage gaps: 0; informational caveats: 0.\n" +
+  "This is not a clean-review claim.";
+// P6: a result retained before P6 holds a proposal with the old body, and the
+// inline comments of the layout before P7. It still loads, because an unreadable
+// record refuses every later review in that session, and nothing else in that
+// proposal may differ from what the retained findings rebuild.
 {
   const earlier = await harness({ options: { comment: true } });
   const retained = await earlier.run();
-  const before = "Quick review: 1 selected validated finding(s). Review coverage: completed.\n" +
-    "Execution failures: 0; discarded candidates: 0; coverage gaps: 0; informational caveats: 0.\n" +
-    "This is not a clean-review claim.";
+  const before = bodyBeforeP6;
   retained.preview.request.payload.body = before;
+  retained.preview.request.payload.comments[0].body = commentBeforeP7;
   validateRecord(retainedRecord(retained), earlier.parent.sessionId);
   for (const mutate of [
     (request) => { request.payload.body = before.replace("completed", "INCOMPLETE"); },
@@ -226,6 +233,28 @@ assert.match(summaryBody({ mode: "quick", head: "a".repeat(40), complete: false,
   }
 }
 console.log("PASS P6 published summaries by coverage kind, marker, locations, confinement and pre-P6 proposals");
+// P7: a result retained after P6 and before P7 holds the summary beside the
+// earlier inline comments. It loads for the same reason, and nothing else in its
+// proposal may differ: not a comment's bytes, and not the body from before P6
+// beside the current comments, which no version ever proposed.
+{
+  const earlier = await harness({ options: { comment: true } });
+  const retained = await earlier.run();
+  const comments = structuredClone(retained.preview.request.payload.comments);
+  retained.preview.request.payload.comments[0].body = commentBeforeP7;
+  validateRecord(retainedRecord(retained), earlier.parent.sessionId);
+  for (const mutate of [
+    (payload) => { payload.comments[0].body = commentBeforeP7.replace("0.95", "0.9"); },
+    (payload) => { payload.comments[0].body = commentBeforeP7.replace("\n\nFix: Multiply the unit price by quantity.", ""); },
+    (payload) => { payload.comments[0].body = `${commentBeforeP7} `; },
+    (payload) => { payload.comments = comments; payload.body = bodyBeforeP6; },
+  ]) {
+    const altered = structuredClone(retained);
+    mutate(altered.preview.request.payload);
+    assert.throws(() => validateRecord(retainedRecord(altered), earlier.parent.sessionId), /changed request/);
+  }
+}
+console.log("PASS P7 a proposal retained before P7 loads, and any other difference in it is refused");
 const finding = exact.outcome.validation.findings[0];
 finding.location = { ...finding.before };
 let comments = buildReviewPreview(exact.outcome, exact.boundary).payload.comments;
@@ -416,7 +445,7 @@ console.log("PASS strict version-2 retained previews, altered payload/authority 
   const current = await earlier.run();
   for (const finding of current.validation.findings) delete finding.remediation;
   const [comment] = current.preview.request.payload.comments;
-  comment.body = comment.body.replace("\n\nFix: Multiply the unit price by quantity.", "");
+  comment.body = commentBeforeP7.replace("\n\nFix: Multiply the unit price by quantity.", "");
   assert(!comment.body.includes("Fix:"), "The body an earlier run stored had no Fix paragraph");
   validateRecord(retainedRecord(current), earlier.parent.sessionId);
   assert.throws(() => buildReviewPreview(current, earlier.boundary), /remediation sentence/);

@@ -1,5 +1,5 @@
 import { delimitedFormat, envelope, limitationFormat } from "./findings.mjs";
-import { commentBody } from "./preview.mjs";
+import { commentBody, commentBodyBeforeP7 } from "./preview.mjs";
 import { reviewModes } from "./modes.mjs";
 
 // I1c: reading this tool's own emitted comment prose back into a structured
@@ -9,66 +9,93 @@ import { reviewModes } from "./modes.mjs";
 // is the increment that consumes it.
 //
 // The reader is held to the writer's template rather than to a guess about it.
-// `commentBody` in preview.mjs builds every published finding, the pattern below
-// is that same template with its parts captured, and a parse is accepted
-// only when rebuilding it reproduces the input byte for byte. An emitted body
+// `commentBody` in preview.mjs builds every published finding, each pattern below
+// is a template with its parts captured, and a parse is accepted only when that
+// template's writer rebuilds it into the input byte for byte. An emitted body
 // therefore always reads back, and a template change that forgot this parser
 // fails the round-trip in the suite instead of misreading somebody's comment.
+//
+// P7: two templates are read, the current one and `commentBodyBeforeP7`, which
+// every comment published before P7 carries. One opens in bold and the other
+// does not, so a body can match at most one of them.
 
 // Severities come from the mode table so the reader admits exactly what a
 // published review may have written and never drifts from it. A prior review
 // may have run in any mode, so the union across modes is the right vocabulary:
 // this reads a comment, not a mode's findings policy.
 const severities = [...new Set(Object.values(reviewModes).flatMap((mode) => mode.policy.severities))];
+const severityGroup = `(?<severity>${severities.join("|")})`;
+const confidenceGroup = "(?<confidence>0(?:\\.\\d+)?|1(?:\\.0+)?)";
 
-// Lazy field captures with literal separators, anchored at both ends. Anchoring
-// is what makes the round-trip automatic for any match: a match consumes the
-// whole body, so its parts can only reassemble into the body they came from.
-const bodyPattern = new RegExp(
-  `^\\[(${severities.join("|")})\\] ([\\s\\S]+?)` +
-  "\\n\\nWhen: ([\\s\\S]+?)" +
-  "\\n\\nExpected: ([\\s\\S]+?)" +
-  "\\n\\nActual: ([\\s\\S]+?)" +
-  "\\n\\nIntroduced by this diff: ([\\s\\S]+?)" +
-  // W1: the remediation paragraph, one line, which a body published before W1
-  // does not have. A pre-W1 introduction whose last paragraph is a one-line
-  // "Fix: " reads as carrying one: those bytes admit both splits.
-  "(?:\\n\\nFix: ([^\\n]+))?" +
-  "\\n\\nConfidence: (0(?:\\.\\d+)?|1(?:\\.0+)?)\\. Reported by: ([^\\n]+)\\.$");
-
-// Anchoring the pattern at both ends makes the round-trip automatic for any
+// Anchoring a pattern at both ends makes the round-trip automatic for any
 // match, which is exactly why it proves nothing about which split was chosen: a
 // field whose own prose opens a paragraph with one of these labels admits more
 // than one split, and every one of them rebuilds the same bytes. So ambiguity is
 // refused before the split is trusted. That is the safe direction and the
 // contract this parser states: a body is either recovered exactly or reported
 // unreadable, never misread into fields it did not have.
-const separators = ["When", "Expected", "Actual", "Introduced by this diff", "Confidence"]
-  .map((label) => `\n\n${label}: `);
-
+const once = (text, separator) => {
+  const first = text.indexOf(separator);
+  return first !== -1 && text.indexOf(separator, first + 1) === -1;
+};
 // The optional remediation paragraph may open once or not at all, never twice.
-const fixSeparator = "\n\nFix: ";
+const atMostOnce = (text, separator) => text.indexOf(separator) === text.lastIndexOf(separator);
 
-const unambiguous = (body) => separators.every((separator) => {
-  const first = body.indexOf(separator);
-  return first !== -1 && body.indexOf(separator, first + 1) === -1;
-}) && body.indexOf(fixSeparator) === body.lastIndexOf(fixSeparator);
+// Lazy field captures with literal separators, anchored at both ends. Anchoring
+// is what makes the round-trip automatic for any match: a match consumes the
+// whole body, so its parts can only reassemble into the body they came from.
+const templates = [
+  {
+    // P7. The title and the footer are each one line by construction, so the
+    // title ends at its own line, and the footer's separator is counted only on
+    // the footer's line: elsewhere it is prose that no split can reach.
+    write: commentBody,
+    pattern: new RegExp(`^\\*\\*\\[${severityGroup}\\] (?<title>[^\\n]+?)\\*\\*` +
+      "\\n\\n(?<actual>[\\s\\S]+?)" +
+      "\\n\\n\\*\\*When:\\*\\* (?<trigger>[\\s\\S]+?)" +
+      "\\n\\*\\*Expected:\\*\\* (?<expected>[\\s\\S]+?)" +
+      "(?:\\n\\n\\*\\*Fix:\\*\\* (?<remediation>[^\\n]+))?" +
+      `\\n\\n<sub>Introduced by this diff: (?<introduction>[^\\n]+?) · Confidence ${confidenceGroup} · ` +
+      "(?<reporters>[^\\n]+?) reviewers?</sub>$"),
+    unambiguous: (body) => ["\n\n**When:** ", "\n**Expected:** ", "\n\n<sub>Introduced by this diff: "]
+      .every((separator) => once(body, separator)) && atMostOnce(body, "\n\n**Fix:** ") &&
+      once(body.slice(body.lastIndexOf("\n") + 1), " · Confidence "),
+  },
+  {
+    write: commentBodyBeforeP7,
+    pattern: new RegExp(`^\\[${severityGroup}\\] (?<title>[\\s\\S]+?)` +
+      "\\n\\nWhen: (?<trigger>[\\s\\S]+?)" +
+      "\\n\\nExpected: (?<expected>[\\s\\S]+?)" +
+      "\\n\\nActual: (?<actual>[\\s\\S]+?)" +
+      "\\n\\nIntroduced by this diff: (?<introduction>[\\s\\S]+?)" +
+      // W1: the remediation paragraph, one line, which a body published before W1
+      // does not have. A pre-W1 introduction whose last paragraph is a one-line
+      // "Fix: " reads as carrying one: those bytes admit both splits.
+      "(?:\\n\\nFix: (?<remediation>[^\\n]+))?" +
+      `\\n\\nConfidence: ${confidenceGroup}\\. Reported by: (?<reporters>[^\\n]+)\\.$`),
+    unambiguous: (body) => ["When", "Expected", "Actual", "Introduced by this diff", "Confidence"]
+      .every((label) => once(body, `\n\n${label}: `)) && atMostOnce(body, "\n\nFix: "),
+  },
+];
 
 export function parseCommentFinding(body) {
-  if (typeof body !== "string" || !unambiguous(body)) return undefined;
-  const match = bodyPattern.exec(body);
-  if (!match) return undefined;
-  const [, severity, title, trigger, expected, actual, introduction, remediation, confidence, reporters] = match;
-  const reportedBy = reporters.split(", ");
-  if (reportedBy.some((reporter) => !reporter.trim())) return undefined;
-  const parsed = {
-    severity, title, trigger, expected, actual, introduction,
-    ...(remediation === undefined ? {} : { remediation }),
-    confidence: Number(confidence), reportedBy,
-  };
-  // The invariant, asserted rather than assumed. A parse that cannot rebuild
-  // what it read is not a reading of this tool's output, whatever it matched.
-  return commentBody(parsed) === body ? parsed : undefined;
+  if (typeof body !== "string") return undefined;
+  for (const { write, pattern, unambiguous } of templates) {
+    const match = unambiguous(body) && pattern.exec(body);
+    if (!match) continue;
+    const { severity, title, trigger, expected, actual, introduction, remediation, confidence, reporters } = match.groups;
+    const reportedBy = reporters.split(", ");
+    if (reportedBy.some((reporter) => !reporter.trim())) return undefined;
+    const parsed = {
+      severity, title, trigger, expected, actual, introduction,
+      ...(remediation === undefined ? {} : { remediation }),
+      confidence: Number(confidence), reportedBy,
+    };
+    // The invariant, asserted rather than assumed. A parse that cannot rebuild
+    // what it read is not a reading of this tool's output, whatever it matched.
+    return write(parsed) === body ? parsed : undefined;
+  }
+  return undefined;
 }
 
 // ---------------------------------------------------------------------------

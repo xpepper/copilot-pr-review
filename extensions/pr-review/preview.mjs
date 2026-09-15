@@ -48,7 +48,33 @@ function selectedFindings(outcome) {
 // reads it back reconstructs from the same template it was written with. I1c's
 // parser rebuilds a parsed body with this function and requires byte equality,
 // so the reader and the writer can never drift apart unnoticed.
+//
+// P7: the problem first and the fix prominent, with what justifies the finding
+// (introduction, confidence, reporter) in a small footer. No field is dropped.
 export function commentBody(finding) {
+  const reporters = [...new Set(finding.reportedBy)];
+  return [
+    `**[${finding.severity}] ${oneLine(finding.title)}**`,
+    finding.actual,
+    `**When:** ${finding.trigger}\n**Expected:** ${finding.expected}`,
+    // W1: a result retained before W1 has no remediation and still rebuilds its
+    // request, so the paragraph stays optional here too.
+    ...(finding.remediation === undefined ? [] : [`**Fix:** ${finding.remediation}`]),
+    `<sub>Introduced by this diff: ${oneLine(finding.introduction)} · Confidence ${finding.confidence} · ` +
+      `${reporters.join(", ")} ${reporters.length === 1 ? "reviewer" : "reviewers"}</sub>`,
+  ].join("\n\n");
+}
+
+// A title and an introduction each sit on one rendered line, the title in bold
+// and the introduction inside the footer's tag, so their whitespace folds.
+function oneLine(text) {
+  return text.replace(/\s+/g, " ").trim();
+}
+
+// P7: the shape `commentBody` wrote before P7, kept so that I1c still reads a
+// comment published then and a proposal retained then still loads. It is never
+// published again.
+export function commentBodyBeforeP7(finding) {
   return [
     `[${finding.severity}] ${finding.title}`,
     `When: ${finding.trigger}`,
@@ -125,12 +151,20 @@ function bodyBeforeP6(outcome) {
 }
 
 // A retained proposal matches the request rebuilt from its findings, or differs
-// from it only by the body built before P6. An unreadable record refuses every
-// later review in its session, so such a record has to keep loading.
+// from it only as an earlier version's proposal does: inline comments written
+// before P7, beside the summary or beside the body built before P6. An
+// unreadable record refuses every later review in its session, so such a record
+// has to keep loading.
 export function matchesRetainedProposal(outcome, request) {
   const proposal = outcome.preview?.request;
-  return isDeepStrictEqual(proposal, request) ||
-    isDeepStrictEqual(proposal, { ...request, payload: { ...request.payload, body: bodyBeforeP6(outcome) } });
+  const findings = selectedFindings(outcome);
+  const commentsBeforeP7 = request.payload.comments.map((comment, index) =>
+    ({ ...comment, body: commentBodyBeforeP7(findings[index]) }));
+  return [
+    request.payload,
+    { ...request.payload, comments: commentsBeforeP7 },
+    { ...request.payload, body: bodyBeforeP6(outcome), comments: commentsBeforeP7 },
+  ].some((payload) => isDeepStrictEqual(proposal, { ...request, payload }));
 }
 
 export function buildReviewPreview(outcome, boundary) {

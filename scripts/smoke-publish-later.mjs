@@ -149,7 +149,14 @@ try {
       "This is not a clean-review claim.",
     legacy: "Quick review: 1 selected validated finding(s). Review coverage: INCOMPLETE. This is not a clean-review claim.",
   };
-  for (const [legacy, retainedBeforeP6] of [[false, false], [true, false], [false, true], [true, true]]) {
+  // P7: a proposal retained before P7 carries the earlier inline comments, which
+  // a proposal from before P6 does too; publishing it posts the comments rebuilt
+  // in the current layout.
+  const commentBeforeP7 = "[P2] Multiply cents by quantity\n\nWhen: total(100, 3)\n\nExpected: 300 cents\n\n" +
+    "Actual: 103 cents\n\nIntroduced by this diff: The changed operator adds quantity instead of multiplying.\n\n" +
+    "Fix: Multiply the unit price by quantity.\n\nConfidence: 0.95. Reported by: correctness, contracts.";
+  for (const [legacy, retainedBeforeP6, retainedBeforeP7] of [[false, false, false], [true, false, false],
+    [false, false, true], [true, false, true], [false, true, true], [true, true, true]]) {
     const h = await harness({ prepare(h) {
       const value = h.reviewed;
       value.validation.diagnostics = [
@@ -162,6 +169,7 @@ try {
       if (legacy) delete value.validation.diagnostics;
       value.preview.request = reviewRequest(value);
       h.expectedPayload = structuredClone(value.preview.request.payload);
+      if (retainedBeforeP7) value.preview.request.payload.comments[0].body = commentBeforeP7;
       if (retainedBeforeP6) value.preview.request.payload.body = beforeP6[legacy ? "legacy" : "classified"];
       h.store.write(retainedRecord(value));
     } });
