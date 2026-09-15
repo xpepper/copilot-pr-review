@@ -63,7 +63,7 @@ if (verifyRecord) {
 }
 assert(sdkPath && cliPath && Object.values(settings).every((value) => value && !/\s/.test(value)), "Set CLI/SDK and explicit heavy model/effort");
 const existing = gh(`${endpoint}/reviews?per_page=100`);
-assert(!existing.some((review) => review.commit_id === head && review.body?.startsWith("Quick review:")),
+assert(!existing.some((review) => review.commit_id === head && /^(\*\*)?Quick review:/.test(review.body ?? "")),
   "A plugin review already exists at this head. Do not repeat the live exercise blindly.");
 const directory = await realpath(await mkdtemp(join(tmpdir(), "pr-review-live-publication-")));
 execFileSync("git", ["init", "--quiet", directory]);

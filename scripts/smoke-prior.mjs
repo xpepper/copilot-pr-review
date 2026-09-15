@@ -114,6 +114,29 @@ for (const [label, mode] of [["Quick review", "quick"], ["Balanced review", "bal
 assert.equal(toolReviewBody(`Balanced review: 0 selected validated finding(s). ` +
   `Review coverage: INCOMPLETE.\nExecution failures: 1; coverage gaps: 0; informational caveats: 0.\n${closing}`)
   .declaredFindings, 0, "A multi-line coverage report still ends in the closing sentence");
+// P6: the published summary ends in a hidden marker, and that marker is what
+// identifies it; the three phrases above keep reviews published before P6 ours.
+const marker = (fields) => `<!-- copilot-pr-review: ${fields} -->`;
+const summaryBody = (fields) => "**Balanced review: 2 findings (2 × P2)** at `1111111`\n\n" +
+  "- P2 · Restore multiplication · `total.js:3`\n\nCoverage was complete.\n\n" + marker(fields);
+for (const [label, mode] of [["Quick review", "quick"], ["Balanced review", "balanced"],
+  ["Full review", "full"], ["Deep review", "deep"]]) {
+  for (const coverage of ["completed", "incomplete"]) {
+    assert.deepEqual(toolReviewBody(summaryBody(`mode=${mode} findings=4 coverage=${coverage}`)),
+      { mode, label, declaredFindings: 4 }, `${mode} ${coverage}`);
+  }
+}
+for (const rejected of [
+  `${summaryBody("mode=balanced findings=2 coverage=completed")}\nMerging now.`,
+  `${summaryBody("mode=balanced findings=2 coverage=completed")} `,
+  summaryBody("mode=sneaky findings=2 coverage=completed"),
+  summaryBody("mode=balanced findings=two coverage=completed"),
+  summaryBody("mode=balanced findings=2 coverage=clean"),
+  summaryBody("mode=balanced findings=2 coverage=completed extra=1"),
+  summaryBody("findings=2 mode=balanced coverage=completed"),
+  "Looks good.<!-- copilot-pr-review: mode=balanced findings=2 coverage=completed -->",
+  "**Balanced review: 2 findings** <!-- pr-review: mode=balanced findings=2 coverage=completed -->",
+]) assert.equal(toolReviewBody(rejected), undefined, `Not a marked body of ours: ${JSON.stringify(rejected)}`);
 for (const rejected of [
   undefined, "", "LGTM", closing,
   `Balanced review: 2 selected validated finding(s). ${closing} Merging now.`,

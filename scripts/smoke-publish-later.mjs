@@ -10,6 +10,7 @@ import {
   inspectRetained, retainedFilename, retainedRecord, sessionStore, validateRecord,
 } from "../extensions/pr-review/retention.mjs";
 import { reviewKey } from "../extensions/pr-review/findings.mjs";
+import { toolReviewBody } from "../extensions/pr-review/prior.mjs";
 import { retentionFixture } from "./retention-fixture.mjs";
 import { contentsResponse, pull, validationDiff } from "./target-fixture.mjs";
 
@@ -69,7 +70,7 @@ try {
           "repos/fixture/repository/pulls/12/reviews", "--include", "--input", "-",
           "-H", "Accept: application/vnd.github+json", "-H", "X-GitHub-Api-Version: 2022-11-28"]);
         const payload = JSON.parse(options.input);
-        assert.deepEqual(payload, h.reviewed.preview.request.payload, "Exact retained canonical payload");
+        assert.deepEqual(payload, h.expectedPayload ?? h.reviewed.preview.request.payload, "Exact retained canonical payload");
         return post ? post(h, payload) : success(payload);
       }
       assert.equal(args[4], "GET");
@@ -137,7 +138,18 @@ try {
   assert.deepEqual(positive.store.read(), published, "A refused repeat leaves the record untouched");
   console.log("PASS explicit publish-later of a --no-comment result: refetched evidence, exact payload, version-4 authority and no repeat");
 
-  for (const legacy of [false, true]) {
+  // P6: a proposal retained before P6 carries the old body. Publishing it posts
+  // the summary rebuilt from the retained findings, which carries the marker,
+  // and the retained proposal stays as it was.
+  const beforeP6 = {
+    classified: "Quick review: 1 selected validated finding(s). Review coverage: INCOMPLETE.\n" +
+      "Execution failures: 0; discarded candidates: 0; coverage gaps: 1; informational caveats: 1.\n" +
+      "Informational caveat: External dependency internals not audited.\n" +
+      "Coverage gap: Changed adapter contract absent; compatibility assessment blocked.\n" +
+      "This is not a clean-review claim.",
+    legacy: "Quick review: 1 selected validated finding(s). Review coverage: INCOMPLETE. This is not a clean-review claim.",
+  };
+  for (const [legacy, retainedBeforeP6] of [[false, false], [true, false], [false, true], [true, true]]) {
     const h = await harness({ prepare(h) {
       const value = h.reviewed;
       value.validation.diagnostics = [
@@ -149,11 +161,17 @@ try {
       value.coverage = "incomplete";
       if (legacy) delete value.validation.diagnostics;
       value.preview.request = reviewRequest(value);
+      h.expectedPayload = structuredClone(value.preview.request.payload);
+      if (retainedBeforeP6) value.preview.request.payload.body = beforeP6[legacy ? "legacy" : "classified"];
       h.store.write(retainedRecord(value));
     } });
     const original = h.store.read();
-    if (legacy) assert.equal(original.outcome.preview.request.payload.body,
-      "Quick review: 1 selected validated finding(s). Review coverage: INCOMPLETE. This is not a clean-review claim.");
+    assert.equal(h.expectedPayload.body, "**Quick review: 1 finding (1 × P2)** at `bbbbbbb`\n\n" +
+      "- P2 · Multiply cents by quantity · `total.js:3`\n\n" +
+      "Coverage was partial: 1 part of the change could not be fully assessed. " +
+      "Finding nothing elsewhere does not mean nothing is there.\n\n" +
+      "<!-- copilot-pr-review: mode=quick findings=1 coverage=incomplete -->");
+    assert.equal(toolReviewBody(h.expectedPayload.body)?.declaredFindings, 1);
     const result = await h.run();
     assert.equal(result.publication.status, "succeeded");
     const published = h.store.read();

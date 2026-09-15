@@ -18,11 +18,13 @@ earlier review saw. It reads GitHub only, spends no credits, and `--capture-only
 reports it too.
 
 A review counts only when your authenticated GitHub identity submitted it **and**
-it carries the review body this tool builds: one of four mode labels, a count of
+it carries the review body this tool builds. Since `P6` that body ends with a
+hidden marker line naming the mode, the finding count and the coverage. A body
+published earlier still counts when it has one of four mode labels, a count of
 selected validated findings, a stated coverage, and the closing claim sentence.
-An ordinary hand-written review matches none of that and is counted as
-considered rather than treated as a prior one. A body deliberately written to
-imitate all four parts would still be taken for ours.
+An ordinary hand-written review matches neither and is counted as considered
+rather than treated as a prior one. A body deliberately written to imitate either
+would still be taken for ours.
 
 | Reported | Meaning |
 | --- | --- |
@@ -90,11 +92,11 @@ have. The filter removes only what it can prove an earlier turn already
 covered.
 
 **A confined review does not cover the whole pull request**, and says so in the
-run and in the published review body. It says it as an informational caveat
-rather than as incomplete coverage, because nothing failed and `INCOMPLETE` has
-to keep meaning that something did. What the run did not hunt was covered by the
-earlier review, whose own coverage this run does not read and does not vouch
-for.
+run and, in one plain sentence, in the published review body. It is recorded as
+an informational caveat rather than as incomplete coverage, because nothing
+failed and `INCOMPLETE` has to keep meaning that something did. What the run did
+not hunt was covered by the earlier review, whose own coverage this run does not
+read and does not vouch for.
 
 That is why the flag is opt-in and narrowing is not the default. Two cases
 decided it. A re-review in a heavier mode than the earlier one would otherwise

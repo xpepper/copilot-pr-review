@@ -5,7 +5,8 @@ import {
 import { reviewMode } from "./modes.mjs";
 import { waitForInteraction } from "./interaction.mjs";
 import { selectionBinding } from "./selection.mjs";
-import { formatCoverage } from "./coverage.mjs";
+import { coverageDiagnostics, formatCoverage } from "./coverage.mjs";
+import { summaryBody } from "./summary.mjs";
 
 const authorizedStatuses = ["flag-authorized", "config-authorized", "confirmed"];
 
@@ -93,18 +94,43 @@ function inlineComment(finding, binding, policy) {
 export function reviewRequest(outcome) {
   const mode = reviewMode(outcome.mode);
   const findings = selectedFindings(outcome);
+  const comments = findings.map((finding) => inlineComment(finding, outcome.binding, mode.policy));
   return {
     binding: selectionBinding(outcome),
     payload: {
       commit_id: outcome.binding.head, event: "COMMENT",
-      body: `${mode.label}: ${findings.length} selected validated finding(s). ` +
-        (outcome.validation.diagnostics === undefined
-          ? `Review coverage: ${outcome.complete ? "completed" : "INCOMPLETE"}. `
-          : `${formatCoverage(outcome)}\n`) +
-        "This is not a clean-review claim.",
-      comments: findings.map((finding) => inlineComment(finding, outcome.binding, mode.policy)),
+      // P6: a short summary for the pull request's author. `formatCoverage`
+      // stays the terminal and retained presentation and is not published.
+      body: summaryBody({
+        mode: mode.id, head: outcome.binding.head, complete: outcome.complete,
+        diagnostics: coverageDiagnostics(outcome),
+        findings: findings.map((finding, index) => ({
+          severity: finding.severity, title: finding.title, path: comments[index].path,
+          startLine: finding.location.startLine, endLine: finding.location.endLine,
+        })),
+      }),
+      comments,
     },
   };
+}
+
+// P6: the body `reviewRequest` built before P6, kept only to recognise a
+// proposal retained by that version. It is never published again.
+function bodyBeforeP6(outcome) {
+  return `${reviewMode(outcome.mode).label}: ${selectedFindings(outcome).length} selected validated finding(s). ` +
+    (outcome.validation.diagnostics === undefined
+      ? `Review coverage: ${outcome.complete ? "completed" : "INCOMPLETE"}. `
+      : `${formatCoverage(outcome)}\n`) +
+    "This is not a clean-review claim.";
+}
+
+// A retained proposal matches the request rebuilt from its findings, or differs
+// from it only by the body built before P6. An unreadable record refuses every
+// later review in its session, so such a record has to keep loading.
+export function matchesRetainedProposal(outcome, request) {
+  const proposal = outcome.preview?.request;
+  return isDeepStrictEqual(proposal, request) ||
+    isDeepStrictEqual(proposal, { ...request, payload: { ...request.payload, body: bodyBeforeP6(outcome) } });
 }
 
 export function buildReviewPreview(outcome, boundary) {
@@ -237,7 +263,8 @@ export function validatePreview(outcome) {
     requirePreview(initial.status === "confirmation-required"
       ? ["confirmed", "declined", "unavailable"].includes(preview.status)
       : preview.status === initial.status, "authority does not follow posting policy");
-    expected.request = reviewRequest(outcome);
+    const request = reviewRequest(outcome);
+    expected.request = matchesRetainedProposal(outcome, request) ? preview.request : request;
   }
   requirePreview(isDeepStrictEqual(preview, expected), "incompatible schema or changed request");
 }

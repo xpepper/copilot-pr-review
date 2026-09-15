@@ -1,4 +1,5 @@
 import { reviewModes } from "./modes.mjs";
+import { markedReview } from "./summary.mjs";
 import { runGh } from "./target.mjs";
 
 const shaPattern = /^[0-9a-f]{40}$/;
@@ -16,21 +17,26 @@ function requirePrior(condition, message) {
   if (!condition) throw new Error(`Prior review discovery refused: ${message}.`);
 }
 
-export function toolReviewBody(body) {
-  // The opening and the closing alone would let anything sit between them.
-  // Every body `reviewRequest` builds states the coverage, in both of its
-  // branches, so requiring that narrows the shape at no cost to stability: a
-  // review published by an older version of this tool must stay recognisable,
-  // and the coverage wording between these three fixed parts is the half most
-  // likely to change.
-  if (typeof body !== "string" || !body.endsWith(claimSentence) ||
-      !body.includes(coverageSentence)) return undefined;
-  const opening = openingPattern.exec(body);
-  if (!opening) return undefined;
-  const mode = Object.values(reviewModes).find(({ label }) => label === opening[1]);
-  const declaredFindings = Number(opening[2]);
+function declared(mode, count) {
+  const declaredFindings = Number(count);
   if (!mode || !Number.isSafeInteger(declaredFindings)) return undefined;
   return { mode: mode.id, label: mode.label, declaredFindings };
+}
+
+export function toolReviewBody(body) {
+  if (typeof body !== "string") return undefined;
+  // P6: the marker summary.mjs writes as the last line of every summary body.
+  const marked = markedReview(body);
+  if (marked) return declared(marked.mode, marked.findings);
+  // Before P6. The opening and the closing alone would let anything sit between
+  // them. Every body `reviewRequest` built then stated the coverage, in both of
+  // its branches, so requiring that narrows the shape at no cost to stability: a
+  // review published by an older version of this tool must stay recognisable,
+  // and the coverage wording between these three fixed parts varied.
+  if (!body.endsWith(claimSentence) || !body.includes(coverageSentence)) return undefined;
+  const opening = openingPattern.exec(body);
+  if (!opening) return undefined;
+  return declared(Object.values(reviewModes).find(({ label }) => label === opening[1]), opening[2]);
 }
 
 export function identityFrom(raw) {

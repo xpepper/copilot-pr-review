@@ -1,8 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
-import { isDeepStrictEqual } from "node:util";
 import { assembleContext } from "./context.mjs";
 import { evidenceBoundary, reviewKey } from "./findings.mjs";
-import { buildReviewPreview } from "./preview.mjs";
+import { buildReviewPreview, matchesRetainedProposal } from "./preview.mjs";
 import {
   cancelPublication, dispatchPublication, publicationSummary, verifyPublicationTarget,
 } from "./publication.mjs";
@@ -69,8 +68,10 @@ export async function publishRetained(parent, { controller, gh = runGh, store, a
   guard();
   const boundary = evidenceBoundary(snapshot, context, binding);
   const request = buildReviewPreview(outcome, boundary);
+  // P6: a proposal retained before P6 differs only by its old body, and what is
+  // published is the summary rebuilt here, which carries the marker.
   if (outcome.preview?.request) {
-    refuse(isDeepStrictEqual(request, outcome.preview.request),
+    refuse(matchesRetainedProposal(outcome, request),
       "the retained proposal no longer matches the canonical payload");
   }
   await parent.log("Publish-later COMMENT review payload, rebuilt from the retained selection and " +
