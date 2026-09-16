@@ -35,7 +35,7 @@ jobs:
           set -euo pipefail
           for s in findings review selection retention preview publication publish-later \
             checkout config context fixture target safeguards prior incremental revalidation cost \
-            benchmark; do
+            benchmark help; do
             echo "--- smoke-$s"
             node "scripts/smoke-$s.mjs"
           done
