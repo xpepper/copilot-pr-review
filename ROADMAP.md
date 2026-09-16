@@ -100,7 +100,7 @@ posting them.
 | Q9 | Completed | With an exact location citation, a failing supporting citation is dropped instead of the candidate, reported as a caveat the adjudicator reads; the location and an `H1` rule citation never are. Pull request #57, one plugin review on the branch install. | Q8; [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | O2 | Completed | `--quiet` replaces the static configuration policy with one line naming the sources this run read, groups reviewers by identical model, effort and window, says a captured target's review is starting, and says what an authorized run will publish instead of printing its payload JSON; every model, effort, window, fallback, coverage and publication line stays. Pull request #58, one plugin review on the branch install: 193.076478 credits, INCOMPLETE, 0 validated, one real finding fixed here. The standing review cannot print quiet output, because `dogfood-review.mjs` refuses the flag. | Q9; [Models/execution](SCOPE.md#models-configuration-and-execution) |
 | H2 | Completed | `/pr-review help` answers the question people actually open with, in 35 lines: the five modes, the options grouped by the decision each one makes, and the lifecycle commands. The 155 lines it used to print keep every word behind `help --all`, minus a first line that called this plugin a runtime feasibility prototype; a mistyped flag now appends the orientation rather than the reference. Both texts moved to `help.mjs`, which a controlled suite can import, because `extension.mjs` calls `joinSession` at the top level and nothing cheap could ever read this text: three false user-facing strings had shipped in it. `smoke-help.mjs` checks it against the parsers' own exported flag lists, so an undocumented flag fails CI. `status` and a bare `/pr-review` are deliberately unchanged. Pull request #59, one plugin review on the branch install: balanced, 119.146906 credits, INCOMPLETE, 0 validated and no candidate raised at all; its only signal, that the dispatch was not shown end to end, was closed by a zero-inference `smoke-runtime.mjs --targets --startup` run against a verified-identical install. | O2; user-scheduled 2026-09-16; no scope clause |
-| S2 | In progress | Cut and list `v0.2.0`, the first release after #54-#59. The bump is minor because the release contains new capabilities and pre-1.0 breaking-category publication-format changes; older review summaries remain recognisable. | H2; [Release boundary](SCOPE.md#priority-and-release-boundary); [release procedure](docs/release.md) |
+| S2 | In progress | Cut and list `v0.2.0`, the first release after #54-#59. The bump is minor because the release contains new capabilities and pre-1.0 breaking-category publication-format changes; older review summaries remain recognisable. Pull request #60, reviewed once on the verified branch install: balanced, 75.476181 credits, INCOMPLETE, 0 validated findings. | H2; [Release boundary](SCOPE.md#priority-and-release-boundary); [release procedure](docs/release.md) |
 
 ## Every completed increment, `F1` through `H2`, is archived
 
@@ -152,20 +152,38 @@ controlled suites are regression evidence, not evidence that the manifest says
 the intended version, so validation separately parses `plugin.json`, asserts
 `version === "0.2.0"`, and asserts the load-bearing name is unchanged.
 
+### The installed-plugin review
+
+Pull request #60 was reviewed once at the standing authorization, after the user
+agreed to replace the marketplace install temporarily. The direct install was
+byte-identical to commit `e97aea4`. Balanced used `gpt-5.6-terra`/high for four
+heavy reviewers and the adjudicator, and `gpt-5.6-luna`/high for overview:
+75.476181 credits over 17 requests, 205.4 seconds of model work in six passes,
+82.6 seconds elapsed. Coverage was INCOMPLETE, with 0 validated findings, 0
+execution failures, 3 discarded candidates, 3 coverage gaps and 1 informational
+caveat. Nothing was published.
+
+Three reviewers independently claimed the removed live H2 record was absent
+from the archive. That was false: the unchanged archive already contains the
+complete H2 section, and the adjudicator rejected the one candidate that reached
+it because the captured context could not establish the claimed loss. The
+fourth reviewer correctly noticed that this section still told readers to open
+the pull request which was already open; its candidate failed the exact quote
+gate and is fixed below anyway. No rerun is authorized or needed for that
+documentation correction. The marketplace `v0.1.0` install was restored and
+verified byte-for-byte against `git archive v0.1.0`.
+
 ### The exact next step
 
-Open the version-bump pull request, then review it once with the plugin under the
-standing authorization. The review must use a direct install proven identical
-to the branch; replacing the user's marketplace install needs their agreement
-first. Restore and verify the `v0.1.0` marketplace install afterwards. The user
-then merges the pull request.
+Pull request #60 is open and has had its one authorized plugin review. The user
+merges it.
 
-Only after that merge, ask for the next authorization: run the full controlled
-set at the new squash commit on `main`, create an annotated `v0.2.0` tag like
-`v0.1.0`, and push it. Tag verification, the marketplace-index pull request,
-its merge, marketplace refresh and reinstall belong in the same sitting so the
-index trails the tag for as little time as possible. A GitHub Release is
-optional and separately authorized.
+After that merge, ask for the next authorization: run the full controlled set at
+the new squash commit on `main`, create an annotated `v0.2.0` tag like `v0.1.0`,
+and push it. Tag verification, the marketplace-index pull request, its merge,
+marketplace refresh and reinstall belong in the same sitting so the index trails
+the tag for as little time as possible. A GitHub Release is optional and
+separately authorized.
 
 Nothing under the earlier "Recorded, not scheduled" list became scheduled.
 
