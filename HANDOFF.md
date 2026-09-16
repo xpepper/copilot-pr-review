@@ -9,7 +9,7 @@ from an API declaration.
 ## Where things stand
 
 `S2` is complete. `v0.2.0` is tagged, listed and installed from the marketplace.
-The only current repository work is the documentation-only closing branch
+The only current repository work is documentation-only pull request #61 from
 `s2/release-evidence`, which records the completed release evidence and this
 fresh-session handoff.
 
@@ -52,11 +52,9 @@ failures are neither a review nor evidence about the release.
 
 ## Exact next step
 
-Complete the documentation-only closing pull request from
-`s2/release-evidence`. If it is already open, inspect its state. Documentation-
-only work still lands through a pull request, but its plugin review costs
-credits and is the user's choice rather than a requirement. Do not run one
-unless the user explicitly asks. The user merges the closing PR.
+Complete documentation-only pull request #61. Its plugin review costs credits
+and is the user's choice rather than a requirement. Do not run one unless the
+user explicitly asks. The user merges the closing PR.
 
 After that, **nothing is scheduled**. Ask the user what to work on; do not pick
 anything under ROADMAP's "Recorded, not scheduled" list. The draft GitHub
