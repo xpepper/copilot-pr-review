@@ -10410,6 +10410,50 @@ record and the handoff were still missing at that head: both added since.
 
 `O2`, after #57 merges; archive this entry first if the next one does not fit.
 
+### `G1`'s references, all read, and the five more the widest sweep added
+
+The user named five when scheduling `G1`, as a starting point rather than a
+boundary, and then chose the widest sweep, so five more were read as well.
+**All ten were read and none was copied.** The comparison and everything it
+concluded is in [docs/gap-analysis.md](docs/gap-analysis.md); this list is kept
+only so a later session knows what the document rests on.
+
+The five the user named:
+
+- Upstream: [`pi-pr-review`](https://pi.dev/packages/pi-pr-review?name=review),
+  the baseline `SCOPE.md` pins. **Read at the pinned `457e18e` and again at its
+  current head**, which is where the convergence on `I1a`-`I1c` was found.
+- [openai/codex `.codex/skills`](https://github.com/openai/codex/tree/main/.codex/skills)
+- [channingwalton `code-reviewer`](https://github.com/channingwalton/skills/blob/main/skills/code-reviewer/SKILL.md)
+- [JPeetz `code-quality`](https://github.com/JPeetz/agent-skills/tree/main/skills/code-quality)
+- [unclecatvn `code-review`](https://github.com/unclecatvn/agent-skills/blob/main/skills/code-review/SKILL.md)
+
+The five the widest sweep added: Claude Code's own official `code-review`
+plugin, read from the local plugin cache and the closest peer to this tool;
+GitHub's own Copilot code review, which this project already meets on its own
+pull requests; the hosted products, being CodeRabbit, Qodo, Greptile, Cursor
+BugBot and Graphite Diamond; the open-source `PR-Agent` command surface around
+them; and Martian's Code Review Bench, the one independent benchmark in the
+field, read second-hand.
+
+**They were read and nothing was copied.** `docs/upstream-licensing.md` records
+why, and the rule is not specific to upstream: anything adopted is adopted as
+behaviour and re-implemented here. **That rule held through `G1`**, which read
+more third-party material than any increment before it.
+
+**Nothing above `G1` is to be redone, widened or reopened.** Every increment's
+authorization is spent, and the evidence for each is either in the entry
+kept here or in
+[docs/roadmap-archive-2026-09-10.md](docs/roadmap-archive-2026-09-10.md).
+
+**`V2` is closed**, and its answers are not to be reopened: no reviewer receives
+safeguard output, the retained record says nothing about what ran, the citation
+gate still accepts a prefix, the shell gate does not accept a command a project
+wrote as a chain, and no timeout of any kind bounds a running safeguard.
+**`L1` is closed**: upstream declares MIT and publishes no licence text or
+copyright notice, so no upstream source may be copied and none has been. This
+project's own licence is settled and is MIT, and `LICENSE` carries the text.
+
 ## Every completed increment, `F1` through `S1`, is archived
 
 Fifty-nine sections were here and fifteen increments, the backlog triage, the

@@ -96,7 +96,7 @@ posting them.
 | P6 | Completed | The published body is a short Markdown summary: severity counts and head, one line per finding, one plain coverage sentence chosen by kind, a hidden marker; no caveats or internal errors, but a confined run still says it covers less. `prior.mjs` accepts the marker or the old phrases. Pull request #55, one plugin review on the branch install. | Q8; [Publication](SCOPE.md#selection-publication-and-cached-results) |
 | P7 | Completed | Each inline comment leads with the problem and a prominent fix, keeps every field, and footers introduction, confidence and reporter; `I1c` parses old and new templates byte for byte, and a proposal retained before `P7` still loads. Pull request #56, one plugin review on the branch install. | P6; [Publication](SCOPE.md#selection-publication-and-cached-results) |
 | Q9 | Completed | With an exact location citation, a failing supporting citation is dropped instead of the candidate, reported as a caveat the adjudicator reads; the location and an `H1` rule citation never are. Pull request #57, one plugin review on the branch install. | Q8; [Modes/findings](SCOPE.md#review-modes-and-findings) |
-| O2 | Completed | `--quiet` replaces the static configuration policy with one line naming the sources this run read, groups reviewers by identical model, effort and window, says a captured target's review is starting, and says what an authorized run will publish instead of printing its payload JSON; every model, effort, window, fallback, coverage and publication line stays. Pull request #58; the standing review cannot print quiet output, because `dogfood-review.mjs` refuses the flag. | Q9; [Models/execution](SCOPE.md#models-configuration-and-execution) |
+| O2 | Completed | `--quiet` replaces the static configuration policy with one line naming the sources this run read, groups reviewers by identical model, effort and window, says a captured target's review is starting, and says what an authorized run will publish instead of printing its payload JSON; every model, effort, window, fallback, coverage and publication line stays. Pull request #58, one plugin review on the branch install: 193.076478 credits, INCOMPLETE, 0 validated, one real finding fixed here. The standing review cannot print quiet output, because `dogfood-review.mjs` refuses the flag. | Q9; [Models/execution](SCOPE.md#models-configuration-and-execution) |
 
 ## Every completed increment, `F1` through `Q9`, is archived
 
@@ -110,7 +110,10 @@ that file's last section, because 870 bytes were spare here and no live entry
 was left to archive; the user chose that move on 2026-09-15. **`P6` moved
 `Q8`'s 4105 bytes** verbatim, just before that section, because `P6`'s entry did
 not fit beside it; **`P7` moved `P6`'s 4273 bytes**, **`Q9` moved `P7`'s 3510**
-and **`O2` moved `Q9`'s 4220** the same way. The rule stands:
+and **`O2` moved `Q9`'s 4220** the same way. **`O2` also moved `G1`'s 2685-byte
+reference list** there, verbatim and just before that last section, when its own
+review record left this file 1033 bytes over the cap and this project's own
+discovery stopped reading it. The rule stands:
 keep the most recent entries live, archive the rest verbatim, and measure this
 file with `wc -c` against the 65536-byte cap before opening a pull request.
 [docs/upstream-licensing.md](docs/upstream-licensing.md) did not move.
@@ -177,16 +180,64 @@ The worked example's opening goes from about thirty lines to six.
 
 ### The installed-plugin review
 
-**`scripts/dogfood-review.mjs` refuses `--quiet`**, so the one review this
-workflow authorizes per increment pull request cannot print `O2`'s own output.
-**The live quiet timeline is not demonstrated**: the controlled suites are the
-only evidence for what a quiet run prints. Anything more costs a separate
-authorized run and is the user's decision.
+One run, at the standing authorization and with the user's agreement to swap
+installs: the checkout replaced the marketplace copy, `diff -rq --exclude=.git`
+printed nothing, and it ran at `3bf1831`. Balanced, `gpt-5.6-terra` high for the
+four specialists and the adjudicator, `gpt-5.6-luna` high for overview, default
+window, no fallbacks. 11 changed files, 43001 diff bytes. **193.076478 credits,
+29 requests, 343.7 s of model work, 167.6 s elapsed.** INCOMPLETE, 0 validated:
+1 execution failure, 0 discarded candidates, 3 coverage gaps, 3 caveats. Two
+candidates reached adjudication; neither survived it.
+
+- **The one real finding was accepted and then lost by the adjudicator itself.**
+  `correctness:1` said a fallback configured identical to its tier's own
+  assignment is dropped by `reviewerAssignments`, so the quiet assignment line
+  says `Fallbacks: none.` while the tier block that reports it as `NOT OFFERED`
+  is exactly what a quiet run leaves out: the configured fallback vanished
+  altogether, against `O2`'s own rule. The adjudicator accepted it, but its own
+  citation quoted 10 lines for a 9-line range of `review.mjs`, so the candidate
+  was discarded as `invalid adjudication` and never became a finding. **It was
+  right, and it is fixed here**: the quiet configuration line now names each
+  tier whose configured fallback is not offered, with a test written first.
+- **Recorded, not scheduled**: `Q9` drops a reviewer's failing supporting
+  citation rather than the candidate; an *adjudication's* own citation has no
+  such treatment, so one miscounted range discards a judged candidate. Do not
+  widen `O2` for it.
+- `security:1` said the quiet line should show `autoPostReviews` and its origin
+  before reviewers start. Rejected by the adjudicator and by me: posting
+  authority is stated at the proposal, before any write, and the plan's worked
+  example settled what that line carries.
+- The 3 coverage gaps and 3 caveats all say the same true thing:
+  **`scripts/dogfood-review.mjs` refuses `--quiet`**, so this run printed the
+  verbose timeline and **the live quiet timeline is not demonstrated**. The
+  controlled suites are the only evidence for what a quiet run prints. Anything
+  more costs a separate authorized run and is the user's decision.
+- `README.md` (65489) and `ROADMAP.md` (64229) do not fit the 49152-byte
+  standards budget and were skipped; `AGENTS.md`, `CLAUDE.md`, `HANDOFF.md` and
+  `SCOPE.md` reached the overview reviewer.
+
+The marketplace install was restored, identical to `git archive v0.1.0`.
+Nothing was published.
 
 ### The exact next step
 
-**Nothing is scheduled after `O2`.** It was the last of the five increments the
-user scheduled on 2026-09-15. Ask the user what comes next; do not pick it.
+**`O2` was the last of the five increments scheduled on 2026-09-15**, and the
+backlog is empty. Asked on 2026-09-16, the user scheduled one thing:
+
+**Make the plugin easy to start using, through its own help.** Today they open
+by asking an agent "I want to use the /pr-review plugin to review this PR, what
+options do I have?", and the agent reads the installed plugin and answers with a
+modes table, the useful controls grouped by purpose, and the lifecycle commands.
+That answer is what `/pr-review help` should give.
+
+**It is not a new command.** `/pr-review help` already exists: `extension.mjs`
+has `case "help"` and a `help` constant spanning lines 18-172, about 155 lines.
+It opens "Copilot PR Review - runtime feasibility prototype" and is exhaustive
+reference prose, so the work is to make it a short, task-oriented orientation,
+and to decide what the long-form text becomes. **The scope decision is the
+user's, taken in the session that builds it**, as `T1`, `X1`, `W1`, `H1` and
+`K1` each took theirs; do not assume it from this row. Nothing else is
+scheduled.
 
 ## v1 is complete, and five more increments are scheduled on top of it
 
@@ -278,50 +329,6 @@ two published reviews are on playground pull requests still at the head they
 evaluated. Arranging one means publishing a real review or pushing a commit to a
 playground branch. **Both are the user's call, and playground #1 and #2 must
 never be merged.**
-
-### `G1`'s references, all read, and the five more the widest sweep added
-
-The user named five when scheduling `G1`, as a starting point rather than a
-boundary, and then chose the widest sweep, so five more were read as well.
-**All ten were read and none was copied.** The comparison and everything it
-concluded is in [docs/gap-analysis.md](docs/gap-analysis.md); this list is kept
-only so a later session knows what the document rests on.
-
-The five the user named:
-
-- Upstream: [`pi-pr-review`](https://pi.dev/packages/pi-pr-review?name=review),
-  the baseline `SCOPE.md` pins. **Read at the pinned `457e18e` and again at its
-  current head**, which is where the convergence on `I1a`-`I1c` was found.
-- [openai/codex `.codex/skills`](https://github.com/openai/codex/tree/main/.codex/skills)
-- [channingwalton `code-reviewer`](https://github.com/channingwalton/skills/blob/main/skills/code-reviewer/SKILL.md)
-- [JPeetz `code-quality`](https://github.com/JPeetz/agent-skills/tree/main/skills/code-quality)
-- [unclecatvn `code-review`](https://github.com/unclecatvn/agent-skills/blob/main/skills/code-review/SKILL.md)
-
-The five the widest sweep added: Claude Code's own official `code-review`
-plugin, read from the local plugin cache and the closest peer to this tool;
-GitHub's own Copilot code review, which this project already meets on its own
-pull requests; the hosted products, being CodeRabbit, Qodo, Greptile, Cursor
-BugBot and Graphite Diamond; the open-source `PR-Agent` command surface around
-them; and Martian's Code Review Bench, the one independent benchmark in the
-field, read second-hand.
-
-**They were read and nothing was copied.** `docs/upstream-licensing.md` records
-why, and the rule is not specific to upstream: anything adopted is adopted as
-behaviour and re-implemented here. **That rule held through `G1`**, which read
-more third-party material than any increment before it.
-
-**Nothing above `G1` is to be redone, widened or reopened.** Every increment's
-authorization is spent, and the evidence for each is either in the entry
-kept here or in
-[docs/roadmap-archive-2026-09-10.md](docs/roadmap-archive-2026-09-10.md).
-
-**`V2` is closed**, and its answers are not to be reopened: no reviewer receives
-safeguard output, the retained record says nothing about what ran, the citation
-gate still accepts a prefix, the shell gate does not accept a command a project
-wrote as a chain, and no timeout of any kind bounds a running safeguard.
-**`L1` is closed**: upstream declares MIT and publishes no licence text or
-copyright notice, so no upstream source may be copied and none has been. This
-project's own licence is settled and is MIT, and `LICENSE` carries the text.
 
 ### Why the approval question keeps coming back empty, and it is not the schema
 
