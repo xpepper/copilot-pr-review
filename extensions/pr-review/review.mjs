@@ -214,8 +214,40 @@ export async function reviewerAssignments(parent, mode, flags, configuration, { 
   }));
 }
 
-export function describeAssignments(mode, assignments) {
+// O2: one reviewer's assignment as a quiet run states it. Every part a verbose
+// run reports is here except where each part came from, which is precedence,
+// and precedence is what the one configuration line points at.
+function quietAssignment({ model, reasoningEffort, contextTier, origin }) {
+  return `${model ?? "(unset)"} ${reasoningEffort ?? "(not configurable)"}, ` +
+    `${contextTier === "long_context" ? "long-context" : "default"} window` +
+    `${origin?.contextTier === "model" ? " (no long-context window)" : ""}`;
+}
+
+// Reviewers that resolved the same model, effort and window are named together.
+// Grouping shortens the list without dropping anything from it: a reviewer whose
+// assignment differs in any of the three cannot share a line with another.
+function groupAssignments(assignments, pick) {
+  const groups = new Map();
+  for (const assignment of assignments) {
+    const subject = pick(assignment);
+    if (!subject) continue;
+    const text = quietAssignment(subject);
+    if (!groups.has(text)) groups.set(text, []);
+    groups.get(text).push(assignment.label);
+  }
+  return [...groups].map(([text, labels]) => `${labels.join(", ")}: ${text}`);
+}
+
+export function describeAssignments(mode, assignments, { quiet = false } = {}) {
   const withFallback = assignments.filter(({ fallback }) => fallback);
+  if (quiet) {
+    const fallbacks = groupAssignments(assignments, ({ fallback }) => fallback);
+    return [
+      `${mode.label}: ${assignments.length} reviewer(s); ${describePolicy(mode.policy)}.`,
+      ...groupAssignments(assignments, (assignment) => assignment).map((group) => `  ${group}`),
+      `  Fallbacks: ${fallbacks.length ? `${fallbacks.join("; ")}.` : "none."}`,
+    ].join("\n");
+  }
   return [
     `Effective reviewer assignments: ${mode.id} mode, ${assignments.length} reviewer(s); ` +
       `findings policy: ${describePolicy(mode.policy)}.`,

@@ -220,9 +220,16 @@ export async function finishPreview(parent, outcome, options, controller, bounda
     } else {
       const request = buildReviewPreview(outcome, boundary);
       preview = { ...initial, request };
-      await parent.log("COMMENT review payload proposal - submission requires authority and fresh publication gates; no safeguards.\n" +
-        `Posting authority: ${preview.status}. Review coverage: ${outcome.coverage}.\n` +
-        JSON.stringify(request, null, 2));
+      const authority = `Posting authority: ${preview.status}. Review coverage: ${outcome.coverage}.`;
+      // O2: a run that is already authorized to post is told what it is about to
+      // publish, not handed the payload. A run that still has to be approved
+      // keeps the payload, because the payload is exactly what is being
+      // approved, and so does every verbose run, which O2 does not reopen.
+      await parent.log(options.quiet === true && authorizedStatuses.includes(preview.status)
+        ? `Publishing ${request.payload.comments.length} inline comment(s) to ` +
+          `#${request.binding.number}…\n${authority}`
+        : "COMMENT review payload proposal - submission requires authority and fresh publication gates; no safeguards.\n" +
+          `${authority}\n${JSON.stringify(request, null, 2)}`);
       guard();
       if (preview.status === "confirmation-required") {
         if (!parent.capabilities.ui?.elicitation) {

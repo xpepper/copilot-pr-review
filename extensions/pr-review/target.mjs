@@ -247,11 +247,24 @@ export async function executeTargetCapture(session, args, {
   // O1: a quiet run drops the JSON dump, never the decision it records. A
   // skipped or refused target is the whole reason nothing was reviewed, so it is
   // stated in words rather than left to a suppressed line.
+  //
+  // O2: a quiet capture a review is about to use says that instead. The
+  // capture-only sentence belongs to `--capture-only`, which refuses `--quiet`;
+  // it is simply false of a run whose reviewers start next, and it carried a
+  // doubled period there because the disposition's own reason ends in one. A
+  // target that was skipped or refused still says no review was performed,
+  // because none was.
+  const notReviewed = "\nNo PR review performed; no clean-review claim. Nothing published.";
+  const target = `Target ${outcome.repository.nameWithOwner}#${outcome.pull.number}`;
   await session.log(`${quiet
-    ? `Target ${outcome.repository.nameWithOwner}#${outcome.pull.number}: ${outcome.disposition}` +
-      `${outcome.reason ? `; ${outcome.reason}` : ""}. State ${outcome.pull.state}` +
-      `${outcome.pull.draft ? " (draft)" : ""}, head ${outcome.pull.head.sha}, ` +
-      `${outcome.pull.changedFiles} changed file(s).`
+    ? outcome.snapshot
+      ? `${target}: captured at ${outcome.pull.head.sha}${outcome.pull.draft ? " (draft)" : ""}, ` +
+        `${outcome.pull.changedFiles} changed file(s)` +
+        `${outcome.pull.state === "OPEN" ? "" : `; state ${outcome.pull.state}`}. Review starting.`
+      : `${target}: ${outcome.disposition}` +
+        `${outcome.reason ? `; ${outcome.reason}` : ""}. State ${outcome.pull.state}` +
+        `${outcome.pull.draft ? " (draft)" : ""}, head ${outcome.pull.head.sha}, ` +
+        `${outcome.pull.changedFiles} changed file(s).${notReviewed}`
     : `Q1 target: ${JSON.stringify({
       disposition: outcome.disposition, reason: outcome.reason,
       repository: outcome.repository, number: outcome.pull.number, state: outcome.pull.state,
@@ -261,7 +274,7 @@ export async function executeTargetCapture(session, args, {
         diffSha256: outcome.snapshot.diffSha256, diffBytes: outcome.snapshot.diffBytes,
         capturedAt: outcome.snapshot.capturedAt,
       } : {}),
-    })}`}\nNo PR review performed; no clean-review claim. Nothing published.`);
+    })}${notReviewed}`}`);
   if (!outcome.snapshot) return outcome;
   // Context is bound to the captured revisions; unavailable or inconsistent source stops here.
   const context = await assembleContext(outcome.snapshot, { gh, cwd });
