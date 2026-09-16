@@ -5,8 +5,51 @@
 // controlled suite can read a line of this text. Three false user-facing
 // strings have shipped in it for exactly that reason. Here `smoke-help.mjs`
 // reads both constants directly, for free, on every CI run.
+// The answer to "I want to review a pull request, what are my options?". It is
+// what `help` prints, so it is the first thing anybody reads: the modes, then
+// the options grouped by the decision each one makes, then the lifecycle
+// commands. Everything it leaves out is one command away, and `smoke-help.mjs`
+// holds it to a line budget so it cannot grow back into the reference below.
+export const helpOrientation = [
+  "Review a pull request with Copilot. Reviews use Copilot credits.",
+  "",
+  "  /pr-review NUMBER [mode] [options]",
+  "",
+  "MODES (pick one; --balanced is the default)",
+  "  --quick         Three heavy specialists, P0-P2 findings only.",
+  "  --balanced      Four specialists plus an overview reviewer; P0-P2 plus at most three minor.",
+  "  --full          Adds a conventions/maintainability reviewer; every severity, no minor cap.",
+  "  --deep          One integrated reviewer over the whole change instead of specialists.",
+  "  --capture-only  Capture and bind the target, then stop. No reviewers, no credits.",
+  "",
+  "OPTIONS",
+  "  Publishing   --comment authorizes posting, --no-comment suppresses it, and --all selects",
+  "               every validated finding. Selecting a finding never authorizes posting it.",
+  "  Scope        --incremental confines fresh hunting to the commits added since an earlier",
+  "               review, --revalidate judges what became of that review's findings,",
+  "               --no-standards stops handing this project's own rules to the reviewer,",
+  "               --include-drafts and --include-closed widen what may be captured.",
+  "  Safety       --verify adds the stricter preflight and offers this project's safeguards,",
+  "               --unattended refuses up front any run that would need somebody present.",
+  "  Output       --quiet prints less of the same review, never less of what makes it",
+  "               trustworthy: coverage, refusals and publication outcomes always print.",
+  "  Models       --long-context asks each model for its long-context window, at its own",
+  "               price; heavyModel=ID and heavyEffort=LEVEL set the heavy tier for one run.",
+  "",
+  "COMMANDS",
+  "  status   What this plugin implements.   models    What your subscription offers.",
+  "  inspect  This session's retained result. publish   Publish that retained selection.",
+  "  cancel   Stop active review work and its runtime.",
+  "  /pr-review-config   Saved model tiers, fallbacks, autoPostReviews, project trust.",
+  "",
+  "Reviewers also read your checkout, which must be the reviewed revision:",
+  "run `gh pr checkout NUMBER` first, with nothing modified or staged.",
+  "",
+  "Full reference, with every flag, gate and rule: /pr-review help --all",
+].join("\n");
+
 export const helpReference = [
-  "Copilot PR Review - runtime feasibility prototype",
+  "Copilot PR Review - full reference",
   "",
   "Usage: /pr-review [status|help|models|fixture model1=ID effort1=LEVEL model2=ID effort2=LEVEL]",
   "       /pr-review NUMBER [--balanced|--full|--deep|--quick|--major-only] [--comment|--no-comment] [--all]",
@@ -160,3 +203,19 @@ export const helpReference = [
   "Validation also uses Copilot credits; publish uses none.",
   "Other review flags are not supported yet.",
 ].join("\n");
+
+// Which help text an invocation is asking for, or undefined when it is not
+// asking for one. `extension.mjs` does nothing but call this, so the choice is
+// checked by a controlled suite rather than by a runtime probe that needs an
+// installed plugin and a CLI path.
+//
+// Whitespace is normalised because `help  --all` is the same question as
+// `help --all`, and an exact-match dispatch would answer the first with
+// "Unsupported arguments". Anything else returns undefined and stays somebody
+// else's command: `help me` is an unsupported argument, not a silent success.
+export function helpTextFor(args) {
+  const [first, second, ...rest] = String(args ?? "").trim().split(/\s+/).filter(Boolean);
+  if (rest.length || (first !== "help" && first !== "--help")) return undefined;
+  if (second === undefined) return helpOrientation;
+  return second === "--all" || second === "all" ? helpReference : undefined;
+}

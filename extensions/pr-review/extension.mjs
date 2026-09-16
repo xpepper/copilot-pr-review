@@ -14,7 +14,7 @@ import { executePublishLater } from "./publish-later.mjs";
 import { publicationSummary } from "./publication.mjs";
 import { resolveCliPath } from "./cli-runtime.mjs";
 import { verificationNotice } from "./checkout.mjs";
-import { helpReference } from "./help.mjs";
+import { helpOrientation, helpTextFor } from "./help.mjs";
 
 const status = [
   "Copilot PR Review: entry point ready.",
@@ -92,6 +92,14 @@ const session = await joinSession({
       description: "Read-only balanced/full/deep/quick PR review, target capture, status, or fixture experiment",
       handler: async ({ args }) => {
         if (shuttingDown) throw new Error("Extension is shutting down.");
+        // Every spelling of a request for help, including its --all form, is
+        // decided by one pure function, so what each one answers with is
+        // checked for free instead of only by an installed-plugin probe.
+        const requestedHelp = helpTextFor(args);
+        if (requestedHelp) {
+          await session.log(requestedHelp);
+          return;
+        }
         switch (args.trim()) {
           case "cancel": {
             const run = activeRun;
@@ -113,10 +121,6 @@ const session = await joinSession({
           case "":
           case "status":
             await session.log(status);
-            return;
-          case "help":
-          case "--help":
-            await session.log(helpReference);
             return;
           case "models": {
             const { list } = await session.rpc.model.list();
@@ -176,7 +180,7 @@ const session = await joinSession({
                 executeFixtureRun(session, client, settings, { ...lifecycle, experiment }));
               return;
             }
-            const message = `Unsupported arguments. No review was started.\n\n${helpReference}`;
+            const message = `Unsupported arguments. No review was started.\n\n${helpOrientation}`;
             await session.log(message, { level: "error" });
             throw new Error(message);
           }
