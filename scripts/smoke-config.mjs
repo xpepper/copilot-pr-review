@@ -511,6 +511,27 @@ console.log("PASS configuration argument parsing, unknown keys, malformed assign
     /project trusted: 2 setting\(s\) from \.copilot\/pr-review\/config\.json\./);
   console.log("PASS O2 the quiet configuration line reports the project layer it actually read");
 }
+// --- O2: a configured fallback that is not offered stays visible when quiet ---
+{
+  // Found by the installed plugin reviewing O2's own pull request. A fallback
+  // configured identical to its tier's own assignment is dropped by
+  // `reviewerAssignments`, so the quiet assignment line says "Fallbacks: none."
+  // A verbose run still reports it under the tier, as NOT OFFERED; a quiet run
+  // dropped the tier block, so the configured fallback vanished altogether,
+  // against O2's rule that every fallback stays visible.
+  const h = harness({ home: "fallback-home", work: "fallback-checkout" });
+  const bare = describeConfiguration(await loadConfiguration(h.parent), { quiet: true });
+  assert.doesNotMatch(bare, /not offered/, "A run with no fallback configured says nothing about one");
+
+  await executeConfiguration(h.parent, "heavyModel=heavy heavyEffort=high heavyFallbackModel=heavy");
+  const configuration = await loadConfiguration(h.parent);
+  assert.match(describeConfiguration(configuration), /NOT OFFERED: identical to this tier's own assignment/,
+    "the verbose report is unchanged");
+  const quiet = describeConfiguration(configuration, { quiet: true });
+  assert.equal(quiet.split("\n").length, 1, "It stays one line");
+  assert.match(quiet, /Configured fallback not offered for heavy: identical to that tier's own assignment\./);
+  console.log("PASS O2 a configured fallback that is not offered is still named by a quiet run");
+}
 // --- the effective autoPostReviews reaches the retained posting policy ------
 for (const autoPostReviews of [true, false]) {
   const h = harness();

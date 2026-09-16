@@ -446,8 +446,22 @@ export function describeConfiguration(configuration, { flags = {}, heading, quie
   // still prints every word of it, and the tier assignments this run resolved
   // are printed next by `describeAssignments`.
   if (quiet) {
+    // Found by the installed plugin reviewing `O2`'s own pull request: a
+    // fallback configured identical to its tier's own assignment is not
+    // offered, so `reviewerAssignments` drops it and the quiet assignment line
+    // says "Fallbacks: none." The tier block that reports it as NOT OFFERED is
+    // exactly what a quiet run leaves out, so without this the configured
+    // fallback would vanish altogether, against the rule that every fallback
+    // stays visible.
+    const notOffered = tiers.filter((tier) => resolveFallback(
+      resolveTier(tier, { settings: effective.settings, origins: effective.origins, ambient, flags, models }),
+      { settings: effective.settings, origins: effective.origins, models },
+    )?.identical);
     return `Configuration: personal (${store.filename})${stored ? "" : ", not created yet"}; ` +
-      `${quietProjectLayer(configuration)}. /pr-review-config show explains precedence and trust.`;
+      `${quietProjectLayer(configuration)}.` +
+      (notOffered.length ? ` Configured fallback not offered for ${notOffered.join(", ")}: ` +
+        "identical to that tier's own assignment." : "") +
+      " /pr-review-config show explains precedence and trust.";
   }
   const lines = [
     heading ?? "Personal PR review configuration.",
