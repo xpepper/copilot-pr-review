@@ -101,7 +101,7 @@ posting them.
 | Q9 | Completed | With an exact location citation, a failing supporting citation is dropped instead of the candidate, reported as a caveat the adjudicator reads; the location and an `H1` rule citation never are. Pull request #57, one plugin review on the branch install. | Q8; [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | O2 | Completed | `--quiet` replaces the static configuration policy with one line naming the sources this run read, groups reviewers by identical model, effort and window, says a captured target's review is starting, and says what an authorized run will publish instead of printing its payload JSON; every model, effort, window, fallback, coverage and publication line stays. Pull request #58, one plugin review on the branch install: 193.076478 credits, INCOMPLETE, 0 validated, one real finding fixed here. The standing review cannot print quiet output, because `dogfood-review.mjs` refuses the flag. | Q9; [Models/execution](SCOPE.md#models-configuration-and-execution) |
 | H2 | Completed | `/pr-review help` answers the question people actually open with, in 35 lines: the five modes, the options grouped by the decision each one makes, and the lifecycle commands. The 155 lines it used to print keep every word behind `help --all`, minus a first line that called this plugin a runtime feasibility prototype; a mistyped flag now appends the orientation rather than the reference. Both texts moved to `help.mjs`, which a controlled suite can import, because `extension.mjs` calls `joinSession` at the top level and nothing cheap could ever read this text: three false user-facing strings had shipped in it. `smoke-help.mjs` checks it against the parsers' own exported flag lists, so an undocumented flag fails CI. `status` and a bare `/pr-review` are deliberately unchanged. Pull request #59, one plugin review on the branch install: balanced, 119.146906 credits, INCOMPLETE, 0 validated and no candidate raised at all; its only signal, that the dispatch was not shown end to end, was closed by a zero-inference `smoke-runtime.mjs --targets --startup` run against a verified-identical install. | O2; user-scheduled 2026-09-16; no scope clause |
-| S2 | Completed | Cut and listed `v0.2.0`, the first release after #54-#59. Pull request #60 was reviewed once on the verified branch install, then merged; the tagged build and marketplace build both matched the tag and passed the no-inference runtime probe. Listed by xpepper/copilot-plugins#3. A GitHub Release exists as an unpublished draft. | H2; [Release boundary](SCOPE.md#priority-and-release-boundary); [release procedure](docs/release.md) |
+| S2 | Completed | Cut and listed `v0.2.0`, the first release after #54-#59. Pull request #60 was reviewed once on the verified branch install, then merged; the tagged build and marketplace build both matched the tag and passed the no-inference runtime probe. Listed by xpepper/copilot-plugins#3. The GitHub Release is published. | H2; [Release boundary](SCOPE.md#priority-and-release-boundary); [release procedure](docs/release.md) |
 
 ## Every completed increment, `F1` through `H2`, is archived
 
@@ -197,16 +197,15 @@ the change.
 - After refreshing the marketplace, the marketplace install listed
   `copilot-pr-review@xpepper-copilot-plugins (v0.2.0)`, matched
   `git archive v0.2.0` byte-for-byte, and passed the same no-inference probe.
-- The user authorized a GitHub Release as a **draft**. It exists for tag
-  `v0.2.0` and remains unpublished; publishing it needs a new explicit
-  instruction.
+- The user first authorized a draft GitHub Release, then explicitly chose it as
+  the next action. It was published for tag `v0.2.0` on 2026-09-16:
+  <https://github.com/xpepper/copilot-pr-review/releases/tag/v0.2.0>.
 
 ### The exact next step
 
 **Nothing is scheduled.** `S2` is complete and the marketplace installation is
 the verified `v0.2.0` release. Ask the user what to work on; do not pick from
-the "Recorded, not scheduled" list. The draft GitHub Release is not a queued
-action: publish it only if the user explicitly asks.
+the "Recorded, not scheduled" list.
 
 ## v1 is complete, and five more increments are scheduled on top of it
 

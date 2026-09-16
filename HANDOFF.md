@@ -8,10 +8,9 @@ from an API declaration.
 
 ## Where things stand
 
-`S2` is complete. `v0.2.0` is tagged, listed and installed from the marketplace.
-The only current repository work is documentation-only pull request #61 from
-`s2/release-evidence`, which records the completed release evidence and this
-fresh-session handoff.
+`S2` is complete. `v0.2.0` is tagged, listed, installed from the marketplace and
+published as a GitHub Release. Documentation-only pull request #61 merged as
+`6afeeb6`, recording the completed release evidence.
 
 Pull request #60 squash-merged as `3889064`, bumping `plugin.json` from `0.1.0`
 to `0.2.0`. Its one authorized plugin review used the exact branch install:
@@ -47,18 +46,13 @@ failures are neither a review nor evidence about the release.
 - After marketplace refresh, `copilot-pr-review@xpepper-copilot-plugins`
   installed as v0.2.0, matched `git archive v0.2.0` byte-for-byte and passed the
   same no-inference runtime probe. This marketplace copy remains installed.
-- A GitHub Release for `v0.2.0` exists as an unpublished draft. Publishing it
-  requires a new explicit instruction.
+- The GitHub Release for `v0.2.0` is published:
+  <https://github.com/xpepper/copilot-pr-review/releases/tag/v0.2.0>.
 
 ## Exact next step
 
-Complete documentation-only pull request #61. Its plugin review costs credits
-and is the user's choice rather than a requirement. Do not run one unless the
-user explicitly asks. The user merges the closing PR.
-
-After that, **nothing is scheduled**. Ask the user what to work on; do not pick
-anything under ROADMAP's "Recorded, not scheduled" list. The draft GitHub
-Release is not queued work and must remain unpublished unless the user asks.
+**Nothing is scheduled.** Ask the user what to work on; do not pick anything
+under ROADMAP's "Recorded, not scheduled" list.
 
 Follow the checkpoint, pull-request and handoff rules in `AGENTS.md`. Before
 ending any later project session, update `ROADMAP.md`, then refresh this file as
