@@ -421,10 +421,48 @@ function describeProject({ project, trustRecord, projectPath, settings }) {
   return lines;
 }
 
-export function describeConfiguration(configuration, { flags = {}, heading } = {}) {
+// O2: what the quiet configuration line says about the project layer. It reports
+// what this run actually read, so an ignored file is named rather than left to
+// read as "nothing found", and a trusted file says how much of it was applied.
+function quietProjectLayer({ project, trustRecord }) {
+  const oneLine = (text) => text.replace(/\s+/g, " ").trim();
+  if (!trustRecord) {
+    return project.status === "absent"
+      ? "project not trusted" : `project not trusted, so ${projectConfigDisplayPath} was ignored`;
+  }
+  if (project.error) return `project trusted, but its configuration is in ERROR: ${oneLine(project.error)}`;
+  if (project.status === "absent") return "project trusted, no project file";
+  return `project trusted: ${Object.keys(project.settings).length} setting(s) ` +
+    `from ${projectConfigDisplayPath}`;
+}
+
+export function describeConfiguration(configuration, { flags = {}, heading, quiet = false } = {}) {
   const {
     store, stored, settings, ambient, models, effective, autoPostReviews, autoPostSource, trustedProjects,
   } = configuration;
+  // O2: the precedence, inheritance, fallback and trust policy is the same on
+  // every run, so a quiet run names the sources it read and points at the
+  // command that explains the rest. Nothing is hidden: /pr-review-config show
+  // still prints every word of it, and the tier assignments this run resolved
+  // are printed next by `describeAssignments`.
+  if (quiet) {
+    // Found by the installed plugin reviewing `O2`'s own pull request: a
+    // fallback configured identical to its tier's own assignment is not
+    // offered, so `reviewerAssignments` drops it and the quiet assignment line
+    // says "Fallbacks: none." The tier block that reports it as NOT OFFERED is
+    // exactly what a quiet run leaves out, so without this the configured
+    // fallback would vanish altogether, against the rule that every fallback
+    // stays visible.
+    const notOffered = tiers.filter((tier) => resolveFallback(
+      resolveTier(tier, { settings: effective.settings, origins: effective.origins, ambient, flags, models }),
+      { settings: effective.settings, origins: effective.origins, models },
+    )?.identical);
+    return `Configuration: personal (${store.filename})${stored ? "" : ", not created yet"}; ` +
+      `${quietProjectLayer(configuration)}.` +
+      (notOffered.length ? ` Configured fallback not offered for ${notOffered.join(", ")}: ` +
+        "identical to that tier's own assignment." : "") +
+      " /pr-review-config show explains precedence and trust.";
+  }
   const lines = [
     heading ?? "Personal PR review configuration.",
     `Location: ${store.filename}${stored ? "" : " (not created yet; defaults shown)"}.`,

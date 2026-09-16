@@ -22,7 +22,8 @@ immediately after `B1`. **`T1`, `B1`, `X1`, `W1`, `N1`, `H1` and `K1` are
 complete and archived.** On 2026-09-14, outside that backlog, the user
 scheduled `S1`, now complete and archived. On 2026-09-15 the user scheduled five
 more from the first review published on somebody else's pull request: `Q8`,
-`P6`, `P7`, `Q9` and `O2`, in that order; `Q8`, `P6`, `P7` and `Q9` are complete, and `O2` is the `Pending` row below.
+`P6`, `P7`, `Q9` and `O2`, in that order; **all five are complete, and nothing is
+scheduled after `O2`.**
 The closing section records what was decided, and what stays open as a
 limitation rather than as work.
 
@@ -95,11 +96,11 @@ posting them.
 | P6 | Completed | The published body is a short Markdown summary: severity counts and head, one line per finding, one plain coverage sentence chosen by kind, a hidden marker; no caveats or internal errors, but a confined run still says it covers less. `prior.mjs` accepts the marker or the old phrases. Pull request #55, one plugin review on the branch install. | Q8; [Publication](SCOPE.md#selection-publication-and-cached-results) |
 | P7 | Completed | Each inline comment leads with the problem and a prominent fix, keeps every field, and footers introduction, confidence and reporter; `I1c` parses old and new templates byte for byte, and a proposal retained before `P7` still loads. Pull request #56, one plugin review on the branch install. | P6; [Publication](SCOPE.md#selection-publication-and-cached-results) |
 | Q9 | Completed | With an exact location citation, a failing supporting citation is dropped instead of the candidate, reported as a caveat the adjudicator reads; the location and an `H1` rule citation never are. Pull request #57, one plugin review on the branch install. | Q8; [Modes/findings](SCOPE.md#review-modes-and-findings) |
-| O2 | Pending | `--quiet` replaces static configuration policy, the capture-only sentence inside a review, and an authorized run's payload JSON with run-specific lines; every model, effort, window, fallback, coverage and publication line stays. | Q9; [Models/execution](SCOPE.md#models-configuration-and-execution) |
+| O2 | Completed | `--quiet` replaces the static configuration policy with one line naming the sources this run read, groups reviewers by identical model, effort and window, says a captured target's review is starting, and says what an authorized run will publish instead of printing its payload JSON; every model, effort, window, fallback, coverage and publication line stays. Pull request #58, one plugin review on the branch install: 193.076478 credits, INCOMPLETE, 0 validated, one real finding fixed here. The standing review cannot print quiet output, because `dogfood-review.mjs` refuses the flag. | Q9; [Models/execution](SCOPE.md#models-configuration-and-execution) |
 
-## Every completed increment, `F1` through `P7`, is archived
+## Every completed increment, `F1` through `Q9`, is archived
 
-Every completed increment entry, `F1` through `P7`, and the working record kept
+Every completed increment entry, `F1` through `Q9`, and the working record kept
 between them are in
 [docs/roadmap-archive-2026-09-10.md](docs/roadmap-archive-2026-09-10.md),
 verbatim, as the evidence of record. Read it for the evidence behind an older
@@ -108,83 +109,135 @@ section's own record of the seventeen earlier moves there too**, verbatim, as
 that file's last section, because 870 bytes were spare here and no live entry
 was left to archive; the user chose that move on 2026-09-15. **`P6` moved
 `Q8`'s 4105 bytes** verbatim, just before that section, because `P6`'s entry did
-not fit beside it; **`P7` moved `P6`'s 4273 bytes** and **`Q9` moved `P7`'s 3510** the same way. The rule stands:
+not fit beside it; **`P7` moved `P6`'s 4273 bytes**, **`Q9` moved `P7`'s 3510**
+and **`O2` moved `Q9`'s 4220** the same way. **`O2` also moved `G1`'s 2685-byte
+reference list** there, verbatim and just before that last section, when its own
+review record left this file 1033 bytes over the cap and this project's own
+discovery stopped reading it. The rule stands:
 keep the most recent entries live, archive the rest verbatim, and measure this
 file with `wc -c` against the 65536-byte cap before opening a pull request.
 [docs/upstream-licensing.md](docs/upstream-licensing.md) did not move.
 
-## `Q9`: a wrong supporting citation is dropped, not the candidate, complete
+## `O2`: a quieter `--quiet`, complete
 
-**Built on `q9/drop-supporting-citation`, pull request #57**, after #56 merged; the decision and
-#65's three candidates are in
+**Built on `o2/quieter-quiet`, pull request #58**, after #57 merged; the decision
+and its worked example of #65's opening are in
 [docs/published-review-feedback-plan.md](docs/published-review-feedback-plan.md).
 
 ### What was built
 
-- `evidenceBoundary` marks `Q8`'s three refusals (outside every window, quote
-  mismatch, failed repair) as the exact-quote check. In `candidate`, a `breaks`,
-  `before`, `after` or `evidence` citation failing one is dropped: a side becomes
-  `null`, an evidence entry is removed, and no quote is forwarded or rewritten.
-- The location, an `H1` rule citation, provenance and shape refusals, and a
-  refusal found after a drop still refuse the candidate. So does one left with
-  no exact evidence entry, for the first failing entry, so retention's "missing
-  evidence" invariant holds and `Q8`'s single-evidence messages stand.
-- **Settled with the user while building**: each drop is an informational
-  caveat, `correctness:1: dropped supporting citation breaks: <Q8 cause> The
-  candidate went on to adjudication without it.` It does not block completed
-  coverage and is not published; a discarded candidate reports no drop.
-- The adjudicator reads that caveat among its candidate diagnostics; its
-  instructions say a dropped side is not a null claim, and to reject a
-  candidate whose claims no longer stand without it. `README.md` says so.
+Under `--quiet` only. A verbose run is unchanged, and so is everything that
+keeps a result honest at either verbosity.
+
+- `describeConfiguration` takes `quiet` and returns one line: the personal store
+  and whether it exists yet, what this run read from the project layer, and
+  `/pr-review-config show` for the precedence, inheritance, fallback and trust
+  policy that reads the same on every run. An ignored project file is named
+  rather than left to read as "nothing found", and a trusted one says how many
+  settings were applied.
+- `describeAssignments` takes `quiet` and names together the reviewers that
+  resolved the same model, effort and window. Every model, effort, window and
+  fallback stays visible; only the per-part origin tags go, and those are
+  precedence, which is what the one configuration line points at.
+- A captured target says `captured at <head>, N changed file(s). Review
+  starting.` The capture-only sentence belongs to `--capture-only`, which
+  refuses `--quiet`; it is false of a run whose reviewers start next, and it
+  carried a doubled period because the disposition's own reason ends in one. A
+  skipped, refused or unconfirmed target is unchanged and still says plainly
+  that no review was performed.
+- A flag- or config-authorized run prints `Publishing N inline comment(s) to
+  #N…` in place of the payload JSON. A confirmation-required run still prints
+  the payload, because the payload is what is being approved. `--no-comment` is
+  deliberately unchanged: the plan did not reopen it.
+- `extension.mjs` passes `options.quiet` to the first two.
+
+The worked example's opening goes from about thirty lines to six.
 
 ### Evidence
 
-- **Test first**: `smoke-findings` failed on the first drop (the candidate was
-  discarded), `smoke-review` on the adjudicator that never started.
-- Pinned: #65's three shapes (a range one line short, a line missing from the
-  middle, a leading space on every line), an out-of-window `breaks` and an
-  unrepairable `before` each reach adjudication with one caveat, every remaining
-  citation exact under `cite`, and can be accepted or rejected. A failing
-  location, a structural refusal after a drop, and every evidence entry failing
-  are discarded with no drop reported; a wrong rule beside a drop still refuses;
-  end to end, the adjudicator receives `breaks: null` and the caveat.
-- Two scratch mutations fail the suite: dropping any refusal, and keeping a
-  candidate with no evidence.
+- **Test first**: `smoke-config` failed on a 27-line quiet report, `smoke-preview`
+  on the payload printed where the publishing line belongs, and `smoke-review` on
+  the verbose assignment block and on the capture line. Each was seen to fail for
+  that reason before the code existed.
+- Two of my own mistakes were caught by those tests rather than by a reviewer:
+  the capture trailer was appended outside the ternary, so the new line carried
+  "No PR review performed" as well, and a suppressed-run assertion compared two
+  harnesses whose generated ids differ.
+- Pinned: the one-line report for an unsaved store, an ignored project file and
+  a trusted one; grouping across five reviewers, a long-context window, a model
+  with no configurable effort, and a fallback whose model lists no long-context
+  window; the quiet capture line; the publishing line for both authorized
+  statuses; the payload kept for confirmation-required and for `--no-comment`.
+- **Verbose is unchanged**, and is asserted so: the existing verbose assertions
+  in `smoke-config`, `smoke-review`, `smoke-target` and `smoke-preview` pass
+  untouched.
 - All eighteen suites, `git diff --check`, the control-byte check and
   `collectInstructionFiles` (six read, none skipped) pass.
+- **`README.md` went 99 bytes over the 65536-byte cap** when the two new table
+  rows were added, which would have silently stopped this project's own
+  discovery reading it. It was measured, cut back under by consolidating two
+  rows and tightening prose, and measured again.
 
 ### The installed-plugin review
 
 One run, at the standing authorization and with the user's agreement to swap
 installs: the checkout replaced the marketplace copy, `diff -rq --exclude=.git`
-printed nothing, and it ran at `b2439f4`. Balanced, `gpt-5.6-terra` high for the
+printed nothing, and it ran at `3bf1831`. Balanced, `gpt-5.6-terra` high for the
 four specialists and the adjudicator, `gpt-5.6-luna` high for overview, default
-window, no fallbacks. **170.841755 credits, 21 requests, 306.4 s elapsed.**
-INCOMPLETE, 0 validated: 1 discarded candidate, 2 rejected, 0 gaps, 4 caveats.
+window, no fallbacks. 11 changed files, 43001 diff bytes. **193.076478 credits,
+29 requests, 343.7 s of model work, 167.6 s elapsed.** INCOMPLETE, 0 validated:
+1 execution failure, 0 discarded candidates, 3 coverage gaps, 3 caveats. Two
+candidates reached adjudication; neither survived it.
 
-- **`Q9` ran on its own pull request**: correctness's P2 quoted 9 lines on an
-  8-line `evidence[0]` range, was reported as a dropped citation, and still
-  reached adjudication; before `Q9` it would have been discarded unjudged.
-- That P2 said a dropped `before` on the wrong side skips the side and hunk
-  checks. Rejected by the adjudicator and by me: a dropped citation is never
-  forwarded, so nothing is left to check.
-- Contracts' P3, and overview's same claim, discarded for a stray `)` in its
-  location quote, said a candidate a confined run sets aside reports no drop.
-  Rejected by the adjudicator and by me as deliberate: that candidate is never
-  judged, and the caveat says it went on to adjudication.
-- The other three caveats name what reviewers could not execute; no action.
+- **The one real finding was accepted and then lost by the adjudicator itself.**
+  `correctness:1` said a fallback configured identical to its tier's own
+  assignment is dropped by `reviewerAssignments`, so the quiet assignment line
+  says `Fallbacks: none.` while the tier block that reports it as `NOT OFFERED`
+  is exactly what a quiet run leaves out: the configured fallback vanished
+  altogether, against `O2`'s own rule. The adjudicator accepted it, but its own
+  citation quoted 10 lines for a 9-line range of `review.mjs`, so the candidate
+  was discarded as `invalid adjudication` and never became a finding. **It was
+  right, and it is fixed here**: the quiet configuration line now names each
+  tier whose configured fallback is not offered, with a test written first.
+- **Recorded, not scheduled**: `Q9` drops a reviewer's failing supporting
+  citation rather than the candidate; an *adjudication's* own citation has no
+  such treatment, so one miscounted range discards a judged candidate. Do not
+  widen `O2` for it.
+- `security:1` said the quiet line should show `autoPostReviews` and its origin
+  before reviewers start. Rejected by the adjudicator and by me: posting
+  authority is stated at the proposal, before any write, and the plan's worked
+  example settled what that line carries.
+- The 3 coverage gaps and 3 caveats all say the same true thing:
+  **`scripts/dogfood-review.mjs` refuses `--quiet`**, so this run printed the
+  verbose timeline and **the live quiet timeline is not demonstrated**. The
+  controlled suites are the only evidence for what a quiet run prints. Anything
+  more costs a separate authorized run and is the user's decision.
+- `README.md` (65489) and `ROADMAP.md` (64229) do not fit the 49152-byte
+  standards budget and were skipped; `AGENTS.md`, `CLAUDE.md`, `HANDOFF.md` and
+  `SCOPE.md` reached the overview reviewer.
 
 The marketplace install was restored, identical to `git archive v0.1.0`.
-Nothing was published. CI passed on #57.
-
-The user also ran GitHub's Copilot review on #57 at `b2439f4`: two comments,
-both accepted. README's new sentence read as if every such candidate is judged,
-though one left with no exact evidence entry is refused: reworded. The review
-record and the handoff were still missing at that head: both added since.
+Nothing was published.
 
 ### The exact next step
 
-`O2`, after #57 merges; archive this entry first if the next one does not fit.
+**`O2` was the last of the five increments scheduled on 2026-09-15**, and the
+backlog is empty. Asked on 2026-09-16, the user scheduled one thing:
+
+**Make the plugin easy to start using, through its own help.** Today they open
+by asking an agent "I want to use the /pr-review plugin to review this PR, what
+options do I have?", and the agent reads the installed plugin and answers with a
+modes table, the useful controls grouped by purpose, and the lifecycle commands.
+That answer is what `/pr-review help` should give.
+
+**It is not a new command.** `/pr-review help` already exists: `extension.mjs`
+has `case "help"` and a `help` constant spanning lines 18-172, about 155 lines.
+It opens "Copilot PR Review - runtime feasibility prototype" and is exhaustive
+reference prose, so the work is to make it a short, task-oriented orientation,
+and to decide what the long-form text becomes. **The scope decision is the
+user's, taken in the session that builds it**, as `T1`, `X1`, `W1`, `H1` and
+`K1` each took theirs; do not assume it from this row. Nothing else is
+scheduled.
 
 ## v1 is complete, and five more increments are scheduled on top of it
 
@@ -276,50 +329,6 @@ two published reviews are on playground pull requests still at the head they
 evaluated. Arranging one means publishing a real review or pushing a commit to a
 playground branch. **Both are the user's call, and playground #1 and #2 must
 never be merged.**
-
-### `G1`'s references, all read, and the five more the widest sweep added
-
-The user named five when scheduling `G1`, as a starting point rather than a
-boundary, and then chose the widest sweep, so five more were read as well.
-**All ten were read and none was copied.** The comparison and everything it
-concluded is in [docs/gap-analysis.md](docs/gap-analysis.md); this list is kept
-only so a later session knows what the document rests on.
-
-The five the user named:
-
-- Upstream: [`pi-pr-review`](https://pi.dev/packages/pi-pr-review?name=review),
-  the baseline `SCOPE.md` pins. **Read at the pinned `457e18e` and again at its
-  current head**, which is where the convergence on `I1a`-`I1c` was found.
-- [openai/codex `.codex/skills`](https://github.com/openai/codex/tree/main/.codex/skills)
-- [channingwalton `code-reviewer`](https://github.com/channingwalton/skills/blob/main/skills/code-reviewer/SKILL.md)
-- [JPeetz `code-quality`](https://github.com/JPeetz/agent-skills/tree/main/skills/code-quality)
-- [unclecatvn `code-review`](https://github.com/unclecatvn/agent-skills/blob/main/skills/code-review/SKILL.md)
-
-The five the widest sweep added: Claude Code's own official `code-review`
-plugin, read from the local plugin cache and the closest peer to this tool;
-GitHub's own Copilot code review, which this project already meets on its own
-pull requests; the hosted products, being CodeRabbit, Qodo, Greptile, Cursor
-BugBot and Graphite Diamond; the open-source `PR-Agent` command surface around
-them; and Martian's Code Review Bench, the one independent benchmark in the
-field, read second-hand.
-
-**They were read and nothing was copied.** `docs/upstream-licensing.md` records
-why, and the rule is not specific to upstream: anything adopted is adopted as
-behaviour and re-implemented here. **That rule held through `G1`**, which read
-more third-party material than any increment before it.
-
-**Nothing above `G1` is to be redone, widened or reopened.** Every increment's
-authorization is spent, and the evidence for each is either in the entry
-kept here or in
-[docs/roadmap-archive-2026-09-10.md](docs/roadmap-archive-2026-09-10.md).
-
-**`V2` is closed**, and its answers are not to be reopened: no reviewer receives
-safeguard output, the retained record says nothing about what ran, the citation
-gate still accepts a prefix, the shell gate does not accept a command a project
-wrote as a chain, and no timeout of any kind bounds a running safeguard.
-**`L1` is closed**: upstream declares MIT and publishes no licence text or
-copyright notice, so no upstream source may be copied and none has been. This
-project's own licence is settled and is MIT, and `LICENSE` carries the text.
 
 ### Why the approval question keeps coming back empty, and it is not the schema
 

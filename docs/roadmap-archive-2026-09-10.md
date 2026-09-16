@@ -10337,6 +10337,123 @@ was published, so the layout has had no live GitHub round trip.
 
 `Q9`, after #56 merges; archive this entry first if the next one does not fit.
 
+## `Q9`: a wrong supporting citation is dropped, not the candidate, complete
+
+**Built on `q9/drop-supporting-citation`, pull request #57**, after #56 merged; the decision and
+#65's three candidates are in
+[docs/published-review-feedback-plan.md](docs/published-review-feedback-plan.md).
+
+### What was built
+
+- `evidenceBoundary` marks `Q8`'s three refusals (outside every window, quote
+  mismatch, failed repair) as the exact-quote check. In `candidate`, a `breaks`,
+  `before`, `after` or `evidence` citation failing one is dropped: a side becomes
+  `null`, an evidence entry is removed, and no quote is forwarded or rewritten.
+- The location, an `H1` rule citation, provenance and shape refusals, and a
+  refusal found after a drop still refuse the candidate. So does one left with
+  no exact evidence entry, for the first failing entry, so retention's "missing
+  evidence" invariant holds and `Q8`'s single-evidence messages stand.
+- **Settled with the user while building**: each drop is an informational
+  caveat, `correctness:1: dropped supporting citation breaks: <Q8 cause> The
+  candidate went on to adjudication without it.` It does not block completed
+  coverage and is not published; a discarded candidate reports no drop.
+- The adjudicator reads that caveat among its candidate diagnostics; its
+  instructions say a dropped side is not a null claim, and to reject a
+  candidate whose claims no longer stand without it. `README.md` says so.
+
+### Evidence
+
+- **Test first**: `smoke-findings` failed on the first drop (the candidate was
+  discarded), `smoke-review` on the adjudicator that never started.
+- Pinned: #65's three shapes (a range one line short, a line missing from the
+  middle, a leading space on every line), an out-of-window `breaks` and an
+  unrepairable `before` each reach adjudication with one caveat, every remaining
+  citation exact under `cite`, and can be accepted or rejected. A failing
+  location, a structural refusal after a drop, and every evidence entry failing
+  are discarded with no drop reported; a wrong rule beside a drop still refuses;
+  end to end, the adjudicator receives `breaks: null` and the caveat.
+- Two scratch mutations fail the suite: dropping any refusal, and keeping a
+  candidate with no evidence.
+- All eighteen suites, `git diff --check`, the control-byte check and
+  `collectInstructionFiles` (six read, none skipped) pass.
+
+### The installed-plugin review
+
+One run, at the standing authorization and with the user's agreement to swap
+installs: the checkout replaced the marketplace copy, `diff -rq --exclude=.git`
+printed nothing, and it ran at `b2439f4`. Balanced, `gpt-5.6-terra` high for the
+four specialists and the adjudicator, `gpt-5.6-luna` high for overview, default
+window, no fallbacks. **170.841755 credits, 21 requests, 306.4 s elapsed.**
+INCOMPLETE, 0 validated: 1 discarded candidate, 2 rejected, 0 gaps, 4 caveats.
+
+- **`Q9` ran on its own pull request**: correctness's P2 quoted 9 lines on an
+  8-line `evidence[0]` range, was reported as a dropped citation, and still
+  reached adjudication; before `Q9` it would have been discarded unjudged.
+- That P2 said a dropped `before` on the wrong side skips the side and hunk
+  checks. Rejected by the adjudicator and by me: a dropped citation is never
+  forwarded, so nothing is left to check.
+- Contracts' P3, and overview's same claim, discarded for a stray `)` in its
+  location quote, said a candidate a confined run sets aside reports no drop.
+  Rejected by the adjudicator and by me as deliberate: that candidate is never
+  judged, and the caveat says it went on to adjudication.
+- The other three caveats name what reviewers could not execute; no action.
+
+The marketplace install was restored, identical to `git archive v0.1.0`.
+Nothing was published. CI passed on #57.
+
+The user also ran GitHub's Copilot review on #57 at `b2439f4`: two comments,
+both accepted. README's new sentence read as if every such candidate is judged,
+though one left with no exact evidence entry is refused: reworded. The review
+record and the handoff were still missing at that head: both added since.
+
+### The exact next step
+
+`O2`, after #57 merges; archive this entry first if the next one does not fit.
+
+### `G1`'s references, all read, and the five more the widest sweep added
+
+The user named five when scheduling `G1`, as a starting point rather than a
+boundary, and then chose the widest sweep, so five more were read as well.
+**All ten were read and none was copied.** The comparison and everything it
+concluded is in [docs/gap-analysis.md](docs/gap-analysis.md); this list is kept
+only so a later session knows what the document rests on.
+
+The five the user named:
+
+- Upstream: [`pi-pr-review`](https://pi.dev/packages/pi-pr-review?name=review),
+  the baseline `SCOPE.md` pins. **Read at the pinned `457e18e` and again at its
+  current head**, which is where the convergence on `I1a`-`I1c` was found.
+- [openai/codex `.codex/skills`](https://github.com/openai/codex/tree/main/.codex/skills)
+- [channingwalton `code-reviewer`](https://github.com/channingwalton/skills/blob/main/skills/code-reviewer/SKILL.md)
+- [JPeetz `code-quality`](https://github.com/JPeetz/agent-skills/tree/main/skills/code-quality)
+- [unclecatvn `code-review`](https://github.com/unclecatvn/agent-skills/blob/main/skills/code-review/SKILL.md)
+
+The five the widest sweep added: Claude Code's own official `code-review`
+plugin, read from the local plugin cache and the closest peer to this tool;
+GitHub's own Copilot code review, which this project already meets on its own
+pull requests; the hosted products, being CodeRabbit, Qodo, Greptile, Cursor
+BugBot and Graphite Diamond; the open-source `PR-Agent` command surface around
+them; and Martian's Code Review Bench, the one independent benchmark in the
+field, read second-hand.
+
+**They were read and nothing was copied.** `docs/upstream-licensing.md` records
+why, and the rule is not specific to upstream: anything adopted is adopted as
+behaviour and re-implemented here. **That rule held through `G1`**, which read
+more third-party material than any increment before it.
+
+**Nothing above `G1` is to be redone, widened or reopened.** Every increment's
+authorization is spent, and the evidence for each is either in the entry
+kept here or in
+[docs/roadmap-archive-2026-09-10.md](docs/roadmap-archive-2026-09-10.md).
+
+**`V2` is closed**, and its answers are not to be reopened: no reviewer receives
+safeguard output, the retained record says nothing about what ran, the citation
+gate still accepts a prefix, the shell gate does not accept a command a project
+wrote as a chain, and no timeout of any kind bounds a running safeguard.
+**`L1` is closed**: upstream declares MIT and publishes no licence text or
+copyright notice, so no upstream source may be copied and none has been. This
+project's own licence is settled and is MIT, and `LICENSE` carries the text.
+
 ## Every completed increment, `F1` through `S1`, is archived
 
 Fifty-nine sections were here and fifteen increments, the backlog triage, the

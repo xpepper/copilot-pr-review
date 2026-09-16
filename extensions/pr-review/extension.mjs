@@ -310,10 +310,11 @@ const session = await joinSession({
               const configuration = await loadConfiguration(session);
               await session.log(describeConfiguration(configuration, {
                 flags: options.settings, heading: "Effective PR review configuration for this invocation.",
+                quiet: options.quiet,
               }));
               const assignments = await reviewerAssignments(session, mode, options.settings, configuration,
                 { longContext: options.longContext });
-              await session.log(describeAssignments(mode, assignments));
+              await session.log(describeAssignments(mode, assignments, { quiet: options.quiet }));
               // A verification-enabled run states its own boundary before it
               // starts. An ordinary run's output is unchanged.
               if (options.verify) await session.log(verificationNotice);

@@ -666,38 +666,37 @@ minor cap, so nothing is withheld and `capped` stays empty.
 
 ### Quieter output with `--quiet`
 
-A review prints a great deal, and most of it is not the findings. `--quiet` asks
-for the same review with less of it printed:
+A review prints a great deal, and most of it is not the findings. `--quiet`
+prints the same review with less of it:
 
 | Left out by `--quiet` | Why it is the verbose part |
 | --- | --- |
 | `Q1 target:` and `Q2 context:` | JSON dumps of the captured pull request and the bound source windows |
 | The mode's `binding:` line | The same binding again, as JSON |
-| Each reviewer's raw untrusted output | The single largest thing a run prints, once per reviewer |
-| The adjudicator's raw output | The same, for the validation pass |
+| Each reviewer's raw untrusted output, and the adjudicator's | The single largest thing a run prints, once per pass |
 | The settled `evidence:` line, `P1` and `P2` | JSON dumps repeating most of the above |
+| The configuration policy, and one line per reviewer | Precedence, inheritance, fallback and trust rules, the same every run; reviewers sharing a model, effort and window are grouped |
+| The capture-only sentence, and an authorized payload | A review is starting; posting is already authorized |
 
-Everything that decides whether a result can be trusted stays, at every
-verbosity: the effective assignments, per-reviewer progress, every refusal and
-every failure with its error, the coverage report and its diagnostics, the
-sentences saying a result is not a clean-review claim, the safeguard discovery,
-approval and execution summaries, the findings themselves, and every publication
-outcome including an uncertain write. **A quiet run is still impossible to
-mistake for a clean review.** A skipped or refused target still says which
-disposition it took and why.
+Everything that decides whether a result can be trusted stays at every
+verbosity: per-reviewer progress, every refusal and every failure with its
+error, the coverage report and its diagnostics, the sentences saying a result is
+not a clean-review claim, the safeguard summaries, the findings, and every
+publication outcome including an uncertain write. Every model, effort, window
+and fallback still appears. **A quiet run is still impossible to mistake for a
+clean review.** A skipped or refused target still says its disposition, why, and
+that no review was performed.
 
-**Verbose is the default**, and a run without the flag prints exactly what it
-printed before. The flag changes presentation and nothing else: the same review
-settles the same way, and the retained record still holds every reviewer's own
-output whether or not it was printed, so `/pr-review inspect` and
+**Verbose is the default**: a run without the flag prints exactly what it did
+before. The same review settles the same way, and the retained record still
+holds every reviewer's own output, so `/pr-review inspect` and
 `/pr-review publish` are unaffected.
 
-`--quiet` authorizes nothing and opens no gate, and it is deliberately **not a
+`--quiet` authorizes nothing, opens no gate, and is deliberately **not a
 configuration key**: it is asked for one run at a time, so no saved or trusted
-project setting can make a run quieter than the person running it expects. It
-cannot be combined with `--capture-only`, whose entire output is the evidence
-`--quiet` would suppress. `scripts/dogfood-review.mjs` refuses it outright,
-because this project reads its own increment evidence out of those lines.
+project setting can quieten a run. It cannot be combined with `--capture-only`.
+`scripts/dogfood-review.mjs` refuses it outright, because this project reads its
+own increment evidence out of those lines.
 
 ## Selecting findings
 
@@ -991,7 +990,7 @@ Review flags:
 | `--full` | Balanced plus a medium conventions reviewer, no minor cap |
 | `--deep` | One integrated heavy reviewer over the whole change |
 | `--verify` | Stricter preflight, then safeguard discovery, approval and execution |
-| `--quiet` | Leave out the evidence JSON and the raw reviewer output. Suppresses nothing about coverage, refusals, failures, safeguards or publication |
+| `--quiet` | Print less of the same review. Suppresses nothing about coverage, refusals, failures, safeguards or publication |
 | `--all` | Select every validated finding. Does not authorize posting |
 | `--comment` | Authorize posting without final confirmation |
 | `--no-comment` | Suppress posting for this run. Conflicts with `--comment` |

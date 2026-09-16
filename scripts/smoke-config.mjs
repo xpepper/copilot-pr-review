@@ -471,6 +471,66 @@ console.log("PASS configuration argument parsing, unknown keys, malformed assign
     assert(precedence.includes(id), `The precedence note must say which tiers ${id} mode uses`);
   }
   console.log("PASS saved tiers drive quick assignments, flags override them, and invalid settings are refused");
+
+  // O2: under --quiet the static policy text becomes one line naming the
+  // configuration sources and pointing at /pr-review-config show. What is the
+  // same on every run goes; what this run actually read stays. A verbose
+  // description is unchanged, which is why both are built from the same object.
+  const verbose = describeConfiguration(posting, { heading: "Effective PR review configuration for this invocation." });
+  const quiet = describeConfiguration(posting, {
+    heading: "Effective PR review configuration for this invocation.", quiet: true,
+  });
+  assert.equal(quiet.split("\n").length, 1, "A quiet configuration report is one line");
+  assert.equal(quiet, `Configuration: personal (${h.filename}); project not trusted. ` +
+    "/pr-review-config show explains precedence and trust.");
+  for (const dropped of [
+    "Precedence: invocation flags", "Fallback models are optional and start unset",
+    "A repository cannot authorize itself", "Effective tier assignments:", "Trusted project directories:",
+    "This command ran no inference", "Effective PR review configuration for this invocation.",
+  ]) {
+    assert(verbose.includes(dropped), `the verbose report still carries ${JSON.stringify(dropped)}`);
+    assert(!quiet.includes(dropped), `a quiet report drops ${JSON.stringify(dropped)}`);
+  }
+  console.log("PASS O2 a quiet configuration report is one line naming the sources");
+}
+// --- O2: what the one quiet configuration line says about the project layer ---
+{
+  const h = harness({ home: "quiet-home", work: "quiet-checkout" });
+  // Nothing saved yet: the line says so rather than implying a file exists.
+  assert.equal(describeConfiguration(await loadConfiguration(h.parent), { quiet: true }),
+    `Configuration: personal (${h.filename}), not created yet; project not trusted. ` +
+    "/pr-review-config show explains precedence and trust.");
+  // An untrusted project file is located and ignored; the quiet line must still
+  // say the file is there, because "not trusted" alone reads as "nothing found".
+  h.writeProject({ schemaVersion: projectSchemaVersion, settings: { heavyModel: "other", heavyEffort: "low" } });
+  assert.match(describeConfiguration(await loadConfiguration(h.parent), { quiet: true }),
+    /project not trusted, so \.copilot\/pr-review\/config\.json was ignored\./);
+  await executeConfiguration(h.parent, "trust");
+  // A trusted project's settings are what this run actually read, so they stay.
+  assert.match(describeConfiguration(await loadConfiguration(h.parent), { quiet: true }),
+    /project trusted: 2 setting\(s\) from \.copilot\/pr-review\/config\.json\./);
+  console.log("PASS O2 the quiet configuration line reports the project layer it actually read");
+}
+// --- O2: a configured fallback that is not offered stays visible when quiet ---
+{
+  // Found by the installed plugin reviewing O2's own pull request. A fallback
+  // configured identical to its tier's own assignment is dropped by
+  // `reviewerAssignments`, so the quiet assignment line says "Fallbacks: none."
+  // A verbose run still reports it under the tier, as NOT OFFERED; a quiet run
+  // dropped the tier block, so the configured fallback vanished altogether,
+  // against O2's rule that every fallback stays visible.
+  const h = harness({ home: "fallback-home", work: "fallback-checkout" });
+  const bare = describeConfiguration(await loadConfiguration(h.parent), { quiet: true });
+  assert.doesNotMatch(bare, /not offered/, "A run with no fallback configured says nothing about one");
+
+  await executeConfiguration(h.parent, "heavyModel=heavy heavyEffort=high heavyFallbackModel=heavy");
+  const configuration = await loadConfiguration(h.parent);
+  assert.match(describeConfiguration(configuration), /NOT OFFERED: identical to this tier's own assignment/,
+    "the verbose report is unchanged");
+  const quiet = describeConfiguration(configuration, { quiet: true });
+  assert.equal(quiet.split("\n").length, 1, "It stays one line");
+  assert.match(quiet, /Configured fallback not offered for heavy: identical to that tier's own assignment\./);
+  console.log("PASS O2 a configured fallback that is not offered is still named by a quiet run");
 }
 // --- the effective autoPostReviews reaches the retained posting policy ------
 for (const autoPostReviews of [true, false]) {

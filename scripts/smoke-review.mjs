@@ -268,6 +268,41 @@ assert.match(description, /findings policy: P0-P2 findings, plus at most 3 P3\/n
 assert.match(description, /\n {2}correctness \[heavy\]: model=heavy \[configured:heavy\] reasoning=high \[configured:heavy\]/);
 assert.match(description, /\n {2}overview \[light\]: model=other \[project:light\] reasoning=low \[project:light\]/);
 assert.match(describeAssignments(quickMode, assignments), /quick mode, 3 reviewer\(s\); findings policy: P0-P2 findings only/);
+// O2: under --quiet the reviewers are grouped by identical model, effort and
+// window. Every model, effort, window and fallback stays visible; the static
+// precedence and fallback prose, which is the same on every run, goes.
+assert.equal(describeAssignments(balancedMode, layeredBalanced, { quiet: true }),
+  "Balanced review: 5 reviewer(s); P0-P2 findings, plus at most 3 P3/nit finding(s) anchored on " +
+  "this diff's changed lines.\n" +
+  "  correctness, contracts, security, performance-resources: heavy high, default window\n" +
+  "  overview: other low, default window\n" +
+  "  Fallbacks: none.");
+const longContextWithFallback = assignments.map((assignment) => ({
+  ...assignment, contextTier: "long_context", origin: { ...assignment.origin, contextTier: "flag" },
+  fallback: { model: "other", reasoningEffort: "low", contextTier: "default",
+    origin: { model: "configured:heavy", reasoningEffort: "configured:heavy", contextTier: "model" } },
+}));
+assert.equal(describeAssignments(quickMode, longContextWithFallback, { quiet: true }),
+  "Quick review: 3 reviewer(s); P0-P2 findings only.\n" +
+  "  correctness, contracts, security-performance-resources: heavy high, long-context window\n" +
+  "  Fallbacks: correctness, contracts, security-performance-resources: other low, " +
+  "default window (no long-context window).");
+// A model with no configurable effort still says so, and an unset one is not
+// silently dropped: the quiet line may shorten the prose, never the assignment.
+assert.match(describeAssignments(quickMode, effortless, { quiet: true }),
+  /\n {2}correctness, contracts, security-performance-resources: plain \(not configurable\), default window\n/);
+for (const dropped of [
+  "Effective reviewer assignments:", "Reviewer count and concurrency follow the selected mode",
+  "each gets at most one attempt", "a reviewer that fails stays incomplete coverage",
+]) {
+  assert(describeAssignments(balancedMode, layeredBalanced).includes(dropped) ||
+    describeAssignments(quickMode, longContextWithFallback).includes(dropped),
+  `the verbose description still carries ${JSON.stringify(dropped)}`);
+  for (const quiet of [describeAssignments(balancedMode, layeredBalanced, { quiet: true }),
+    describeAssignments(quickMode, longContextWithFallback, { quiet: true })]) {
+    assert(!quiet.includes(dropped), `a quiet description drops ${JSON.stringify(dropped)}`);
+  }
+}
 await assert.rejects(reviewerAssignments(parentModels, balancedMode, {}, {
   ...layered,
   effective: { settings: { ...layered.effective.settings, lightModel: "missing" }, origins: layered.effective.origins },
@@ -2890,7 +2925,6 @@ console.log("PASS U1 an unattended run asks an interactive host nothing and sett
     "Q4 evidence gate: ",
     // The trailers of the suppressed lines are not evidence dumps; they are what
     // the run promises about the evidence, so they stay when the JSON goes.
-    "No PR review performed; no clean-review claim.",
     "Source context comes only from the captured GitHub revisions.",
     "Unvalidated candidates cannot publish; only final selected, authorized findings can.",
     "3 validated finding(s); completed coverage. Findings are not a clean-review claim.",
@@ -2903,6 +2937,19 @@ console.log("PASS U1 an unattended run asks an interactive host nothing and sett
       assert(h.messages.some((message) => message.includes(kept)), `${label} run keeps ${JSON.stringify(kept)}`);
     }
   }
+  // O2: the capture line of a review that is actually starting. Verbose is
+  // unchanged, including the capture-only sentence it has always carried; a
+  // quiet run says the target was captured and the review is starting, because
+  // "No PR review performed" is false of a run that is about to perform one.
+  assert(loud.h.messages.some((message) =>
+    message.startsWith("Q1 target: ") && message.includes("No PR review performed; no clean-review claim.")),
+  "a verbose capture is unchanged");
+  assert(!quiet.h.messages.some((message) => message.includes("No PR review performed")),
+    "a quiet run that reviews its target never says no review was performed");
+  assert(quiet.h.messages.some((message) =>
+    /^Target fixture\/repository#1: captured at [0-9a-f]{40}, \d+ changed file\(s\)\. Review starting\.$/
+      .test(message)),
+  "a quiet capture says what was captured and that the review is starting");
   // Verbosity is presentation only. The same run settles the same way, and the
   // retained record still holds every reviewer's own untrusted output whether or
   // not it was printed.

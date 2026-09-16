@@ -77,6 +77,43 @@ for (const [options, effective, ui, expected] of [
 }
 console.log("PASS flag precedence, effective autoPostReviews seam, independent authority, missing UI and explicit confirmation");
 
+// O2: a run whose posting is already authorized prints what it is about to do,
+// not the payload it is about to post. A run that still has to be approved
+// prints the payload, because the payload is what is being approved.
+for (const [options, effective, expected] of [
+  [{ comment: true, quiet: true }, undefined, "flag-authorized"],
+  [{ quiet: true }, { autoPostReviews: true }, "config-authorized"],
+]) {
+  const h = await harness({ options, effective, ui: false });
+  const result = await h.run();
+  assert.equal(result.preview.status, expected);
+  assert.equal(h.messages[0], `Publishing 1 inline comment(s) to #${h.outcome.binding.number}…\n` +
+    `Posting authority: ${expected}. Review coverage: completed.`);
+  assert(!h.messages.some((message) => message.includes('"commit_id"')),
+    "an authorized quiet run does not print the payload it is about to post");
+}
+{
+  // Confirmation-required: the payload is the thing being approved, so --quiet
+  // does not take it away.
+  const h = await harness({ options: { quiet: true }, ui: true });
+  const result = await h.run();
+  assert.equal(result.preview.status, "confirmed");
+  assert.match(h.messages[0], /^COMMENT review payload proposal/);
+  assert(h.messages[0].includes('"commit_id"'), "the approved payload is still shown in full");
+}
+{
+  // --no-comment publishes nothing, and O2 did not reopen what such a run
+  // prints. Each harness generates its own invocation and session ids, so what
+  // is compared is that the payload is still there, not the bytes around it.
+  const quiet = await harness({ options: { noComment: true, quiet: true } });
+  const result = await quiet.run();
+  assert.equal(result.preview.status, "suppressed");
+  assert.match(quiet.messages[0], /^COMMENT review payload proposal/);
+  assert(quiet.messages[0].includes('"commit_id"'),
+    "a suppressed run still prints the payload at both verbosities");
+}
+console.log("PASS O2 an authorized quiet run prints what it will publish instead of the payload");
+
 const exact = await harness({ options: { comment: true } });
 const request = buildReviewPreview(exact.outcome, exact.boundary);
 assert.deepEqual(request, {
