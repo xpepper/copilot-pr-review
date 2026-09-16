@@ -10337,6 +10337,79 @@ was published, so the layout has had no live GitHub round trip.
 
 `Q9`, after #56 merges; archive this entry first if the next one does not fit.
 
+## `Q9`: a wrong supporting citation is dropped, not the candidate, complete
+
+**Built on `q9/drop-supporting-citation`, pull request #57**, after #56 merged; the decision and
+#65's three candidates are in
+[docs/published-review-feedback-plan.md](docs/published-review-feedback-plan.md).
+
+### What was built
+
+- `evidenceBoundary` marks `Q8`'s three refusals (outside every window, quote
+  mismatch, failed repair) as the exact-quote check. In `candidate`, a `breaks`,
+  `before`, `after` or `evidence` citation failing one is dropped: a side becomes
+  `null`, an evidence entry is removed, and no quote is forwarded or rewritten.
+- The location, an `H1` rule citation, provenance and shape refusals, and a
+  refusal found after a drop still refuse the candidate. So does one left with
+  no exact evidence entry, for the first failing entry, so retention's "missing
+  evidence" invariant holds and `Q8`'s single-evidence messages stand.
+- **Settled with the user while building**: each drop is an informational
+  caveat, `correctness:1: dropped supporting citation breaks: <Q8 cause> The
+  candidate went on to adjudication without it.` It does not block completed
+  coverage and is not published; a discarded candidate reports no drop.
+- The adjudicator reads that caveat among its candidate diagnostics; its
+  instructions say a dropped side is not a null claim, and to reject a
+  candidate whose claims no longer stand without it. `README.md` says so.
+
+### Evidence
+
+- **Test first**: `smoke-findings` failed on the first drop (the candidate was
+  discarded), `smoke-review` on the adjudicator that never started.
+- Pinned: #65's three shapes (a range one line short, a line missing from the
+  middle, a leading space on every line), an out-of-window `breaks` and an
+  unrepairable `before` each reach adjudication with one caveat, every remaining
+  citation exact under `cite`, and can be accepted or rejected. A failing
+  location, a structural refusal after a drop, and every evidence entry failing
+  are discarded with no drop reported; a wrong rule beside a drop still refuses;
+  end to end, the adjudicator receives `breaks: null` and the caveat.
+- Two scratch mutations fail the suite: dropping any refusal, and keeping a
+  candidate with no evidence.
+- All eighteen suites, `git diff --check`, the control-byte check and
+  `collectInstructionFiles` (six read, none skipped) pass.
+
+### The installed-plugin review
+
+One run, at the standing authorization and with the user's agreement to swap
+installs: the checkout replaced the marketplace copy, `diff -rq --exclude=.git`
+printed nothing, and it ran at `b2439f4`. Balanced, `gpt-5.6-terra` high for the
+four specialists and the adjudicator, `gpt-5.6-luna` high for overview, default
+window, no fallbacks. **170.841755 credits, 21 requests, 306.4 s elapsed.**
+INCOMPLETE, 0 validated: 1 discarded candidate, 2 rejected, 0 gaps, 4 caveats.
+
+- **`Q9` ran on its own pull request**: correctness's P2 quoted 9 lines on an
+  8-line `evidence[0]` range, was reported as a dropped citation, and still
+  reached adjudication; before `Q9` it would have been discarded unjudged.
+- That P2 said a dropped `before` on the wrong side skips the side and hunk
+  checks. Rejected by the adjudicator and by me: a dropped citation is never
+  forwarded, so nothing is left to check.
+- Contracts' P3, and overview's same claim, discarded for a stray `)` in its
+  location quote, said a candidate a confined run sets aside reports no drop.
+  Rejected by the adjudicator and by me as deliberate: that candidate is never
+  judged, and the caveat says it went on to adjudication.
+- The other three caveats name what reviewers could not execute; no action.
+
+The marketplace install was restored, identical to `git archive v0.1.0`.
+Nothing was published. CI passed on #57.
+
+The user also ran GitHub's Copilot review on #57 at `b2439f4`: two comments,
+both accepted. README's new sentence read as if every such candidate is judged,
+though one left with no exact evidence entry is refused: reworded. The review
+record and the handoff were still missing at that head: both added since.
+
+### The exact next step
+
+`O2`, after #57 merges; archive this entry first if the next one does not fit.
+
 ## Every completed increment, `F1` through `S1`, is archived
 
 Fifty-nine sections were here and fifteen increments, the backlog triage, the
