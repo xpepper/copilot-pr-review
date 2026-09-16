@@ -25,7 +25,8 @@ more from the first review published on somebody else's pull request: `Q8`,
 `P6`, `P7`, `Q9` and `O2`, in that order; **all five are complete.** On
 2026-09-16 the user scheduled one thing, `H2`, so that the plugin is easy to
 start using through its own help; **it is complete.** After #59 merged, the user
-scheduled `S2`: cut and list `v0.2.0`. It is in progress.
+scheduled `S2`: cut and list `v0.2.0`. **It is complete, and nothing is
+scheduled after it.**
 The closing section records what was decided, and what stays open as a
 limitation rather than as work.
 
@@ -100,7 +101,7 @@ posting them.
 | Q9 | Completed | With an exact location citation, a failing supporting citation is dropped instead of the candidate, reported as a caveat the adjudicator reads; the location and an `H1` rule citation never are. Pull request #57, one plugin review on the branch install. | Q8; [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | O2 | Completed | `--quiet` replaces the static configuration policy with one line naming the sources this run read, groups reviewers by identical model, effort and window, says a captured target's review is starting, and says what an authorized run will publish instead of printing its payload JSON; every model, effort, window, fallback, coverage and publication line stays. Pull request #58, one plugin review on the branch install: 193.076478 credits, INCOMPLETE, 0 validated, one real finding fixed here. The standing review cannot print quiet output, because `dogfood-review.mjs` refuses the flag. | Q9; [Models/execution](SCOPE.md#models-configuration-and-execution) |
 | H2 | Completed | `/pr-review help` answers the question people actually open with, in 35 lines: the five modes, the options grouped by the decision each one makes, and the lifecycle commands. The 155 lines it used to print keep every word behind `help --all`, minus a first line that called this plugin a runtime feasibility prototype; a mistyped flag now appends the orientation rather than the reference. Both texts moved to `help.mjs`, which a controlled suite can import, because `extension.mjs` calls `joinSession` at the top level and nothing cheap could ever read this text: three false user-facing strings had shipped in it. `smoke-help.mjs` checks it against the parsers' own exported flag lists, so an undocumented flag fails CI. `status` and a bare `/pr-review` are deliberately unchanged. Pull request #59, one plugin review on the branch install: balanced, 119.146906 credits, INCOMPLETE, 0 validated and no candidate raised at all; its only signal, that the dispatch was not shown end to end, was closed by a zero-inference `smoke-runtime.mjs --targets --startup` run against a verified-identical install. | O2; user-scheduled 2026-09-16; no scope clause |
-| S2 | In progress | Cut and list `v0.2.0`, the first release after #54-#59. The bump is minor because the release contains new capabilities and pre-1.0 breaking-category publication-format changes; older review summaries remain recognisable. Pull request #60, reviewed once on the verified branch install: balanced, 75.476181 credits, INCOMPLETE, 0 validated findings. | H2; [Release boundary](SCOPE.md#priority-and-release-boundary); [release procedure](docs/release.md) |
+| S2 | Completed | Cut and listed `v0.2.0`, the first release after #54-#59. Pull request #60 was reviewed once on the verified branch install, then merged; the tagged build and marketplace build both matched the tag and passed the no-inference runtime probe. Listed by xpepper/copilot-plugins#3. A GitHub Release exists as an unpublished draft. | H2; [Release boundary](SCOPE.md#priority-and-release-boundary); [release procedure](docs/release.md) |
 
 ## Every completed increment, `F1` through `H2`, is archived
 
@@ -124,7 +125,7 @@ keep the most recent entries live, archive the rest verbatim, and measure this
 file with `wc -c` against the 65536-byte cap before opening a pull request.
 [docs/upstream-licensing.md](docs/upstream-licensing.md) did not move.
 
-## `S2`: cut and list `v0.2.0`, in progress
+## `S2`: cut and list `v0.2.0`, complete
 
 **Built on `release/v0.2.0`**, after #59 merged. The user asked to draft a new
 release and make sure it becomes available from the marketplace.
@@ -173,29 +174,39 @@ gate and is fixed below anyway. No rerun is authorized or needed for that
 documentation correction. The marketplace `v0.1.0` install was restored and
 verified byte-for-byte against `git archive v0.1.0`.
 
-GitHub's controlled-suites job passed on the final review-evidence checkpoint.
-The separate `claude-review` workflow failed twice before making any model call:
-the action initialized, returned `is_error:true`, reported zero usage and no
-permission denial, and exposed no further diagnostic. The user confirmed their
-Claude five-hour credits were exhausted. This is an external quota blocker, not
-a passing review and not evidence about the change; #60 needs a fresh successful
-check after the quota resets before it is ready to merge.
+GitHub's controlled-suites job passed. The separate `claude-review` workflow
+failed twice before making any model call because the user's Claude five-hour
+credits were exhausted. At the user's explicit instruction, #60 was merged
+regardless; those zero-usage failures remain neither a review nor evidence about
+the change.
+
+### Release and marketplace evidence
+
+- #60 squash-merged as `3889064`. All 19 controlled suites, manifest assertions,
+  self-readability, control-byte and diff checks passed again at that exact
+  commit.
+- Annotated tag `v0.2.0` points to `3889064` and was pushed only after those
+  checks.
+- A detached checkout of the tag installed as `copilot-pr-review (v0.2.0)`;
+  its cached copy matched the tag byte-for-byte and
+  `smoke-runtime.mjs --targets` passed, including its assertion that no model,
+  subagent or tool execution occurred.
+- xpepper/copilot-plugins#3 changed the entry's version and source ref together
+  to `0.2.0`/`v0.2.0` and updated the README row. It squash-merged as
+  `8e8f113`; the merged manifest and README were read back and agree.
+- After refreshing the marketplace, the marketplace install listed
+  `copilot-pr-review@xpepper-copilot-plugins (v0.2.0)`, matched
+  `git archive v0.2.0` byte-for-byte, and passed the same no-inference probe.
+- The user authorized a GitHub Release as a **draft**. It exists for tag
+  `v0.2.0` and remains unpublished; publishing it needs a new explicit
+  instruction.
 
 ### The exact next step
 
-Pull request #60 is open and has had its one authorized plugin review. Wait for
-the user's Claude five-hour quota to reset, then obtain a fresh successful
-`claude-review` check. Do not treat either zero-usage failure as a code review.
-Once both required checks are green, the user merges #60.
-
-After that merge, ask for the next authorization: run the full controlled set at
-the new squash commit on `main`, create an annotated `v0.2.0` tag like `v0.1.0`,
-and push it. Tag verification, the marketplace-index pull request, its merge,
-marketplace refresh and reinstall belong in the same sitting so the index trails
-the tag for as little time as possible. A GitHub Release is optional and
-separately authorized.
-
-Nothing under the earlier "Recorded, not scheduled" list became scheduled.
+**Nothing is scheduled.** `S2` is complete and the marketplace installation is
+the verified `v0.2.0` release. Ask the user what to work on; do not pick from
+the "Recorded, not scheduled" list. The draft GitHub Release is not a queued
+action: publish it only if the user explicitly asks.
 
 ## v1 is complete, and five more increments are scheduled on top of it
 
