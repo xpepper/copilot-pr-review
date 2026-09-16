@@ -10454,6 +10454,127 @@ wrote as a chain, and no timeout of any kind bounds a running safeguard.
 copyright notice, so no upstream source may be copied and none has been. This
 project's own licence is settled and is MIT, and `LICENSE` carries the text.
 
+## `O2`: a quieter `--quiet`, complete
+
+**Built on `o2/quieter-quiet`, pull request #58**, after #57 merged; the decision
+and its worked example of #65's opening are in
+[docs/published-review-feedback-plan.md](docs/published-review-feedback-plan.md).
+
+### What was built
+
+Under `--quiet` only. A verbose run is unchanged, and so is everything that
+keeps a result honest at either verbosity.
+
+- `describeConfiguration` takes `quiet` and returns one line: the personal store
+  and whether it exists yet, what this run read from the project layer, and
+  `/pr-review-config show` for the precedence, inheritance, fallback and trust
+  policy that reads the same on every run. An ignored project file is named
+  rather than left to read as "nothing found", and a trusted one says how many
+  settings were applied.
+- `describeAssignments` takes `quiet` and names together the reviewers that
+  resolved the same model, effort and window. Every model, effort, window and
+  fallback stays visible; only the per-part origin tags go, and those are
+  precedence, which is what the one configuration line points at.
+- A captured target says `captured at <head>, N changed file(s). Review
+  starting.` The capture-only sentence belongs to `--capture-only`, which
+  refuses `--quiet`; it is false of a run whose reviewers start next, and it
+  carried a doubled period because the disposition's own reason ends in one. A
+  skipped, refused or unconfirmed target is unchanged and still says plainly
+  that no review was performed.
+- A flag- or config-authorized run prints `Publishing N inline comment(s) to
+  #N…` in place of the payload JSON. A confirmation-required run still prints
+  the payload, because the payload is what is being approved. `--no-comment` is
+  deliberately unchanged: the plan did not reopen it.
+- `extension.mjs` passes `options.quiet` to the first two.
+
+The worked example's opening goes from about thirty lines to six.
+
+### Evidence
+
+- **Test first**: `smoke-config` failed on a 27-line quiet report, `smoke-preview`
+  on the payload printed where the publishing line belongs, and `smoke-review` on
+  the verbose assignment block and on the capture line. Each was seen to fail for
+  that reason before the code existed.
+- Two of my own mistakes were caught by those tests rather than by a reviewer:
+  the capture trailer was appended outside the ternary, so the new line carried
+  "No PR review performed" as well, and a suppressed-run assertion compared two
+  harnesses whose generated ids differ.
+- Pinned: the one-line report for an unsaved store, an ignored project file and
+  a trusted one; grouping across five reviewers, a long-context window, a model
+  with no configurable effort, and a fallback whose model lists no long-context
+  window; the quiet capture line; the publishing line for both authorized
+  statuses; the payload kept for confirmation-required and for `--no-comment`.
+- **Verbose is unchanged**, and is asserted so: the existing verbose assertions
+  in `smoke-config`, `smoke-review`, `smoke-target` and `smoke-preview` pass
+  untouched.
+- All eighteen suites, `git diff --check`, the control-byte check and
+  `collectInstructionFiles` (six read, none skipped) pass.
+- **`README.md` went 99 bytes over the 65536-byte cap** when the two new table
+  rows were added, which would have silently stopped this project's own
+  discovery reading it. It was measured, cut back under by consolidating two
+  rows and tightening prose, and measured again.
+
+### The installed-plugin review
+
+One run, at the standing authorization and with the user's agreement to swap
+installs: the checkout replaced the marketplace copy, `diff -rq --exclude=.git`
+printed nothing, and it ran at `3bf1831`. Balanced, `gpt-5.6-terra` high for the
+four specialists and the adjudicator, `gpt-5.6-luna` high for overview, default
+window, no fallbacks. 11 changed files, 43001 diff bytes. **193.076478 credits,
+29 requests, 343.7 s of model work, 167.6 s elapsed.** INCOMPLETE, 0 validated:
+1 execution failure, 0 discarded candidates, 3 coverage gaps, 3 caveats. Two
+candidates reached adjudication; neither survived it.
+
+- **The one real finding was accepted and then lost by the adjudicator itself.**
+  `correctness:1` said a fallback configured identical to its tier's own
+  assignment is dropped by `reviewerAssignments`, so the quiet assignment line
+  says `Fallbacks: none.` while the tier block that reports it as `NOT OFFERED`
+  is exactly what a quiet run leaves out: the configured fallback vanished
+  altogether, against `O2`'s own rule. The adjudicator accepted it, but its own
+  citation quoted 10 lines for a 9-line range of `review.mjs`, so the candidate
+  was discarded as `invalid adjudication` and never became a finding. **It was
+  right, and it is fixed here**: the quiet configuration line now names each
+  tier whose configured fallback is not offered, with a test written first.
+- **Recorded, not scheduled**: `Q9` drops a reviewer's failing supporting
+  citation rather than the candidate; an *adjudication's* own citation has no
+  such treatment, so one miscounted range discards a judged candidate. Do not
+  widen `O2` for it.
+- `security:1` said the quiet line should show `autoPostReviews` and its origin
+  before reviewers start. Rejected by the adjudicator and by me: posting
+  authority is stated at the proposal, before any write, and the plan's worked
+  example settled what that line carries.
+- The 3 coverage gaps and 3 caveats all say the same true thing:
+  **`scripts/dogfood-review.mjs` refuses `--quiet`**, so this run printed the
+  verbose timeline and **the live quiet timeline is not demonstrated**. The
+  controlled suites are the only evidence for what a quiet run prints. Anything
+  more costs a separate authorized run and is the user's decision.
+- `README.md` (65489) and `ROADMAP.md` (64229) do not fit the 49152-byte
+  standards budget and were skipped; `AGENTS.md`, `CLAUDE.md`, `HANDOFF.md` and
+  `SCOPE.md` reached the overview reviewer.
+
+The marketplace install was restored, identical to `git archive v0.1.0`.
+Nothing was published.
+
+### The exact next step
+
+**`O2` was the last of the five increments scheduled on 2026-09-15**, and the
+backlog is empty. Asked on 2026-09-16, the user scheduled one thing:
+
+**Make the plugin easy to start using, through its own help.** Today they open
+by asking an agent "I want to use the /pr-review plugin to review this PR, what
+options do I have?", and the agent reads the installed plugin and answers with a
+modes table, the useful controls grouped by purpose, and the lifecycle commands.
+That answer is what `/pr-review help` should give.
+
+**It is not a new command.** `/pr-review help` already exists: `extension.mjs`
+has `case "help"` and a `help` constant spanning lines 18-172, about 155 lines.
+It opens "Copilot PR Review - runtime feasibility prototype" and is exhaustive
+reference prose, so the work is to make it a short, task-oriented orientation,
+and to decide what the long-form text becomes. **The scope decision is the
+user's, taken in the session that builds it**, as `T1`, `X1`, `W1`, `H1` and
+`K1` each took theirs; do not assume it from this row. Nothing else is
+scheduled.
+
 ## Every completed increment, `F1` through `S1`, is archived
 
 Fifty-nine sections were here and fifteen increments, the backlog triage, the
