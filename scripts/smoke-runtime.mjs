@@ -108,21 +108,32 @@ try {
     ["", "Copilot PR Review: entry point ready."],
     ["status", "Copilot PR Review: entry point ready."],
     ["  status  ", "Copilot PR Review: entry point ready."],
-    ["help", "Usage: /pr-review [status|help|models|fixture"],
-    ["--help", "Usage: /pr-review [status|help|models|fixture"],
+    // H2: `help` answers with the orientation and says where the rest is; the
+    // reference is one command away, in every spelling the dispatch accepts.
+    // The invariant these pairs used to carry, that a flag the help does not
+    // mention is a flag nobody can find, moved to `scripts/smoke-help.mjs`,
+    // which checks the text against the parsers' own lists on every CI run.
+    // What is checked here is the thing only a real runtime can show: that the
+    // dispatch reaches the right text at all.
+    ["help", "/pr-review NUMBER [mode] [options]"],
+    ["--help", "/pr-review NUMBER [mode] [options]"],
+    ["help", "Full reference, with every flag, gate and rule: /pr-review help --all"],
+    ["help --all", "Copilot PR Review - full reference"],
+    ["help  --all", "Copilot PR Review - full reference"],
+    ["help all", "Copilot PR Review - full reference"],
+    ["--help --all", "Usage: /pr-review [status|help|models|fixture"],
     // Three false user-facing strings have shipped here, each surviving several
     // increments because nothing dispatches these commands and reads the text.
-    // A flag the help does not mention is a flag nobody can find.
-    ["help", "--unattended  Declare that this run leaves no question for anybody to answer"],
+    ["help --all", "--unattended  Declare that this run leaves no question for anybody to answer"],
     ["status", "--unattended declares that a run leaves nothing for a person to answer"],
-    ["help", "--incremental  Ask for fresh hunting to be confined to the commits added since an earlier review"],
+    ["help --all", "--incremental  Ask for fresh hunting to be confined to the commits added since an earlier review"],
     ["status", "--incremental asks for fresh hunting to be confined to the commits added since an earlier review"],
-    ["help", "--revalidate  Judge what became of the findings an earlier review of this pull request published"],
+    ["help --all", "--revalidate  Judge what became of the findings an earlier review of this pull request published"],
     ["status", "--revalidate buys one model pass over the earlier review's findings that this tool cannot settle"],
     // T1 adds no flag, so the help and the status describe a report every run
     // now prints. A behaviour nothing dispatches and reads is a behaviour that
     // can go false silently, which is what these pairs exist to stop.
-    ["help", "A finished review reports what it cost on one line beside its coverage"],
+    ["help --all", "A finished review reports what it cost on one line beside its coverage"],
     ["status", "A finished review reports what it cost beside its coverage"],
     ["cancel", "No review is running."],
   ]) {
@@ -136,7 +147,10 @@ try {
     console.log(`PASS /pr-review ${args}`);
   }
 
-  for (const args of ["123 --unsupported --no-comment", "status extra", "cancel extra", "--comment"]) {
+  // `help me` and `help --all extra` are unsupported arguments rather than
+  // requests for help that quietly succeed: only the spellings above answer.
+  for (const args of ["123 --unsupported --no-comment", "status extra", "cancel extra", "--comment",
+    "help me", "help --all extra", "help --nope"]) {
     const result = await session.rpc.commands.execute({ commandName: "pr-review", args });
     assert.match(result.error, /Unsupported arguments\. No review was started\./);
     console.log(`PASS rejected /pr-review ${args}`);
