@@ -99,7 +99,7 @@ posting them.
 | P7 | Completed | Each inline comment leads with the problem and a prominent fix, keeps every field, and footers introduction, confidence and reporter; `I1c` parses old and new templates byte for byte, and a proposal retained before `P7` still loads. Pull request #56, one plugin review on the branch install. | P6; [Publication](SCOPE.md#selection-publication-and-cached-results) |
 | Q9 | Completed | With an exact location citation, a failing supporting citation is dropped instead of the candidate, reported as a caveat the adjudicator reads; the location and an `H1` rule citation never are. Pull request #57, one plugin review on the branch install. | Q8; [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | O2 | Completed | `--quiet` replaces the static configuration policy with one line naming the sources this run read, groups reviewers by identical model, effort and window, says a captured target's review is starting, and says what an authorized run will publish instead of printing its payload JSON; every model, effort, window, fallback, coverage and publication line stays. Pull request #58, one plugin review on the branch install: 193.076478 credits, INCOMPLETE, 0 validated, one real finding fixed here. The standing review cannot print quiet output, because `dogfood-review.mjs` refuses the flag. | Q9; [Models/execution](SCOPE.md#models-configuration-and-execution) |
-| H2 | Completed | `/pr-review help` answers the question people actually open with, in 35 lines: the five modes, the options grouped by the decision each one makes, and the lifecycle commands. The 155 lines it used to print keep every word behind `help --all`, minus a first line that called this plugin a runtime feasibility prototype; a mistyped flag now appends the orientation rather than the reference. Both texts moved to `help.mjs`, which a controlled suite can import, because `extension.mjs` calls `joinSession` at the top level and nothing cheap could ever read this text: three false user-facing strings had shipped in it. `smoke-help.mjs` checks it against the parsers' own exported flag lists, so an undocumented flag fails CI. `status` and a bare `/pr-review` are deliberately unchanged. | O2; user-scheduled 2026-09-16; no scope clause |
+| H2 | Completed | `/pr-review help` answers the question people actually open with, in 35 lines: the five modes, the options grouped by the decision each one makes, and the lifecycle commands. The 155 lines it used to print keep every word behind `help --all`, minus a first line that called this plugin a runtime feasibility prototype; a mistyped flag now appends the orientation rather than the reference. Both texts moved to `help.mjs`, which a controlled suite can import, because `extension.mjs` calls `joinSession` at the top level and nothing cheap could ever read this text: three false user-facing strings had shipped in it. `smoke-help.mjs` checks it against the parsers' own exported flag lists, so an undocumented flag fails CI. `status` and a bare `/pr-review` are deliberately unchanged. Pull request #59, one plugin review on the branch install: balanced, 119.146906 credits, INCOMPLETE, 0 validated and no candidate raised at all; its only signal, that the dispatch was not shown end to end, was closed by a zero-inference `smoke-runtime.mjs --targets --startup` run against a verified-identical install. | O2; user-scheduled 2026-09-16; no scope clause |
 
 ## Every completed increment, `F1` through `O2`, is archived
 
@@ -173,12 +173,36 @@ decision in this session, one at a time and cheapest first, as `T1`, `X1`, `W1`,
   mutations, the stale prototype line and an orientation grown past its budget,
   were killed by the first version.
 - `smoke-runtime.mjs` kept only what a real runtime can show, that the dispatch
-  reaches the right text, and its flag assertions moved to `help --all`. **It
-  was not run here**: it needs `COPILOT_SDK_PATH`, `COPILOT_CLI_PATH` and an
-  installed plugin, and runs in neither CI nor the validation loop. Every
-  `[args, expected]` row was instead extracted from its source and checked
-  against what `helpTextFor` returns: 11 help rows, 6 status rows, all 6
-  spellings, and the 3 new rejected spellings.
+  reaches the right text, and its flag assertions moved to `help --all`. Before
+  running it, every `[args, expected]` row was extracted from its source and
+  checked against what `helpTextFor` returns: 11 help rows, 6 status rows, all
+  6 spellings, and the 3 new rejected spellings.
+- **The dispatch is demonstrated end to end.** `smoke-runtime.mjs --targets
+  --startup`, against a direct install `diff -rq` showed identical to this
+  checkout, reported `Running: plugin:copilot-pr-review:pr-review` and 94 PASS
+  lines at exit 0: `help`, `--help`, `help --all`, `help all`, `--help --all`,
+  `help  --all` with two spaces, and the rejections of `help me`,
+  `help --all extra` and `help --nope`. It spent nothing and says so itself,
+  **PASS no model turns, subagents, or tool executions**, which is why the user
+  authorized it. It is still in neither CI nor the validation loop.
+
+### The installed-plugin review
+
+Pull request #59, reviewed once at the standing authorization and with the
+user's agreement to swap installs, on a direct install `diff -rq` showed
+identical to the checkout: balanced, 119.146906 credits over 12 requests,
+137.6 s of model work in 5 passes, 57.8 s elapsed. INCOMPLETE, 0 validated
+findings, 0 execution failures, 0 discarded candidates, and **no reviewer
+raised a single candidate**.
+
+Its one signal was unanimous, and was about evidence rather than about code: 3
+coverage gaps (correctness, contracts, overview) and 2 informational caveats
+(security, performance-resources) all said that no installed-plugin execution
+of the new help dispatcher was in the captured evidence. They were reading back
+the limitation this file recorded. **That gap is now closed** by the probe
+above, which the user authorized once its cost was shown to be zero. Nothing
+was published; publication was not-attempted. The marketplace install was
+restored, identical to `git archive v0.1.0`.
 
 ### The exact next step
 

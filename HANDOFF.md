@@ -9,118 +9,139 @@ assume.
 
 ## Where things stand
 
-`O2` is built on branch `o2/quieter-quiet`, pull request #58, in three commits:
-`03d8e89` the behaviour, `3bf1831` the documentation, `007b6bb` the fix its own
-review found. Under `--quiet` only, the static configuration policy became one
-line naming the sources this run read, reviewers are grouped by identical model,
-effort and window, a captured target says the review is starting instead of the
-capture-only sentence, and a flag- or config-authorized run says what it will
-publish instead of printing the payload. A verbose run is unchanged.
-`ROADMAP.md`'s `O2` entry has the evidence. **Check whether #58 has merged**
-(`gh pr list --state all --head o2/quieter-quiet`). If it has not, stop and ask
-the user. Open pull requests #1 and #2 remain the synthetic "do not merge"
+`H2` is built on branch `h2/help-orientation`, pull request #59, in eight
+commits: `06548ae` moves the help text into an importable module, `c6095e0`
+exports the parsers' flag lists, `86241c6` the behaviour, `e8baa84` the runtime
+probe, `b7008be` CI, `5130629` the README, `4c2d43e` the roadmap, and the
+records commit.
+
+`/pr-review help` answers in 35 lines: the five modes, the options grouped by
+the decision each one makes, and the lifecycle commands. The 155 lines it used
+to print are behind `/pr-review help --all`, verbatim except a first line that
+called this plugin a runtime feasibility prototype. A mistyped flag appends the
+orientation, not the reference. `status` and a bare `/pr-review` are unchanged.
+`ROADMAP.md`'s `H2` entry has the evidence. **Check whether #59 has merged**
+(`gh pr list --state all --head h2/help-orientation`). If it has not, stop and
+ask the user. Open pull requests #1 and #2 remain the synthetic "do not merge"
 playgrounds; leave them alone.
 
-#58 was reviewed once, at the standing authorization and with the user's
+#59 was reviewed once, at the standing authorization and with the user's
 agreement to swap installs, on a direct install `diff -rq` showed identical to
-the checkout: 193.076478 credits, 29 requests, 167.6 s, INCOMPLETE, 0 validated.
-**Its one real finding was accepted by the adjudicator and then lost by it**: a
-fallback configured identical to its tier's own assignment is dropped by
-`reviewerAssignments`, so a quiet run said `Fallbacks: none.` while the tier
-block reporting it as `NOT OFFERED` is exactly what quiet leaves out. The
-adjudicator's own citation quoted 10 lines for a 9-line range, so the candidate
-was discarded as `invalid adjudication`. It was right; `007b6bb` fixes it, test
-first. `security:1` (quiet omits `autoPostReviews`) was rejected as not
-established: posting authority is stated at the proposal. The marketplace
-install was restored, identical to `git archive v0.1.0`. Nothing was posted.
+the checkout: balanced, 119.146906 credits, 12 requests, 137.6 s of model work,
+57.8 s elapsed, INCOMPLETE, 0 validated. **No reviewer raised a single
+candidate.** Its only signal was unanimous and about evidence, not code: 3
+coverage gaps and 2 caveats all said no installed-plugin execution of the new
+dispatcher was in the captured evidence, reading back the limitation the
+roadmap recorded. The user then authorized the probe that closes it, once its
+cost was shown to be zero: `smoke-runtime.mjs --targets --startup` gave 94 PASS
+lines at exit 0 against a verified-identical install, covering all six help
+spellings including `help  --all`, and asserting **no model turns, subagents,
+or tool executions**. The marketplace install was restored, identical to
+`git archive v0.1.0`. Nothing was posted.
 
-## This session's task: the help orientation, and nothing after it
+## This session's task: nothing is scheduled
 
-**Scheduled by the user on 2026-09-16, and the only thing scheduled.** They want
-the plugin easy to start using. Today they open by asking an agent "I want to use
-the /pr-review plugin to review this PR, what options do I have?", and the agent
-reads the installed plugin and answers with a modes table, the useful controls
-grouped by purpose, and the lifecycle commands. That answer is what
-`/pr-review help` should give.
+**`H2` was the only thing the user scheduled on 2026-09-16, and it is done.**
+The backlog is empty. **Ask the user what to work on; do not pick it yourself.**
 
-**Demonstrated, not assumed**: `/pr-review help` already exists. `extension.mjs`
-has `case "help"` and a `help` constant spanning lines 18-172, about 155 lines,
-opening "Copilot PR Review - runtime feasibility prototype". It is exhaustive
-reference prose, not an orientation. So this is not a new command.
+`ROADMAP.md`'s "Recorded, not scheduled" items are candidates, not a queue:
 
-**The scope decision is the user's, taken in the session that builds it**, as
-`T1`, `X1`, `W1`, `H1` and `K1` each took theirs. Put the choices to them one at
-a time, cheapest first, with a recommendation: what the short help says and in
-what order; whether the long-form text moves behind something else, moves to
-`README.md`, or stays; whether `status` changes too; and whether the stale
-"runtime feasibility prototype" line simply goes. Do not assume any of it from
-this file. Agree the acceptance criteria before building, then test first; one
-plugin review of the pull request; record it.
-
-**After it nothing is scheduled**: record that and ask the user; do not pick the
-next work yourself.
+- **A bare `/pr-review` and `/pr-review status` print a 57-line essay**, and
+  `case ""` falls through to `status`, so that essay is the true first thing
+  anybody sees. The user scoped it out of `H2` to keep the increment reviewable.
+  Splitting `case ""` from `case "status"` is one line; giving `status` the
+  orientation treatment is larger, and would rewrite the prose
+  `smoke-runtime.mjs` pins in status/help pairs.
+- **The posting flags are read as literals** at their `seen.has()` sites.
+  `postingFlags` covers the membership checks, but `seen.has("--commnt")` would
+  silently never match. Naming the three constants would close it.
+- Unchanged and untouched by `H2`: `Q9`'s adjudication-citation item, and `P7`'s
+  item about model prose holding `<!--` or `</sub>`.
 
 ### Caveats that are easy to miss
 
-- **Sizes**: `README.md` is at 65489 bytes, 47 spare against the 65536-byte cap,
-  so any README wording must replace text rather than add it. `ROADMAP.md` is at
-  63884 after `O2` moved `Q9`'s entry and `G1`'s reference list to the archive
-  verbatim; archive before writing if the next entry does not fit, and never
-  condense archived history. **Measure both with `wc -c` before every commit.**
-  `O2` put each of them over the cap once, and `collectInstructionFiles` then
-  skips the file silently: that is what the CI invariant catches.
-- **The help text is shipped user-facing text.** Changing it is a behaviour
-  change, so it needs the installed-plugin review, and `F1`'s archived entry
-  records that the status/help entry point is code-owned.
+- **Sizes**: `README.md` is at 65527 bytes, **9 spare** against the 65536-byte
+  cap. That is the tightest it has been: almost any README wording must now
+  replace text of the same length. `H2` fitted its command-reference change by
+  naming both `help` spellings in one row rather than two, 39 bytes instead of
+  78, so that no documentation was cut to buy space. `ROADMAP.md` is at 64900,
+  **636 spare**, even after `H2` moved `O2`'s 7187-byte section to the archive
+  verbatim: this increment's own record took back most of what that freed.
+  Archive before writing if the next entry does not fit, and never condense
+  archived history. **Measure both with `wc -c` before every commit.**
+  `collectInstructionFiles` skips an oversized file silently; that is what the
+  CI invariant catches.
+- **An increment's section contains `### The exact next step`**, so archiving
+  the previous increment's section moves that subsection too. The live
+  increment section supplies the new one.
+- **Both help texts live only in `help.mjs`**, and `extension.mjs` does nothing
+  but call `helpTextFor`. Keep it that way: `extension.mjs` calls `joinSession`
+  at the top level, so anything defined there cannot be read by a controlled
+  suite, which is how three false user-facing strings shipped.
+- **`smoke-help.mjs` imports the parsers' own exported lists** (`modeFlags`,
+  `postingFlags`, `settingKeys`, `supportedTargetFlags` and the six flag
+  constants), so an undocumented flag fails CI. Its `orientationOmits` set
+  excuses only aliases and is itself checked against the parsers. Do not
+  replace those imports with a retyped list: an early version of this suite
+  could not detect a control missing from the orientation, and only a mutation
+  check caught it.
+- **`supportedTargetFlags` is deliberately not named `targetFlags`**:
+  `parseReviewArgs` has a local of that name for the tokens it forwards, and an
+  import would shadow it silently.
 - **`dogfood-review.mjs` refuses `--quiet`**, so the standing review can never
-  show `O2`'s own output. The live quiet timeline is still not demonstrated; the
-  controlled suites are the only evidence for what a quiet run prints. Ask
-  before spending on any separate run.
+  show a quiet run's output. Still not demonstrated live.
 - **The review runs the installed plugin, and `dogfood-review.mjs` only checks
   that some copy is running.** With the user's agreement: `copilot plugin
-  uninstall copilot-pr-review`, `copilot plugin install "$(pwd)"`, then `diff -rq
-  --exclude=.git ~/.copilot/installed-plugins/_direct/pr-review .` must print
-  nothing. Afterwards `copilot plugin uninstall copilot-pr-review` and `copilot
-  plugin install copilot-pr-review@xpepper-copilot-plugins`, and compare with
-  `git archive v0.1.0`. Do not edit repository files while the review runs. The
-  runner needs `COPILOT_CLI_PATH="$(command -v copilot)"` and
+  uninstall copilot-pr-review`, `copilot plugin install "$(pwd)"`, then `diff
+  -rq --exclude=.git ~/.copilot/installed-plugins/_direct/pr-review .` must
+  print nothing. Afterwards `copilot plugin uninstall copilot-pr-review` and
+  `copilot plugin install copilot-pr-review@xpepper-copilot-plugins`, and
+  compare with `git archive v0.1.0`. Do not edit repository files while the
+  review runs. The runner needs `COPILOT_CLI_PATH="$(command -v copilot)"` and
   `COPILOT_SDK_PATH="$HOME/.copilot/pkg/<platform>/<version>/copilot-sdk"`.
-- **Recorded, not scheduled** by `O2`: `Q9` drops a reviewer's failing supporting
-  citation rather than the candidate, but an *adjudication's* own citation has no
-  such treatment, so one miscounted range discards a candidate the adjudicator
-  had already accepted. Do not fix it inside the help increment.
-- **Recorded, not scheduled** by `P7`: model prose holding `<!--` or `</sub>` can
-  hide or unwrap the rest of an inline comment.
+- **`smoke-runtime.mjs --targets --startup` spends nothing** and proves it, so
+  an increment that changes dispatch can demonstrate itself on the installed
+  plugin without credits. Every inference-spending path in that file is behind
+  an explicit flag. Ask before any run that is not one of these.
 - **Import cycles**: `preview.mjs` must not import `prior.mjs` or
   `incremental.mjs`.
 - **Releasing follows `docs/release.md`**; every tag, release and index change
   needs the user's authorization in that session.
 - In zsh, a bare `====` argument is expanded and aborts a chained command, an
   unquoted `--include=*.mjs` glob aborts `grep`, and `$PIPESTATUS` is
-  `$pipestatus`; quote globs and check exit codes directly. A guard regex that
-  must match a heading like ``### `G1`'s references`` needs the apostrophe too.
+  `$pipestatus`; quote globs and check exit codes directly. On macOS `cat -A`
+  does not exist and `sed -i` needs an argument, so prefer `perl -pi -e` or a
+  temporary file, and the builtin `echo` interprets `\n`, so build file content
+  with quoted heredocs. A guard regex that must match a heading like
+  ``### `G1`'s references`` needs the apostrophe too.
 
 ## Validation
 
 ```sh
 for s in findings review selection retention preview publication publish-later \
   checkout config context fixture target safeguards prior incremental revalidation \
-  cost benchmark; do node scripts/smoke-$s.mjs; done
+  cost benchmark help; do node scripts/smoke-$s.mjs; done
 ```
 
-Also run `git diff --check`, the tracked-control-byte check CI runs, and
-`collectInstructionFiles`, which must read all six root files and skip none.
-Build control characters with `String.fromCharCode` rather than typing an escape.
+Nineteen suites; `help` is the newest, and CI runs it. Also run `git diff
+--check`, the tracked-control-byte check CI runs, and `collectInstructionFiles`,
+which must read all six root files and skip none. Build control characters with
+`String.fromCharCode` rather than typing an escape.
+
+`scripts/smoke-runtime.mjs` is **not** in that loop: it needs
+`COPILOT_SDK_PATH`, `COPILOT_CLI_PATH` and an installed plugin. Run it when the
+increment changes dispatch or shipped text, and see the caveat above for the
+invocation that costs nothing.
 
 ## Runtime and settled constraints
 
-CLI **1.0.85** was the runtime `O2`'s review actually ran on; the roadmap's older
-entries record 1.0.83. Every increment lands on a branch and a pull request,
-never `main`; never amend published history or force-push. Findings stay local.
-Do not add review timeouts, weaken the shell gate, use `fs.realpathSync` in
-`read-only.mjs`, change `F6`'s marker unwrap, or treat a compaction event as a
-retry or stop condition. `K1`'s reception is information only. GitHub
-review-thread ids are matched by `fullDatabaseId` as strings.
+CLI **1.0.85** was the runtime `H2`'s review and probe ran on; the roadmap's
+older entries record 1.0.83. Every increment lands on a branch and a pull
+request, never `main`; never amend published history or force-push. Findings
+stay local. Do not add review timeouts, weaken the shell gate, use
+`fs.realpathSync` in `read-only.mjs`, change `F6`'s marker unwrap, or treat a
+compaction event as a retry or stop condition. `K1`'s reception is information
+only. GitHub review-thread ids are matched by `fullDatabaseId` as strings.
 
 Before ending, update `ROADMAP.md` with evidence and the exact next step, then
 replace this file as the final repository edit, commit both on your branch, push,
