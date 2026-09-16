@@ -12,13 +12,18 @@ import { collectPriorReview, describePrior, priorSummary } from "./prior.mjs";
 
 const execute = promisify(execFile);
 const shaPattern = /^[0-9a-f]{40}$/;
+// H2: the flags target capture accepts, hoisted out of the parser so the help
+// text can be checked against them. Deliberately not named `targetFlags`:
+// `parseReviewArgs` has a local of that name for the tokens it forwards here,
+// and an import would shadow it silently.
+export const supportedTargetFlags = ["--include-drafts", "--include-closed", "--review-closed"];
 
 export function parseTargetArgs(args) {
   const [number, ...flags] = args.trim().split(/\s+/);
   if (!/^[1-9]\d*$/.test(number) || !Number.isSafeInteger(Number(number))) {
     throw new Error("PR number must be a positive safe integer.");
   }
-  const supported = new Set(["--include-drafts", "--include-closed", "--review-closed"]);
+  const supported = new Set(supportedTargetFlags);
   if (flags.some((flag) => !supported.has(flag)) || new Set(flags).size !== flags.length) {
     throw new Error("Unsupported arguments. No review was started. Target capture accepts only --include-drafts, --include-closed, or --review-closed.");
   }

@@ -962,7 +962,6 @@ attributed to, and what a safeguard deliberately cannot do. It sits under
 `docs/` because this README has to stay under the 65536 bytes this tool's own
 discovery reads, and discovery does not recurse into a subdirectory.
 
-
 ## Command reference
 
 ### `/pr-review`
@@ -970,7 +969,7 @@ discovery reads, and discovery does not recurse into a subdirectory.
 | Invocation | Effect |
 | --- | --- |
 | `/pr-review` or `/pr-review status` | Capability summary. No models, no background work |
-| `/pr-review help` | Usage information |
+| `/pr-review help` | Modes, options, commands; `--all` for the full reference |
 | `/pr-review models` | Subscription models and their supported reasoning efforts |
 | `/pr-review NUMBER [flags]` | Capture, bind, review. Spends credits |
 | `/pr-review NUMBER --capture-only` | Capture and bind, then stop |

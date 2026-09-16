@@ -33,7 +33,10 @@ import {
   discoveryEnvelope, discoveryInstructions, discoveryPrompt, executeSafeguards, judgeCommands,
 } from "./safeguards.mjs";
 
-const settingKeys = ["heavyModel", "heavyEffort"];
+// H2: exported so `smoke-help.mjs` checks the help text against the parser's
+// own list rather than against a list retyped beside it, which would agree
+// with the documentation by construction and catch nothing.
+export const settingKeys = ["heavyModel", "heavyEffort"];
 // O1: the one verbosity control. It asks for less output and authorizes
 // nothing, which is why it is a flag and deliberately not a configuration key:
 // there is no saved state to make a run quieter than the person running it
@@ -54,6 +57,11 @@ export const unattendedFlag = "--unattended";
 // It asks every model pass the run starts for its model's long-context window,
 // and a model that lists none keeps its own window rather than refusing the run.
 export const longContextFlag = "--long-context";
+// The three flags that decide what a run may publish and what it selects. They
+// are listed once and read by both membership checks below, so the accepted set
+// and the documented set cannot drift apart. Unlike the flags above, each is
+// also read on its own for what it means, not merely for being present.
+export const postingFlags = ["--comment", "--no-comment", "--all"];
 
 export function parseReviewArgs(args) {
   const [number, ...tokens] = args.trim().split(/\s+/);
@@ -64,7 +72,7 @@ export function parseReviewArgs(args) {
     if (seen.has(token)) throw new Error(`Duplicate review argument: ${token}`);
     seen.add(token);
     if ([...modeFlags, captureOnlyFlag, verifyFlag, quietFlag, unattendedFlag, incrementalFlag,
-      revalidateFlag, longContextFlag, noStandardsFlag, "--comment", "--no-comment", "--all"].includes(token)) continue;
+      revalidateFlag, longContextFlag, noStandardsFlag, ...postingFlags].includes(token)) continue;
     if (token.includes("=")) {
       const [key, value, extra] = token.split("=");
       if (!settingKeys.includes(key) || !value || extra !== undefined || key in settings) {
@@ -85,7 +93,7 @@ export function parseReviewArgs(args) {
   // it takes no mode, posting, selection or model argument of its own.
   if (seen.has(captureOnlyFlag)) {
     const conflicting = [...chosen,
-      ...["--comment", "--no-comment", "--all", verifyFlag, quietFlag, unattendedFlag, incrementalFlag,
+      ...[...postingFlags, verifyFlag, quietFlag, unattendedFlag, incrementalFlag,
         revalidateFlag, longContextFlag, noStandardsFlag].filter((flag) => seen.has(flag)),
       ...Object.keys(settings)];
     if (conflicting.length) {

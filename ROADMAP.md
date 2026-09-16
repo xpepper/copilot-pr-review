@@ -22,8 +22,10 @@ immediately after `B1`. **`T1`, `B1`, `X1`, `W1`, `N1`, `H1` and `K1` are
 complete and archived.** On 2026-09-14, outside that backlog, the user
 scheduled `S1`, now complete and archived. On 2026-09-15 the user scheduled five
 more from the first review published on somebody else's pull request: `Q8`,
-`P6`, `P7`, `Q9` and `O2`, in that order; **all five are complete, and nothing is
-scheduled after `O2`.**
+`P6`, `P7`, `Q9` and `O2`, in that order; **all five are complete.** On
+2026-09-16 the user scheduled one thing, `H2`, so that the plugin is easy to
+start using through its own help; **it is complete, and nothing is scheduled
+after it.**
 The closing section records what was decided, and what stays open as a
 limitation rather than as work.
 
@@ -97,10 +99,11 @@ posting them.
 | P7 | Completed | Each inline comment leads with the problem and a prominent fix, keeps every field, and footers introduction, confidence and reporter; `I1c` parses old and new templates byte for byte, and a proposal retained before `P7` still loads. Pull request #56, one plugin review on the branch install. | P6; [Publication](SCOPE.md#selection-publication-and-cached-results) |
 | Q9 | Completed | With an exact location citation, a failing supporting citation is dropped instead of the candidate, reported as a caveat the adjudicator reads; the location and an `H1` rule citation never are. Pull request #57, one plugin review on the branch install. | Q8; [Modes/findings](SCOPE.md#review-modes-and-findings) |
 | O2 | Completed | `--quiet` replaces the static configuration policy with one line naming the sources this run read, groups reviewers by identical model, effort and window, says a captured target's review is starting, and says what an authorized run will publish instead of printing its payload JSON; every model, effort, window, fallback, coverage and publication line stays. Pull request #58, one plugin review on the branch install: 193.076478 credits, INCOMPLETE, 0 validated, one real finding fixed here. The standing review cannot print quiet output, because `dogfood-review.mjs` refuses the flag. | Q9; [Models/execution](SCOPE.md#models-configuration-and-execution) |
+| H2 | Completed | `/pr-review help` answers the question people actually open with, in 35 lines: the five modes, the options grouped by the decision each one makes, and the lifecycle commands. The 155 lines it used to print keep every word behind `help --all`, minus a first line that called this plugin a runtime feasibility prototype; a mistyped flag now appends the orientation rather than the reference. Both texts moved to `help.mjs`, which a controlled suite can import, because `extension.mjs` calls `joinSession` at the top level and nothing cheap could ever read this text: three false user-facing strings had shipped in it. `smoke-help.mjs` checks it against the parsers' own exported flag lists, so an undocumented flag fails CI. `status` and a bare `/pr-review` are deliberately unchanged. Pull request #59, one plugin review on the branch install: balanced, 119.146906 credits, INCOMPLETE, 0 validated and no candidate raised at all; its only signal, that the dispatch was not shown end to end, was closed by a zero-inference `smoke-runtime.mjs --targets --startup` run against a verified-identical install. | O2; user-scheduled 2026-09-16; no scope clause |
 
-## Every completed increment, `F1` through `Q9`, is archived
+## Every completed increment, `F1` through `O2`, is archived
 
-Every completed increment entry, `F1` through `Q9`, and the working record kept
+Every completed increment entry, `F1` through `O2`, and the working record kept
 between them are in
 [docs/roadmap-archive-2026-09-10.md](docs/roadmap-archive-2026-09-10.md),
 verbatim, as the evidence of record. Read it for the evidence behind an older
@@ -109,135 +112,115 @@ section's own record of the seventeen earlier moves there too**, verbatim, as
 that file's last section, because 870 bytes were spare here and no live entry
 was left to archive; the user chose that move on 2026-09-15. **`P6` moved
 `Q8`'s 4105 bytes** verbatim, just before that section, because `P6`'s entry did
-not fit beside it; **`P7` moved `P6`'s 4273 bytes**, **`Q9` moved `P7`'s 3510**
-and **`O2` moved `Q9`'s 4220** the same way. **`O2` also moved `G1`'s 2685-byte
-reference list** there, verbatim and just before that last section, when its own
+not fit beside it; **`P7` moved `P6`'s 4273 bytes**, **`Q9` moved `P7`'s 3510**,
+**`O2` moved `Q9`'s 4220** and **`H2` moved `O2`'s 7187** the same way. **`O2`
+also moved `G1`'s 2685-byte reference list** there, verbatim and just before
+that last section, when its own
 review record left this file 1033 bytes over the cap and this project's own
 discovery stopped reading it. The rule stands:
 keep the most recent entries live, archive the rest verbatim, and measure this
 file with `wc -c` against the 65536-byte cap before opening a pull request.
 [docs/upstream-licensing.md](docs/upstream-licensing.md) did not move.
 
-## `O2`: a quieter `--quiet`, complete
+## `H2`: a help that orients, complete
 
-**Built on `o2/quieter-quiet`, pull request #58**, after #57 merged; the decision
-and its worked example of #65's opening are in
-[docs/published-review-feedback-plan.md](docs/published-review-feedback-plan.md).
+**Built on `h2/help-orientation`**, after #58 merged. The user took every scope
+decision in this session, one at a time and cheapest first, as `T1`, `X1`, `W1`,
+`H1`, `K1` and `O2` each took theirs.
+
+### What was decided
+
+1. The orientation is a modes table, then the options grouped by purpose, then
+   the lifecycle commands: the shape an agent already answers this question in.
+2. The 155-line reference keeps every word, behind `/pr-review help --all`. Not
+   in `README.md`, which has 47 spare bytes, and not left on `help`.
+3. `status` and a bare `/pr-review` are unchanged, and recorded below as the
+   next candidate rather than widened into here.
+4. A mistyped flag appends the orientation, not the reference: the error was a
+   155-line wall for one wrong character.
+5. The reference's first line drops "runtime feasibility prototype". It is the
+   one deviation from moving those lines verbatim, and it was false: this ships
+   from a marketplace listing at a tagged release.
+6. `smoke-help.mjs` imports the parsers' own flag lists rather than retyping
+   them, so the check cannot agree with the documentation by construction.
 
 ### What was built
 
-Under `--quiet` only. A verbose run is unchanged, and so is everything that
-keeps a result honest at either verbosity.
-
-- `describeConfiguration` takes `quiet` and returns one line: the personal store
-  and whether it exists yet, what this run read from the project layer, and
-  `/pr-review-config show` for the precedence, inheritance, fallback and trust
-  policy that reads the same on every run. An ignored project file is named
-  rather than left to read as "nothing found", and a trusted one says how many
-  settings were applied.
-- `describeAssignments` takes `quiet` and names together the reviewers that
-  resolved the same model, effort and window. Every model, effort, window and
-  fallback stays visible; only the per-part origin tags go, and those are
-  precedence, which is what the one configuration line points at.
-- A captured target says `captured at <head>, N changed file(s). Review
-  starting.` The capture-only sentence belongs to `--capture-only`, which
-  refuses `--quiet`; it is false of a run whose reviewers start next, and it
-  carried a doubled period because the disposition's own reason ends in one. A
-  skipped, refused or unconfirmed target is unchanged and still says plainly
-  that no review was performed.
-- A flag- or config-authorized run prints `Publishing N inline comment(s) to
-  #N…` in place of the payload JSON. A confirmation-required run still prints
-  the payload, because the payload is what is being approved. `--no-comment` is
-  deliberately unchanged: the plan did not reopen it.
-- `extension.mjs` passes `options.quiet` to the first two.
-
-The worked example's opening goes from about thirty lines to six.
+- `extensions/pr-review/help.mjs` holds `helpOrientation`, `helpReference` and
+  `helpTextFor`. The 153 reference lines moved byte for byte, verified by md5
+  against the pre-edit file; only the first line changed afterwards.
+- `helpTextFor` decides which text an invocation asks for, and is the whole of
+  the dispatch. It normalises whitespace, so `help  --all` is answered rather
+  than refused as an unsupported argument, and returns undefined for everything
+  else, so `help me` stays an error instead of quietly succeeding.
+- `settingKeys` and `postingFlags` (`review.mjs`) and `supportedTargetFlags`
+  (`target.mjs`) are exported and consumed by the parsers' own membership
+  checks, so the accepted set and the documented set cannot drift. The export is
+  not named `targetFlags`: `parseReviewArgs` has a local of that name that an
+  import would shadow silently.
 
 ### Evidence
 
-- **Test first**: `smoke-config` failed on a 27-line quiet report, `smoke-preview`
-  on the payload printed where the publishing line belongs, and `smoke-review` on
-  the verbose assignment block and on the capture line. Each was seen to fail for
-  that reason before the code existed.
-- Two of my own mistakes were caught by those tests rather than by a reviewer:
-  the capture trailer was appended outside the ternary, so the new line carried
-  "No PR review performed" as well, and a suppressed-run assertion compared two
-  harnesses whose generated ids differ.
-- Pinned: the one-line report for an unsaved store, an ignored project file and
-  a trusted one; grouping across five reviewers, a long-context window, a model
-  with no configurable effort, and a fallback whose model lists no long-context
-  window; the quiet capture line; the publishing line for both authorized
-  statuses; the payload kept for confirmation-required and for `--no-comment`.
-- **Verbose is unchanged**, and is asserted so: the existing verbose assertions
-  in `smoke-config`, `smoke-review`, `smoke-target` and `smoke-preview` pass
-  untouched.
-- All eighteen suites, `git diff --check`, the control-byte check and
-  `collectInstructionFiles` (six read, none skipped) pass.
-- **`README.md` went 99 bytes over the 65536-byte cap** when the two new table
-  rows were added, which would have silently stopped this project's own
-  discovery reading it. It was measured, cut back under by consolidating two
-  rows and tightening prose, and measured again.
+- `scripts/smoke-help.mjs`, written first and seen to fail twice for the right
+  reason, is CI's nineteenth controlled suite. It checks all 19 accepted flags
+  and both settings against the reference, every mode and control against the
+  orientation, a 40-line budget, the six accepted spellings, and that neither
+  text claims to be a prototype.
+- **Mutation-checked, and the first version had a real gap**: deleting `--quiet`
+  from the orientation survived, because only mode and posting flags were pinned
+  there. An explicit `orientationOmits` set, itself checked against the parsers,
+  now requires every other accepted flag; the same mutation is killed. Two other
+  mutations, the stale prototype line and an orientation grown past its budget,
+  were killed by the first version.
+- `smoke-runtime.mjs` kept only what a real runtime can show, that the dispatch
+  reaches the right text, and its flag assertions moved to `help --all`. Before
+  running it, every `[args, expected]` row was extracted from its source and
+  checked against what `helpTextFor` returns: 11 help rows, 6 status rows, all
+  6 spellings, and the 3 new rejected spellings.
+- **The dispatch is demonstrated end to end.** `smoke-runtime.mjs --targets
+  --startup`, against a direct install `diff -rq` showed identical to this
+  checkout, reported `Running: plugin:copilot-pr-review:pr-review` and 94 PASS
+  lines at exit 0: `help`, `--help`, `help --all`, `help all`, `--help --all`,
+  `help  --all` with two spaces, and the rejections of `help me`,
+  `help --all extra` and `help --nope`. It spent nothing and says so itself,
+  **PASS no model turns, subagents, or tool executions**, which is why the user
+  authorized it. It is still in neither CI nor the validation loop.
 
 ### The installed-plugin review
 
-One run, at the standing authorization and with the user's agreement to swap
-installs: the checkout replaced the marketplace copy, `diff -rq --exclude=.git`
-printed nothing, and it ran at `3bf1831`. Balanced, `gpt-5.6-terra` high for the
-four specialists and the adjudicator, `gpt-5.6-luna` high for overview, default
-window, no fallbacks. 11 changed files, 43001 diff bytes. **193.076478 credits,
-29 requests, 343.7 s of model work, 167.6 s elapsed.** INCOMPLETE, 0 validated:
-1 execution failure, 0 discarded candidates, 3 coverage gaps, 3 caveats. Two
-candidates reached adjudication; neither survived it.
+Pull request #59, reviewed once at the standing authorization and with the
+user's agreement to swap installs, on a direct install `diff -rq` showed
+identical to the checkout: balanced, 119.146906 credits over 12 requests,
+137.6 s of model work in 5 passes, 57.8 s elapsed. INCOMPLETE, 0 validated
+findings, 0 execution failures, 0 discarded candidates, and **no reviewer
+raised a single candidate**.
 
-- **The one real finding was accepted and then lost by the adjudicator itself.**
-  `correctness:1` said a fallback configured identical to its tier's own
-  assignment is dropped by `reviewerAssignments`, so the quiet assignment line
-  says `Fallbacks: none.` while the tier block that reports it as `NOT OFFERED`
-  is exactly what a quiet run leaves out: the configured fallback vanished
-  altogether, against `O2`'s own rule. The adjudicator accepted it, but its own
-  citation quoted 10 lines for a 9-line range of `review.mjs`, so the candidate
-  was discarded as `invalid adjudication` and never became a finding. **It was
-  right, and it is fixed here**: the quiet configuration line now names each
-  tier whose configured fallback is not offered, with a test written first.
-- **Recorded, not scheduled**: `Q9` drops a reviewer's failing supporting
-  citation rather than the candidate; an *adjudication's* own citation has no
-  such treatment, so one miscounted range discards a judged candidate. Do not
-  widen `O2` for it.
-- `security:1` said the quiet line should show `autoPostReviews` and its origin
-  before reviewers start. Rejected by the adjudicator and by me: posting
-  authority is stated at the proposal, before any write, and the plan's worked
-  example settled what that line carries.
-- The 3 coverage gaps and 3 caveats all say the same true thing:
-  **`scripts/dogfood-review.mjs` refuses `--quiet`**, so this run printed the
-  verbose timeline and **the live quiet timeline is not demonstrated**. The
-  controlled suites are the only evidence for what a quiet run prints. Anything
-  more costs a separate authorized run and is the user's decision.
-- `README.md` (65489) and `ROADMAP.md` (64229) do not fit the 49152-byte
-  standards budget and were skipped; `AGENTS.md`, `CLAUDE.md`, `HANDOFF.md` and
-  `SCOPE.md` reached the overview reviewer.
-
-The marketplace install was restored, identical to `git archive v0.1.0`.
-Nothing was published.
+Its one signal was unanimous, and was about evidence rather than about code: 3
+coverage gaps (correctness, contracts, overview) and 2 informational caveats
+(security, performance-resources) all said that no installed-plugin execution
+of the new help dispatcher was in the captured evidence. They were reading back
+the limitation this file recorded. **That gap is now closed** by the probe
+above, which the user authorized once its cost was shown to be zero. Nothing
+was published; publication was not-attempted. The marketplace install was
+restored, identical to `git archive v0.1.0`.
 
 ### The exact next step
 
-**`O2` was the last of the five increments scheduled on 2026-09-15**, and the
-backlog is empty. Asked on 2026-09-16, the user scheduled one thing:
+**Nothing is scheduled.** `H2` was the only thing the user scheduled on
+2026-09-16, and the backlog is empty. **Ask the user; do not pick the next
+work.**
 
-**Make the plugin easy to start using, through its own help.** Today they open
-by asking an agent "I want to use the /pr-review plugin to review this PR, what
-options do I have?", and the agent reads the installed plugin and answers with a
-modes table, the useful controls grouped by purpose, and the lifecycle commands.
-That answer is what `/pr-review help` should give.
+Recorded, not scheduled, and noticed while building `H2`:
 
-**It is not a new command.** `/pr-review help` already exists: `extension.mjs`
-has `case "help"` and a `help` constant spanning lines 18-172, about 155 lines.
-It opens "Copilot PR Review - runtime feasibility prototype" and is exhaustive
-reference prose, so the work is to make it a short, task-oriented orientation,
-and to decide what the long-form text becomes. **The scope decision is the
-user's, taken in the session that builds it**, as `T1`, `X1`, `W1`, `H1` and
-`K1` each took theirs; do not assume it from this row. Nothing else is
-scheduled.
+- **A bare `/pr-review` and `/pr-review status` still print a 57-line essay**,
+  and `case ""` falls through to `status`, so that essay is the true first thing
+  anybody sees. The user scoped it out of `H2` deliberately, to keep the diff
+  to one reviewable increment. Splitting `case ""` from `case "status"` is one
+  line.
+- **The posting flags are still read as literals** at their `seen.has()` sites.
+  The exported list covers the membership checks, but `seen.has("--commnt")`
+  would silently never match. Naming the three constants would close it.
+- `Q9`'s and `P7`'s recorded items are unchanged and were not touched here.
 
 ## v1 is complete, and five more increments are scheduled on top of it
 
