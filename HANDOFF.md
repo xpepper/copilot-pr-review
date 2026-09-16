@@ -62,10 +62,20 @@ gate, but the stale instruction was fixed after the review. No second review is
 authorized. The marketplace install was restored and verified byte-for-byte
 against `git archive v0.1.0`.
 
+GitHub's controlled-suites job passed on the final review-evidence checkpoint.
+The separate `claude-review` workflow failed twice before making any model call:
+the action initialized, returned `is_error:true`, reported zero usage and no
+permission denial, and exposed no further diagnostic. The user confirmed their
+Claude five-hour credits were exhausted. Treat this as an external quota blocker,
+not as a completed review and not as evidence about the release change.
+
 ## Exact next step
 
-If #60 is not merged, stop and ask the user to merge it. Do not tag the branch
-commit: `docs/release.md` requires tagging the new squash commit on `main`.
+If #60 is not merged, first wait for the user's Claude five-hour quota to reset
+and obtain a fresh successful `claude-review` check. Do not treat either existing
+zero-usage failure as a flake to ignore. Once both required checks are green, ask
+the user to merge #60. Do not tag the branch commit: `docs/release.md` requires
+tagging the new squash commit on `main`.
 
 After #60 merges, ask for explicit authorization to:
 

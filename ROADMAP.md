@@ -173,10 +173,20 @@ gate and is fixed below anyway. No rerun is authorized or needed for that
 documentation correction. The marketplace `v0.1.0` install was restored and
 verified byte-for-byte against `git archive v0.1.0`.
 
+GitHub's controlled-suites job passed on the final review-evidence checkpoint.
+The separate `claude-review` workflow failed twice before making any model call:
+the action initialized, returned `is_error:true`, reported zero usage and no
+permission denial, and exposed no further diagnostic. The user confirmed their
+Claude five-hour credits were exhausted. This is an external quota blocker, not
+a passing review and not evidence about the change; #60 needs a fresh successful
+check after the quota resets before it is ready to merge.
+
 ### The exact next step
 
-Pull request #60 is open and has had its one authorized plugin review. The user
-merges it.
+Pull request #60 is open and has had its one authorized plugin review. Wait for
+the user's Claude five-hour quota to reset, then obtain a fresh successful
+`claude-review` check. Do not treat either zero-usage failure as a code review.
+Once both required checks are green, the user merges #60.
 
 After that merge, ask for the next authorization: run the full controlled set at
 the new squash commit on `main`, create an annotated `v0.2.0` tag like `v0.1.0`,
