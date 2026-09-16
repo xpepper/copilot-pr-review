@@ -501,6 +501,8 @@ function harness({
   failure, fallbackFailure, controller = new AbortController(), withCandidate = false, acceptCandidate = false,
   limitations = [], mode = reviewModes.quick, severity = "P2", candidateFrom = [0], clipQuotes = false,
   badAnchor = false, extraBadCandidate = false, proseFrom = [0], discovered = [], approve,
+  // Q9: a breaks quote with one extra leading space, which the boundary drops.
+  wrongBreaks = false,
   // H1: `{ index, rule }` puts a quoted project rule on that reviewer's candidate.
   ruleFrom,
   // B1: context-loss events a session emits as soon as its turn starts, keyed by
@@ -730,7 +732,7 @@ function harness({
               title: `Keep value at 1 (${mode.reviewers[i].label})`, severity, confidence: 0.9,
               location, before: cite("base"), after: cite("head"),
               // Unchanged code outside the only hunk: the shape Q5 exists for.
-              breaks: unchanged,
+              breaks: wrongBreaks ? { ...unchanged, quote: ` ${unchanged.quote}` } : unchanged,
               trigger: "Read value", expected: "1", actual: "2",
               introduction: "The constant changed", remediation: "Restore value to 1.", evidence: [cite("base")],
               ...(ruleFrom?.index === i ? { rule: ruleFrom.rule } : {}),
@@ -1247,6 +1249,22 @@ for (const mode of [quickMode, balancedMode, fullMode, deepMode]) {
   assert(report.validation.diagnostics.some((d) =>
     d.kind === "caveat" && /repaired clipped-end citation/.test(d.message)));
   assert(!h.messages.some((m) => /falling back once/.test(m)));
+}
+{
+  // Q9: a wrong supporting citation is dropped before adjudication. The
+  // adjudicator is told which one and why, and never receives the wrong quote.
+  const h = harness({ withCandidate: true, acceptCandidate: true, wrongBreaks: true, candidateFrom: [0] });
+  const report = await executeReviewRun(h.parent, h.client, options, withFallbackAssignments(), {
+    controller: h.controller, gh: fakeGh(), git: checkoutGit,
+  });
+  validateRecord(retainedRecord(report), h.parent.sessionId);
+  const input = JSON.parse(h.sessions.find((s) => s.validating).prompt.split("\n").at(-1));
+  assert.deepEqual(input.candidates.map(({ id, breaks }) => [id, breaks]), [["correctness:1", null]]);
+  const dropped = /^correctness:1: dropped supporting citation breaks: Citation quote does not match example\.js head line 2: /;
+  assert(input.candidateDiagnostics.some(({ kind, message }) => kind === "caveat" && dropped.test(message)));
+  assert.equal(report.complete, true, "A dropped citation does not make the review incomplete");
+  assert.equal(report.validation.findings.length, 1);
+  assert(h.messages.some((m) => /\nInformational caveat: correctness:1: dropped supporting citation breaks: /.test(m)));
 }
 {
   // The adjudicator holds the same contract, so its own discarded decisions are
