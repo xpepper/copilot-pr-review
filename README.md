@@ -16,7 +16,7 @@ This document is the user guide: what the commands do, what the output means,
 and how to reproduce each behaviour yourself.
 
 - [SCOPE.md](SCOPE.md) is the authoritative product specification.
-- [ROADMAP.md](ROADMAP.md) records what has been demonstrated, with evidence.
+- [ROADMAP.md](ROADMAP.md) is the forward plan; it links the evidence.
 - [AGENTS.md](AGENTS.md) is the workflow this repository is developed under.
 - [docs/safeguards.md](docs/safeguards.md) is the full `--verify` guide, which
   this one summarises.
@@ -24,8 +24,8 @@ and how to reproduce each behaviour yourself.
   request this tool has reviewed before, which this one also summarises.
 - [docs/gap-analysis.md](docs/gap-analysis.md) compares this tool with upstream
   and with the rest of the field, and proposes what is worth adopting. Six of
-  its twelve proposals are scheduled in [ROADMAP.md](ROADMAP.md), six are not,
-  and its own ranking and sequence did not survive that triage.
+  its twelve proposals were scheduled, six were not, and its own ranking and
+  sequence did not survive that triage.
 - [docs/readme-archive-2026-09-10.md](docs/readme-archive-2026-09-10.md) is the
   previous README, kept verbatim. Look there for a harness probe invocation this
   guide no longer prints, or for how a capability read when its increment landed.
@@ -1223,5 +1223,5 @@ Development happens on branches. Every increment lands through a pull request
 that is reviewed with this plugin before it merges, and `main` is protected by a
 repository ruleset that requires it with no bypass. That review is each
 increment's real integration test, and its outcome, cost and findings are
-recorded in [ROADMAP.md](ROADMAP.md). [AGENTS.md](AGENTS.md) records the
-workflow for humans and agents alike.
+recorded in [the archived roadmap](docs/roadmap-archive-2026-09-28.md).
+[AGENTS.md](AGENTS.md) records the workflow for humans and agents alike.
